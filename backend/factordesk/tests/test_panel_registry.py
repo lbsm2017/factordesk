@@ -25,6 +25,7 @@ ORDER = [
     ("lead_lag", 510),
     ("shrunk", 520),
     ("fragility", 530),
+    ("world_beta", 540),
     ("returns", 600),
     ("risk", 700),
     ("residual_alpha", 710),
@@ -40,6 +41,7 @@ SECTION_PANELS = {
     "lead_lag": ("lead-lag", "exposures"),
     "shrunk_betas": ("shrunk", "lead-lag"),
     "fragility": ("fragility", "shrunk"),
+    "world_beta": ("world-beta", "fragility"),
     "residual": ("residual", "risk"),
     "kalman_betas": ("kalman", "rolling"),
 }

@@ -104,6 +104,7 @@ from factordesk.section_hooks import lead_lag as lead_lag_hook
 from factordesk.section_hooks import load_section_inputs
 from factordesk.section_hooks import residual_alpha as residual_alpha_hook
 from factordesk.section_hooks import shrunk as shrunk_hook
+from factordesk.section_hooks import world_beta as world_beta_hook
 from factordesk.section_hooks.context import CoreSections, SectionContext, SectionInputs
 
 STALE_AFTER_DAYS = factor_data.STALE_AFTER_DAYS
@@ -839,12 +840,14 @@ def assemble_report(
     lead_lag = lead_lag_hook.build_lead_lag(ctx)
     shrunk_betas = shrunk_hook.build_shrunk_betas(ctx)
     fragility = fragility_hook.build_fragility(ctx)
+    world_beta = world_beta_hook.build_world_beta(ctx)
     residual = residual_alpha_hook.build_residual_analysis(ctx)
     kalman_betas = kalman_hook.build_kalman_betas(ctx)
     present: dict[str, object | None] = {
         "lead_lag": lead_lag,
         "shrunk_betas": shrunk_betas,
         "fragility": fragility,
+        "world_beta": world_beta,
         "residual": residual,
         "kalman_betas": kalman_betas,
     }
@@ -867,6 +870,7 @@ def assemble_report(
         lead_lag=lead_lag,
         shrunk_betas=shrunk_betas,
         fragility=fragility,
+        world_beta=world_beta,
         residual=residual,
         kalman_betas=kalman_betas,
     )
@@ -920,6 +924,7 @@ def build_report(
             now_utc,
             offline=factors is not None,
             factor_last_date=pd.Timestamp(factor_frame.index[-1]).date(),
+            price_provider=provider,
         )
     )
     return assemble_report(

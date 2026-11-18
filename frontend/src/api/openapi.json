@@ -910,6 +910,75 @@
         "title": "AverageBetaPanel",
         "description": "Average beta over all stamps of the primary window (M5). Stamped at the sample end."
       },
+      "BetaFit": {
+        "properties": {
+          "beta": {
+            "type": "number",
+            "title": "Beta"
+          },
+          "se_hac": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Se Hac",
+            "description": "Newey-West standard error of the beta (M0.5)."
+          },
+          "ci95_low": {
+            "type": "number",
+            "title": "Ci95 Low",
+            "description": "Normal 95% interval of the beta, lower end."
+          },
+          "ci95_high": {
+            "type": "number",
+            "title": "Ci95 High",
+            "description": "Normal 95% interval of the beta, upper end."
+          },
+          "r2": {
+            "type": "number",
+            "maximum": 1.000000000001,
+            "minimum": 0.0,
+            "title": "R2",
+            "description": "R squared of the regression."
+          },
+          "correlation": {
+            "type": "number",
+            "maximum": 1.000000000001,
+            "minimum": -1.000000000001,
+            "title": "Correlation",
+            "description": "Correlation of the two excess returns."
+          },
+          "alpha_annual": {
+            "type": "number",
+            "title": "Alpha Annual",
+            "description": "Intercept times 252, as a decimal a year."
+          },
+          "alpha_t": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha T",
+            "description": "HAC t of the intercept; null on an exact fit."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "beta",
+          "se_hac",
+          "ci95_low",
+          "ci95_high",
+          "r2",
+          "correlation",
+          "alpha_annual",
+          "alpha_t"
+        ],
+        "title": "BetaFit",
+        "description": "One single-factor regression of the stock's excess return, with Newey-West inference."
+      },
       "CorrPair": {
         "properties": {
           "a": {
@@ -1416,6 +1485,17 @@
             ],
             "description": "Fragility score (docs/specs/fragility-score.md)."
           },
+          "world_beta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorldBetaSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md)."
+          },
           "residual": {
             "anyOf": [
               {
@@ -1461,6 +1541,7 @@
           "lead_lag",
           "shrunk_betas",
           "fragility",
+          "world_beta",
           "residual",
           "kalman_betas"
         ],
@@ -5809,6 +5890,195 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WorldBetaSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "benchmark": {
+            "type": "string",
+            "const": "ACWI",
+            "title": "Benchmark",
+            "description": "Yahoo ticker of the world proxy."
+          },
+          "hac_lags": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hac Lags",
+            "description": "Newey-West lags of both regressions; null if none."
+          },
+          "n_sample": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Sample",
+            "description": "Rows of the analysis sample."
+          },
+          "n_not_in_benchmark": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Not In Benchmark",
+            "description": "Rows of the analysis sample with no usable ACWI return."
+          },
+          "acwi_first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acwi First Date",
+            "description": "First date of the ACWI price history used; null if there is none."
+          },
+          "acwi_last_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acwi Last Date",
+            "description": "Last date of the ACWI price history used; null if there is none."
+          },
+          "acwi_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acwi Note",
+            "description": "Set when the ACWI refresh failed: where the cached history ends, or why there is none."
+          },
+          "audit_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Audit Warnings",
+            "description": "Warnings of the ACWI price audit (M1.4)."
+          },
+          "world": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BetaFit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Against the world: ACWI, excess of RF."
+          },
+          "us_market": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BetaFit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Against the US market, same days."
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "about_the_same",
+                  "higher_against_the_world",
+                  "lower_against_the_world"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison"
+          },
+          "comparison_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Text",
+            "description": "The plain reading of the comparison."
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-WORLD-PROXY",
+                "L-WORLD-ASYNC"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "benchmark",
+          "hac_lags",
+          "n_sample",
+          "n_not_in_benchmark",
+          "acwi_first_date",
+          "acwi_last_date",
+          "acwi_note",
+          "audit_warnings",
+          "world",
+          "us_market",
+          "comparison",
+          "comparison_text",
+          "labels"
+        ],
+        "title": "WorldBetaSection",
+        "description": "The quick beta against ACWI next to the beta against the US market, on the same days."
       }
     }
   }

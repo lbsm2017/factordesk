@@ -283,6 +283,49 @@ export interface components {
             factors: components["schemas"]["AverageBeta"][];
         };
         /**
+         * BetaFit
+         * @description One single-factor regression of the stock's excess return, with Newey-West inference.
+         */
+        BetaFit: {
+            /** Beta */
+            beta: number;
+            /**
+             * Se Hac
+             * @description Newey-West standard error of the beta (M0.5).
+             */
+            se_hac: number;
+            /**
+             * Ci95 Low
+             * @description Normal 95% interval of the beta, lower end.
+             */
+            ci95_low: number;
+            /**
+             * Ci95 High
+             * @description Normal 95% interval of the beta, upper end.
+             */
+            ci95_high: number;
+            /**
+             * R2
+             * @description R squared of the regression.
+             */
+            r2: number;
+            /**
+             * Correlation
+             * @description Correlation of the two excess returns.
+             */
+            correlation: number;
+            /**
+             * Alpha Annual
+             * @description Intercept times 252, as a decimal a year.
+             */
+            alpha_annual: number;
+            /**
+             * Alpha T
+             * @description HAC t of the intercept; null on an exact fit.
+             */
+            alpha_t: number | null;
+        };
+        /**
          * CorrPair
          * @description A factor pair whose sample correlation exceeds 0.6 in absolute value (M3.4).
          */
@@ -524,6 +567,8 @@ export interface components {
             shrunk_betas: components["schemas"]["ShrunkBetas"][] | null;
             /** @description Fragility score (docs/specs/fragility-score.md). */
             fragility: components["schemas"]["FragilitySection"] | null;
+            /** @description Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md). */
+            world_beta: components["schemas"]["WorldBetaSection"] | null;
             /** @description Residual alpha analysis (docs/methodology-residual-analysis.md). */
             residual: components["schemas"]["ResidualAnalysis"] | null;
             /** @description Kalman-filter betas (docs/specs/kalman-betas.md). */
@@ -2174,6 +2219,77 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WorldBetaSection
+         * @description The quick beta against ACWI next to the beta against the US market, on the same days.
+         */
+        WorldBetaSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Benchmark
+             * @description Yahoo ticker of the world proxy.
+             * @constant
+             */
+            benchmark: "ACWI";
+            /**
+             * Hac Lags
+             * @description Newey-West lags of both regressions; null if none.
+             */
+            hac_lags: number | null;
+            /**
+             * N Sample
+             * @description Rows of the analysis sample.
+             */
+            n_sample: number;
+            /**
+             * N Not In Benchmark
+             * @description Rows of the analysis sample with no usable ACWI return.
+             */
+            n_not_in_benchmark: number;
+            /**
+             * Acwi First Date
+             * @description First date of the ACWI price history used; null if there is none.
+             */
+            acwi_first_date: string | null;
+            /**
+             * Acwi Last Date
+             * @description Last date of the ACWI price history used; null if there is none.
+             */
+            acwi_last_date: string | null;
+            /**
+             * Acwi Note
+             * @description Set when the ACWI refresh failed: where the cached history ends, or why there is none.
+             */
+            acwi_note: string | null;
+            /**
+             * Audit Warnings
+             * @description Warnings of the ACWI price audit (M1.4).
+             */
+            audit_warnings: string[];
+            /** @description Against the world: ACWI, excess of RF. */
+            world: components["schemas"]["BetaFit"] | null;
+            /** @description Against the US market, same days. */
+            us_market: components["schemas"]["BetaFit"] | null;
+            /** Comparison */
+            comparison: ("about_the_same" | "higher_against_the_world" | "lower_against_the_world") | null;
+            /**
+             * Comparison Text
+             * @description The plain reading of the comparison.
+             */
+            comparison_text: string | null;
+            /** Labels */
+            labels: ("L-DESC" | "L-WORLD-PROXY" | "L-WORLD-ASYNC")[];
         };
     };
     responses: never;

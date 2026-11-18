@@ -25,6 +25,10 @@ sections, each defined in its own module under ``report/sections/`` and ``None``
 reason ``lead_after_sample_end``. Version 3 files still load (SC5). The shared building blocks
 (``SampleInfo``, the statistic base, the status and label types) live in ``report/base.py`` and
 are re-exported here.
+
+The optional section ``world_beta`` (the quick beta against the iShares MSCI ACWI ETF;
+``report/sections/world_beta.py``) is additive and ``None`` when not computed, so it does not bump
+the version (contract SC5).
 """
 
 from __future__ import annotations
@@ -56,6 +60,7 @@ from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
+from factordesk.report.sections.world_beta import WORLD_BETA_SECTION, WorldBetaSection
 
 SCHEMA_VERSION = "4"
 """Version written by this code (the schema v3 contract; contract SC5)."""
@@ -69,6 +74,7 @@ SECTIONS: tuple[SectionSpec, ...] = (
     LEAD_LAG_SECTION,
     SHRUNK_SECTION,
     FRAGILITY_SECTION,
+    WORLD_BETA_SECTION,
     RESIDUAL_ALPHA_SECTION,
     KALMAN_SECTION,
 )
@@ -417,6 +423,11 @@ class FactorReport(FrozenModel):
     )
     fragility: FragilitySection | None = Field(
         default=None, description="Fragility score (docs/specs/fragility-score.md)."
+    )
+    world_beta: WorldBetaSection | None = Field(
+        default=None,
+        description="Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the "
+        "MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md).",
     )
     residual: ResidualAnalysis | None = Field(
         default=None,

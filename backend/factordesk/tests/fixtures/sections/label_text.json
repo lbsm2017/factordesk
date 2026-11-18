@@ -8,6 +8,10 @@
     "L-MDE": "Smallest beta that the test behind the reliable tags would detect with 80% power, after correcting for testing 5 betas. It describes that test, not the shrunk estimate, and assumes the standard error keeps shrinking like one over the square root of the data."
   },
   "fragility": {},
+  "world_beta": {
+    "L-WORLD-PROXY": "ACWI is the iShares MSCI ACWI ETF (an exchange-traded fund), used here as a stand-in for the MSCI ACWI index, which has no free daily data. It is priced in US dollars on a US exchange at the same close as US stocks.",
+    "L-WORLD-ASYNC": "A quick estimate, not a full model. ACWI holds mostly non-US stocks whose markets close earlier than the US, so same-day co-movement with a US stock can be understated; this is not corrected here. A stock with a short history has a wide interval."
+  },
   "residual": {
     "L-INSAMPLE": "In-sample: betas are fitted on this same period.",
     "L-PIT": "Point-in-time: each day uses betas estimated only from earlier days.",

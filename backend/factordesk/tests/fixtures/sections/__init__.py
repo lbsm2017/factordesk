@@ -25,6 +25,7 @@ SECTION_FILES: dict[str, str] = {
     "lead_lag": "lead_lag.json",
     "shrunk_betas": "shrunk.json",
     "fragility": "fragility.json",
+    "world_beta": "world_beta.json",
     "residual": "residual_alpha.json",
     "kalman_betas": "kalman.json",
 }
