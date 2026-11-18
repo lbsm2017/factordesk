@@ -367,7 +367,7 @@ Conventions as in `docs/test-oracle.md` section 0 (seed `20261118 + k` for test 
 - **TSB02 Dogmatic limit.** `tau = 1e-8`: `|b_post - m0| <= 1e-6`, `V_post <= 1e-15` elementwise.
 - **TSB03 Weight identities.** For random inputs: `b_post == (I - S_w) b + S_w m0` and `V_post V^-1 + S_w == I` (1e-12).
 - **TSB04 Scalar hand example.** One factor with `V = 0.04`, `tau^2 = 0.04`, `b = 0.6`, `m0 = 0`: `pull = 0.5`, `b_post = 0.3`, `V_post = 0.02` (1e-15). Diagonal 5x5 version: each coordinate equals the scalar formula `b_post = (tau^2 b + V m0)/(tau^2 + V)` (1e-12).
-- **TSB05 Correlated move away.** `V = [[0.04, 0.036], [0.036, 0.04]]` (correlation 0.9), `tau = (10, 0.1)` (first coefficient nearly free), `b = (0.5, 0.5)`, `m0 = (0, 0)`. Assert the first posterior coefficient moves away from 0 (`b_post[0] > 0.5`) and `moved_away` is true for it, false for the second. This pins L-CORR-MOVE.
+- **TSB05 Correlated move away.** `V = [[0.04, 0.036], [0.036, 0.04]]` (correlation 0.9), `tau = (10, 0.1)` (first coefficient nearly free), `b = (0.5, -0.5)`, `m0 = (0, 0)`. Assert the first posterior coefficient moves away from 0 (`b_post[0] > 0.5`, about 0.86) and `moved_away` is true for it, false for the second. This pins L-CORR-MOVE. Correction made at implementation: the first draft had `b = (0.5, 0.5)`, but with a positive covariance that input moves the first coefficient **toward** 0 (about 0.14); the estimates need opposite signs, as in RDDT (SMB positive, HML and RMW negative, SB8.2). A second case with `b = (0.5, 0.5)` asserts the move toward 0.
 - **TSB06 HAC block.** On DGP-A, `V` passed to the posterior equals the `[1:, 1:]` block of the reference call of M0.5 with `L(n)` (1e-10 relative); for the latest window it uses `L(W_p)`.
 
 ### Prior estimation
