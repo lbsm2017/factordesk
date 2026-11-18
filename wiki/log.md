@@ -10,6 +10,7 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 ## 2026-11-18 (owner ranking)
 
 - The owner ranked 16 epics on 2026-11-18. The [priority ranking](../docs/ROADMAP.md#priority-ranking-owner-2026-11-18) is in the roadmap, and Now, Next, Later and Very later follow that order.
+
 ## 2026-11-18 (rolling precision)
 
 - Added `decision-rolling-fast-path-precision.md` after the independent validation of the rolling speed-up: precision wording corrected, fast-path check tightened, start-date effect recorded.
