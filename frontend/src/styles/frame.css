@@ -75,3 +75,8 @@
 
 /* Error state: the ticker heading sits above the notice. */
 .req-error .masthead + .notice { margin-top: var(--s-4); }
+
+/* Review DF7: with the equation omitted, the KPI strip (or its empty state) follows the notice, or
+   the header when there is no notice. It gets the panel spacing instead of touching them. */
+.masthead + .kpis,
+.notice + .kpis { margin-top: var(--s-4); }
