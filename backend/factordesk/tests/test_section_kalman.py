@@ -6,12 +6,14 @@ The fixture ``fixtures/sections/kalman.json`` is a synthetic section (1,300 rows
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
@@ -299,6 +301,60 @@ def test_a_failure_of_the_input_check_becomes_a_failed_section(
     monkeypatch.setattr(kalman_hook, "kalman_betas", boom)
     s = _section(_report(dgp_a(rng_for(655), n=520)))
     assert s.status == "failed" and s.reason is not None and "finite" in s.reason
+
+
+def test_a_non_value_error_of_the_filter_becomes_a_failed_section(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """F1 of the validation: any error of the filter leaves the report building (SC3.2)."""
+
+    def boom(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("internal failure")
+
+    monkeypatch.setattr(kalman_hook, "kalman_betas", boom)
+    report = _report(dgp_a(rng_for(657), n=520))
+    s = _section(report)
+    assert s.status == "failed" and s.reason is not None and "kalman_error" in s.reason
+    assert s.dates == [] and s.betas == {} and s.labels == []
+    assert report.regression.status == "ok"
+    assert "internal failure" in caplog.text
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf], ids=["nan", "inf"])
+@pytest.mark.parametrize("field", ["betas", "band_low", "alpha", "latest_sd"])
+def test_a_non_finite_value_in_the_result_becomes_a_failed_section(
+    monkeypatch: pytest.MonkeyPatch, field: str, bad: float
+) -> None:
+    """F1 of the validation: NaN or inf in a stamped value fails the section, not the report."""
+    real = kalman_betas
+
+    def corrupted(*args: Any, **kwargs: Any) -> Any:
+        result = real(*args, **kwargs)
+        array = np.array(getattr(result, field))
+        array[-1] = bad  # the last row is stamped; latest_sd has one entry per factor
+        return dataclasses.replace(result, **{field: array})
+
+    monkeypatch.setattr(kalman_hook, "kalman_betas", corrupted)
+    report = _report(dgp_a(rng_for(658), n=520))
+    s = _section(report)
+    assert s.status == "failed" and s.reason is not None and "kalman_invalid_output" in s.reason
+    assert s.dates == [] and s.betas == {} and s.latest == {}
+    assert report.regression.status == "ok" and report.data.n_obs == 520
+
+
+def test_a_non_finite_hyperparameter_becomes_a_failed_section(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = kalman_betas
+
+    def corrupted(*args: Any, **kwargs: Any) -> Any:
+        result = real(*args, **kwargs)
+        vintages = (dataclasses.replace(result.vintages[0], resid_var=math.nan),)
+        return dataclasses.replace(result, vintages=vintages)
+
+    monkeypatch.setattr(kalman_hook, "kalman_betas", corrupted)
+    s = _section(_report(dgp_a(rng_for(659), n=520)))
+    assert s.status == "failed" and s.reason is not None and "kalman_invalid_output" in s.reason
 
 
 def test_tkb23_no_core_number_changes(monkeypatch: pytest.MonkeyPatch) -> None:

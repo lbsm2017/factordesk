@@ -11,10 +11,14 @@ Status and reason strings (spec KB8.3):
   {n} (kalman_needs_504_rows)."
 * ``failed``: "... first 21 rows ... (singular_burn_in)" or "... factor covariance ...
   (singular_factor_covariance)", or the input check message when a value is not finite.
+* ``failed`` also covers any other error of the filter ("... unexpected error ... (kalman_error)")
+  and a result with a non-finite value or a section that does not validate ("... not usable ...
+  (kalman_invalid_output)"). The hook logs the exception and the report still builds.
 """
 
 from __future__ import annotations
 
+import logging
 import math
 
 import numpy as np
@@ -40,6 +44,8 @@ from factordesk.report.sections.kalman import (
 from factordesk.section_hooks.context import SectionContext
 
 FloatArray = NDArray[np.float64]
+
+logger = logging.getLogger(__name__)
 
 SIG_DIGITS = 6
 """Series are rounded to 6 significant digits, as the rolling betas are (methodology D31)."""
@@ -77,6 +83,21 @@ def _by_factor(matrix: FloatArray) -> dict[str, list[float | None]]:
 
 def _labels(gate_fired: bool) -> list[KalmanLabelKey]:
     return ["L-KF", "L-KBAND", "L-KTAIL"] if gate_fired else ["L-KF", "L-KBAND"]
+
+
+def _require_finite(result: KalmanResult) -> None:
+    """Raise ``ValueError`` when a stamped value of an ``ok`` result is NaN or infinite.
+
+    Warm-up rows (``vintage_index == -1``) are NaN by design; everything else a panel reads must be
+    finite, or ``_round`` would turn a NaN into a silent gap.
+    """
+    stamped = result.vintage_index >= 0
+    series = (result.alpha[stamped], *(m[stamped] for m in (result.betas, result.band_low)))
+    series += (result.band_high[stamped], result.latest_sd)
+    if not stamped.any() or not all(bool(np.isfinite(a).all()) for a in series):
+        raise ValueError("the filter returned a non-finite value")
+    if not all(math.isfinite(v.lam) and math.isfinite(v.resid_var) for v in result.vintages):
+        raise ValueError("the filter returned a non-finite hyperparameter")
 
 
 def not_ok_section(
@@ -120,6 +141,7 @@ def section_from_result(
         template = _NOT_OK_REASONS.get(code, "{code}")
         reason = template.format(need=TRAINING_ROWS, n=result.n, burn=BURN_IN_ROWS, code=code)
         return not_ok_section(result.status, reason, info, result.error_model)
+    _require_finite(result)
     stamps = [pd.Timestamp(ts).date() for ts in dates]
     vintages = [
         KalmanVintage(
@@ -178,7 +200,23 @@ def build_kalman_betas(ctx: SectionContext) -> KalmanBetaSeries | None:
         result = kalman_betas(y, f)
     except ValueError as exc:  # non-finite input: the sample builder never produces it
         return not_ok_section("failed", f"The Kalman betas could not be computed ({exc}).", info)
+    except Exception:  # any other error of the filter must not stop the report (SC3.2)
+        logger.exception("kalman_betas raised; the Kalman section is marked failed")
+        return not_ok_section(
+            "failed",
+            "The Kalman betas could not be computed because of an unexpected error (kalman_error).",
+            info,
+        )
     gate_fired = ctx.gate is not None and ctx.gate.fired
-    return section_from_result(
-        result, pd.DatetimeIndex(sample.xret.index), info, gate_fired=gate_fired
-    )
+    try:
+        return section_from_result(
+            result, pd.DatetimeIndex(sample.xret.index), info, gate_fired=gate_fired
+        )
+    except Exception:  # a non-finite value or a section that does not validate
+        logger.exception("the Kalman result could not be turned into a section")
+        return not_ok_section(
+            "failed",
+            "The Kalman betas were computed but the result is not usable (kalman_invalid_output).",
+            info,
+            result.error_model,
+        )
