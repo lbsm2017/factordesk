@@ -16,5 +16,23 @@ export default defineConfig({
     proxy: { "/api": "http://127.0.0.1:8000" },
     fs: { allow: [".."] },
   },
-  build: { outDir: "dist", sourcemap: false, assetsInlineLimit: 0 },
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    assetsInlineLimit: 0,
+    // ECharts and zrender are the lazy chunk (about 545 kB raw, loaded after the page frame paints), so
+    // the default 500 kB warning does not apply to them. The initial JS has its own budget: `npm run size`.
+    chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: "react", test: /node_modules[/\\](react|react-dom|scheduler)[/\\]/, priority: 30 },
+            { name: "query", test: /node_modules[/\\]@tanstack[/\\]/, priority: 20 },
+            { name: "echarts", test: /node_modules[/\\](echarts|zrender|tslib)[/\\]/, priority: 10 },
+          ],
+        },
+      },
+    },
+  },
 });

@@ -6,10 +6,13 @@ Vite, React, TypeScript (strict), TanStack Query, ECharts (price and exposure ov
 npm ci
 npm run dev        # API on 8000 (uvicorn reload) and Vite on 5173; open http://localhost:5173
 npm run typecheck && npm run lint && npm test && npm run build
+npm run size       # after build: fails if the initial JS is over budget (scripts/size.mjs)
 npm run gen:types  # after: uv run python -m factordesk.api.openapi_dump frontend/src/api/openapi.json (repo root)
 ```
 
 In development, `/?demo=1` renders the mock report so panels can be seen without the API. The demo is not in the production build.
+
+ECharts loads in its own lazy chunk (`echarts`), so it is not in the initial JS; React and TanStack Query have their own vendor chunks. `npm run size` counts the entry script plus preloaded chunks against a budget of 400 kB raw and 125 kB gzip (measured: 372 and 114). Raise the budget in `scripts/size.mjs` only on purpose.
 
 ## Component map
 
