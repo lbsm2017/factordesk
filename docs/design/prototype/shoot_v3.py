@@ -57,6 +57,8 @@ SHOTS = [
     ("shot_v3_crop_risk_rolling", 1440, None, "", "risk,rolling"),
     ("shot_v3_crop_deeper", 1440, None, "", "residual,kalman,shrunk"),
     ("shot_v3_crop_audit_stats_on", 1440, None, "stats", "data,detail"),
+    ("shot_v3_1440_empty", 1440, 900, "", None),
+    ("shot_v3_390_crop_tables", 390, None, "", "exposures,risk"),
 ]
 
 
@@ -162,7 +164,7 @@ def shoot() -> None:
     for name, w, h, on, only in SHOTS:
         if only_names and name not in only_names:
             continue
-        page = variant(name, on, only, measure=h is None)
+        page = variant(name, on, only, measure=h is None, empty="empty" in name)
         if h is None:
             h = measure(page, w)[2]
         out = HERE / f"{name}.png"
