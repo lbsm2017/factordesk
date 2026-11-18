@@ -32,7 +32,7 @@ Sorted by RICE, highest first. Owner decision and status are the owner's words.
 | 2 | Rolling regression speed-up conditions | 10 | 1 | 0.9 | 1 | 9 | Must | ok | In progress |
 | 3 | SPY hardening: diagnostics, quality gate, bad input | 10 | 3 | 0.8 | 5 | 4.8 | Must | deliver and close | In progress (closure agent) |
 | 4 | Schema v3 contract | 8 | 2 | 0.8 | 3 | 4.3 | Must | deliver and close | In progress |
-| 5 | First GitHub CI run | 5 | 2 | 0.8 | 2 | 4.0 | Should | next | Starts with the pull request |
+| 5 | First GitHub CI run | 5 | 2 | 0.8 | 2 | 4.0 | Should | next | In progress: first run failed on one test, fix committed on fix/ci-first-run, second run pending |
 | 6 | Fragility score | 6 | 2 | 0.7 | 5 | 1.7 | Should | later | Spec ready |
 | 7 | One-shot install and run | 8 | 1 | 0.7 | 5 | 1.1 | Should | next | In progress (no publishing) |
 | 8 | Residual alpha analysis | 6 | 2 | 0.7 | 8 | 1.1 | Should | next | Starts after schema v3 |
