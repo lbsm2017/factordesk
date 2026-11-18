@@ -39,6 +39,16 @@ DELTA = 0.05
 """Smallest style beta the "years to detect" sentence asks about; fixed (SB10.4 Q3)."""
 MAX_YEARS_SHOWN = 50.0
 """Beyond this many extra years the sentence says "not detectable" (SB5)."""
+MOVE_TOLERANCE = 1e-9
+"""A shift smaller than this fraction of the coefficient's scale is not a move (SB6, L-CORR-MOVE).
+
+The spec compares ``sign(b_post - b)`` with ``sign(m0 - b)``. When the prior is flat the true shift
+is zero and the computed one is rounding noise (about 1e-14 of the scale with ``cond(V) = 1e3``)
+whose sign depends on the order of the floating point operations, so the same input gave
+``moved_away`` true on Linux and false on Windows. A shift below this tolerance is treated as
+zero, like the spec's own case ``b == m0``; 1e-9 is far above the noise (it allows ``cond(V)`` up
+to about 1e5) and far below any shift a reader could see.
+"""
 PULL_DISPLAY_THRESHOLD = 0.05
 """A shrunk marker is drawn only for a factor pulled at least this much (SB6 rule 2)."""
 MARKET_INDEX = 0
@@ -121,6 +131,8 @@ def posterior(b: FloatArray, cov: FloatArray, centre: FloatArray, tau: FloatArra
     sd_post = np.sqrt(np.diag(v_post))
     shift = b_post - bv
     toward = m0 - bv
+    scale = np.maximum(np.maximum(np.abs(bv), np.abs(b_post)), np.abs(m0))
+    moved = (shift * toward < 0.0) & (np.abs(shift) > MOVE_TOLERANCE * scale)
     return Posterior(
         b_ols=bv,
         se_hac=np.sqrt(np.diag(v)),
@@ -133,7 +145,7 @@ def posterior(b: FloatArray, cov: FloatArray, centre: FloatArray, tau: FloatArra
         sd_post=sd_post,
         cred_low=b_post - Z_975 * sd_post,
         cred_high=b_post + Z_975 * sd_post,
-        moved_away=tuple(bool(s * t < 0.0) for s, t in zip(shift, toward, strict=True)),
+        moved_away=tuple(bool(m) for m in moved),
     )
 
 

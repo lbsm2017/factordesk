@@ -16,6 +16,7 @@ from factordesk.analytics.sample import build_sample
 from factordesk.analytics.shrinkage import (
     COND_LIMIT,
     K80,
+    MOVE_TOLERANCE,
     SingularCovarianceError,
     any_visible_pull,
     display_pull,
@@ -139,6 +140,40 @@ def test_tsb05_no_move_away_when_the_shift_is_zero_or_toward_the_centre() -> Non
     v = np.diag([0.04, 0.04])
     post = posterior(np.array([0.5, 0.0]), v, np.array([0.0, 0.0]), np.array([0.2, 0.2]))
     assert post.moved_away == (False, False)  # first moves toward 0; second b == m0, no move
+
+
+def test_moved_away_ignores_rounding_noise_in_the_flat_prior_limit() -> None:
+    # Reordering the coefficients changes only the order of the floating point operations. The
+    # true shift is zero, so no ordering may flag a move (this failed on Linux before the
+    # tolerance: the noise is about 1e-14 and its sign depends on the ordering).
+    rng = _seed(1)
+    v = _random_spd(rng)
+    b = rng.normal(size=5)
+    tau = np.full(5, 1e8)
+    for order in (np.arange(5), np.arange(5)[::-1], np.array([2, 0, 4, 1, 3])):
+        post = posterior(b[order], v[np.ix_(order, order)], M0[order], tau)
+        assert np.abs(post.b_post - b[order]).max() > 0.0  # there is noise to ignore
+        assert not any(post.moved_away)
+
+
+def test_moved_away_tolerance_has_two_sides() -> None:
+    # TSB05 input: the first coefficient is pushed away from 0 through the covariance by the
+    # pull on the second, so its shift is 0.9 * 0.5 * pull_2 and its scale is 0.5. The spread of
+    # the second coefficient sets the pull (about V_22 / tau^2 when tau is large).
+    v = np.array([[0.04, 0.036], [0.036, 0.04]])
+    b = np.array([0.5, -0.5])
+    m0 = np.array([0.0, 0.0])
+
+    def first(tau_2: float) -> tuple[float, bool]:
+        post = posterior(b, v, m0, np.array([1e8, tau_2]))
+        return abs(post.b_post[0] - b[0]) / 0.5, post.moved_away[0]
+
+    just_inside, flag_inside = first(1.9e4)  # relative shift about 1e-10
+    just_outside, flag_outside = first(1.9e3)  # relative shift about 1e-8
+    clear, flag_clear = first(0.1)  # relative shift about 0.7
+    assert 0.0 < just_inside < MOVE_TOLERANCE and not flag_inside
+    assert just_outside > MOVE_TOLERANCE and flag_outside
+    assert clear > 0.1 and flag_clear
 
 
 def test_tsb06_hac_block_is_the_reference_block_with_the_rule_of_the_regression() -> None:
