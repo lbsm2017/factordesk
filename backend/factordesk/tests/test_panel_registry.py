@@ -92,7 +92,9 @@ def test_present_sections_draw_their_frame_in_place() -> None:
     ids = _panel_ids(page)
     for pid, after in SECTION_PANELS.values():
         assert ids.index(pid) == ids.index(after) + 1, (pid, ids)
-    assert page.count("Placeholder (schema v3 contract)") == 6  # shrunk has two scopes
+    # The residual fixture is a populated section, so only the four other features show a
+    # placeholder (shrunk has two scopes).
+    assert page.count("Placeholder (schema v3 contract)") == 5
 
 
 def test_panel_css_is_inlined_only_when_the_panel_draws(monkeypatch: pytest.MonkeyPatch) -> None:
