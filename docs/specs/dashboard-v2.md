@@ -693,6 +693,13 @@ On 2026-11-18 the owner answered as follows. These override any earlier text in 
 8. **Fintech-tool palette and IBM Plex Sans** (design rev 3, M and B), with the density rules of
    design C rev 3, and a dark navy icon-and-label sidebar after the owner's references (Altoo and
    an investment analytics tearsheet tool).
+9. **10Y range preset** (owner, 2026-11-19): the range control offers 3Y, 5Y, 10Y and Full history,
+   in that order. This extends the owner decision of 2026-11-18 in `docs/specs/dashboard.md` (3Y, 5Y and
+   Full history only). Code: `RangePreset` and `RANGE_PRESETS` in `backend/factordesk/report/schema.py:459`,
+   the start-date rule in `backend/factordesk/api/ranges.py` (ten calendar years back, same
+   29 February rule as 3Y and 5Y), the `range` URL value in `frontend/src/state/url.ts`, the
+   segmented control, the availability reason when the history is shorter than ten years, the
+   OpenAPI types, and the tests of each. It ships with ticket V4 (controls in the sidebar).
 
 ---
 
