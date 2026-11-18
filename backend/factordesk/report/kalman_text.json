@@ -37,7 +37,7 @@
   "fold": {
     "span": "Every row uses the same vertical span, centred on its own band, so wiggles compare across factors.",
     "thinning": "The chart draws a thinned copy of the daily series that keeps every high and low; the numbers use all of it.",
-    "drift_rate": "The drift rate is the weight the filter gives to a new day. It is re-estimated each year from the data up to that date. The equivalent window is the rolling window that smooths about as much. Each table row gives the estimate in force between its two dates."
+    "drift_rate": "The drift rate says how fast the model lets the betas wander, compared with the day-to-day noise in returns. A higher rate lets the betas move faster, gives a new day more weight and gives a shorter equivalent window. The weight of a new day is not the rate itself but roughly its square root: a rate of 0.0001 gives a new day a weight of about 0.01, or 1 percent. The rate is re-estimated each year from the data up to that date. The equivalent window is the rolling window that smooths about as much. Each table row gives the estimate in force between its two dates."
   },
   "warnings": {
     "kalman_lambda_at_upper_bound": "For at least one yearly re-estimate the filter follows daily noise; the estimate is not meaningful."
