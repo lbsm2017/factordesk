@@ -233,14 +233,15 @@ section's `SampleInfo` can list the removed row.
 ## SC4. Panel order
 
 The same names and positions in both renderers (React has one extra entry, `notice`, at 150,
-because the static page draws the notice inside the header).
+because the static page draws the notice inside the header). Element ids of the core panels are
+as they were; the five new panels use the same id in both renderers.
 
-| Position | Name | Static element id | Source |
+| Position | Name | Element id (static / React) | Source |
 |---|---|---|---|
-| 100 | `header` | `header` (masthead) | core |
-| 150 | `notice` | `notice` | core, React only |
-| 200 | `equation` | `equation` | core |
-| 300 | `kpis` | `kpis` | core |
+| 100 | `header` | masthead, no id / `header` | core |
+| 150 | `notice` | inside the header / `notice` | core, React only |
+| 200 | `equation` | no id / `equation` | core |
+| 300 | `kpis` | no id / `kpis` | core |
 | 400 | `price` | `price` | core |
 | 500 | `exposures` | `exposures` | core |
 | 510 | `lead_lag` | `lead-lag` | lead-lag |
@@ -252,8 +253,8 @@ because the static page draws the notice inside the header).
 | 800 | `rolling` | `rolling` | core |
 | 810 | `kalman` | `kalman` | Kalman betas |
 | 900 | `data` | `data` | core |
-| 1000 | `regression_detail` | `regression-detail` | core |
-| 1100 | `colophon` | `colophon` | core |
+| 1000 | `regression_detail` | `detail` / `regression-detail` | core |
+| 1100 | `colophon` | footer, no id / `colophon` | core |
 
 Reasons: lead-lag, shrunk and fragility qualify the betas and the alpha shown in the exposures
 panel, so they follow it; the residual panel belongs after return and risk contribution (R8); the
