@@ -16,9 +16,10 @@ test written down first, logged, independently reviewed) before it ships.
   It waits for the owner to review and merge. Not yet run against live Yahoo data beyond one ticker.
 - **Built, not released:** the one-shot install and run command (rank 7), in PR #1. The release
   is the owner's step, following `docs/release-checklist.md`.
-- **In progress:** follow-ups to the first GitHub CI run (rank 5); residual alpha, shrunk betas and
-  Kalman betas (ranks 8, 12 and 14), at the analytics step; a data-source comparison of Yahoo,
-  Tiingo and Alpaca (blocks rank 11).
+- **Built and validated, on `integrate/features`, not merged to prod:** shrunk betas (rank 12) and
+  Kalman betas (rank 14).
+- **In progress:** follow-ups to the first GitHub CI run (rank 5); residual alpha (rank 8), being
+  validated; a data-source comparison of Yahoo, Tiingo and Alpaca (blocks rank 11).
 - **Specified, not built:** report redesign (`docs/design/report-design.md`), regional datasets
   (`docs/methodology-datasets.md`).
 - **Owner ranking (2026-11-18, re-scored in update 2):** 16 epics are ranked in the priority ranking
@@ -44,9 +45,9 @@ gave them.
 | 9 | Lead-lag betas | 4 | 2 | 0.7 | 8 | 0.7 | Could | later | Not started; spec ready | Schema contract (done); hardening gate (done); gate threshold calibration (owner) |
 | 10 | Dead-code cleanup | 2 | 0.25 | 1.0 | 1 | 0.5 | Could | later | Not started | none |
 | 11 | Data triangulation | 7 | 2 | 0.5 | 20 | 0.35 | Could | later | Not started | Data-source comparison (in progress) |
-| 12 | Shrunk betas | 3 | 1 | 0.6 | 5 | 0.4 | Could | next | In progress: analytics step; then pipeline, panels, validation | Schema contract (done) |
+| 12 | Shrunk betas | 3 | 1 | 0.6 | 5 | 0.4 | Could | next | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
 | 13 | Peers using the batch price fetch | 4 | 1 | 0.6 | 8 | 0.3 | Could | very later | Not started; the batch fetch exists but nothing calls it | Cointegration (not built) |
-| 14 | Kalman betas | 4 | 1 | 0.6 | 8 | 0.3 | Could | next, before later items | In progress: analytics step; runtime budget a couple of seconds | Schema contract (done) |
+| 14 | Kalman betas | 4 | 1 | 0.6 | 8 | 0.3 | Could | next, before later items | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
 | 15 | European mode | 3 | 2 | 0.5 | 20 | 0.15 | Won't (this round) | later | Not started; D16 covers RF source, ECB FX, regressor default, Canada | Owner decisions D16 and F13 |
 | 16 | Alpaca adapter | 2 | 1 | 0.5 | 8 | 0.13 | Won't (this round) | very later | Not started | none |
 
@@ -83,8 +84,8 @@ Items 5, 8, 12 and 14 of the priority ranking, in owner order.
 |---|---|---|---|
 | First GitHub CI run (rank 5) | Runs the checks on GitHub for every pull request | Done: run 1 failed on one float comparison in a fixture, fixed; run 2 green (3 min 30 s). Open: Playwright cache hit path needs a third run; nightly slow tests need an owner decision | PR #1 |
 | Residual alpha analysis (rank 8) | Shows how much alpha holds up with point-in-time betas | In progress: analytics step (agent resumed after a network error); then pipeline, static panel, React panel, independent validation | Schema contract (done) |
-| Shrunk betas (rank 12) | Pull noisy style betas toward a prior; report how much data would make an effect detectable | In progress: analytics step; then pipeline, panels, validation | Schema contract (done) |
-| Kalman-filter betas (rank 14) | Time-varying betas with proper uncertainty, using past data only | In progress: analytics step; runtime budget a couple of seconds; goes before the Later items | Schema contract (done) |
+| Shrunk betas (rank 12) | Pull noisy style betas toward a prior; report how much data would make an effect detectable | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
+| Kalman-filter betas (rank 14) | Time-varying betas with proper uncertainty, using past data only | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
 
 ## Later
 

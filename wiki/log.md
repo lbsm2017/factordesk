@@ -109,3 +109,7 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - Scholes-Williams estimator approved as a cross-check beside Dimson lead-lag betas.
 - The quality-gate caveat will not blame late vendor closes; the reversal persists on official closes.
 - Postponed: the fragility warning threshold, and whether a lead-lag beta may ever replace the headline beta (until then it never does).
+
+## 2026-11-18 (integration)
+
+- Shrunk betas and Kalman betas merged into `integrate/features` (stacked on PR #1); both validated, not merged to prod. Residual alpha is merged later.
