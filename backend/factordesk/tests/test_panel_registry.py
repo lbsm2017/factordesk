@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from factordesk.report import load_report, render_report_html
 from factordesk.report import render_html as render_module
 from factordesk.report.panel_registry import PanelRegistry, PanelSpec, registered_panels
 from factordesk.report.schema import FactorReport
-from factordesk.tests.fixtures.sections import SECTION_FILES, report_with_section
+from factordesk.tests.fixtures.sections import SECTION_FILES, report_with_section, section_payload
 
 MOCK = Path(__file__).parent / "fixtures" / "mock_report.json"
 
@@ -92,9 +93,13 @@ def test_present_sections_draw_their_frame_in_place() -> None:
     ids = _panel_ids(page)
     for pid, after in SECTION_PANELS.values():
         assert ids.index(pid) == ids.index(after) + 1, (pid, ids)
-    # 6 with every placeholder in place (shrunk has two scopes); each feature that replaces its
-    # placeholder with a real fixture lowers the count.
-    assert page.count("Placeholder (schema v3 contract)") <= 6
+    # Sections whose fixture is still a contract placeholder draw the placeholder reason; a
+    # feature that fills its fixture in drops out of the count (shrunk has two scopes).
+    placeholder = "Placeholder (schema v3 contract)"
+    expected = sum(
+        json.dumps(section_payload(field)).count(placeholder) for field in SECTION_PANELS
+    )
+    assert page.count(placeholder) == expected
 
 
 def test_panel_css_is_inlined_only_when_the_panel_draws(monkeypatch: pytest.MonkeyPatch) -> None:
