@@ -233,6 +233,8 @@ def test_power_statement_grammar_and_boundaries() -> None:
     assert "a CMA beta" in power_text("CMA", 504, 0.1, 1.0)
     assert "a Mkt-RF beta" in power_text("Mkt-RF", 504, 0.1, None)
     assert "An SMB beta of 0.05 is already detectable" in power_text("SMB", 504, 0.1, 0.0)
+    assert "less than 0.1 more years" in power_text("HML", 504, 0.1, 0.0123)
+    assert "about 0.1 more years" in power_text("HML", 504, 0.1, 0.05)
     # 50 years is still "about"; just above is "not detectable".
     assert "about 50.0 more years" in power_text("HML", 504, 0.1, 50.0)
     assert "not detectable" in power_text("HML", 504, 0.1, 50.01)

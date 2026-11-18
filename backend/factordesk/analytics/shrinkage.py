@@ -198,6 +198,11 @@ def power_text(factor: str, n: int, mde80: float, extra: float | None, delta: fl
         return text
     if extra == 0.0:
         return f"{text} {article.capitalize()} {factor} beta of {delta:.2f} is already detectable."
+    if extra < 0.05:  # would print as "0.0 more years"
+        return (
+            f"{text} Detecting {article} {factor} beta of {delta:.2f} would take less than "
+            "0.1 more years of similar data."
+        )
     if extra <= MAX_YEARS_SHOWN:
         return (
             f"{text} Detecting {article} {factor} beta of {delta:.2f} would take about "
