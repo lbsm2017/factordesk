@@ -58,3 +58,16 @@
 }
 
 @media screen and (max-width: 719px) { .sk-chip.chip { width: 100%; } }
+
+/* Busy placeholders (spec DB6.4, review S3): while a request runs, the figures that belong to the
+   report on screen are blanked so old numbers never sit beside a new request. The longer chains
+   outrank the faded-term and not-significant colours in lead.css. */
+[aria-busy="true"] .ticker,
+[aria-busy="true"] .kpis .kpi .v,
+[aria-busy="true"] .kpis .kpi .n,
+[aria-busy="true"] .model .term .m,
+[aria-busy="true"] .model .term .ann span {
+  color: transparent;
+  background: var(--grid);
+  border-radius: 2px;
+}

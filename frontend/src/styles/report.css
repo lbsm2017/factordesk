@@ -252,7 +252,6 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .ctl-label { margin-top: var(--s-3); color: var(--ink-2); max-width: 76ch; }
 .ctl-label b { color: var(--ink); font-weight: 560; }
 .ctl-why { margin-top: var(--s-1); font-size: var(--fs-1); color: var(--ink-3); }
-[aria-busy="true"] .ticker, [aria-busy="true"] .kpi .v { color: transparent; background: var(--grid); border-radius: 2px; }
 
 /* ------------------------------------------------------------------ narrow screens */
 @media screen and (max-width: 719px) {
