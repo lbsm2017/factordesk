@@ -4,6 +4,22 @@ Written 2026-11-18 on branch `feat/kalman-betas` (stage 3 of the chain, after th
 
 Everything below that says "measured" was measured on this branch on 2026-11-18 on a Windows 11 machine with 12 logical cores that other work was also using (CPU load 32 to 38 percent from other processes when sampled). Timings are therefore upper-ish and noisy; they are given as ranges.
 
+## After validation (2026-11-18)
+
+The independent validation (`docs/reviews/kalman-betas-validation-2026-11-18.md`, branch `validate/kalman-betas`) found the statistics correct and asked for four fixes. What was done on `feat/kalman-betas`:
+
+- **F1 (hook could stop the whole report).** `build_kalman_betas` now catches any error of the filter and any error or non-finite value (NaN or infinity in a stamped series, `latest` or a vintage) when the section is built, logs it, and returns a `failed` section with a reason (`kalman_error` or `kalman_invalid_output`). The report builds as before. Tests: a `RuntimeError` from the filter, NaN and infinity in four result fields, and a NaN hyperparameter. A guard in `pipeline.py` that adds a report-level notice is still a proposal for the owner (contract file, SC3.2).
+- **F2 (wrong drift-rate sentence).** The panel text (`kalman_text.json` and its frontend copy) and the wiki page no longer say the drift rate is the weight of a new day. The weight is roughly the square root of the rate (spec KB2.5): a rate of 0.0001 gives a new day a weight of about 0.01. The two copies are equal and their tests pass. Section 3 below shows the old sentence and is superseded on this point.
+- **F3 (drift term untested in CI).** The validator's two tests with drifting betas are kept. Two more were added: the output pass equals statsmodels at lambda > 0 (states and bands, every vintage), and the grid pass picks the maximiser of the single-path likelihood (itself tied to statsmodels by TKB02). With each of M3, M4 and M5 applied by hand, the new tests fail without cached data.
+- **F6 (payload).** Owner decision of 2026-11-18: `ex_ante_betas` is dropped from the served section (model, hook, fixture, tests, OpenAPI document and TypeScript types). The ex-ante beta for day t is the filtered beta of day t-1 (`betas[t-1]`); the analytics result `KalmanResult.ex_ante` stays for the look-ahead tests. Neither panel read the field. Size on the cached SPY history now: section 1,445,350 bytes (was 1,849,618), 37.7 percent of a 3,831,628-byte report (was 43.7 percent of 4,236,076); the report gzips to 1,173,770 bytes. Section 7 and the first decision in section 9 are superseded.
+
+Left for the owner (not changed here):
+
+- **F4.** Sign-off of the edits to contract files (`test_schema_contract.py`, `test_panel_registry.py`, `panelRegistry.test.tsx`, `panel_registry.py`) and the merge order with `feat/shrunk-betas` and `feat/residual-alpha`, which edit the same three test files.
+- **The L-KF window clause.** The spec's `L-KF` text has the clause "behaves like a {W_eq}-day window for this stock"; the implemented label drops it and the window appears only in the vintage table. Either amend the spec label or restore the clause.
+- The five unfilled spec markers, the stale spec header and KB8.1 runtime (validation F8), the screen-reader strings that differ between the panels (F7), and the MSTR half of TKB24 as a test.
+- Proposed for `docs/methodology.md` at the fold-in: the corrected definition of the drift rate (weight of a new day roughly the square root of the rate).
+
 ## 1. What was built
 
 | Piece | Where | Status |
