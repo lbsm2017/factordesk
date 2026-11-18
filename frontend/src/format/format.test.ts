@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateLong, dateShort, isIsoDate, MINUS, num, parseIsoDate, pct, pval, signed, tstat } from "./index";
+import { count, dateLong, dateShort, isIsoDate, MINUS, num, parseIsoDate, pct, pval, signed, tstat } from "./index";
 
 describe("numbers", () => {
   it("uses the true minus sign U+2212 and never a hyphen", () => {
@@ -37,6 +37,15 @@ describe("numbers", () => {
     expect(tstat(2.24)).toBe("2.2");
     expect(pval(0.0004)).toBe("<0.001");
     expect(pval(0.0312)).toBe("0.031");
+  });
+});
+
+describe("count", () => {
+  it("groups thousands like the KPI strip", () => {
+    expect(count(8474)).toBe("8,474");
+    expect(count(999)).toBe("999");
+    expect(count(0)).toBe("0");
+    expect(count(1234567)).toBe("1,234,567");
   });
 });
 

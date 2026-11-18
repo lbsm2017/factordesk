@@ -107,6 +107,18 @@ describe("DataAuditPanel", () => {
     expect(f["Excluded inside the range"]).toBe("0");
   });
 
+  it("groups thousands in counts, as the KPI strip does (real Full-history SPY run)", () => {
+    const report = cloneReport();
+    report.data.n_obs = 8474;
+    report.data.uncovered.n = 1034;
+    report.data.dropped_price_dates_before_factors = 2500;
+    const { container } = render(<DataAuditPanel report={report} />);
+    const f = facts(container);
+    expect(f["Analysed"]).toMatch(/, 8,474 trading days$/);
+    expect(f["After factor data"]).toMatch(/^1,034 price days/);
+    expect(f["Before factor data"]).toBe("2,500 price days");
+  });
+
   it("closes with the note that findings are never acted on", () => {
     const { container } = render(<DataAuditPanel report={mockReport} />);
     const foot = container.querySelector(".foot");

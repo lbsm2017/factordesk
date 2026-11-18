@@ -1,5 +1,5 @@
 import type { AuditFinding, DataInfo } from "../../api/types";
-import { dateLong, pct } from "../../format";
+import { count, dateLong, pct } from "../../format";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
 
@@ -48,7 +48,7 @@ function datesText(dates: readonly string[]): string {
 }
 
 function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
+  return `${count(n)} ${n === 1 ? one : many}`;
 }
 
 /** "2026-11-01T00:00:00Z" as "2026-11-01 00:00 UTC" (the API sends UTC). */
@@ -65,7 +65,7 @@ function coverage(d: DataInfo): [string, string][] {
     .join(", ");
   const unc = d.uncovered;
   const after = unc.n
-    ? `${unc.n} price days (raw return ${unc.compounded_return === null ? "n/a" : pct(unc.compounded_return)}, not analysed)`
+    ? `${count(unc.n)} price days (raw return ${unc.compounded_return === null ? "n/a" : pct(unc.compounded_return)}, not analysed)`
     : "none";
   return [
     ["Requested", `${dateLong(d.requested_start)} to ${dateLong(d.requested_end)}`],
@@ -73,10 +73,10 @@ function coverage(d: DataInfo): [string, string][] {
       "Analysed",
       `${dateLong(d.actual_start)} to ${dateLong(d.actual_end)}, ${plural(d.n_obs, "trading day", "trading days")}`,
     ],
-    ["Excluded inside the range", `${d.n_excluded}${reasons ? ` (${reasons})` : ""}`],
+    ["Excluded inside the range", `${count(d.n_excluded)}${reasons ? ` (${reasons})` : ""}`],
     ["After factor data", after],
-    ["Before factor data", `${d.dropped_price_dates_before_factors} price days`],
-    ["Factor data ends", `${dateLong(d.factors_last_date)}, ${d.factors_days_behind} days before the report`],
+    ["Before factor data", `${count(d.dropped_price_dates_before_factors)} price days`],
+    ["Factor data ends", `${dateLong(d.factors_last_date)}, ${count(d.factors_days_behind)} days before the report`],
     ["Factor file downloaded", downloadedText(d.factors_downloaded_at)],
     ["Prices", d.price_source],
     // Plain text on purpose: the report never links out.
