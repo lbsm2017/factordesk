@@ -16,6 +16,7 @@ from factordesk.api.routes_factors import router as factors_router
 from factordesk.api.routes_report import router as report_router
 from factordesk.api.runtime import Runtime
 from factordesk.api.service import ReportService
+from factordesk.api.static import install_static
 from factordesk.report.schema import SCHEMA_VERSION
 
 
@@ -32,6 +33,8 @@ def create_app(deps: AppDeps) -> FastAPI:
     install_error_handlers(app)
     app.include_router(factors_router)
     app.include_router(report_router)
+    if deps.static_dir is not None:
+        install_static(app, deps.static_dir)  # last: its catch-all must not shadow the API
     return app
 
 
