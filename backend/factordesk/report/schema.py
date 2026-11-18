@@ -60,7 +60,15 @@ LABEL_TEXT: dict[str, str] = {
 class _Frozen(BaseModel):
     """Base class: immutable, strict types, unknown keys rejected, NaN/inf rejected."""
 
-    model_config = ConfigDict(frozen=True, strict=True, extra="forbid", allow_inf_nan=False)
+    # Fields with a default are always present in a serialised report, so the output schema (and the
+    # generated frontend types) lists them as required.
+    model_config = ConfigDict(
+        frozen=True,
+        strict=True,
+        extra="forbid",
+        allow_inf_nan=False,
+        json_schema_serialization_defaults_required=True,
+    )
 
 
 # ------------------------------------------------------------------------------ sample metadata

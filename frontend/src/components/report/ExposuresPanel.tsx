@@ -137,7 +137,7 @@ function ExposureTable({ model }: { model: ExposureModel }) {
 
 function footnotes(report: FactorReport, window: number): { footnote: string; how: string } {
   const g = report.regression;
-  const texts = report.label_text ?? {};
+  const texts = report.label_text;
   const desc = texts["L-DESC"] ?? DEFAULT_DESC;
   const more = [
     "Reliable means the Benjamini-Hochberg adjusted p is below 0.05 (Yes in the Significant column); noise means it is not (No, shown faded).",

@@ -87,8 +87,8 @@ function coverage(d: DataInfo): [string, string][] {
 /** Data and audit: coverage, audit findings, caveats. Findings are reported, never acted on. */
 export function DataAuditPanel({ report }: ReportPanelProps) {
   const d = report.data;
-  const findings = d.audit_findings ?? [];
-  const notes = [...(report.notes ?? [])];
+  const findings = d.audit_findings;
+  const notes = [...report.notes];
   const vintage = report.label_text?.["L-VINTAGE"];
   if (vintage && !notes.includes(vintage)) notes.push(vintage);
   return (
@@ -120,7 +120,7 @@ export function DataAuditPanel({ report }: ReportPanelProps) {
                   <span className="sev">{f.severity.charAt(0).toUpperCase() + f.severity.slice(1)}</span>
                   <span className="msg">
                     {f.message}
-                    <span className="dates">{datesText(f.dates ?? [])}</span>
+                    <span className="dates">{datesText(f.dates)}</span>
                   </span>
                 </li>
               ))

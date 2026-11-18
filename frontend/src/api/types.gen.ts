@@ -187,7 +187,7 @@ export interface components {
              * Dates
              * @description Dates the finding refers to (may be empty).
              */
-            dates?: string[];
+            dates: string[];
         };
         /**
          * AverageBeta
@@ -345,7 +345,7 @@ export interface components {
              */
             audit_status: "clean" | "warnings" | "errors";
             /** Audit Findings */
-            audit_findings?: components["schemas"]["AuditFinding"][];
+            audit_findings: components["schemas"]["AuditFinding"][];
         };
         /**
          * DiagnosticTest
@@ -449,17 +449,17 @@ export interface components {
             five_day_regression: components["schemas"]["MultiDayRegression"];
             price_series: components["schemas"]["PriceSeries"];
             /** Warnings */
-            warnings?: components["schemas"]["ReportWarning"][];
+            warnings: components["schemas"]["ReportWarning"][];
             /**
              * Notes
              * @description User-facing caveats: in-sample, US factors, survivorship, vintage.
              */
-            notes?: string[];
+            notes: string[];
             /**
              * Label Text
              * @description Footnote texts by label key.
              */
-            label_text?: {
+            label_text: {
                 [key: string]: string;
             };
         };

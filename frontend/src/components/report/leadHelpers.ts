@@ -21,7 +21,7 @@ export interface NoticeItem {
  * warning already carries it (same rule as the static renderer's `_notice_items`).
  */
 export function noticeItems(report: FactorReport): NoticeItem[] {
-  const items: NoticeItem[] = (report.warnings ?? []).map((w) => ({ code: w.code, message: w.message }));
+  const items: NoticeItem[] = report.warnings.map((w) => ({ code: w.code, message: w.message }));
   const gate = report.quality_gate;
   if (gate.fired && gate.message && !items.some((i) => i.code === "residual_reversal")) {
     items.unshift({ code: "residual_reversal", message: gate.message });

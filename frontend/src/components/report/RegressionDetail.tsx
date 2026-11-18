@@ -168,7 +168,7 @@ function DiagnosticsTable({ rd }: { rd: ResidualDiagnostics }) {
 }
 
 function labelTexts(report: FactorReport, keys: readonly string[]): string[] {
-  const texts = report.label_text ?? {};
+  const texts = report.label_text;
   return keys.filter((k) => k !== "L-DESC" && k in texts).map((k) => texts[k] ?? "");
 }
 

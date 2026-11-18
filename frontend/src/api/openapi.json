@@ -606,7 +606,8 @@
         "required": [
           "code",
           "severity",
-          "message"
+          "message",
+          "dates"
         ],
         "title": "AuditFinding",
         "description": "One data-quality finding from the price audit (reported, never acted on)."
@@ -957,7 +958,8 @@
           "n_excluded",
           "excluded_by_reason",
           "uncovered",
-          "audit_status"
+          "audit_status",
+          "audit_findings"
         ],
         "title": "DataInfo",
         "description": "Provenance and coverage of the data behind the report."
@@ -1223,6 +1225,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "schema_version",
           "ticker",
           "generated_at",
           "data",
@@ -1234,7 +1237,10 @@
           "residual_diagnostics",
           "quality_gate",
           "five_day_regression",
-          "price_series"
+          "price_series",
+          "warnings",
+          "notes",
+          "label_text"
         ],
         "title": "FactorReport",
         "description": "Everything the UI or an exported file needs to describe one ticker's factor exposures."
