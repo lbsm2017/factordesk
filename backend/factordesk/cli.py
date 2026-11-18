@@ -215,6 +215,7 @@ def _cmd_report(
         _err(
             f"{symbol} has {exc.n} daily returns that line up with the factor data; at least "
             f"{exc.required} (about two years) are required"
+            + (f": {exc.detail}" if exc.detail else "")
         )
         return EXIT_DATA
     except DegenerateInputError as exc:

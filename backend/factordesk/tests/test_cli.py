@@ -150,6 +150,39 @@ def test_too_short_history(capsys: pytest.CaptureFixture[str], tmp_path: Path) -
     assert code == cli.EXIT_DATA
     err = capsys.readouterr().err
     assert "300" in err and "504" in err and err.count("\n") == 1
+    assert "missing" not in err and "overlap" not in err  # a short history has no single cause
+
+
+def test_zero_aligned_rows_name_their_cause(
+    synthetic: tuple[StaticProvider, pd.DataFrame],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Validation F14: all prices missing and no date overlap give different reasons."""
+    provider, factors = synthetic
+    history = provider.fetch("SPY")
+    frame = history.frame.copy()
+    frame[["close", "adj_close"]] = np.nan
+    blank = StaticProvider(PriceHistory("SPY", frame, history.fetched_at, history.source))
+    code = cli.main(
+        ["report", "SPY", "--out", str(tmp_path)], price_provider=blank, factors=factors, now=NOW
+    )
+    assert code == cli.EXIT_DATA
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and "has 0 daily returns" in err
+    assert "every price in the requested range is missing" in err
+
+    after_factors = str(history.frame.index[790].date())  # factors cover the first 780 rows
+    code = cli.main(
+        ["report", "SPY", "--out", str(tmp_path), "--start", after_factors],
+        price_provider=provider,
+        factors=factors,
+        now=NOW,
+    )
+    assert code == cli.EXIT_DATA
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and "has 0 daily returns" in err
+    assert "no price date falls in both the requested range" in err
 
 
 def test_refuses_cache_folder(
