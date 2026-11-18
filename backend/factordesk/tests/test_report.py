@@ -880,3 +880,20 @@ def test_render_price_shades_both_non_analysed_ends() -> None:
     only_right = render_report_html(rep)
     assert only_right.count('class="tailzone"') == 1 and "Not analysed: before" not in only_right
     assert "How has the price moved over the window? Shaded days are not in the analysis." in both
+
+
+def test_decimation_keeps_one_day_spikes() -> None:
+    """Validation F11: thinning a long series for the page must not hide its extremes."""
+    from factordesk.report import render_html
+
+    n, spike_at = 8000, 4321  # a fixed stride of 20 would skip index 4321
+    pts = [(float(i), 1.0, 0.1) for i in range(n)]
+    pts[spike_at] = (float(spike_at), 5.0, 0.1)
+    pts[6007] = (6007.0, -3.0, 0.1)
+    out = render_html._decimate(pts, 400, render_html._second)  # pyright: ignore[reportPrivateUsage]
+    assert len(out) <= 402 and out[0] == pts[0] and out[-1] == pts[-1]
+    assert pts[spike_at] in out and pts[6007] in out
+    assert [p[0] for p in out] == sorted(p[0] for p in out)  # original order
+    assert out == render_html._decimate(pts, 400, render_html._second)  # pyright: ignore[reportPrivateUsage]
+    short = pts[:300]
+    assert render_html._decimate(short, 400, render_html._second) == short  # pyright: ignore[reportPrivateUsage]

@@ -245,15 +245,29 @@ def _decimals(values: Sequence[float]) -> int:
     return 4
 
 
-def _decimate[T](items: list[T], max_n: int) -> list[T]:
-    """Deterministic stride decimation that always keeps the last element."""
-    if len(items) <= max_n or max_n < 2:
+def _decimate[T](items: list[T], max_n: int, value: Callable[[T], float]) -> list[T]:
+    """Deterministic min-max decimation to about ``max_n`` points (validation F11).
+
+    The series is cut into ``max_n // 2`` consecutive buckets; each bucket keeps its lowest and
+    highest point by ``value``, in their original order, so a one-day spike is never thinned
+    away the way a fixed stride would. The first and last points are always kept (at most
+    ``max_n + 2`` points in all).
+    """
+    n = len(items)
+    if n <= max_n or max_n < 4:
         return items
-    stride = math.ceil(len(items) / max_n)
-    out = items[::stride]
-    if out[-1] is not items[-1]:
-        out.append(items[-1])
-    return out
+    size = math.ceil(n / (max_n // 2))
+    keep = {0, n - 1}
+    for lo in range(0, n, size):
+        idx = range(lo, min(lo + size, n))
+        keep.add(min(idx, key=lambda i: value(items[i])))
+        keep.add(max(idx, key=lambda i: value(items[i])))
+    return [items[i] for i in sorted(keep)]
+
+
+def _second(point: tuple[float, ...]) -> float:
+    """The plotted value of a ``(x, value, ...)`` point, the key for ``_decimate``."""
+    return point[1]
 
 
 def _quantile(xs: list[float], q: float) -> float:
@@ -699,9 +713,9 @@ def _price_panel(report: FactorReport) -> str:
     tail = [(x_of(dt), y_of(v)) for dt, v in pts[max(cut, 0) :]]
     paths = ""
     if len(main) > 1:
-        paths += f'<path class="price-line" d="{_path_xy(_decimate(main, 700))}"/>'
+        paths += f'<path class="price-line" d="{_path_xy(_decimate(main, 700, _second))}"/>'
     if len(tail) > 1:
-        paths += f'<path class="price-tail" d="{_path_xy(_decimate(tail, 300))}"/>'
+        paths += f'<path class="price-tail" d="{_path_xy(_decimate(tail, 300, _second))}"/>'
     label = f"{report.ticker} adjusted close price over time"
     svg = (
         f'<svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" '
@@ -1128,7 +1142,7 @@ def _rolling_block(
         def y_of(v: float, lo: float = lo, hi: float = hi) -> float:
             return 100 - (v - lo) / (hi - lo) * 100
 
-        sp = _decimate(pts, 400)
+        sp = _decimate(pts, 400, _second)
         upper = [(x_of(i), y_of(v + z * s)) for i, v, s in sp]
         lower = [(x_of(i), y_of(v - z * s)) for i, v, s in sp][::-1]
         band = _path_xy(upper + lower) + "Z"
