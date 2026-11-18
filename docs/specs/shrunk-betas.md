@@ -352,7 +352,7 @@ M0.9 labels L-SHRINK, L-SHRINK-PRIOR, L-CRED, L-CORR-MOVE, L-MDE; M0.7 rows for 
 ### SB10.4 Open questions for the owner
 
 1. **Prior spread for single stocks.** Portfolio dispersion understates single-stock dispersion (SB2.4), and the simulation shows the cost when the prior is too tight. Options: (a) ship as specified with the caveat; (b) inflate `tau` by a fixed factor (for example 2) until peers exist, which is a tuning choice we cannot verify today; (c) ship only the power statement now and the shrunk betas with the peer prior. Recommendation: (a) with the caveat, because the view is secondary and the `c = 0.5` case shows a conservative spread costs little.
-2. **Download size.** The prior needs 4 extra files (about 13.4 MB zipped, 76 MB unzipped [V]) per vintage. Acceptable?
+2. **Download size.** The prior needs 4 extra files (about 13.4 MB zipped, 76 MB unzipped [V]) per vintage. Acceptable? **Owner decision, 2026-11-18: approved.** The four files are refreshed together with the factor data: same staleness policy as the factor file (more than 40 days behind, at most one automatic attempt per 12 hours), re-downloaded when the factor vintage moves on, checked with `If-Modified-Since` on a manual refresh, downloaded one after the other, and refreshed by `factordesk factors refresh` and `POST /api/factors/refresh`. When the site cannot be reached the section is `failed` (`prior_unavailable`) and the rest of the report is unaffected.
 3. **`delta = 0.05`** for the "years to detect" sentence: keep fixed, or let the user choose (it would be a fourth tunable for the regression panel; M15 allows none today)?
 
 ---
