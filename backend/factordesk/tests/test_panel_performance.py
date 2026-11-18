@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from html import unescape
 from pathlib import Path
 
 import pytest
@@ -39,7 +40,7 @@ def _html(report: FactorReport) -> str:
 
 
 def _text(html: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+    return re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", html)))
 
 
 def test_tp41_absent_section_draws_nothing() -> None:
@@ -71,12 +72,16 @@ def test_tp43_four_cell_strip_with_plain_lines() -> None:
     text = _text(html)
     assert "Compound growth over the window" in text
     assert "Typical size of daily swings, scaled to a year" in text
-    assert "Return above the risk-free rate per unit of risk; the interval includes zero" in text
+    # DV4.7 wording, word for word.
+    assert (
+        "Return above the factor file's risk-free rate, per unit of volatility. "
+        "Cannot be told apart from zero." in text
+    )
     # The values come from the section, true minus sign for negatives.
     assert panel.fmt_pct(sec.returns.cagr, 1) in text
     assert panel.fmt_pct(sec.drawdown.max_drawdown, 1) in text
     assert "−7.2%" in text and "22.9%" in text and "−0.36" in text and "−41.0%" in text
-    assert "Peak 2 Jan 2025, trough 12 Mar 2026, not recovered" in text
+    assert "From 2 Jan 2025 to 12 Mar 2026; not recovered by 30 Sep 2026" in text
 
 
 def test_tp44_sharpe_line_says_whether_the_interval_includes_zero() -> None:
@@ -86,8 +91,8 @@ def test_tp44_sharpe_line_says_whether_the_interval_includes_zero() -> None:
         update={"ratio_annual": 1.2, "ci95_low": 0.3, "ci95_high": 2.1, "ci_includes_zero": False}
     )
     text = _text(_html(_with(report, sharpe=sharpe)))
-    assert "the interval does not include zero" in text and "1.20" in text
-    assert "includes zero" not in text.replace("does not include zero", "")
+    assert "Above zero at the 5% level." in text and "1.20" in text
+    assert "Cannot be told apart from zero." not in text and "Below zero" not in text
     assert "from 0.30 to 2.10" in text
     assert "assumes independent daily returns" in text
 
@@ -131,7 +136,7 @@ def test_tp46_recovered_and_no_fall_states() -> None:
         series=DrawdownSeries(dates=[date(2025, 1, 2)], values=[0.0]),
     )
     text = _text(_html(_with(report, drawdown=dd)))
-    assert "Peak 2 Jan 2025, trough 3 Mar 2025, recovered 2 Jun 2025" in text
+    assert "From 2 Jan 2025 to 3 Mar 2025; back at the peak by 2 Jun 2025" in text
     assert "−20.0%" in text
     none = PerformanceDrawdown(
         max_drawdown=0.0,
@@ -218,3 +223,36 @@ def test_tp51_uses_existing_classes_only(width_class: str) -> None:
         "perf-table-title", "scroll-x", "reg", "num", "vh", "foot", "how",
     }  # fmt: skip
     assert flat <= allowed, flat - allowed
+
+
+def test_tp60_sharpe_below_zero_and_no_interval_wording() -> None:
+    report = _report()
+    assert report.performance is not None and report.performance.sharpe is not None
+    below = report.performance.sharpe.model_copy(
+        update={
+            "ratio_annual": -1.2,
+            "ci95_low": -2.1,
+            "ci95_high": -0.3,
+            "ci_includes_zero": False,
+        }
+    )
+    text = _text(_html(_with(report, sharpe=below)))
+    assert "Below zero at the 5% level." in text and "Above zero" not in text
+    assert panel._sharpe_note(below.model_copy(update={"ci95_low": None})).endswith(
+        "No interval available."
+    )
+
+
+def test_tp61_the_window_sentence_leaves_out_the_arithmetic_average() -> None:
+    report = _report()
+    assert report.performance is not None and report.performance.returns is not None
+    html = _html(report)
+    line = re.search(r'<p class="perf-line">(.*?)</p>', html, flags=re.S)
+    assert line is not None
+    sentence = _text(line.group(1))
+    assert "in total" in sentence and "times 252" not in sentence
+    shown = panel.fmt_pct(report.performance.returns.mean_return_annual, 1)
+    assert shown not in _text(html)
+    how = _text(html.split("How this is computed", 1)[1])
+    assert "large swings cut compound growth" in how and "not what an investor earned" in how
+    assert "two other ways to state the same history" not in how

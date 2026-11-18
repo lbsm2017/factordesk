@@ -16,6 +16,8 @@ only changes the strip from five to four cells); a larger visual redesign will r
 
 from __future__ import annotations
 
+from datetime import date
+
 from factordesk.report.panel_registry import register_panel
 from factordesk.report.render_html import (
     date_long,
@@ -31,6 +33,7 @@ from factordesk.report.sections.performance import (
     DrawdownEpisodeInfo,
     PerformanceDrawdown,
     PerformanceSection,
+    PerformanceSharpe,
 )
 
 PANEL_ID = "performance"
@@ -41,7 +44,11 @@ FOOTNOTE = "Past performance does not predict future performance."
 NOTES = {
     "return": "Compound growth over the window",
     "volatility": "Typical size of daily swings, scaled to a year",
-    "sharpe": "Return above the risk-free rate per unit of risk; the interval {verb} zero",
+    "sharpe": "Return above the factor file's risk-free rate, per unit of volatility.",
+    "sharpe_none": "No interval available.",
+    "sharpe_zero": "Cannot be told apart from zero.",
+    "sharpe_above": "Above zero at the 5% level.",
+    "sharpe_below": "Below zero at the 5% level.",
     "sharpe_undefined": "Not defined: the daily returns do not vary",
     "no_fall": "No fall from an earlier high",
 }
@@ -51,8 +58,10 @@ HOW = (
     "moves with the date range. Returns are simple daily total returns from adjusted close.",
     "Return a year is the compound annual growth rate: the product of one plus each daily "
     "return, raised to 252 divided by the number of days, minus one. The total return over the "
-    "window and the average daily return times 252 are the two other ways to state the same "
-    "history.",
+    "window is the same history without the annual scaling. The simple average of daily "
+    "returns times 252 is higher than the compound figure when returns swing widely, because "
+    "large swings cut compound growth; it is not what an investor earned, so the panel does "
+    "not show it as a result.",
     "Volatility a year is the sample standard deviation of daily returns times the square root "
     "of 252.",
     "The Sharpe ratio is the average daily excess return (stock return minus the risk-free rate "
@@ -88,24 +97,38 @@ def _days(n: int | None) -> str:
     return "n/a" if n is None else f"{n:,}"
 
 
-def _fall_note(dd: PerformanceDrawdown) -> str:
+def _fall_note(dd: PerformanceDrawdown, end: date) -> str:
     if dd.peak_date is None or dd.trough_date is None:
         return NOTES["no_fall"]
-    text = f"Peak {date_long(dd.peak_date)}, trough {date_long(dd.trough_date)}, "
+    text = f"From {date_long(dd.peak_date)} to {date_long(dd.trough_date)}; "
     if dd.recovery_date is None:
-        return text + "not recovered"
-    return text + f"recovered {date_long(dd.recovery_date)}"
+        return text + f"not recovered by {date_long(end)}"
+    return text + f"back at the peak by {date_long(dd.recovery_date)}"
+
+
+def _sharpe_note(sharpe: PerformanceSharpe) -> str:
+    """The Sharpe line: what it measures, then what the 95% interval allows (DV4.7 wording)."""
+    if sharpe.ci95_low is None or sharpe.ci95_high is None:
+        verdict = NOTES["sharpe_none"]
+    elif sharpe.ci95_low > 0.0:
+        verdict = NOTES["sharpe_above"]
+    elif sharpe.ci95_high < 0.0:
+        verdict = NOTES["sharpe_below"]
+    else:
+        verdict = NOTES["sharpe_zero"]
+    return f"{NOTES['sharpe']} {verdict}"
 
 
 def _cells(section: PerformanceSection) -> list[tuple[str, str, str, str]]:
     returns, sharpe, dd = section.returns, section.sharpe, section.drawdown
     assert returns is not None and sharpe is not None and dd is not None
+    assert section.periods is not None
+    periods_end = section.periods.end
     if sharpe.ratio_annual is None or sharpe.ci_includes_zero is None:
         sharpe_value, sharpe_note, sharpe_cls = "n/a", NOTES["sharpe_undefined"], "ns"
     else:
-        verb = "includes" if sharpe.ci_includes_zero else "does not include"
         sharpe_value = fmt_num(sharpe.ratio_annual, 2)
-        sharpe_note, sharpe_cls = NOTES["sharpe"].format(verb=verb), ""
+        sharpe_note, sharpe_cls = _sharpe_note(sharpe), ""
     return [
         ("Return a year", fmt_pct(returns.cagr, 1), NOTES["return"], ""),
         (
@@ -115,7 +138,7 @@ def _cells(section: PerformanceSection) -> list[tuple[str, str, str, str]]:
             "",
         ),
         ("Sharpe ratio", sharpe_value, sharpe_note, sharpe_cls),
-        ("Worst fall", fmt_pct(dd.max_drawdown, 1), _fall_note(dd), ""),
+        ("Worst fall", fmt_pct(dd.max_drawdown, 1), _fall_note(dd, periods_end), ""),
     ]
 
 
@@ -134,8 +157,7 @@ def _window_line(section: PerformanceSection) -> str:
     parts = [
         f"Over {periods.years:.1f} years ({periods.n_days:,} trading days, "
         f"{date_long(periods.start)} to {date_long(periods.end)}) the stock returned "
-        f"{fmt_pct(returns.cumulative_return, 1)} in total; the average daily return times 252 "
-        f"is {fmt_pct(returns.mean_return_annual, 1)}."
+        f"{fmt_pct(returns.cumulative_return, 1)} in total."
     ]
     if sharpe.ci95_low is not None and sharpe.ci95_high is not None:
         parts.append(
