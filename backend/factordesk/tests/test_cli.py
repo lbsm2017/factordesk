@@ -24,6 +24,7 @@ from factordesk.api import deps as deps_module
 from factordesk.data.factors import FactorDownloadError, FactorStatus
 from factordesk.data.prices import PriceDataError, PriceHistory
 from factordesk.report import load_report
+from factordesk.section_hooks.context import SectionInputs
 from factordesk.tests.fixtures.dgp import StaticProvider, dgp_a, rng_for
 
 NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
@@ -703,3 +704,33 @@ def test_open_when_ready_opens_after_the_port_accepts(monkeypatch: pytest.Monkey
         cli._open_when_ready("127.0.0.1", port)  # pyright: ignore[reportPrivateUsage]
         assert done.wait(timeout=10)
     assert opened_urls == [f"http://127.0.0.1:{port}/"]
+
+
+def test_report_passes_the_factor_last_date_to_the_section_loader(
+    synthetic: tuple[StaticProvider, pd.DataFrame],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The CLI path keeps the portfolio files on the factor vintage, like the dashboard (C3)."""
+    provider, factors = synthetic
+    seen: list[dict[str, object]] = []
+
+    def loader(now: datetime, **kwargs: object) -> SectionInputs:
+        seen.append(kwargs)
+        return SectionInputs()
+
+    monkeypatch.setattr("factordesk.pipeline.load_section_inputs", loader)
+
+    def load_factors(**kwargs: object) -> pd.DataFrame:
+        return factors
+
+    def no_status(**kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr("factordesk.pipeline.factor_data.load_ff5_daily", load_factors)
+    monkeypatch.setattr("factordesk.pipeline.factor_data.factor_status", no_status)
+    code = cli.main(["report", "SPY", "--out", str(tmp_path)], price_provider=provider, now=NOW)
+    assert code == 0
+    (kwargs,) = seen
+    assert kwargs["offline"] is False
+    assert kwargs["factor_last_date"] == pd.Timestamp(factors.index[-1]).date()

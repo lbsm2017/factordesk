@@ -201,3 +201,13 @@ None of C1 to C3 changes a number. C1 and C2 concern the owner's texts. If the o
 - The decade stability table of SB2.2, the SB8.3 rows other than c = 1 and c = 2, and the serially correlated DGP. TSB15 passed in the repo's slow test; I did not re-simulate it.
 - The RDDT numbers rest on the cached RDDT file (SHA-256 `9fe2d18e...`), which is not listed in the hand-off.
 - TSB18 (OLS untouched) beyond the repo test: I did not diff a full report with and without the section. The shrunk section's `beta_ols` equals my independent OLS.
+
+## 9. Conditions met (2026-11-18)
+
+The three conditions of section 7 were met on branch `feat/shrunk-betas`, one commit each, with no change to any number:
+
+- **C1** (commit `350ff34`): the pull note, the legend, the React marker tooltip and the schema description of `pull` now say that pull is the weight the prior gets on a beta by itself, and that the beta can move less, more or away from typical when factors are estimated together. A row that moved away is no longer called "pulled toward typical". Tests on both panels pin the words.
+- **C2** (commit `781dce7`): L-SHRINK-PRIOR says "(values above)", which is where the prior values are. Proposed spec edits for SB6 and the SB5 "already detectable" sentence are in section 9 of `shrunk-betas-handoff-2026-11-18.md`; the spec itself is not edited.
+- **C3** (this commit): the CLI path passes `factor_last_date`, as the dashboard does; test in `test_cli.py`.
+
+Gates after the three commits: pytest 651 passed (209 `slow` and `live` deselected), ruff and pyright clean, frontend typecheck and lint clean, vitest 399 passed, build, size budget and the browser smoke test pass.
