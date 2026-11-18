@@ -45,13 +45,60 @@ Options, as of commit f36255e (`backend/factordesk/cli.py`):
 |---|---|
 | `--host HOST` | Address to listen on. Default `127.0.0.1`. |
 | `--port PORT` | Port, 1 to 65535. Default `8000`. |
-| `--static DIR` | Folder with the built page. Default `frontend/dist` in the repository. |
+| `--static DIR` | Folder with the built page. Default: `frontend/dist` in a checkout, otherwise the copy shipped inside the package (`factordesk/web`). |
 | `--dev` | API only, restarts when Python code changes. The page comes from Vite. |
 | `--open` | Open the dashboard in a browser once the server accepts connections. |
 
 If you pass a host that is not a loopback address, the server prints a warning: the dashboard has
 no login, so anyone who can reach that address can use it. Keep the default unless you know why
 you are changing it.
+
+### Install without cloning (after the first release)
+
+This section depends on factordesk being published on PyPI and on a tagged release that carries
+the bootstrap scripts. As of commit ce931c7 neither exists, so the commands below do not work
+yet. The wheel is built and tested locally (see `docs/release-checklist.md`). Replace `0.1.0`
+with the release you want; there is no "latest" form on purpose, so a run is repeatable.
+
+The wheel contains the built page and the report fonts, so a clean machine needs only uv, not Node
+and not a checkout.
+
+If you already have uv:
+
+```text
+uvx --from factordesk==0.1.0 factordesk serve --open
+```
+
+If you do not have uv, download the script from the release, check it, then run it. Do not pipe
+a download into a shell. The release page lists a SHA-256 for each script in `SHA256SUMS`.
+
+macOS and Linux:
+
+```text
+curl -fsSLO https://github.com/lbsm2017/factordesk/releases/download/v0.1.0/install.sh
+curl -fsSLO https://github.com/lbsm2017/factordesk/releases/download/v0.1.0/SHA256SUMS
+grep ' install.sh$' SHA256SUMS      # the published hash; compare it with the next line
+sha256sum install.sh                # on macOS: shasum -a 256 install.sh
+sh install.sh --version 0.1.0 --expect-sha256 <the hash from SHA256SUMS>
+```
+
+Windows PowerShell:
+
+```text
+Invoke-WebRequest https://github.com/lbsm2017/factordesk/releases/download/v0.1.0/install.ps1 -OutFile install.ps1
+Get-FileHash install.ps1 -Algorithm SHA256     # compare with install.ps1 in the release SHA256SUMS
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version 0.1.0 -ExpectSha256 <the hash>
+```
+
+Both scripts print what they will do before they do it. Add `--dry-run` (`-DryRun` on Windows)
+to see the plan and change nothing. They install uv only if it is missing, using uv's own
+installer (<https://docs.astral.sh/uv/getting-started/installation/>) at a pinned uv version,
+saved to a file first. The `--expect-sha256` check catches a damaged or swapped copy of the
+script. It does not help if both the script and the hash came from a compromised page, so read
+the script (about 140 lines) if that matters to you.
+
+The cache folder `data/` is created in the folder you run the command from (the default of
+`DATA_DIR`). Run it from a folder you are happy to keep cached files in, or set `DATA_DIR`.
 
 ### Development, two servers
 
