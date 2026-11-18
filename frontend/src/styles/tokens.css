@@ -1,0 +1,108 @@
+/* Design tokens, docs/design/report-design.md section A (light, dark by prefers-color-scheme,
+   and html[data-theme] overrides both ways). The only file that may contain colour literals. */
+
+:root {
+  color-scheme: light;
+  /* named palette */
+  --chalk: #edf0f3;
+  --sheet: #ffffff;
+  --graphite: #16202b;
+  --slate: #465361;
+  --cobalt: #2a5bc0;
+  --copper: #b4560c;
+  /* semantic */
+  --page: var(--chalk);
+  --surface: var(--sheet);
+  --sunk: #f5f7f9;
+  --border: #d3d9e0;
+  --grid: #e5e9ee;
+  --axis: #8a95a2;
+  --ink: var(--graphite);
+  --ink-2: var(--slate);
+  --ink-3: #5f6b78;
+  --ink-faded: #777e85;
+  --focus: var(--graphite);
+  --accent: var(--graphite);
+  --pos: var(--cobalt);
+  --neg: var(--copper);
+  --f1: #7559c5; /* Mkt-RF */
+  --f2: #066e33; /* SMB */
+  --f3: #c25078; /* HML */
+  --f4: #1995ba; /* RMW */
+  --f5: #a18a21; /* CMA */
+  /* type */
+  --sans: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --math: "STIX Two Text", "Cambria Math", Cambria, "Times New Roman", serif;
+  --fs-1: 12.5px;
+  --fs-2: 15px;
+  --fs-3: 18px;
+  --fs-4: 21.6px;
+  --fs-5: 26px;
+  --fs-6: 44.8px;
+  /* space */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --row: 44px;
+  --label-w: 176px;
+  --num-w: 92px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --chalk: #0e1318;
+    --sheet: #151b22;
+    --graphite: #e8edf2;
+    --slate: #b0bbc6;
+    --cobalt: #5f8ae6;
+    --copper: #d27c2e;
+    --sunk: #1b232c;
+    --border: #2c3743;
+    --grid: #212a34;
+    --axis: #66727f;
+    --ink-3: #8f9ba8;
+    --ink-faded: #8a929b;
+    --f1: #7053be;
+    --f2: #19783c;
+    --f3: #cb587f;
+    --f4: #1493b8;
+    --f5: #aa932d;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --chalk: #0e1318;
+  --sheet: #151b22;
+  --graphite: #e8edf2;
+  --slate: #b0bbc6;
+  --cobalt: #5f8ae6;
+  --copper: #d27c2e;
+  --sunk: #1b232c;
+  --border: #2c3743;
+  --grid: #212a34;
+  --axis: #66727f;
+  --ink-3: #8f9ba8;
+  --ink-faded: #8a929b;
+  --f1: #7053be;
+  --f2: #19783c;
+  --f3: #cb587f;
+  --f4: #1493b8;
+  --f5: #aa932d;
+}
+
+/* print: light tokens even from a dark OS */
+@media print {
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --chalk: #ffffff; --sheet: #ffffff; --graphite: #16202b; --slate: #465361;
+    --cobalt: #2a5bc0; --copper: #b4560c; --sunk: #f5f7f9; --border: #c9d0d8; --grid: #e5e9ee;
+    --axis: #8a95a2; --ink-3: #5f6b78; --ink-faded: #777e85;
+    --f1: #7559c5; --f2: #066e33; --f3: #c25078; --f4: #1995ba; --f5: #a18a21;
+    --label-w: 132px; --num-w: 72px;
+  }
+}

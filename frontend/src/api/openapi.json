@@ -1,0 +1,3153 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "factordesk",
+    "summary": "Local Fama-French 5-factor analysis API.",
+    "version": "3"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Get Health",
+        "description": "Liveness. Reads no disk and no network.",
+        "operationId": "get_health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/factors/status": {
+      "get": {
+        "summary": "Get Factor Status",
+        "description": "Coverage and age of the cached factor file; ``available`` is false when none.",
+        "operationId": "get_factor_status_api_factors_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactorDataStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/factors/refresh": {
+      "post": {
+        "summary": "Refresh Factors",
+        "description": "Force a factor download. Calls made while one runs join it; a failure keeps the cache.",
+        "operationId": "refresh_factors_api_factors_refresh_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactorDataStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The data source could not be reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The downloaded factor file failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tickers": {
+      "get": {
+        "summary": "Get Tickers",
+        "description": "Tickers already fetched (prefix match, newest first). Makes no network call.",
+        "operationId": "get_tickers_api_tickers_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 12,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 8,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TickerSuggestions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report/{ticker}/ranges": {
+      "get": {
+        "summary": "Get Ranges",
+        "description": "Availability of every range preset for this ticker, with the reason when one is short.",
+        "operationId": "get_ranges_api_report__ticker__ranges_get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RangeOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range or the dates are not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No prices were returned for the ticker.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid ticker, too little history, or inputs that cannot be analysed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The report could not be computed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The downloaded factor file failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A data source could not be reached or refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report/{ticker}": {
+      "get": {
+        "summary": "Get Report",
+        "description": "The factor report for a range preset or custom dates (neither: Full history).",
+        "operationId": "get_report_api_report__ticker__get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "3Y",
+                    "5Y",
+                    "FULL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Range preset; not together with start or end.",
+              "title": "Range"
+            },
+            "description": "Range preset; not together with start or end."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First requested date, YYYY-MM-DD.",
+              "title": "Start"
+            },
+            "description": "First requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last requested date, YYYY-MM-DD.",
+              "title": "End"
+            },
+            "description": "Last requested date, YYYY-MM-DD."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactorReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range or the dates are not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No prices were returned for the ticker.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid ticker, too little history, or inputs that cannot be analysed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The report could not be computed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The downloaded factor file failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A data source could not be reached or refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report/{ticker}/html": {
+      "get": {
+        "summary": "Get Report Html",
+        "description": "The offline HTML report for the same ticker and range, as a file download.",
+        "operationId": "get_report_html_api_report__ticker__html_get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "3Y",
+                    "5Y",
+                    "FULL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Range preset; not together with start or end.",
+              "title": "Range"
+            },
+            "description": "Range preset; not together with start or end."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First requested date, YYYY-MM-DD.",
+              "title": "Start"
+            },
+            "description": "First requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last requested date, YYYY-MM-DD.",
+              "title": "End"
+            },
+            "description": "Last requested date, YYYY-MM-DD."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range or the dates are not valid.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No prices were returned for the ticker.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid ticker, too little history, or inputs that cannot be analysed.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The report could not be computed.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The downloaded factor file failed validation.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A data source could not be reached or refused.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_ticker",
+              "unknown_ticker",
+              "bad_range",
+              "insufficient_history",
+              "degenerate_input",
+              "factor_data_invalid",
+              "network",
+              "upstream_refused",
+              "not_found",
+              "internal",
+              "bad_request"
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "action"
+        ],
+        "title": "ApiError",
+        "description": "Every error body: ``message`` says what went wrong, ``action`` what to do."
+      },
+      "AuditFinding": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Stable machine-readable code, e.g. 'large_return'."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "User-facing explanation in plain English."
+          },
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates",
+            "description": "Dates the finding refers to (may be empty)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "AuditFinding",
+        "description": "One data-quality finding from the price audit (reported, never acted on)."
+      },
+      "AverageBeta": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "full_sample_beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Sample Beta"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "sd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sd",
+            "description": "Standard deviation (ddof = 1); not a standard error."
+          },
+          "p10": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P10"
+          },
+          "p90": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "share_positive": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Positive",
+            "description": "Share of stamps with beta > 0."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "full_sample_beta",
+          "mean",
+          "sd",
+          "p10",
+          "p90",
+          "min",
+          "max",
+          "share_positive"
+        ],
+        "title": "AverageBeta",
+        "description": "Distribution of the rolling betas of the primary window for one factor (M5)."
+      },
+      "AverageBetaPanel": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "window": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Window"
+          },
+          "n_stamps": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Stamps"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/AverageBeta"
+            },
+            "type": "array",
+            "title": "Factors"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "window",
+          "n_stamps",
+          "factors"
+        ],
+        "title": "AverageBetaPanel",
+        "description": "Average beta over all stamps of the primary window (M5). Stamped at the sample end."
+      },
+      "CorrPair": {
+        "properties": {
+          "a": {
+            "type": "string",
+            "title": "A"
+          },
+          "b": {
+            "type": "string",
+            "title": "B"
+          },
+          "corr": {
+            "type": "number",
+            "title": "Corr"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "a",
+          "b",
+          "corr"
+        ],
+        "title": "CorrPair",
+        "description": "A factor pair whose sample correlation exceeds 0.6 in absolute value (M3.4)."
+      },
+      "DataInfo": {
+        "properties": {
+          "requested_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Requested Start"
+          },
+          "requested_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Requested End"
+          },
+          "actual_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Actual Start",
+            "description": "First date of the analysis sample."
+          },
+          "actual_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Actual End",
+            "description": "Last date of the analysis sample."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Rows in the analysis sample."
+          },
+          "factors_last_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Factors Last Date",
+            "description": "Last date for which French factor data exists."
+          },
+          "factors_downloaded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factors Downloaded At",
+            "description": "UTC download time of the factor file; None when injected."
+          },
+          "factors_days_behind": {
+            "type": "integer",
+            "title": "Factors Days Behind",
+            "description": "Days from factors_last_date to the report date."
+          },
+          "factors_source_url": {
+            "type": "string",
+            "title": "Factors Source Url"
+          },
+          "price_source": {
+            "type": "string",
+            "title": "Price Source",
+            "description": "Price provider label, e.g. 'yfinance (Adj Close)'."
+          },
+          "dropped_price_dates_after_factors": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Dropped Price Dates After Factors",
+            "description": "Price dates after factors_last_date that could not enter the sample."
+          },
+          "dropped_price_dates_before_factors": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Dropped Price Dates Before Factors",
+            "description": "Price dates before the factor file's first date."
+          },
+          "n_excluded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Excluded",
+            "description": "Rows inside the range excluded (see reasons)."
+          },
+          "excluded_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Excluded By Reason"
+          },
+          "uncovered": {
+            "$ref": "#/components/schemas/UncoveredTail"
+          },
+          "audit_status": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "warnings",
+              "errors"
+            ],
+            "title": "Audit Status"
+          },
+          "audit_findings": {
+            "items": {
+              "$ref": "#/components/schemas/AuditFinding"
+            },
+            "type": "array",
+            "title": "Audit Findings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requested_start",
+          "requested_end",
+          "actual_start",
+          "actual_end",
+          "n_obs",
+          "factors_last_date",
+          "factors_downloaded_at",
+          "factors_days_behind",
+          "factors_source_url",
+          "price_source",
+          "dropped_price_dates_after_factors",
+          "dropped_price_dates_before_factors",
+          "n_excluded",
+          "excluded_by_reason",
+          "uncovered",
+          "audit_status"
+        ],
+        "title": "DataInfo",
+        "description": "Provenance and coverage of the data behind the report."
+      },
+      "DiagnosticTest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "ljung_box",
+              "robust_breusch_godfrey",
+              "arch_lm",
+              "jarque_bera",
+              "durbin_watson"
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name."
+          },
+          "statistic": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statistic"
+          },
+          "df": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Df",
+            "description": "Degrees of freedom of the chi-square reference; None for Durbin-Watson."
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P",
+            "description": "Nominal p-value, not corrected; None for Durbin-Watson."
+          },
+          "reading": {
+            "type": "string",
+            "title": "Reading",
+            "description": "Plain-language reading of the result."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "statistic",
+          "df",
+          "p",
+          "reading"
+        ],
+        "title": "DiagnosticTest",
+        "description": "One residual diagnostic (M3.5). Informational: never drives tags or alerts."
+      },
+      "ExcludedRow": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "multi_day_return",
+              "no_factor_row",
+              "price_missing",
+              "factor_missing"
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date",
+          "reason"
+        ],
+        "title": "ExcludedRow",
+        "description": "One return row left out of the analysis sample, with the reason (M2)."
+      },
+      "FactorDataStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date"
+          },
+          "last_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Date"
+          },
+          "days_behind": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Behind"
+          },
+          "last_download_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Download At"
+          },
+          "stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "available",
+          "first_date",
+          "last_date",
+          "days_behind",
+          "last_download_at",
+          "stale",
+          "source_url"
+        ],
+        "title": "FactorDataStatus",
+        "description": "Coverage and age of the cached Fama-French file; ``available`` is False when none."
+      },
+      "FactorReport": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "default": "3"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At",
+            "description": "Timezone-aware UTC timestamp."
+          },
+          "data": {
+            "$ref": "#/components/schemas/DataInfo"
+          },
+          "regression": {
+            "$ref": "#/components/schemas/Regression"
+          },
+          "rolling": {
+            "items": {
+              "$ref": "#/components/schemas/RollingWindow"
+            },
+            "type": "array",
+            "title": "Rolling",
+            "description": "One entry per window, e.g. 126 and 252."
+          },
+          "average_beta": {
+            "$ref": "#/components/schemas/AverageBetaPanel"
+          },
+          "return_contribution": {
+            "$ref": "#/components/schemas/ReturnContribution"
+          },
+          "risk_contribution": {
+            "$ref": "#/components/schemas/RiskContribution"
+          },
+          "residual_diagnostics": {
+            "$ref": "#/components/schemas/ResidualDiagnostics"
+          },
+          "quality_gate": {
+            "$ref": "#/components/schemas/QualityGate"
+          },
+          "five_day_regression": {
+            "$ref": "#/components/schemas/MultiDayRegression"
+          },
+          "price_series": {
+            "$ref": "#/components/schemas/PriceSeries"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/ReportWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "User-facing caveats: in-sample, US factors, survivorship, vintage."
+          },
+          "label_text": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Label Text",
+            "description": "Footnote texts by label key."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "generated_at",
+          "data",
+          "regression",
+          "rolling",
+          "average_beta",
+          "return_contribution",
+          "risk_contribution",
+          "residual_diagnostics",
+          "quality_gate",
+          "five_day_regression",
+          "price_series"
+        ],
+        "title": "FactorReport",
+        "description": "Everything the UI or an exported file needs to describe one ticker's factor exposures."
+      },
+      "FactorStat": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "se": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Se",
+            "description": "Newey-West HAC standard error of beta."
+          },
+          "z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z",
+            "description": "HAC z-statistic (normal reference distribution)."
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P",
+            "description": "Two-sided p-value, unadjusted."
+          },
+          "p_adj_bh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Adj Bh",
+            "description": "Benjamini-Hochberg adjusted p (family of 5)."
+          },
+          "ci_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Low",
+            "description": "Lower bound of the unadjusted 95% HAC interval."
+          },
+          "ci_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci High",
+            "description": "Upper bound of the unadjusted 95% HAC interval."
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reliable",
+                  "noise"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag",
+            "description": "'reliable' when BH rejects at q = 0.05, else 'noise'."
+          },
+          "interpretation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpretation",
+            "description": "Plain-English reading; generated only for reliable betas."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "beta",
+          "se",
+          "z",
+          "p",
+          "p_adj_bh",
+          "ci_low",
+          "ci_high",
+          "tag",
+          "interpretation"
+        ],
+        "title": "FactorStat",
+        "description": "Full-sample OLS coefficient for one factor. ``beta`` is a unitless sensitivity."
+      },
+      "FactorVintage": {
+        "properties": {
+          "last_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Last Date",
+            "description": "Last date in the French factor file."
+          },
+          "downloaded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Downloaded At",
+            "description": "UTC time the file was downloaded; None when the factors were injected."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "last_date",
+          "downloaded_at"
+        ],
+        "title": "FactorVintage",
+        "description": "Which French file the numbers come from (M0.8)."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "schema_version"
+        ],
+        "title": "Health",
+        "description": "Liveness answer; reads no disk and no network."
+      },
+      "MultiDayRegression": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "horizon_days": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Horizon Days",
+            "description": "Block length in trading days (5)."
+          },
+          "n_blocks": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Blocks"
+          },
+          "n_rows_unused": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Rows Unused",
+            "description": "Rows after the last full block (0-4)."
+          },
+          "blocks_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks Start"
+          },
+          "blocks_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks End"
+          },
+          "alpha_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Annual",
+            "description": "(252 / horizon) x block intercept."
+          },
+          "alpha_se_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Se Annual"
+          },
+          "alpha_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Z"
+          },
+          "alpha_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha P"
+          },
+          "alpha_ci_low_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Ci Low Annual"
+          },
+          "alpha_ci_high_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Ci High Annual"
+          },
+          "alpha_tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reliable",
+                  "noise"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Tag",
+            "description": "'reliable' iff alpha_p < 0.05."
+          },
+          "r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R2"
+          },
+          "adj_r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adj R2"
+          },
+          "sigma_e_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma E Annual",
+            "description": "sqrt(252 / horizon) x sd of residuals."
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lags L(n_blocks)."
+          },
+          "bh_family_size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Bh Family Size",
+            "description": "Betas in BH family F9."
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/FactorStat"
+            },
+            "type": "array",
+            "title": "Factors"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "horizon_days",
+          "n_blocks",
+          "n_rows_unused",
+          "blocks_start",
+          "blocks_end",
+          "alpha_annual",
+          "alpha_se_annual",
+          "alpha_z",
+          "alpha_p",
+          "alpha_ci_low_annual",
+          "alpha_ci_high_annual",
+          "alpha_tag",
+          "r2",
+          "adj_r2",
+          "sigma_e_annual",
+          "hac_lags",
+          "bh_family_size",
+          "factors"
+        ],
+        "title": "MultiDayRegression",
+        "description": "Regression on sums over non-overlapping 5-day blocks (M3.6); only when the gate fired."
+      },
+      "PriceSeries": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "adj_close": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Adj Close",
+            "description": "Adjusted close in price units."
+          },
+          "factor_coverage_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Factor Coverage End",
+            "description": "Last date with factor data; later points are drawn muted."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dates",
+          "adj_close",
+          "factor_coverage_end"
+        ],
+        "title": "PriceSeries",
+        "description": "Adjusted close for charting only (never used for regression here)."
+      },
+      "QualityGate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "rho_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rho Threshold",
+            "description": "Fires when lag-1 autocorrelation < this."
+          },
+          "z_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Threshold",
+            "description": "... and its robust z < this."
+          },
+          "lag1_autocorrelation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 Autocorrelation"
+          },
+          "lag1_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 Z"
+          },
+          "fired": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fired"
+          },
+          "noise_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Share",
+            "description": "min(1, -2 x lag-1 autocorrelation): share of residual variance that is a price error reversing the next day, under the simple model of M3.6."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "The caveat shown in the report when fired."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "rho_threshold",
+          "z_threshold",
+          "lag1_autocorrelation",
+          "lag1_z",
+          "fired",
+          "noise_share",
+          "message"
+        ],
+        "title": "QualityGate",
+        "description": "Residual quality gate for non-synchronous prices (M3.6)."
+      },
+      "RangeOption": {
+        "properties": {
+          "preset": {
+            "type": "string",
+            "enum": [
+              "3Y",
+              "5Y",
+              "FULL"
+            ],
+            "title": "Preset"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "n_obs": {
+            "type": "integer",
+            "title": "N Obs"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preset",
+          "start",
+          "n_obs",
+          "available",
+          "reason"
+        ],
+        "title": "RangeOption",
+        "description": "One range preset for one ticker; ``reason`` is None exactly when ``available``."
+      },
+      "RangeOptions": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "first_return_date": {
+            "type": "string",
+            "format": "date",
+            "title": "First Return Date"
+          },
+          "last_price_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Last Price Date"
+          },
+          "factors_last_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Factors Last Date"
+          },
+          "min_obs": {
+            "type": "integer",
+            "title": "Min Obs"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/RangeOption"
+            },
+            "type": "array",
+            "title": "Options"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "first_return_date",
+          "last_price_date",
+          "factors_last_date",
+          "min_obs",
+          "options"
+        ],
+        "title": "RangeOptions",
+        "description": "Availability of every preset for one ticker (always three, in preset order)."
+      },
+      "Regression": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "alpha_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Annual",
+            "description": "Annualised alpha, decimal per year (x252)."
+          },
+          "alpha_se_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Se Annual"
+          },
+          "alpha_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Z"
+          },
+          "alpha_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha P"
+          },
+          "alpha_ci_low_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Ci Low Annual"
+          },
+          "alpha_ci_high_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Ci High Annual"
+          },
+          "alpha_tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reliable",
+                  "noise"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Tag",
+            "description": "'reliable' iff alpha_p < 0.05 (single test); when the quality gate fired, also the 5-day alpha p must be below 0.05 (M3.6)."
+          },
+          "alpha_sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Sentence",
+            "description": "Explanation shown when |alpha| >= 3% a year but p >= 0.05 (M3.2)."
+          },
+          "r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R2"
+          },
+          "adj_r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adj R2"
+          },
+          "sigma_e_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma E Annual",
+            "description": "Residual volatility, sqrt(252) x sd."
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lag length L(n)."
+          },
+          "bh_family_size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Bh Family Size",
+            "description": "Number of betas in the BH family (F1)."
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/FactorStat"
+            },
+            "type": "array",
+            "title": "Factors"
+          },
+          "vif": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Vif",
+            "description": "Variance inflation factor per factor."
+          },
+          "condition_number": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Number",
+            "description": "sqrt(max/min eigenvalue) of the 5x5 factor correlation matrix over the sample (M3.4). Not statsmodels' results.condition_number, which is computed on the raw design including the constant and is large even for uncorrelated daily factors."
+          },
+          "high_corr_pairs": {
+            "items": {
+              "$ref": "#/components/schemas/CorrPair"
+            },
+            "type": "array",
+            "title": "High Corr Pairs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "alpha_annual",
+          "alpha_se_annual",
+          "alpha_z",
+          "alpha_p",
+          "alpha_ci_low_annual",
+          "alpha_ci_high_annual",
+          "alpha_tag",
+          "alpha_sentence",
+          "r2",
+          "adj_r2",
+          "sigma_e_annual",
+          "hac_lags",
+          "bh_family_size",
+          "factors",
+          "vif",
+          "condition_number",
+          "high_corr_pairs"
+        ],
+        "title": "Regression",
+        "description": "Full-sample excess-return regression ``y = alpha + sum(b_i f_i) + e`` (M3)."
+      },
+      "ReportWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ReportWarning",
+        "description": "A report-level warning (short history, collinearity, audit status, data lag, ...)."
+      },
+      "ResidualDiagnostics": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "lag1_autocorrelation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 Autocorrelation",
+            "description": "sum e_t e_{t-1} / sum e_t^2 over the full-sample residuals."
+          },
+          "lag1_se": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 Se",
+            "description": "Heteroskedasticity-robust standard error."
+          },
+          "lag1_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 Z"
+          },
+          "lag1_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 P",
+            "description": "Two-sided normal p-value of lag1_z."
+          },
+          "lag1_reading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 Reading"
+          },
+          "tests": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticTest"
+            },
+            "type": "array",
+            "title": "Tests"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "HAC is used whatever the tests show."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "lag1_autocorrelation",
+          "lag1_se",
+          "lag1_z",
+          "lag1_p",
+          "lag1_reading",
+          "tests",
+          "note"
+        ],
+        "title": "ResidualDiagnostics",
+        "description": "Diagnostics of the full-sample regression residuals (M3.5)."
+      },
+      "ReturnContribution": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "factors": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Factors",
+            "description": "252 x beta_i x mean(f_i) per factor."
+          },
+          "alpha": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha",
+            "description": "252 x alpha (daily intercept)."
+          },
+          "residual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual",
+            "description": "252 x mean(residual); 0 by construction."
+          },
+          "total_annualised_mean_excess_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Annualised Mean Excess Return"
+          },
+          "identity_residual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Residual",
+            "description": "total - (sum(factors) + alpha + residual); float error only (~1e-17)."
+          },
+          "memo": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Memo",
+            "description": "Memo rows: uncovered dates and excluded rows (D8)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "factors",
+          "alpha",
+          "residual",
+          "total_annualised_mean_excess_return",
+          "identity_residual",
+          "memo"
+        ],
+        "title": "ReturnContribution",
+        "description": "Static arithmetic return attribution, annualised decimals (M6.1, M6.4).\n\n``sum(factors) + alpha + residual == total_annualised_mean_excess_return`` up to\n``identity_residual``. Memo rows are outside every sum."
+      },
+      "RiskContribution": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "factors": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Factors",
+            "description": "RC_i, share of variance per factor."
+          },
+          "idiosyncratic": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idiosyncratic",
+            "description": "sigma2_e / V with sigma2_e = SSR/(n-1)."
+          },
+          "sums_to_one_residual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sums To One Residual",
+            "description": "1 - (sum(factors) + idiosyncratic); float error only."
+          },
+          "total_vol_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Vol Annual",
+            "description": "sqrt(252 x V)."
+          },
+          "order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Order",
+            "description": "Display order: factors by share descending, then 'Idiosyncratic'."
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/RiskFactorDetail"
+            },
+            "type": "array",
+            "title": "Details"
+          },
+          "sentences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sentences",
+            "description": "Disagreement / offset sentences (M7)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "factors",
+          "idiosyncratic",
+          "sums_to_one_residual",
+          "total_vol_annual",
+          "order",
+          "details",
+          "sentences"
+        ],
+        "title": "RiskContribution",
+        "description": "Euler risk decomposition over the full sample (M7). Shares may be negative."
+      },
+      "RiskFactorDetail": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share",
+            "description": "Euler share of variance RC_i (may be negative)."
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "sigma_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma Annual",
+            "description": "Factor volatility, sqrt(252) x sd."
+          },
+          "rho_sys": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rho Sys",
+            "description": "Correlation of the factor with the systematic return beta'f."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "share",
+          "beta",
+          "sigma_annual",
+          "rho_sys"
+        ],
+        "title": "RiskFactorDetail",
+        "description": "Exposure x volatility x correlation view of one factor's risk share (M7)."
+      },
+      "RollingWindow": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-ARITH",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-EXPL",
+                "L-PROXY",
+                "L-VINTAGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Standard footnotes that apply (keys of M0.9)."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "window": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Window",
+            "description": "Window length in trading days (e.g. 126 or 252)."
+          },
+          "n_stamps": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Stamps",
+            "description": "Number of stamps, n - window + 1."
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lags L(window)."
+          },
+          "ci_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Z",
+            "description": "Normal quantile for the pointwise 95% band; None when status is not 'ok'."
+          },
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "window_start": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Window Start",
+            "description": "First date of each stamp's window."
+          },
+          "betas": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Betas",
+            "description": "Rolling betas per stamp, rounded to 6 significant digits (D31)."
+          },
+          "se": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Se",
+            "description": "HAC standard errors per stamp, rounded to 6 significant digits (D31)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "window",
+          "n_stamps",
+          "hac_lags",
+          "ci_z",
+          "dates",
+          "window_start",
+          "betas",
+          "se"
+        ],
+        "title": "RollingWindow",
+        "description": "Trailing-window betas. ``betas[name][i]`` belongs to ``dates[i]``; None during warm-up.\n\nEach stamp uses exactly ``window`` rows of the sample ending on (and including) its date.\nThe pointwise 95% band is ``beta +/- ci_z * se``."
+      },
+      "SampleInfo": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N",
+            "description": "Rows of the analysis sample used."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start",
+            "description": "Actual first date used."
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End",
+            "description": "Actual last date used (the stamp of in-sample stats)."
+          },
+          "requested_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Requested Start"
+          },
+          "requested_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Requested End"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window",
+            "description": "Trailing-window length in rows, if any."
+          },
+          "n_excluded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Excluded"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedRow"
+            },
+            "type": "array",
+            "title": "Excluded"
+          },
+          "factor_vintage": {
+            "$ref": "#/components/schemas/FactorVintage"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "n",
+          "start",
+          "end",
+          "requested_start",
+          "requested_end",
+          "window",
+          "n_excluded",
+          "excluded",
+          "factor_vintage"
+        ],
+        "title": "SampleInfo",
+        "description": "Sample metadata carried by every statistic (M0.8)."
+      },
+      "TickerSuggestion": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "last_fetched": {
+            "type": "string",
+            "format": "date",
+            "title": "Last Fetched"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "last_fetched"
+        ],
+        "title": "TickerSuggestion"
+      },
+      "TickerSuggestions": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TickerSuggestion"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "TickerSuggestions"
+      },
+      "UncoveredTail": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N",
+            "description": "Trading days after the factor file's last date."
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last"
+          },
+          "factor_last_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Factor Last Date"
+          },
+          "compounded_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compounded Return",
+            "description": "Raw (not excess) compounded return over those days; None if n = 0 or a price is missing."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "n",
+          "first",
+          "last",
+          "factor_last_date",
+          "compounded_return"
+        ],
+        "title": "UncoveredTail",
+        "description": "Price dates after the last factor date (M2 step 6). Never part of any statistic."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
