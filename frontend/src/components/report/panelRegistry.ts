@@ -4,7 +4,7 @@
  * (`backend/factordesk/report/panel_registry.py`); `notice` exists only here, because the static
  * page draws the notice inside its header.
  *
- * The five optional sections are already listed, each pointing at its own component under
+ * The optional sections are already listed, each pointing at its own component under
  * `sections/`; a feature fills its component in and never edits this file. Each of those
  * components renders nothing while its report field is null.
  */
@@ -28,6 +28,7 @@ import { KalmanPanel } from "./sections/KalmanPanel";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
 import { ResidualAlphaPanel } from "./sections/ResidualAlphaPanel";
 import { ShrunkBetasPanel } from "./sections/ShrunkBetasPanel";
+import { WorldBetaPanel } from "./sections/WorldBetaPanel";
 
 /** What `ReportView` hands to every panel; each panel reads the props it needs. */
 export interface PanelHostProps {
@@ -57,6 +58,7 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "lead_lag", position: 510, Component: LeadLagPanel },
   { name: "shrunk", position: 520, Component: ShrunkBetasPanel },
   { name: "fragility", position: 530, Component: FragilityPanel },
+  { name: "world_beta", position: 540, Component: WorldBetaPanel },
   { name: "returns", position: 600, Component: ReturnPanel },
   { name: "risk", position: 700, Component: RiskPanel },
   { name: "residual_alpha", position: 710, Component: ResidualAlphaPanel },

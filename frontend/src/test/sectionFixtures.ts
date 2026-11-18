@@ -10,15 +10,24 @@ import kalman from "@fixtures/sections/kalman.json";
 import leadLag from "@fixtures/sections/lead_lag.json";
 import residual from "@fixtures/sections/residual_alpha.json";
 import shrunk from "@fixtures/sections/shrunk.json";
+import worldBeta from "@fixtures/sections/world_beta.json";
 
 /** The `FactorReport` fields of the optional sections, in panel order. */
-export const SECTION_FIELDS = ["lead_lag", "shrunk_betas", "fragility", "residual", "kalman_betas"] as const;
+export const SECTION_FIELDS = [
+  "lead_lag",
+  "shrunk_betas",
+  "fragility",
+  "world_beta",
+  "residual",
+  "kalman_betas",
+] as const;
 export type SectionField = (typeof SECTION_FIELDS)[number];
 
 const PAYLOADS: Record<SectionField, unknown> = {
   lead_lag: leadLag,
   shrunk_betas: shrunk,
   fragility,
+  world_beta: worldBeta,
   residual,
   kalman_betas: kalman,
 };
