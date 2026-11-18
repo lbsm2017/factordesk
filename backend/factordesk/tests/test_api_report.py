@@ -508,6 +508,8 @@ def test_invalid_ticker_names_the_symbol(client: ApiClient) -> None:
         ("start=yesterday", "The start date is not a valid date."),
         ("end=2026-02-30", "The end date is not a valid date."),
         ("range=10Y", None),
+        ("range=1Y", None),
+        ("range=YTD", None),
     ],
 )
 def test_bad_ranges_are_refused_before_any_data_is_read(

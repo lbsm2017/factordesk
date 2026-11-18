@@ -1,10 +1,10 @@
 """Range presets to dates, preset availability and request checks (dashboard spec DB2.4).
 
 Pure: no I/O and no clock. The anchor is the earlier of the last factor date and the last price
-date. YTD starts on 1 January of the anchor's year; ``NY`` starts N calendar years before the
-anchor plus one day (29 February maps to 28 February first); FULL has no start. Every preset
-leaves the end open, so the requested range runs to the last price date and the days after the
-factor data are reported as not analysed, exactly like the static report.
+date. ``NY`` starts N calendar years before the anchor plus one day (29 February maps to
+28 February first); FULL has no start. Every preset leaves the end open, so the requested range
+runs to the last price date and the days after the factor data are reported as not analysed,
+exactly like the static report.
 """
 
 from __future__ import annotations
@@ -55,8 +55,6 @@ def preset_start(preset: RangePreset, anchor: date) -> date | None:
     """First requested date of ``preset`` ending at ``anchor`` (None for FULL)."""
     if preset == "FULL":
         return None
-    if preset == "YTD":
-        return date(anchor.year, 1, 1)
     return years_back(anchor, int(preset.removesuffix("Y"))) + timedelta(days=1)
 
 

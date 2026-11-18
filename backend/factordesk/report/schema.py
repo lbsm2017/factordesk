@@ -482,9 +482,10 @@ class FactorReport(_Frozen):
 
 # ------------------------------------------------- API envelope (not part of FactorReport)
 
-RangePreset = Literal["YTD", "1Y", "3Y", "5Y", "FULL"]
-RANGE_PRESETS: tuple[RangePreset, ...] = ("YTD", "1Y", "3Y", "5Y", "FULL")
-"""Range presets in display order (dashboard spec DB2.2)."""
+RangePreset = Literal["3Y", "5Y", "FULL"]
+RANGE_PRESETS: tuple[RangePreset, ...] = ("3Y", "5Y", "FULL")
+"""Range presets in display order (dashboard spec DB2.2; owner decision of 2026-11-18 dropped
+YTD and 1Y)."""
 
 ErrorCode = Literal[
     "invalid_ticker",
@@ -549,7 +550,7 @@ class RangeOption(_Frozen):
 
 
 class RangeOptions(_Frozen):
-    """Availability of every preset for one ticker (always five, in preset order)."""
+    """Availability of every preset for one ticker (always three, in preset order)."""
 
     ticker: str
     first_return_date: date
@@ -559,7 +560,7 @@ class RangeOptions(_Frozen):
     options: list[RangeOption]
 
     @model_validator(mode="after")
-    def _five_presets_in_order(self) -> RangeOptions:
+    def _presets_in_order(self) -> RangeOptions:
         if tuple(option.preset for option in self.options) != RANGE_PRESETS:
             raise ValueError("options must hold every preset exactly once, in preset order")
         return self

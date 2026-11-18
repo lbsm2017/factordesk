@@ -513,9 +513,9 @@ def test_range_options_models_enforce_their_invariants() -> None:
     ok = RangeOption(preset="3Y", start=date(2023, 9, 30), n_obs=700, available=True, reason=None)
     assert ok.reason is None
     with pytest.raises(ValueError, match="reason"):
-        RangeOption(preset="1Y", start=None, n_obs=251, available=False, reason=None)
+        RangeOption(preset="5Y", start=None, n_obs=251, available=False, reason=None)
     with pytest.raises(ValueError, match="reason"):
-        RangeOption(preset="1Y", start=None, n_obs=251, available=True, reason="no")
+        RangeOption(preset="5Y", start=None, n_obs=251, available=True, reason="no")
 
     def option(preset: str) -> RangeOption:
         return RangeOption.model_validate(
