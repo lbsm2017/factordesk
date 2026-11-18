@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others --names api,web \"uv run uvicorn factordesk.api.main:create_dev_app --factory --reload --reload-dir ../backend/factordesk --host 127.0.0.1 --port 8000\" \"vite\"",
+    "dev": "concurrently --kill-others --names api,web \"uv run factordesk serve --dev\" \"vite\"",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

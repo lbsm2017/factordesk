@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
+import socket
+import threading
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Protocol, cast
 
+import httpx
 import numpy as np
 import pandas as pd
 import pytest
+import uvicorn
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from factordesk import cli
+from factordesk.api import deps as deps_module
 from factordesk.data.factors import FactorDownloadError, FactorStatus
 from factordesk.data.prices import PriceDataError, PriceHistory
 from factordesk.report import load_report
@@ -318,3 +326,226 @@ def test_factors_refresh(
     monkeypatch.setattr(cli, "load_ff5_daily", failing)
     assert cli.main(["factors", "refresh"], now=NOW) == cli.EXIT_NETWORK
     assert "network" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------------- serve
+
+
+class UvicornCalls:
+    """Stands in for ``uvicorn.run``: records the call and starts no server."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, dict[str, object]]] = []
+
+    def run(self, app: object, **kwargs: object) -> None:
+        self.calls.append((app, kwargs))
+
+
+class ApiClient(Protocol):
+    """The part of the test client these tests use (its own typing depends on the httpx flavour)."""
+
+    def get(self, url: str) -> httpx.Response: ...
+
+
+@pytest.fixture
+def uvicorn_calls(monkeypatch: pytest.MonkeyPatch) -> UvicornCalls:
+    calls = UvicornCalls()
+    monkeypatch.setattr(uvicorn, "run", calls.run)
+    return calls
+
+
+@pytest.fixture
+def opened(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, int]]:
+    seen: list[tuple[str, int]] = []
+
+    def record(host: str, port: int) -> None:
+        seen.append((host, port))
+
+    monkeypatch.setattr(cli, "_open_when_ready", record)
+    return seen
+
+
+@pytest.fixture
+def dist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "dist"
+    (root / "assets").mkdir(parents=True)
+    (root / "index.html").write_text("<!doctype html><title>built</title>", encoding="utf-8")
+    monkeypatch.setattr(cli, "DEFAULT_STATIC_DIR", root)
+    return root
+
+
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+def test_serve_defaults_are_loopback_port_8000_and_repo_dist() -> None:
+    args = cli._parser().parse_args(["serve"])  # pyright: ignore[reportPrivateUsage]
+    assert (args.host, args.port, args.dev, args.open) == ("127.0.0.1", 8000, False, False)
+    repo_root = Path(cli.__file__).resolve().parents[2]
+    assert repo_root / "frontend" / "dist" == cli.DEFAULT_STATIC_DIR
+
+
+def test_serve_runs_the_api_with_the_built_page(
+    dist: Path,
+    uvicorn_calls: UvicornCalls,
+    opened: list[tuple[str, int]],
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class StubSettings:
+        data_dir = tmp_path / "cache"
+
+    monkeypatch.setattr(deps_module, "get_settings", lambda: StubSettings())
+    port = _free_port()
+    assert cli.main(["serve", "--port", str(port)]) == cli.EXIT_OK
+    ((app, kwargs),) = uvicorn_calls.calls
+    assert kwargs == {"host": "127.0.0.1", "port": port}
+    assert opened == []
+    captured = capsys.readouterr()
+    assert f"http://127.0.0.1:{port}/" in captured.out
+    assert captured.err == ""
+
+    assert isinstance(app, FastAPI)
+    with TestClient(app) as test_client:  # pyright: ignore[reportUnknownVariableType]
+        client = cast(ApiClient, test_client)
+        page = client.get("/?t=SPY")
+        assert page.status_code == 200 and "<title>built</title>" in page.text
+        assert "content-security-policy" in page.headers
+        assert client.get("/api/health").status_code == 200
+        unknown = client.get("/api/nope")
+        assert unknown.status_code == 404
+        assert unknown.json()["code"] == "not_found"
+
+
+def test_serve_open_waits_for_the_server(
+    dist: Path, uvicorn_calls: UvicornCalls, opened: list[tuple[str, int]]
+) -> None:
+    port = _free_port()
+    assert cli.main(["serve", "--port", str(port), "--open"]) == cli.EXIT_OK
+    assert opened == [("127.0.0.1", port)]
+
+
+def test_serve_dev_runs_the_api_factory_with_reload_and_needs_no_build(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    uvicorn_calls: UvicornCalls,
+) -> None:
+    monkeypatch.setattr(cli, "DEFAULT_STATIC_DIR", tmp_path / "missing")
+    port = _free_port()
+    assert cli.main(["serve", "--dev", "--port", str(port)]) == cli.EXIT_OK
+    ((target, kwargs),) = uvicorn_calls.calls
+    assert target == "factordesk.api.main:create_dev_app"
+    assert kwargs["factory"] is True and kwargs["reload"] is True
+    assert kwargs["host"] == "127.0.0.1" and kwargs["port"] == port
+    assert kwargs["reload_dirs"] == [str(Path(cli.__file__).resolve().parent)]
+
+
+def test_serve_static_option_names_the_folder(
+    tmp_path: Path, uvicorn_calls: UvicornCalls, capsys: pytest.CaptureFixture[str]
+) -> None:
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    code = cli.main(["serve", "--static", str(empty), "--port", str(_free_port())])
+    assert code == cli.EXIT_USAGE
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and str(empty) in err
+    assert uvicorn_calls.calls == []
+
+
+def test_serve_without_a_build_is_one_line_and_exit_2(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    uvicorn_calls: UvicornCalls,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "DEFAULT_STATIC_DIR", tmp_path / "no-dist")
+    assert cli.main(["serve", "--port", str(_free_port())]) == cli.EXIT_USAGE
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "factordesk: error: the dashboard is not built; run 'npm --prefix frontend run build' "
+        "first, or use --dev (API only)\n"
+    )
+    assert "Traceback" not in captured.err
+    assert uvicorn_calls.calls == []
+
+
+def test_serve_on_a_busy_port_is_one_line_and_exit_2(
+    dist: Path, uvicorn_calls: UvicornCalls, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        port = int(taken.getsockname()[1])
+        assert cli.main(["serve", "--port", str(port)]) == cli.EXIT_USAGE
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.count("\n") == 1
+    assert f"port {port}" in captured.err and "already in use" in captured.err
+    assert "Traceback" not in captured.err
+    assert uvicorn_calls.calls == []
+
+
+@pytest.mark.parametrize("port", ["0", "70000", "-1"])
+def test_serve_rejects_an_invalid_port(
+    port: str,
+    dist: Path,
+    uvicorn_calls: UvicornCalls,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert cli.main(["serve", "--port", port]) == cli.EXIT_USAGE
+    assert uvicorn_calls.calls == []
+    assert capsys.readouterr().err != ""
+
+
+def test_serve_warns_when_the_host_is_not_loopback(
+    dist: Path, uvicorn_calls: UvicornCalls, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(["serve", "--host", "0.0.0.0", "--port", str(_free_port())]) == cli.EXIT_OK
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and "no login" in err
+    assert len(uvicorn_calls.calls) == 1
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost"])
+def test_serve_is_quiet_on_loopback_hosts(
+    host: str, dist: Path, uvicorn_calls: UvicornCalls, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(["serve", "--host", host, "--port", str(_free_port())]) == cli.EXIT_OK
+    assert capsys.readouterr().err == ""
+
+
+@pytest.mark.parametrize(
+    ("host", "url"),
+    [
+        ("127.0.0.1", "http://127.0.0.1:8000/"),
+        ("0.0.0.0", "http://127.0.0.1:8000/"),
+        ("::", "http://[::1]:8000/"),
+        ("::1", "http://[::1]:8000/"),
+        ("localhost", "http://localhost:8000/"),
+    ],
+)
+def test_browser_url_reaches_the_server_through_loopback(host: str, url: str) -> None:
+    assert cli._browser_url(host, 8000) == url  # pyright: ignore[reportPrivateUsage]
+
+
+def test_open_when_ready_opens_after_the_port_accepts(monkeypatch: pytest.MonkeyPatch) -> None:
+    opened_urls: list[str] = []
+    done = threading.Event()
+
+    def fake_open(url: str) -> bool:
+        opened_urls.append(url)
+        done.set()
+        return True
+
+    monkeypatch.setattr(cli.webbrowser, "open", fake_open)
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        port = int(listener.getsockname()[1])
+        cli._open_when_ready("127.0.0.1", port)  # pyright: ignore[reportPrivateUsage]
+        assert done.wait(timeout=10)
+    assert opened_urls == [f"http://127.0.0.1:{port}/"]
