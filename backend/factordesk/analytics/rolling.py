@@ -192,8 +192,9 @@ def rolling_ols_hac(
     For the same reason a window's value depends, in the last bits, on rows before the
     window: the cumulative sums start at the first row passed in, so a different first row
     moves a window's value by up to about 1e-12 (measured 7.9e-13 on SPY; the previous per-
-    window implementation gave exactly 0). A window never depends on a later row (no look-
-    ahead), and the dependence is far below the 6 significant digits the report keeps.
+    window implementation gave exactly 0; 1e-13 on synthetic data, up to 3e-11 on the volatility
+    regime design of ``test_rolling_equivalence``). A window never depends on a later row (no
+    look-ahead), and the dependence is far below the 6 significant digits the report keeps.
     """
     yv = np.asarray(y, dtype=np.float64)
     x = with_intercept(factors)

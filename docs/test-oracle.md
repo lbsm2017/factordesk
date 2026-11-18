@@ -244,6 +244,7 @@ Each is a named test so a reviewer can find it.
 - **T107 Identities in the payload.** From the JSON of a DGP-A report: return identity (T53) and risk identity (T58) hold within `1e-10` after a round trip.
 - **T108 Refusal.** `POST /api/factor-it` on 503 aligned rows returns the typed error `insufficient_history` with `n` and `required`, HTTP 422.
 - **T128 JSON size and precision (D31).** `dump_report` writes no indentation (no line starts with a space). Every rolling beta and se in the written JSON equals its value rounded to 6 significant digits, and differs from the unrounded analytics value by at most `5e-6` relative (half a unit in the sixth significant digit when the leading digit is 1); all other floats (regression, attribution, diagnostics) equal the analytics values exactly. `load_report(dump_report(r)) == r`. The number of stamps per window is unchanged.
+- **T130 Start-date effect on rolling values (D32).** DGP-A and DGP-G with `n = 4000`, `W = 126` and `252`: the rolling betas and standard errors of the sample starting at row 1, 500, 2000 or 3000 equal the full sample's on every shared stamp to `1e-11` absolute (measured `1e-13` at most; exactly 0 was the old per-window behaviour and is not required). The 60-fold volatility regime with factor means of 20 standard deviations: `1e-10` (measured `3e-11`).
 
 ## 18. Live smoke tests (`live`, non-blocking; data/prices.py, data/factors.py, data/audit.py, analytics/regression.py)
 
