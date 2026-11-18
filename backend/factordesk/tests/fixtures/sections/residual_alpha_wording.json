@@ -44,7 +44,7 @@
     "Point-in-time betas",
     "Gap",
     "Share of the full-period alpha earned on these days",
-    "Survival of the alpha with point-in-time betas"
+    "Kept with point-in-time betas"
   ],
   "rolling_rows": [
     "Latest one-year alpha",
@@ -136,6 +136,38 @@
       "more than 200% kept"
     ],
     [
+      0.125,
+      "15% kept"
+    ],
+    [
+      0.375,
+      "40% kept"
+    ],
+    [
+      0.575,
+      "60% kept"
+    ],
+    [
+      0.4749999999999999,
+      "50% kept"
+    ],
+    [
+      -0.125,
+      "−15% kept (the sign reversed)"
+    ],
+    [
+      1.0,
+      "100% kept"
+    ],
+    [
+      1.0000000001,
+      "100% kept"
+    ],
+    [
+      2.00001,
+      "more than 200% kept"
+    ],
+    [
       null,
       "n/a"
     ]
@@ -157,5 +189,6 @@
       null,
       "n/a"
     ]
-  ]
+  ],
+  "not_distinguishable": "n/a, the in-sample alpha is not distinguishable from zero"
 }

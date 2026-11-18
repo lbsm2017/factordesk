@@ -43,11 +43,15 @@ from factordesk.report.sections.residual_alpha import (
     ResidualAnalysis,
     ResidualStats,
 )
+from factordesk.rounding import round_to_five_points
 
 PANEL_ID = "residual"
 TITLE = "Residual return"
 NEXT_STEP = "Choose a longer date range or another ticker, then run the report again."
 PIT_NEXT_STEP = "Choose a shorter beta window or a longer period."
+NOT_DISTINGUISHABLE = "n/a, the in-sample alpha is not distinguishable from zero"
+"""Printed for the share and the kept rows when the verdict says the alpha is noise (F4)."""
+NO_ALPHA_VERDICTS = ("no_reliable_alpha", "point_in_time_only")
 WARMUP_CAPTION = (
     "Warm-up: the first {w} trading days are used to estimate the first point-in-time betas."
 )
@@ -270,18 +274,13 @@ def _pct_plain(x: float | None, digits: int = 1) -> str:
     return fmt_pct(x, digits, signed=False)
 
 
-def _round5(x: float) -> int:
-    """Magnitude of a ratio in percent, to the nearest 5 points, halves away from zero (TR18)."""
-    return int(abs(x * 100) / 5 + 0.5 + 1e-9) * 5
-
-
 def _kept(ratio: float | None) -> str:
     """The survival ratio in words: ``100% kept``, ``more than 200% kept``, or a reversed sign."""
     if ratio is None or not math.isfinite(ratio):
         return "n/a"
     if ratio > 2:
         return "more than 200% kept"
-    pts = _round5(ratio)
+    pts = round_to_five_points(ratio)
     if ratio < 0 and pts > 0:
         return f"{MINUS}{pts}% kept (the sign reversed)"
     return f"{pts}% kept"
@@ -293,7 +292,7 @@ def _share(q: float | None) -> str:
         return "n/a"
     if q > 2:
         return "more than 200%"
-    pts = _round5(q)
+    pts = round_to_five_points(q)
     return f"{MINUS if q < 0 and pts > 0 else ''}{pts}%"
 
 
@@ -712,6 +711,7 @@ def _gap_block(section: ResidualAnalysis) -> str:
             return f"<h3>{esc(HEADINGS['gap'])}</h3>{state}"
         return ""
     sev = gap.severity or "info"
+    no_alpha = gap.verdict in NO_ALPHA_VERDICTS
     verdict = (
         f'<div class="notice ra-banner" role="note">{GLYPHS.get(sev, "")}'
         f'<p class="notice-sum"><span class="ra-sev">'
@@ -731,9 +731,12 @@ def _gap_block(section: ResidualAnalysis) -> str:
         ),
         (
             "Share of the full-period alpha earned on these days",
-            _cell(_share(gap.comparison_share_of_alpha)),
+            _cell(NOT_DISTINGUISHABLE if no_alpha else _share(gap.comparison_share_of_alpha)),
         ),
-        ("Survival of the alpha with point-in-time betas", _cell(_kept(gap.survival_ratio))),
+        (
+            "Kept with point-in-time betas",
+            _cell(NOT_DISTINGUISHABLE if no_alpha else _kept(gap.survival_ratio)),
+        ),
     ]
     table = _table(
         "Same-days comparison of in-sample and point-in-time residual return",

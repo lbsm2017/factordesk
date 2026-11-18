@@ -15,6 +15,7 @@ import {
   ResidualAlphaBody as ResidualAlphaPanel,
   SEVERITY_WORD,
   keptText,
+  round5,
   shareText,
 } from "./ResidualAlphaBody";
 
@@ -207,7 +208,7 @@ describe("ResidualAlphaPanel: gap and verdict", () => {
       ["Point-in-time betas", "+25.4% a year"],
       ["Gap", "+0.4% a yearApproximate: z 0.42, p 0.675."],
       ["Share of the full-period alpha earned on these days", "95%"],
-      ["Survival of the alpha with point-in-time betas", "100% kept"],
+      ["Kept with point-in-time betas", "100% kept"],
     ]);
   });
 
@@ -247,8 +248,41 @@ describe("ResidualAlphaPanel: gap and verdict", () => {
     });
     expect(container.querySelector(".res-gap .res-verdict")).toBeNull();
     const facts = container.querySelector(".res-gap .res-facts")?.textContent ?? "";
-    expect(facts).toContain("Survival of the alpha with point-in-time betasn/a");
+    expect(facts).toContain("Kept with point-in-time betasn/a");
     expect(facts).toContain("earned on these daysn/a");
+  });
+
+  it.each(["no_reliable_alpha", "point_in_time_only"] as const)(
+    "prints n/a for the share and what is kept when the verdict is %s",
+    (verdict) => {
+      const { container } = mount((s) => {
+        s.gap.verdict = verdict;
+        s.gap.survival_ratio = 2.457;
+        s.gap.comparison_share_of_alpha = 0.9;
+      });
+      const facts = Array.from(container.querySelectorAll(".res-gap .res-facts > div")).map((d) => [
+        d.querySelector("dt")?.textContent,
+        d.querySelector("dd")?.textContent,
+      ]);
+      const text = "n/a, the in-sample alpha is not distinguishable from zero";
+      expect(text).toBe(wording.not_distinguishable);
+      expect(facts.slice(4)).toEqual([
+        ["Share of the full-period alpha earned on these days", text],
+        ["Kept with point-in-time betas", text],
+      ]);
+      expect(container.querySelector(".res-gap")?.textContent).not.toContain("200%");
+    },
+  );
+
+  it("rounds half points to the nearest 5, away from zero, the way the static panel does", () => {
+    expect(round5(0.125)).toBe(15);
+    expect(round5(0.375)).toBe(40);
+    expect(round5(-0.125)).toBe(15);
+    expect(round5(0.4749999999999999)).toBe(50);
+    expect(round5(0.575)).toBe(60);
+    expect(round5(1)).toBe(100);
+    expect(keptText(-0.125)).toBe("−15% kept (the sign reversed)");
+    expect(keptText(2.00001)).toBe("more than 200% kept");
   });
 
   it("rounds what is kept to 5 points and caps it at more than 200%", () => {
@@ -704,7 +738,7 @@ describe("ResidualAlphaPanel: the words of the static panel", () => {
   it("never says survives and keeps none of the old labels", () => {
     const { container } = mount();
     const text = container.textContent ?? "";
-    for (const old of ["survives", "Drawdown of pure noise", "Kept with point-in-time betas", "Points whose 95% band"]) {
+    for (const old of ["survives", "Survival of the alpha", "Drawdown of pure noise", "Points whose 95% band"]) {
       expect(text, old).not.toContain(old);
     }
   });

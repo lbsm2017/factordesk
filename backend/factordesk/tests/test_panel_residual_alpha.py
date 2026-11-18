@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from factordesk.report import load_report, render_report_html
 from factordesk.report.panel_registry import registered_panels
 from factordesk.report.panels.residual_alpha import (
@@ -381,3 +383,56 @@ def _panel_css() -> str:
     from factordesk.report.panels.residual_alpha import PANEL_CSS
 
     return PANEL_CSS
+
+
+@pytest.mark.parametrize("verdict", ["no_reliable_alpha", "point_in_time_only"])
+def test_share_and_kept_rows_say_n_a_when_the_alpha_is_noise(verdict: str) -> None:
+    """F4: no ratio of two numbers that both span zero, and no 'Survival' label."""
+    payload = _fixture()
+    payload["gap"].update(verdict=verdict, survival_ratio=2.457, comparison_share_of_alpha=0.9)
+    text = _text(_panel(_with(payload)))
+    note = WORDING["not_distinguishable"]
+    assert note == "n/a, the in-sample alpha is not distinguishable from zero"
+    assert f"earned on these days {note}" in text
+    assert f"Kept with point-in-time betas {note}" in text
+    assert "more than 200%" not in text and "Survival" not in text
+
+
+def test_share_and_kept_rows_print_the_numbers_when_the_alpha_is_reliable() -> None:
+    text = _text(_panel(report_with_section(_mock(), "residual")))
+    assert "Kept with point-in-time betas 100% kept" in text
+    assert WORDING["not_distinguishable"] not in text
+
+
+def test_panel_and_message_round_the_same_ratios_the_same_way() -> None:
+    """F5: one rule (``factordesk.rounding``) for the table, the message and the React panel."""
+    from factordesk.analytics.residual import ratio_text
+    from factordesk.report.panels import residual_alpha as panel
+    from factordesk.rounding import round_to_five_points
+
+    cases = {
+        0.125: 15,
+        0.375: 40,
+        -0.125: 15,
+        0.025: 5,
+        0.575: 60,
+        1.275: 130,
+        0.4749999999999999: 50,
+        1.0: 100,
+        2.0: 200,
+        0.0: 0,
+        -0.01: 0,
+    }
+    for ratio, points in cases.items():
+        assert round_to_five_points(ratio) == points, ratio
+        assert ratio_text(ratio).lstrip("-") == f"{points}%", ratio
+        kept = panel._kept(ratio)  # pyright: ignore[reportPrivateUsage]
+        assert kept.removeprefix(MINUS).startswith(f"{points}% kept"), ratio
+    assert ratio_text(-0.01) == "0%" and ratio_text(-0.125) == "-15%"
+    assert ratio_text(2.00001) == "more than 200%"
+    assert panel._kept(2.00001) == "more than 200% kept"  # pyright: ignore[reportPrivateUsage]
+    # a ratio built the way the verdict builds it: share * a_c / a_c
+    for share in (0.125, 0.375, 0.475, 0.575, 1.025, 1.275):
+        for a_c in (0.0001, 0.0137, 0.0399):
+            ratio = share * a_c / a_c
+            assert ratio_text(ratio).rstrip("%") == str(round_to_five_points(share)), (share, a_c)

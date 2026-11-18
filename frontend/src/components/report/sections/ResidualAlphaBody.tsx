@@ -115,8 +115,9 @@ function pv(p: number | null | undefined): string {
   return p == null ? NA : pval(p);
 }
 
-/** Magnitude of a ratio in percent, to the nearest 5 points, halves away from zero (TR18). */
-function round5(x: number): number {
+/** Magnitude of a ratio in percent, to the nearest 5 points, halves away from zero (TR18).
+ * The same rule as `factordesk/rounding.py`, with the same 1e-9 tolerance on the half point. */
+export function round5(x: number): number {
   return Math.floor(Math.abs(x * 100) / 5 + 0.5 + 1e-9) * 5;
 }
 
@@ -136,6 +137,10 @@ export function shareText(q: number | null | undefined): string {
   const pts = round5(q);
   return `${q < 0 && pts > 0 ? MINUS : ""}${pts}%`;
 }
+
+/** Printed for the share and the kept rows when the verdict says the alpha is noise. */
+export const NOT_DISTINGUISHABLE = "n/a, the in-sample alpha is not distinguishable from zero";
+const NO_ALPHA_VERDICTS: readonly (string | null)[] = ["no_reliable_alpha", "point_in_time_only"];
 
 function days(n: number): string {
   return `${n} ${n === 1 ? "day" : "days"}`;
@@ -377,6 +382,7 @@ function GapBlock({ gap, pit }: { gap: Gap; pit: Stats }) {
     );
   }
   const severity: Severity = gap.severity ?? "info";
+  const noAlpha = NO_ALPHA_VERDICTS.includes(gap.verdict);
   const rows: [string, ReactNode][] = [
     ["Days compared", <Cell main={span(gap.sample.start, gap.sample.end)} subs={[days(gap.sample.n)]} />],
     ["In-sample betas, same days", <Cell main={`${sp(gap.in_sample_same_days_annual)} a year`} />],
@@ -385,8 +391,8 @@ function GapBlock({ gap, pit }: { gap: Gap; pit: Stats }) {
       "Gap",
       <Cell main={`${sp(gap.gap_annual)} a year`} subs={[`Approximate: z ${n2(gap.gap_z)}, p ${pv(gap.gap_p)}.`]} />,
     ],
-    ["Share of the full-period alpha earned on these days", <Cell main={shareText(gap.comparison_share_of_alpha)} />],
-    ["Survival of the alpha with point-in-time betas", <Cell main={keptText(gap.survival_ratio)} />],
+    ["Share of the full-period alpha earned on these days", <Cell main={noAlpha ? NOT_DISTINGUISHABLE : shareText(gap.comparison_share_of_alpha)} />],
+    ["Kept with point-in-time betas", <Cell main={noAlpha ? NOT_DISTINGUISHABLE : keptText(gap.survival_ratio)} />],
   ];
   return (
     <div className="res-gap">

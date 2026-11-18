@@ -51,6 +51,7 @@ from factordesk.analytics.regression import (
 )
 from factordesk.analytics.rolling import RollingBetas, ex_ante_betas
 from factordesk.analytics.sample import FACTOR_CODES, AnalysisSample
+from factordesk.rounding import round_to_five_points
 
 FloatArray = NDArray[np.float64]
 Status = Literal["ok", "insufficient_data", "not_applicable", "failed"]
@@ -440,8 +441,8 @@ def ratio_text(ratio: float) -> str:
     """A survival ratio as a percentage rounded to 5 points (half away from zero), capped (R4.7)."""
     if ratio > DRAG_CAP:
         return "more than 200%"
-    points = math.floor(abs(ratio) * 100.0 / 5.0 + 0.5) * 5
-    return f"{'-' if ratio < 0 else ''}{points}%"
+    points = round_to_five_points(ratio)
+    return f"{'-' if ratio < 0 and points > 0 else ''}{points}%"
 
 
 def verdict_message(
