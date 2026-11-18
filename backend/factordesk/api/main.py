@@ -13,7 +13,9 @@ from fastapi import FastAPI
 from factordesk.api.deps import AppDeps, default_deps
 from factordesk.api.errors import install_error_handlers
 from factordesk.api.routes_factors import router as factors_router
+from factordesk.api.routes_report import router as report_router
 from factordesk.api.runtime import Runtime
+from factordesk.api.service import ReportService
 from factordesk.report.schema import SCHEMA_VERSION
 
 
@@ -24,9 +26,12 @@ def create_app(deps: AppDeps) -> FastAPI:
         summary="Local Fama-French 5-factor analysis API.",
         version=SCHEMA_VERSION,
     )
-    app.state.runtime = Runtime(deps)
+    runtime = Runtime(deps)
+    app.state.runtime = runtime
+    app.state.report_service = ReportService(runtime)
     install_error_handlers(app)
     app.include_router(factors_router)
+    app.include_router(report_router)
     return app
 
 

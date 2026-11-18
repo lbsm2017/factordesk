@@ -720,11 +720,17 @@ def assemble_report(
     factors_downloaded_at: datetime | None,
     windows: Sequence[int] = WINDOWS,
     primary_window: int = PRIMARY_WINDOW,
+    start: date | None = None,
+    end: date | None = None,
 ) -> FactorReport:
-    """Pure part of ``build_report``: everything after the data has been fetched."""
-    history = _unique_dates(history)
+    """Pure part of ``build_report``: everything after the data has been fetched.
+
+    ``start`` and ``end`` are the requested range (M2); None means the first return date and
+    the last price date. They are reported as given, so nothing is clipped silently.
+    """
+    history = unique_dates(history)
     audit = audit_prices(history.frame, duplicate_dates=history.duplicate_dates)
-    sample = build_sample(history, factor_frame)
+    sample = build_sample(history, factor_frame, start, end)
     vintage = FactorVintage(last_date=sample.factor_last_date, downloaded_at=factors_downloaded_at)
     info = _sample_info(sample, vintage)
     daily = run_regression(sample)
@@ -807,12 +813,16 @@ def build_report(
     price_provider: PriceProvider | None = None,
     factors: pd.DataFrame | None = None,
     now: datetime | None = None,
+    *,
+    start: date | None = None,
+    end: date | None = None,
 ) -> FactorReport:
     """Fetch factors and prices for ``ticker`` and build the validated ``FactorReport``.
 
     ``factors`` is a frame shaped like ``data.factors.load_ff5_daily()`` (French column names,
     decimals); when None the cached French file is loaded (and refreshed when stale). ``now``
     must be timezone-aware; it stamps ``generated_at`` and drives the data-lag figures.
+    ``start`` and ``end`` limit the requested range (None: the whole price history).
     Raises ``PriceDataError`` (bad or unknown ticker), ``FactorError`` (factor data
     unavailable), ``InsufficientHistoryError`` (fewer than 504 aligned rows) or
     ``DegenerateInputError`` (price that does not move, singular factor design; D30).
@@ -837,11 +847,17 @@ def build_report(
     )
     history = provider.fetch(symbol)
     return assemble_report(
-        symbol, history, factor_frame, now=now_utc, factors_downloaded_at=downloaded_at
+        symbol,
+        history,
+        factor_frame,
+        now=now_utc,
+        factors_downloaded_at=downloaded_at,
+        start=start,
+        end=end,
     )
 
 
-def _unique_dates(history: PriceHistory) -> PriceHistory:
+def unique_dates(history: PriceHistory) -> PriceHistory:
     """Collapse repeated dates a provider returned (first bar kept) and record them (D29)."""
     frame, repeated = collapse_duplicate_dates(history.frame)
     if not repeated:
