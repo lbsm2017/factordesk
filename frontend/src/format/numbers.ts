@@ -12,6 +12,11 @@ function isZero(text: string): boolean {
   return Number(text.replace(/,/g, "")) === 0;
 }
 
+/** Whole count with thousands separators, as in the KPI strip: 8474 is "8,474". */
+export function count(n: number): string {
+  return grouped(Math.abs(n), 0).replace(/^/, n < 0 ? MINUS : "");
+}
+
 /** Signed number: "+0.998", "−0.141", and "0.000" for zero (also for values that round to zero). */
 export function signed(x: number, digits = 3): string {
   const s = grouped(Math.abs(x), digits);

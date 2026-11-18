@@ -217,6 +217,15 @@ describe("AnalysedRange", () => {
     expect(label?.querySelector("b")?.textContent).toBe("Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days.");
   });
 
+  it("groups thousands in the range line (real Full-history SPY run)", () => {
+    const report = cloneReport();
+    report.data.n_obs = 8474;
+    report.data.uncovered.n = 1034;
+    const { head, tail } = rangeLine(report);
+    expect(head).toContain(", 8,474 trading days.");
+    expect(tail).toContain("The last 1,034 price days");
+  });
+
   it("words one price day and an untouched tail", () => {
     const report = cloneReport();
     report.data.uncovered.n = 1;
