@@ -416,7 +416,7 @@ Rev 2: the header was two rows of badges plus a paragraph. It is now three short
 
 **Rev 3: company name line.** Under the ticker sits one line with the company name, then the
 exchange and the currency, from the optional `data.security` field (schema version 5,
-`docs/specs/dashboard-v2.md` section V2): for example "Zoom Communications Inc." on the name line
+`docs/specs/dashboard-v2.md` section DV2): for example "Zoom Communications Inc." on the name line
 and "NASDAQ, USD" in `--ink-2` beside it at caption size. In the dashboard the ticker is 32 px / 640
 and the name 19 px / 500 in ink. Rules: the name is plain text, never a link; a name longer than
 the line truncates with an ellipsis and carries the full name in `title`; when `data.security` is
@@ -878,7 +878,7 @@ has the accessible name "Menu"). No icon font and no new dependency.
 - A `<nav aria-labelledby>` with a plain `<ul>` of links to panel ids. Items are listed in
   registry order for every panel that rendered (a panel whose section is null, for example
   `lead_lag` today, has no item). Labels, icons and targets are fixed in
-  `docs/specs/dashboard-v2.md` (V3.2).
+  `docs/specs/dashboard-v2.md` (DV3.2).
 - Each item is 40 px tall: icon, then the label (15 px, `--rail-ink-2`). Hover: `--rail-ink` text.
   The active item: `--rail-ink` text, weight 600, `--rail-active` background, the icon in
   `--rail-accent`, a 3 px `--rail-accent` bar on its left edge, and `aria-current="location"`.
@@ -923,7 +923,7 @@ Two switches, both in the rail, both stored in the URL:
 
 | Label | Default | URL | Off means | On means |
 |---|---|---|---|---|
-| Show statistics | off | `stats=1` when on, absent when off | plain words, bars and verdicts; statistics columns hidden | t-statistics, p-values, intervals, standard errors, VIF and the other statistics columns appear in tiles, cards and tables (column map in `docs/specs/dashboard-v2.md`, V5) |
+| Show statistics | off | `stats=1` when on, absent when off | plain words, bars and verdicts; statistics columns hidden | t-statistics, p-values, intervals, standard errors, VIF and the other statistics columns appear in tiles, cards and tables (column map in `docs/specs/dashboard-v2.md`, DV5) |
 | Dark theme | off | `theme=dark` when on, absent when off | light tokens | dark tokens |
 
 - Markup: `<button type="button" role="switch" aria-checked="false|true">` containing the visible
@@ -966,7 +966,7 @@ the look. Every row here obeys the density rules of C (at most four tiles or car
 - `--highlight-50` fill (indigo tint), a 4 px `--highlight` rule on the left edge, 12 px radius,
   32 px padding (20 px under 600 px), no shadow.
 - The headline: `--fs-verdict`, 36 px at 900 px wide rising to 40 px at 1440 px (`clamp(36px,
-  0.74vw + 29.3px, 40px)`), weight 600, line height 1.25, `--ink`, at most 30 words, max width
+  0.74vw + 29.3px, 40px)`), weight 600, line height 1.25, `--ink`, at most 40 words, max width
   36ch. **Exception, new product choice:** under 600 px the headline is 28 px, because a 36 px
   sentence of 25 words fills more than the first screen at 390 px. Still well above the 14 px
   floor.
@@ -1011,7 +1011,7 @@ the look. Every row here obeys the density rules of C (at most four tiles or car
   and focuses that row exactly as the old equation terms did.
 - Strength bar: 8 px tall, centred zero tick in `--axis`, bar from zero in the direction colour,
   faded (`fill-opacity: 0.3` with a full-colour 1 px outline) when not significant, as in rev 2.
-  All five bars share one symmetric domain (V-rules, V4.6), so bar lengths compare across cards.
+  All five bars share one symmetric domain (V-rules, DV4.6), so bar lengths compare across cards.
 - With Show statistics on, the card adds "beta +0.998, 95% interval +0.994 to +1.002, t 475" in
   14 px `--ink-2` above "How sure".
 
@@ -1034,7 +1034,7 @@ the look. Every row here obeys the density rules of C (at most four tiles or car
   day-to-day risk", not "This chart shows the risk shares").
 - It obeys the V-rules: no causation, no forecast, "not distinguishable from zero" for anything
   not significant, a hedge when the gate fired or the audit has errors.
-- The copy for every panel is fixed in `docs/specs/dashboard-v2.md`, V4.9. A panel in its empty
+- The copy for every panel is fixed in `docs/specs/dashboard-v2.md`, DV4.9. A panel in its empty
   state has no outcome line; the empty state's reason takes its place.
 
 ### L.6 Performance panel
