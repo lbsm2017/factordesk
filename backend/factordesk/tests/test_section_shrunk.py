@@ -730,3 +730,10 @@ def test_dashboard_without_a_loader_leaves_the_section_null(tmp_path: Path) -> N
 
 if __name__ == "__main__":
     write_fixture()
+
+
+def test_prior_label_points_at_values_that_exist() -> None:
+    """L-SHRINK-PRIOR sits after the prior sentence in both panels, so it says "above"."""
+    text = SHRUNK_LABELS["L-SHRINK-PRIOR"]
+    assert "(values above)" in text
+    assert "table" not in text

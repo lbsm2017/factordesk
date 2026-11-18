@@ -291,6 +291,8 @@ def test_prior_sentence_reads_as_in_the_react_panel() -> None:
     # the descriptive label is the footnote; the model labels sit in the fold, after the prior
     assert foot.index("Descriptive, in-sample, not predictive.") < foot.index("<details")
     assert foot.index("Prior centre and spread") < foot.index(esc(LABEL_TEXT["L-SHRINK"]))
+    # the label says "values above": the values are in the sentence that comes first
+    assert foot.index("Prior centre and spread") < foot.index(esc(LABEL_TEXT["L-SHRINK-PRIOR"]))
 
 
 def test_shared_wording_is_fixed() -> None:

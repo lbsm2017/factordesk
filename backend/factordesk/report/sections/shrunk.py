@@ -37,7 +37,7 @@ LABEL_TEXT: dict[str, str] = {
     ),
     "L-SHRINK-PRIOR": (
         "Prior: centre 1 for Mkt-RF and 0 for the other betas, spread from the Ken French "
-        "industry and size portfolios (values in the table). Portfolios differ less than single "
+        "industry and size portfolios (values above). Portfolios differ less than single "
         "stocks, so this pull may be too strong for unusual stocks."
     ),
     "L-CRED": (

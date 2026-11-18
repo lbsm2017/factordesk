@@ -231,6 +231,10 @@ describe("ShrunkBetasPanel", () => {
     expect(container.querySelector("details.how p")?.textContent).toMatch(
       /^Prior centre and spread per factor: Mkt-RF 1\.000 and 0\.209; SMB 0\.000 and 0\.764; HML 0\.000 and 0\.341; RMW 0\.000 and 0\.329; CMA 0\.000 and 0\.254\. The spread comes from 49 industry and 75 size portfolios, 2016-09-21 to 2026-09-30\. Pulled toward typical:/,
     );
+    // L-SHRINK-PRIOR says "values above": the prior values are in the sentence that comes first
+    const fold = container.querySelector("details.how p")?.textContent ?? "";
+    expect(fold.indexOf("Prior centre and spread")).toBe(0);
+    expect(fold.indexOf(LABELS["L-SHRINK-PRIOR"] as string)).toBeGreaterThan(fold.indexOf("2026-09-30"));
     expect(container.querySelector("caption.vh")?.textContent).toBe(
       "OLS and shrunk betas with standard errors, 95% credible intervals and pull; a marker is drawn only where the pull is at least 5%",
     );

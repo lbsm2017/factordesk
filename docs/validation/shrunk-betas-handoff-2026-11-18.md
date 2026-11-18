@@ -240,3 +240,12 @@ The review (`docs/reviews/shrunk-betas-validation-2026-11-18.md`) accepted the s
 | Legend (both panels) | Pulled 5% or more toward typical | Pull of 5% or more | SB6 rule 2 and 3 |
 | Marker tooltip, rows that moved away (React) | ...pulled toward typical to {b_post}... ; moved away from its typical value | ...moved away from its typical value to {b_post}... | SB6 rule 3 |
 | Schema field `ShrunkBeta.pull` description | Share of the way pulled toward the prior centre (S_w[j, j]), unclipped. | Weight the prior gets on this beta by itself (S_w[j, j]), unclipped. With correlated factors the actual move can be smaller, larger or away from the prior centre. | SB7.2 |
+
+### 9.2 C2: L-SHRINK-PRIOR pointed at a table that does not exist
+
+Neither panel has a prior table any more: the prior values are in the sentence that opens "How this is computed", just before the model labels. The model text now says "(values above)". Tests: the model text contains "(values above)" and no "table"; in both panels the prior sentence comes before the label.
+
+| Where | Old text | New text | Spec section |
+| --- | --- | --- | --- |
+| L-SHRINK-PRIOR (model `LABEL_TEXT`) | Prior: centre 1 for Mkt-RF and 0 for the other betas, spread from the Ken French industry and size portfolios (values in the table). Portfolios differ less than single stocks, so this pull may be too strong for unusual stocks. | Prior: centre 1 for Mkt-RF and 0 for the other betas, spread from the Ken French industry and size portfolios (values above). Portfolios differ less than single stocks, so this pull may be too strong for unusual stocks. | SB6 (replaces the `{m0}`, `{tau}`, `{n_A}`, `{n_B}`, `{start}`, `{end}` template: the values are printed in the prior sentence of the panels) |
+| SB5 template, "already detectable" | A beta of 0.05 is already detectable. | An {Factor} beta of 0.05 is already detectable. (with the article "a" or "an" as the code writes it, for example "An SMB beta of 0.05 is already detectable.") | SB5 (the code form; the other SB5 sentences already name the factor) |
