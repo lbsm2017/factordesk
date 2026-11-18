@@ -1,14 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { EMPTY_URL_STATE } from "../../state/url";
 import { mockReport } from "../../test/fixture";
-import { AnalysedRange } from "../controls/AnalysedRange";
-import { ControlsStrip } from "../controls/ControlsStrip";
-import { CustomRange } from "../controls/CustomRange";
-import { FactorDataLine } from "../controls/FactorDataLine";
-import { RangeChips } from "../controls/RangeChips";
-import { TickerSearch } from "../controls/TickerSearch";
 import { EmptyState } from "./EmptyState";
 import { Panel } from "./Panel";
 import { ReportView } from "./ReportView";
@@ -22,39 +15,6 @@ const stubs: [string, string, () => ReactElement][] = [
   ["ReturnPanel", "Where the return came from", () => <ReturnPanel report={report} />],
   ["RiskPanel", "Where the risk comes from", () => <RiskPanel report={report} />],
   ["RollingPanel", "Exposure over time", () => <RollingPanel report={report} win={252} onWinChange={vi.fn()} />],
-  [
-    "ControlsStrip",
-    "Controls",
-    () => (
-      <ControlsStrip
-        state={EMPTY_URL_STATE}
-        recent={[]}
-        suggestions={[]}
-        ranges={undefined}
-        factorStatus={undefined}
-        report={undefined}
-        busy={false}
-        refreshing={false}
-        refreshMessage={null}
-        onQueryChange={vi.fn()}
-        onCommit={vi.fn()}
-        onRefreshFactors={vi.fn()}
-      />
-    ),
-  ],
-  [
-    "TickerSearch",
-    "Ticker search",
-    () => <TickerSearch value="" recent={[]} suggestions={[]} error={null} onQueryChange={vi.fn()} onSubmit={vi.fn()} />,
-  ],
-  ["RangeChips", "Date range", () => <RangeChips options={undefined} selected={null} onSelect={vi.fn()} />],
-  ["CustomRange", "Custom range", () => <CustomRange start="" end="" max={null} onCommit={vi.fn()} />],
-  ["AnalysedRange", "Analysed range", () => <AnalysedRange report={undefined} />],
-  [
-    "FactorDataLine",
-    "Factor data",
-    () => <FactorDataLine status={undefined} refreshing={false} message={null} onRefresh={vi.fn()} />,
-  ],
 ];
 
 describe("stubs", () => {

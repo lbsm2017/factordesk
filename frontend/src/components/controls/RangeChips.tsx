@@ -1,6 +1,6 @@
 import type { RangeOption } from "../../api/types";
+import { PRESETS } from "../../state/url";
 import type { Preset } from "../../state/url";
-import { Panel } from "../report/Panel";
 
 export interface RangeChipsProps {
   /** From the ranges endpoint; undefined while loading. Render only the presets in PRESETS. */
@@ -8,9 +8,39 @@ export interface RangeChipsProps {
   /** Selected preset; null when custom dates are used. */
   selected: Preset | null;
   onSelect: (preset: Preset) => void;
+  /** Id of the element that states why a chip is unavailable (visible text under the strip). */
+  describedBy?: string;
 }
 
-/** STUB (T4): fill in this file only. Props are fixed by T3. */
-export function RangeChips(_props: RangeChipsProps) {
-  return <Panel id="range-chips" title="Date range" />;
+const LABELS: Record<Preset, string> = { "3Y": "3Y", "5Y": "5Y", FULL: "Full history" };
+
+/**
+ * Range chips (dashboard spec DB6.3): native radios in a fieldset with a hidden legend, so arrow
+ * keys work. An unavailable chip is disabled; its reason is shown by the controls strip.
+ */
+export function RangeChips({ options, selected, onSelect, describedBy }: RangeChipsProps) {
+  return (
+    <fieldset className="ctl-range" {...(describedBy ? { "aria-describedby": describedBy } : {})}>
+      <legend className="vh">Date range</legend>
+      <span className="chips">
+        {PRESETS.map((preset) => {
+          const option = options?.find((o) => o.preset === preset);
+          const off = option !== undefined && !option.available;
+          return (
+            <label key={preset} className={off ? "chip-opt off" : "chip-opt"}>
+              <input
+                type="radio"
+                name="range"
+                value={preset}
+                checked={selected === preset}
+                disabled={off}
+                onChange={() => onSelect(preset)}
+              />
+              <span>{LABELS[preset]}</span>
+            </label>
+          );
+        })}
+      </span>
+    </fieldset>
+  );
 }
