@@ -348,6 +348,29 @@ export interface components {
             audit_findings: components["schemas"]["AuditFinding"][];
         };
         /**
+         * DatasetStamp
+         * @description Vintage of one portfolio file behind the prior (SB2.3, methodology-datasets D5).
+         */
+        DatasetStamp: {
+            /**
+             * Key
+             * @description Dataset key, e.g. ind49_daily.
+             */
+            key: string;
+            /**
+             * Crsp Stamp
+             * @description CRSP database stamp of the file ("202609").
+             */
+            crsp_stamp: string | null;
+            /** Sha256 */
+            sha256: string | null;
+            /**
+             * Last Modified
+             * @description HTTP Last-Modified header at download.
+             */
+            last_modified: string | null;
+        };
+        /**
          * DiagnosticTest
          * @description One residual diagnostic (M3.5). Informational: never drives tags or alerts.
          */
@@ -697,6 +720,39 @@ export interface components {
             bh_family_size: number;
             /** Factors */
             factors: components["schemas"]["FactorStat"][];
+        };
+        /**
+         * PowerStatement
+         * @description What the test behind the tags can detect for one factor (SB5).
+         */
+        PowerStatement: {
+            /**
+             * Factor
+             * @enum {string}
+             */
+            factor: "Mkt-RF" | "SMB" | "HML" | "RMW" | "CMA";
+            /**
+             * Mde80
+             * @description Smallest beta detected with 80% power.
+             */
+            mde80: number | null;
+            /**
+             * Alpha Level
+             * @description Level behind the MDE: 0.01 (5 betas).
+             */
+            alpha_level: number;
+            /**
+             * Delta
+             * @description Beta size the years-to-detect figure asks about.
+             */
+            delta: number;
+            /**
+             * Extra Years To Detect Delta
+             * @description More years of similar data needed to detect delta; null for Mkt-RF.
+             */
+            extra_years_to_detect_delta: number | null;
+            /** Text */
+            text: string | null;
         };
         /**
          * PriceSeries
@@ -1241,6 +1297,100 @@ export interface components {
             factor_vintage: components["schemas"]["FactorVintage"];
         };
         /**
+         * ShrinkagePrior
+         * @description The prior the betas were pulled toward (SB2) and what it was estimated from.
+         */
+        ShrinkagePrior: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "reference_ff_portfolios_v1" | "peer_empirical_bayes_v1";
+            /**
+             * Centre
+             * @description Prior centre m0, one per factor, canonical order.
+             */
+            centre: number[];
+            /**
+             * Tau
+             * @description Prior standard deviation per factor.
+             */
+            tau: number[];
+            /**
+             * Tau By Cross Section
+             * @description Spread of each cross-section before the maximum and the floor.
+             */
+            tau_by_cross_section: {
+                [key: string]: number[];
+            } | null;
+            /**
+             * N Portfolios
+             * @description Usable portfolios per cross-section.
+             */
+            n_portfolios: {
+                [key: string]: number;
+            };
+            /**
+             * Window Start
+             * Format: date
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date
+             * @description The last French row used: not after the sample end.
+             */
+            window_end: string;
+            /** Window Rows */
+            window_rows: number;
+            /** Datasets */
+            datasets: components["schemas"]["DatasetStamp"][];
+            /**
+             * Fallback Reason
+             * @description Why a peer prior fell back to this one.
+             */
+            fallback_reason: string | null;
+        };
+        /**
+         * ShrunkBeta
+         * @description One factor: the OLS beta and the beta pulled toward the prior.
+         */
+        ShrunkBeta: {
+            /**
+             * Factor
+             * @enum {string}
+             */
+            factor: "Mkt-RF" | "SMB" | "HML" | "RMW" | "CMA";
+            /** Beta Ols */
+            beta_ols: number;
+            /**
+             * Se Hac
+             * @description Newey-West standard error of the OLS beta.
+             */
+            se_hac: number;
+            /** Beta Shrunk */
+            beta_shrunk: number | null;
+            /**
+             * Sd Post
+             * @description Posterior standard deviation.
+             */
+            sd_post: number | null;
+            /** Cred95 Low */
+            cred95_low: number | null;
+            /** Cred95 High */
+            cred95_high: number | null;
+            /**
+             * Pull
+             * @description Share of the way pulled toward the prior centre (S_w[j, j]), unclipped.
+             */
+            pull: number | null;
+            /**
+             * Moved Away
+             * @description True when the shrunk beta moved away from its centre (L-CORR-MOVE).
+             */
+            moved_away: boolean | null;
+        };
+        /**
          * ShrunkBetas
          * @description OLS betas pulled toward a stated prior, with a power statement per factor (SB0.1).
          */
@@ -1256,6 +1406,28 @@ export interface components {
              */
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "full_sample" | "latest_window";
+            /**
+             * Window
+             * @description Rows of the latest window; null for the full sample.
+             */
+            window: number | null;
+            /**
+             * Hac Lags
+             * @description Newey-West lags of the regression shrunk.
+             */
+            hac_lags: number;
+            prior: components["schemas"]["ShrinkagePrior"] | null;
+            /** Betas */
+            betas: components["schemas"]["ShrunkBeta"][];
+            /** Power */
+            power: components["schemas"]["PowerStatement"][];
+            /** Labels */
+            labels: ("L-DESC" | "L-SHRINK" | "L-SHRINK-PRIOR" | "L-CRED" | "L-CORR-MOVE" | "L-MDE")[];
         };
         /** TickerSuggestion */
         TickerSuggestion: {

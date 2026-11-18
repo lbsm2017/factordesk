@@ -964,6 +964,60 @@
         "title": "DataInfo",
         "description": "Provenance and coverage of the data behind the report."
       },
+      "DatasetStamp": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Dataset key, e.g. ind49_daily."
+          },
+          "crsp_stamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crsp Stamp",
+            "description": "CRSP database stamp of the file (\"202609\")."
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "last_modified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Modified",
+            "description": "HTTP Last-Modified header at download."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "crsp_stamp",
+          "sha256",
+          "last_modified"
+        ],
+        "title": "DatasetStamp",
+        "description": "Vintage of one portfolio file behind the prior (SB2.3, methodology-datasets D5)."
+      },
       "DiagnosticTest": {
         "properties": {
           "code": {
@@ -1885,6 +1939,78 @@
         ],
         "title": "MultiDayRegression",
         "description": "Regression on sums over non-overlapping 5-day blocks (M3.6); only when the gate fired."
+      },
+      "PowerStatement": {
+        "properties": {
+          "factor": {
+            "type": "string",
+            "enum": [
+              "Mkt-RF",
+              "SMB",
+              "HML",
+              "RMW",
+              "CMA"
+            ],
+            "title": "Factor"
+          },
+          "mde80": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mde80",
+            "description": "Smallest beta detected with 80% power."
+          },
+          "alpha_level": {
+            "type": "number",
+            "title": "Alpha Level",
+            "description": "Level behind the MDE: 0.01 (5 betas)."
+          },
+          "delta": {
+            "type": "number",
+            "title": "Delta",
+            "description": "Beta size the years-to-detect figure asks about."
+          },
+          "extra_years_to_detect_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Years To Detect Delta",
+            "description": "More years of similar data needed to detect delta; null for Mkt-RF."
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "factor",
+          "mde80",
+          "alpha_level",
+          "delta",
+          "extra_years_to_detect_delta",
+          "text"
+        ],
+        "title": "PowerStatement",
+        "description": "What the test behind the tags can detect for one factor (SB5)."
       },
       "PriceSeries": {
         "properties": {
@@ -3232,6 +3358,219 @@
         "title": "SampleInfo",
         "description": "Sample metadata carried by every statistic (M0.8)."
       },
+      "ShrinkagePrior": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "reference_ff_portfolios_v1",
+              "peer_empirical_bayes_v1"
+            ],
+            "title": "Source"
+          },
+          "centre": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Centre",
+            "description": "Prior centre m0, one per factor, canonical order."
+          },
+          "tau": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Tau",
+            "description": "Prior standard deviation per factor."
+          },
+          "tau_by_cross_section": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tau By Cross Section",
+            "description": "Spread of each cross-section before the maximum and the floor."
+          },
+          "n_portfolios": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "N Portfolios",
+            "description": "Usable portfolios per cross-section."
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Window Start"
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Window End",
+            "description": "The last French row used: not after the sample end."
+          },
+          "window_rows": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Window Rows"
+          },
+          "datasets": {
+            "items": {
+              "$ref": "#/components/schemas/DatasetStamp"
+            },
+            "type": "array",
+            "title": "Datasets"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason",
+            "description": "Why a peer prior fell back to this one."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "centre",
+          "tau",
+          "tau_by_cross_section",
+          "n_portfolios",
+          "window_start",
+          "window_end",
+          "window_rows",
+          "datasets",
+          "fallback_reason"
+        ],
+        "title": "ShrinkagePrior",
+        "description": "The prior the betas were pulled toward (SB2) and what it was estimated from."
+      },
+      "ShrunkBeta": {
+        "properties": {
+          "factor": {
+            "type": "string",
+            "enum": [
+              "Mkt-RF",
+              "SMB",
+              "HML",
+              "RMW",
+              "CMA"
+            ],
+            "title": "Factor"
+          },
+          "beta_ols": {
+            "type": "number",
+            "title": "Beta Ols"
+          },
+          "se_hac": {
+            "type": "number",
+            "title": "Se Hac",
+            "description": "Newey-West standard error of the OLS beta."
+          },
+          "beta_shrunk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Shrunk"
+          },
+          "sd_post": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sd Post",
+            "description": "Posterior standard deviation."
+          },
+          "cred95_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cred95 Low"
+          },
+          "cred95_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cred95 High"
+          },
+          "pull": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pull",
+            "description": "Share of the way pulled toward the prior centre (S_w[j, j]), unclipped."
+          },
+          "moved_away": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moved Away",
+            "description": "True when the shrunk beta moved away from its centre (L-CORR-MOVE)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "factor",
+          "beta_ols",
+          "se_hac",
+          "beta_shrunk",
+          "sd_post",
+          "cred95_low",
+          "cred95_high",
+          "pull",
+          "moved_away"
+        ],
+        "title": "ShrunkBeta",
+        "description": "One factor: the OLS beta and the beta pulled toward the prior."
+      },
       "ShrunkBetas": {
         "properties": {
           "status": {
@@ -3258,6 +3597,71 @@
           },
           "sample": {
             "$ref": "#/components/schemas/SampleInfo"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "full_sample",
+              "latest_window"
+            ],
+            "title": "Scope"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window",
+            "description": "Rows of the latest window; null for the full sample."
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lags of the regression shrunk."
+          },
+          "prior": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShrinkagePrior"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "betas": {
+            "items": {
+              "$ref": "#/components/schemas/ShrunkBeta"
+            },
+            "type": "array",
+            "title": "Betas"
+          },
+          "power": {
+            "items": {
+              "$ref": "#/components/schemas/PowerStatement"
+            },
+            "type": "array",
+            "title": "Power"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-SHRINK",
+                "L-SHRINK-PRIOR",
+                "L-CRED",
+                "L-CORR-MOVE",
+                "L-MDE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
           }
         },
         "additionalProperties": false,
@@ -3265,7 +3669,14 @@
         "required": [
           "status",
           "reason",
-          "sample"
+          "sample",
+          "scope",
+          "window",
+          "hac_lags",
+          "prior",
+          "betas",
+          "power",
+          "labels"
         ],
         "title": "ShrunkBetas",
         "description": "OLS betas pulled toward a stated prior, with a power statement per factor (SB0.1)."
