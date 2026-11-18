@@ -205,6 +205,26 @@ function windowText(v: KalmanVintage): string {
   return v.w_eq === null ? "All data so far" : `${count(Math.round(v.w_eq))} days`;
 }
 
+// ---------------------------------------------------------------------------- axis
+
+/** Smallest distance in percent of the plot width between two x labels on a wide screen. */
+const WIDE_GAP = 13;
+
+/**
+ * Indices of the x labels kept on a wide screen: the first and the last, then the major ones, then
+ * the rest, each only when it clears every label already kept (a 3-year range has 12 quarterly ticks).
+ */
+export function spacedTicks(ticks: readonly { x: number; major: boolean }[], gap = WIDE_GAP): Set<number> {
+  const rank = (i: number) => (i === 0 ? 0 : i === ticks.length - 1 ? 1 : ticks[i]?.major ? 2 : 3);
+  const order = ticks.map((_, i) => i).sort((a, b) => rank(a) - rank(b) || a - b);
+  const kept: number[] = [];
+  for (const i of order) {
+    const x = (ticks[i] as { x: number }).x;
+    if (kept.every((k) => Math.abs((ticks[k] as { x: number }).x - x) >= gap)) kept.push(i);
+  }
+  return new Set(kept);
+}
+
 // ---------------------------------------------------------------------------- rows
 
 function KalmanRow({ row, model }: { row: KalmanRowData; model: KalmanModel }) {
@@ -216,7 +236,7 @@ function KalmanRow({ row, model }: { row: KalmanRowData; model: KalmanModel }) {
     { value: lo, kind: "bot" },
   ];
   const zeroInside = lo < 0 && hi > 0;
-  if (zeroInside && Math.min(Math.abs(hi), Math.abs(lo)) > span * 0.22) labels.push({ value: 0, kind: "mid" });
+  if (zeroInside && Math.min(Math.abs(hi), Math.abs(lo)) > span * 0.34) labels.push({ value: 0, kind: "mid" });
   const l = row.latest;
   const summary =
     `${row.name} Kalman beta from ${dateLong(model.first)} to ${dateLong(model.last)}: ` +
@@ -274,7 +294,9 @@ function BetaTable({ model }: { model: KalmanModel }) {
   const span = model.to - model.from;
   const ticks = dateTicks(model.from, model.to);
   const pos = (ms: number) => ((ms - model.from) / Math.max(span, 1)) * 100;
-  const narrow = narrowTicks(ticks.map((t) => ({ x: pos(t.ms), major: t.major })));
+  const placed = ticks.map((t) => ({ x: pos(t.ms), major: t.major }));
+  const narrow = narrowTicks(placed);
+  const wide = spacedTicks(placed);
   return (
     <table role="table" className="bars cols-3 rolling kalman-betas">
       <caption className="vh">
@@ -315,7 +337,7 @@ function BetaTable({ model }: { model: KalmanModel }) {
                 return (
                   <span
                     key={t.ms}
-                    className={`xl${t.major ? "" : " minor"}${narrow.has(i) ? " keep" : ""}${x < 3 ? " edge-l" : x > 97 ? " edge-r" : ""}`}
+                    className={`xl${t.major ? "" : " minor"}${narrow.has(i) ? " keep" : ""}${wide.has(i) ? " dk" : ""}${x < 3 ? " edge-l" : x > 97 ? " edge-r" : ""}`}
                     style={{ left: `${x.toFixed(2)}%` }}
                   >
                     {t.label}

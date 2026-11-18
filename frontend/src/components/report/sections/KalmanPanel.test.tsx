@@ -7,6 +7,7 @@ import {
   KalmanPanel,
   MAX_DRAWN_POINTS,
   buildKalmanModel,
+  spacedTicks,
   thinIndices,
 } from "./KalmanPanel";
 
@@ -259,5 +260,15 @@ describe("KalmanPanel accessibility", () => {
   it("has no scroll region that would take a focus stop (the tables fit the page)", () => {
     const { container } = renderPanel(withKalman());
     expect(container.querySelectorAll("[tabindex]")).toHaveLength(0);
+  });
+});
+
+describe("x labels", () => {
+  it("keeps the first and last label and drops those that crowd them on a wide screen", () => {
+    const ticks = [2, 10, 20, 30, 45, 60, 75, 90, 98].map((x, i) => ({ x, major: i % 4 === 1 }));
+    const kept = [...spacedTicks(ticks)].sort((a, b) => a - b);
+    expect(kept).toContain(0);
+    expect(kept).toContain(ticks.length - 1);
+    for (let i = 1; i < kept.length; i++) expect(ticks[kept[i]!]!.x - ticks[kept[i - 1]!]!.x).toBeGreaterThanOrEqual(13);
   });
 });
