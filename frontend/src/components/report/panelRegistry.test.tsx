@@ -13,6 +13,7 @@ const ORDER = [
   "equation",
   "kpis",
   "price",
+  "performance",
   "exposures",
   "lead_lag",
   "shrunk",
@@ -29,6 +30,7 @@ const ORDER = [
 
 /** Element id each optional section's panel uses, and the core panel it follows. */
 const SECTION_PANELS = {
+  performance: { id: "performance", after: "price" },
   lead_lag: { id: "lead-lag", after: "exposures" },
   shrunk_betas: { id: "shrunk", after: "lead-lag" },
   fragility: { id: "fragility", after: "shrunk" },

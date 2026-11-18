@@ -8,14 +8,16 @@ import fragility from "@fixtures/sections/fragility.json";
 import labels from "@fixtures/sections/label_text.json";
 import kalman from "@fixtures/sections/kalman.json";
 import leadLag from "@fixtures/sections/lead_lag.json";
+import performanceFixture from "@fixtures/sections/performance.json";
 import residual from "@fixtures/sections/residual_alpha.json";
 import shrunk from "@fixtures/sections/shrunk.json";
 
 /** The `FactorReport` fields of the optional sections, in panel order. */
-export const SECTION_FIELDS = ["lead_lag", "shrunk_betas", "fragility", "residual", "kalman_betas"] as const;
+export const SECTION_FIELDS = ["performance", "lead_lag", "shrunk_betas", "fragility", "residual", "kalman_betas"] as const;
 export type SectionField = (typeof SECTION_FIELDS)[number];
 
 const PAYLOADS: Record<SectionField, unknown> = {
+  performance: performanceFixture,
   lead_lag: leadLag,
   shrunk_betas: shrunk,
   fragility,

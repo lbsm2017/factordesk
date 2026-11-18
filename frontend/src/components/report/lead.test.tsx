@@ -252,7 +252,7 @@ describe("Colophon", () => {
   it("states the schema, the generated time and the disclaimer", () => {
     const { container } = render(<Colophon report={mockReport} />);
     expect(container.querySelector("footer.colophon p")?.textContent).toBe(
-      "factordesk report, schema v4, generated 18 Nov 2026, 09:30 UTC. Descriptive statistics on past data; nothing here is a forecast or advice.",
+      "factordesk report, schema v5, generated 18 Nov 2026, 09:30 UTC. Descriptive statistics on past data; nothing here is a forecast or advice.",
     );
   });
 });
