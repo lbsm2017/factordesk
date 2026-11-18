@@ -447,7 +447,7 @@ def test_schema_round_trip(tmp_path: Path) -> None:
 
 def test_schema_is_frozen_strict_and_versioned() -> None:
     rep = build_mock_report()
-    assert rep.schema_version == "5"
+    assert rep.schema_version == "4"
     with pytest.raises(ValidationError):
         rep.ticker = "QQQ"  # type: ignore[misc]
     with pytest.raises(ValidationError):

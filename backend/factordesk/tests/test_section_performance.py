@@ -120,13 +120,12 @@ def test_tp26_the_section_is_registered_first_and_is_optional() -> None:
     assert info.default is None and not info.is_required()
     assert PERFORMANCE_SECTION.report_field == "performance"
     assert PERFORMANCE_SECTION.statistic_models == () and not PERFORMANCE_SECTION.label_text
-    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4", "5")
+    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4")
 
 
 def test_tp27_older_files_load_without_the_field() -> None:
     payload = json.loads(MOCK.read_text(encoding="utf-8"))
     del payload["performance"]
-    payload["schema_version"] = "4"
     old = FactorReport.model_validate_json(json.dumps(payload))
     assert old.performance is None and old.schema_version == "4"
 

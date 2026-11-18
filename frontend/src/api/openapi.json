@@ -3,7 +3,7 @@
   "info": {
     "title": "factordesk",
     "summary": "Local Fama-French 5-factor analysis API.",
-    "version": "5"
+    "version": "4"
   },
   "paths": {
     "/api/health": {
@@ -1371,7 +1371,7 @@
           "schema_version": {
             "type": "string",
             "title": "Schema Version",
-            "default": "5"
+            "default": "4"
           },
           "ticker": {
             "type": "string",

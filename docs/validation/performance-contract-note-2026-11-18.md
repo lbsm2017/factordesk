@@ -20,7 +20,7 @@ Branch `feat/performance`. The contract (`docs/specs/schema-v3-contract.md`) lis
 
 Panel order (SC4): add `450 performance` after `400 price`. Reason: the price panel draws the path of the stock and the four numbers read straight off that path; they come before the factor panels that explain where the return came from. The position changes no existing one.
 
-Schema version (SC5): the field is additive, so the section needs no bump of its own. The branch sets `SCHEMA_VERSION = "5"` and `SUPPORTED_SCHEMA_VERSIONS = ("3", "4", "5")` to match `feat/ui-v2-security`, which bumps to 5 for another additive field; the two edits are identical and merge cleanly.
+Schema version (SC5): the field is additive and feature branches do not bump, so `SCHEMA_VERSION` stays `"4"` and `SUPPORTED_SCHEMA_VERSIONS` stays `("3", "4")`. A version 4 file written before this section has no `performance` key and loads with `None`.
 
 ## Edits this branch made to "nobody" files
 
@@ -28,12 +28,12 @@ All are mechanical: a sixth entry next to the five existing ones.
 
 | File | Edit |
 |---|---|
-| `report/schema.py` | import and field `performance`, entry first in `SECTIONS` (panel order), version 5, docstring paragraph |
+| `report/schema.py` | import and field `performance`, entry first in `SECTIONS` (panel order), docstring paragraph |
 | `pipeline.py` | one hook call, one entry in `present`, one keyword in `FactorReport(...)` |
 | `report/panels/__init__.py` | one import line |
 | `tests/fixtures/sections/__init__.py` | `"performance": "performance.json"` in `SECTION_FILES` |
-| `tests/fixtures/mock_report.json` | regenerated (version 5, `performance: null`) |
-| `tests/test_schema_contract.py`, `test_panel_registry.py`, `test_report.py`, `test_section_residual_alpha.py` | the field list, the panel order, the version number |
+| `tests/fixtures/mock_report.json` | regenerated (`performance: null`) |
+| `tests/test_schema_contract.py`, `test_panel_registry.py` | the field list and the panel order |
 | `frontend/src/components/report/panelRegistry.ts` (and its test), `frontend/src/api/types.ts`, `frontend/src/test/sectionFixtures.ts` (and its test) | registry entry, type export, fixture entry |
 | `frontend/src/api/openapi.json`, `types.gen.ts` | regenerated (SC8) |
 

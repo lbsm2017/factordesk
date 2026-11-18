@@ -115,10 +115,10 @@ def test_report_label_text_adds_only_present_sections() -> None:
 
 
 # ----------------------------------------------------------------------------- versions
-def test_mock_fixture_is_version_5_with_null_sections() -> None:
+def test_mock_fixture_is_version_4_with_null_sections() -> None:
     rep = load_report(MOCK)
-    assert rep.schema_version == SCHEMA_VERSION == "5"
-    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4", "5")
+    assert rep.schema_version == SCHEMA_VERSION == "4"
+    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4")
     for name in SECTION_FIELDS:
         assert getattr(rep, name) is None
     payload = json.loads(MOCK.read_text(encoding="utf-8"))
@@ -147,10 +147,10 @@ def test_version_3_file_still_loads() -> None:
     assert "schema v3," in render_report_html(old)
 
 
-@pytest.mark.parametrize("version", ["2", "6", "", "v5"])
+@pytest.mark.parametrize("version", ["2", "5", "", "v4"])
 def test_unknown_versions_are_refused(version: str) -> None:
     text = MOCK.read_text(encoding="utf-8").replace(
-        '"schema_version":"5"', f'"schema_version":"{version}"'
+        '"schema_version":"4"', f'"schema_version":"{version}"'
     )
     with pytest.raises(ValidationError, match="supported"):
         FactorReport.model_validate_json(text)

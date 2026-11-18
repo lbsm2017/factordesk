@@ -26,9 +26,9 @@ reason ``lead_after_sample_end``. Version 3 files still load (SC5). The shared b
 (``SampleInfo``, the statistic base, the status and label types) live in ``report/base.py`` and
 are re-exported here.
 
-Version 5 adds the optional ``performance`` section (historical return, volatility, Sharpe ratio
-and maximum drawdown; ``report/sections/performance.py``). An older file loads unchanged with the
-field ``None``.
+The optional ``performance`` section (historical return, volatility, Sharpe ratio and maximum
+drawdown; ``report/sections/performance.py``) is additive and does not change the version number
+(contract SC5): a file written before it has ``performance`` absent and loads with ``None``.
 """
 
 from __future__ import annotations
@@ -62,10 +62,10 @@ from factordesk.report.sections.performance import PERFORMANCE_SECTION, Performa
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
 
-SCHEMA_VERSION = "5"
+SCHEMA_VERSION = "4"
 """Version written by this code (the schema v3 contract; contract SC5)."""
 
-SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4", "5")
+SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4")
 """Versions this code reads. Version 3 files have no optional sections; they load unchanged."""
 
 AuditStatus = Literal["clean", "warnings", "errors"]

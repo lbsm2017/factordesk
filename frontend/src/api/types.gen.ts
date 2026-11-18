@@ -512,7 +512,7 @@ export interface components {
         FactorReport: {
             /**
              * Schema Version
-             * @default 5
+             * @default 4
              */
             schema_version: string;
             /** Ticker */
