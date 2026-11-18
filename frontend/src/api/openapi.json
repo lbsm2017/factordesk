@@ -3,7 +3,7 @@
   "info": {
     "title": "factordesk",
     "summary": "Local Fama-French 5-factor analysis API.",
-    "version": "3"
+    "version": "4"
   },
   "paths": {
     "/api/health": {
@@ -1049,7 +1049,8 @@
               "multi_day_return",
               "no_factor_row",
               "price_missing",
-              "factor_missing"
+              "factor_missing",
+              "lead_after_sample_end"
             ],
             "title": "Reason"
           }
@@ -1151,7 +1152,7 @@
           "schema_version": {
             "type": "string",
             "title": "Schema Version",
-            "default": "3"
+            "default": "4"
           },
           "ticker": {
             "type": "string",
@@ -1220,6 +1221,65 @@
             "type": "object",
             "title": "Label Text",
             "description": "Footnote texts by label key."
+          },
+          "lead_lag": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadLagSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Lead-lag betas (docs/specs/lead-lag-betas.md)."
+          },
+          "shrunk_betas": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ShrunkBetas"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shrunk Betas",
+            "description": "Shrunk betas, one entry per scope: full sample, then latest window (docs/specs/shrunk-betas.md)."
+          },
+          "fragility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FragilitySection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fragility score (docs/specs/fragility-score.md)."
+          },
+          "residual": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResidualAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Residual alpha analysis (docs/methodology-residual-analysis.md)."
+          },
+          "kalman_betas": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KalmanBetaSeries"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Kalman-filter betas (docs/specs/kalman-betas.md)."
           }
         },
         "additionalProperties": false,
@@ -1240,7 +1300,12 @@
           "price_series",
           "warnings",
           "notes",
-          "label_text"
+          "label_text",
+          "lead_lag",
+          "shrunk_betas",
+          "fragility",
+          "residual",
+          "kalman_betas"
         ],
         "title": "FactorReport",
         "description": "Everything the UI or an exported file needs to describe one ticker's factor exposures."
@@ -1411,6 +1476,44 @@
         "title": "FactorVintage",
         "description": "Which French file the numbers come from (M0.8)."
       },
+      "FragilitySection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample"
+        ],
+        "title": "FragilitySection",
+        "description": "Flip counts, leave-one-year-out table and influential days (FR0.1). In-sample, ``T_end``."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1449,6 +1552,82 @@
         ],
         "title": "Health",
         "description": "Liveness answer; reads no disk and no network."
+      },
+      "KalmanBetaSeries": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample"
+        ],
+        "title": "KalmanBetaSeries",
+        "description": "Filtered (point-in-time) Kalman betas per date, with model-based bands (KB0.1)."
+      },
+      "LeadLagSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample"
+        ],
+        "title": "LeadLagSection",
+        "description": "Timing-adjusted betas: same-day plus previous- and next-day factor coefficients (LL0.1)."
       },
       "MultiDayRegression": {
         "properties": {
@@ -2281,6 +2460,44 @@
         "title": "ReportWarning",
         "description": "A report-level warning (short history, collinearity, audit status, data lag, ...)."
       },
+      "ResidualAnalysis": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample"
+        ],
+        "title": "ResidualAnalysis",
+        "description": "Residual return with in-sample and point-in-time betas, gap, stability (R0.1)."
+      },
       "ResidualDiagnostics": {
         "properties": {
           "status": {
@@ -3014,6 +3231,44 @@
         ],
         "title": "SampleInfo",
         "description": "Sample metadata carried by every statistic (M0.8)."
+      },
+      "ShrunkBetas": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample"
+        ],
+        "title": "ShrunkBetas",
+        "description": "OLS betas pulled toward a stated prior, with a power statement per factor (SB0.1)."
       },
       "TickerSuggestion": {
         "properties": {

@@ -394,7 +394,7 @@ export interface components {
              * Reason
              * @enum {string}
              */
-            reason: "multi_day_return" | "no_factor_row" | "price_missing" | "factor_missing";
+            reason: "multi_day_return" | "no_factor_row" | "price_missing" | "factor_missing" | "lead_after_sample_end";
         };
         /**
          * FactorDataStatus
@@ -423,7 +423,7 @@ export interface components {
         FactorReport: {
             /**
              * Schema Version
-             * @default 3
+             * @default 4
              */
             schema_version: string;
             /** Ticker */
@@ -462,6 +462,19 @@ export interface components {
             label_text: {
                 [key: string]: string;
             };
+            /** @description Lead-lag betas (docs/specs/lead-lag-betas.md). */
+            lead_lag: components["schemas"]["LeadLagSection"] | null;
+            /**
+             * Shrunk Betas
+             * @description Shrunk betas, one entry per scope: full sample, then latest window (docs/specs/shrunk-betas.md).
+             */
+            shrunk_betas: components["schemas"]["ShrunkBetas"][] | null;
+            /** @description Fragility score (docs/specs/fragility-score.md). */
+            fragility: components["schemas"]["FragilitySection"] | null;
+            /** @description Residual alpha analysis (docs/methodology-residual-analysis.md). */
+            residual: components["schemas"]["ResidualAnalysis"] | null;
+            /** @description Kalman-filter betas (docs/specs/kalman-betas.md). */
+            kalman_betas: components["schemas"]["KalmanBetaSeries"] | null;
         };
         /**
          * FactorStat
@@ -530,6 +543,23 @@ export interface components {
              */
             downloaded_at: string | null;
         };
+        /**
+         * FragilitySection
+         * @description Flip counts, leave-one-year-out table and influential days (FR0.1). In-sample, ``T_end``.
+         */
+        FragilitySection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -549,6 +579,40 @@ export interface components {
             version: string;
             /** Schema Version */
             schema_version: string;
+        };
+        /**
+         * KalmanBetaSeries
+         * @description Filtered (point-in-time) Kalman betas per date, with model-based bands (KB0.1).
+         */
+        KalmanBetaSeries: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+        };
+        /**
+         * LeadLagSection
+         * @description Timing-adjusted betas: same-day plus previous- and next-day factor coefficients (LL0.1).
+         */
+        LeadLagSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
         };
         /**
          * MultiDayRegression
@@ -848,6 +912,23 @@ export interface components {
             code: string;
             /** Message */
             message: string;
+        };
+        /**
+         * ResidualAnalysis
+         * @description Residual return with in-sample and point-in-time betas, gap, stability (R0.1).
+         */
+        ResidualAnalysis: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
         };
         /**
          * ResidualDiagnostics
@@ -1158,6 +1239,23 @@ export interface components {
             /** Excluded */
             excluded: components["schemas"]["ExcludedRow"][];
             factor_vintage: components["schemas"]["FactorVintage"];
+        };
+        /**
+         * ShrunkBetas
+         * @description OLS betas pulled toward a stated prior, with a power statement per factor (SB0.1).
+         */
+        ShrunkBetas: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
         };
         /** TickerSuggestion */
         TickerSuggestion: {

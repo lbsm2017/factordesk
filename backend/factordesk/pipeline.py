@@ -3,7 +3,9 @@
 Order of work: factor data, then prices (repeated dates collapsed to their first bar and
 recorded), the price audit, the aligned sample (M2), the full-sample regression (M3), its
 residual diagnostics and quality gate with the 5-day estimate when the gate fires (M3.5-M3.6),
-rolling betas (M4) and average beta (M5), return and risk contribution (M6.1, M6.4, M7).
+rolling betas (M4) and average beta (M5), return and risk contribution (M6.1, M6.4, M7), and
+last the optional sections of the schema v3 contract, one hook each (``section_hooks/``,
+``docs/specs/schema-v3-contract.md`` SC3.2).
 Providers, the factor frame and the clock are injectable so the whole path runs offline in
 tests. Inputs that cannot support a regression raise ``DegenerateInputError`` (D30).
 """
@@ -94,7 +96,15 @@ from factordesk.report.schema import (
     Severity,
     Status,
     UncoveredTail,
+    report_label_text,
 )
+from factordesk.section_hooks import fragility as fragility_hook
+from factordesk.section_hooks import kalman as kalman_hook
+from factordesk.section_hooks import lead_lag as lead_lag_hook
+from factordesk.section_hooks import load_section_inputs
+from factordesk.section_hooks import residual_alpha as residual_alpha_hook
+from factordesk.section_hooks import shrunk as shrunk_hook
+from factordesk.section_hooks.context import CoreSections, SectionContext, SectionInputs
 
 STALE_AFTER_DAYS = factor_data.STALE_AFTER_DAYS
 
@@ -724,11 +734,13 @@ def assemble_report(
     primary_window: int = PRIMARY_WINDOW,
     start: date | None = None,
     end: date | None = None,
+    section_inputs: SectionInputs | None = None,
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
     ``start`` and ``end`` are the requested range (M2); None means the first return date and
     the last price date. They are reported as given, so nothing is clipped silently.
+    ``section_inputs`` holds extra data for the optional sections (None: none).
     """
     history = unique_dates(history)
     audit = audit_prices(history.frame, duplicate_dates=history.duplicate_dates)
@@ -790,9 +802,7 @@ def assemble_report(
             for f in audit.findings
         ],
     )
-    return FactorReport(
-        ticker=ticker,
-        generated_at=now,
+    core = CoreSections(
         data=data,
         regression=_regression_section(reg, info, gate is not None and gate.fired),
         rolling=rolling_sections,
@@ -805,8 +815,60 @@ def assemble_report(
         quality_gate=_gate_section(gate, info),
         five_day_regression=_five_day_section(five, gate, sample.n, info),
         price_series=_price_section(history, sample.factor_last_date),
+    )
+    ctx = SectionContext(
+        ticker=ticker,
+        now=now,
+        history=history,
+        factor_frame=factor_frame,
+        sample=sample,
+        vintage=vintage,
+        audit=audit,
+        daily=daily,
+        regression=reg,
+        diagnostics=diag,
+        gate=gate,
+        five_day=five,
+        rolling=rolling_by_w,
+        primary_window=primary_window,
+        core=core,
+        inputs=section_inputs if section_inputs is not None else SectionInputs(),
+        make_sample_info=lambda window: _sample_info(sample, vintage, window),
+    )
+    # Optional sections (schema v3 contract SC3.2), in panel order. Each hook sees only the core.
+    lead_lag = lead_lag_hook.build_lead_lag(ctx)
+    shrunk_betas = shrunk_hook.build_shrunk_betas(ctx)
+    fragility = fragility_hook.build_fragility(ctx)
+    residual = residual_alpha_hook.build_residual_analysis(ctx)
+    kalman_betas = kalman_hook.build_kalman_betas(ctx)
+    present: dict[str, object | None] = {
+        "lead_lag": lead_lag,
+        "shrunk_betas": shrunk_betas,
+        "fragility": fragility,
+        "residual": residual,
+        "kalman_betas": kalman_betas,
+    }
+    return FactorReport(
+        ticker=ticker,
+        generated_at=now,
+        data=core.data,
+        regression=core.regression,
+        rolling=list(core.rolling),
+        average_beta=core.average_beta,
+        return_contribution=core.return_contribution,
+        risk_contribution=core.risk_contribution,
+        residual_diagnostics=core.residual_diagnostics,
+        quality_gate=core.quality_gate,
+        five_day_regression=core.five_day_regression,
+        price_series=core.price_series,
         warnings=_warnings(sample, reg, audit, days_behind, gate),
         notes=[NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS, NOTE_SURVIVORSHIP],
+        label_text=report_label_text(present),
+        lead_lag=lead_lag,
+        shrunk_betas=shrunk_betas,
+        fragility=fragility,
+        residual=residual,
+        kalman_betas=kalman_betas,
     )
 
 
@@ -818,6 +880,7 @@ def build_report(
     *,
     start: date | None = None,
     end: date | None = None,
+    section_inputs: SectionInputs | None = None,
 ) -> FactorReport:
     """Fetch factors and prices for ``ticker`` and build the validated ``FactorReport``.
 
@@ -825,6 +888,8 @@ def build_report(
     decimals); when None the cached French file is loaded (and refreshed when stale). ``now``
     must be timezone-aware; it stamps ``generated_at`` and drives the data-lag figures.
     ``start`` and ``end`` limit the requested range (None: the whole price history).
+    ``section_inputs`` is the extra data of the optional sections; None fetches it through
+    ``section_hooks.load_section_inputs`` (nothing is fetched when ``factors`` is injected).
     Raises ``PriceDataError`` (bad or unknown ticker), ``FactorError`` (factor data
     unavailable), ``InsufficientHistoryError`` (fewer than 504 aligned rows) or
     ``DegenerateInputError`` (price that does not move, singular factor design; D30).
@@ -848,6 +913,11 @@ def build_report(
         price_provider if price_provider is not None else YFinanceProvider(now=lambda: now_utc)
     )
     history = provider.fetch(symbol)
+    inputs = (
+        section_inputs
+        if section_inputs is not None
+        else load_section_inputs(now_utc, offline=factors is not None)
+    )
     return assemble_report(
         symbol,
         history,
@@ -856,6 +926,7 @@ def build_report(
         factors_downloaded_at=downloaded_at,
         start=start,
         end=end,
+        section_inputs=inputs,
     )
 
 

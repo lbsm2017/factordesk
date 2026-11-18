@@ -46,6 +46,7 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [Branches and pull requests](decision-branches-and-pull-requests.md) [Decided]: `prod`, `dev`, feature and fix branches, maintainer merges.
 - [Independent validation and mutation testing](decision-independent-validation-and-mutation-testing.md) [Decided]: a second recomputation plus deliberately injected bugs.
 - [Precision of the fast rolling regression](decision-rolling-fast-path-precision.md) [Decided-pending-implementation]: the fast path is about 1e-12 from the exact one on real data; its safety check is tighter and costs no speed.
+- [One contract for the five new report sections](decision-schema-v3-contract.md) [Decided-pending-implementation]: optional sections, one file per feature and layer, panel registries, report format version 4.
 
 ### Open source
 

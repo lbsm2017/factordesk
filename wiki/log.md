@@ -23,6 +23,9 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - The roadmap item "Hardening of the SPY slice" is Done. Every validation finding has a row in [docs/validation/spy-hardening-closure-2026-11-18.md](../docs/validation/spy-hardening-closure-2026-11-18.md): 20 fixed before, 4 fixed on branch `fix/spy-hardening-closure` (audit errors mute the headline, `--start`/`--end` on the report command, min-max thinning of long series, a named cause when no return lines up), 5 deferred with reasons. One wording error found during the closure was fixed: the gate summary now says residual volatility is overstated, not understated.
 - Owner decisions still open from the closure: non-USD tickers (warn or refuse, M16 question 2), and adopting the variance-stability check and keeping the gate thresholds after the panel calibration.
 - Updated [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) to Decided, with facts as of commit `4c1cb7c`.
+## 2026-11-18 (schema v3 contract)
+
+- Added [One contract for the five new report sections](decision-schema-v3-contract.md): where fragility, lead-lag, Kalman, shrunk betas and residual alpha plug into the report, so the four statistical features can be built in parallel. Full contract: `docs/specs/schema-v3-contract.md`.
 
 ## 2026-11-18 (dashboard built)
 

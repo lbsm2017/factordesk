@@ -4,6 +4,11 @@ The design is specified in ``docs/design/report-design.md`` (revision 2). No scr
 external requests: the stylesheet (``report.css``) and the fonts (``fonts/*.woff2``, base64) are
 inlined, charts are inline SVG or positioned HTML. Output is deterministic for a given report
 (nothing reads the clock or the environment). Every dynamic string goes through ``html.escape``.
+
+Panels are drawn from the ordered registry of ``panel_registry.py`` (schema v3 contract, SC3.3):
+the core panels register at the end of this module, the optional sections' panels in their own
+modules under ``report/panels/``. The helpers those modules may use are public names here
+(``panel_head``, ``panel_section``, ``empty_state``, ...).
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
+from factordesk.report.panel_registry import register_panel, registered_panels
 from factordesk.report.schema import (
     FACTOR_NAMES,
     FactorReport,
@@ -1563,34 +1569,54 @@ def _colophon(report: FactorReport) -> str:
     )
 
 
+# --------------------------------------------------------------------------------------------
+# Public helpers for the panel modules of the optional sections (schema v3 contract, SC3.3)
+# --------------------------------------------------------------------------------------------
+panel_head = _panel_head
+panel_section = _section
+empty_state = _empty
+footnote = _footnote
+fmt_num = _num
+fmt_signed = _sgn
+fmt_pct = _pct
+fmt_tstat = _tstat
+fmt_pval = _pval
+date_long = _d_long
+label_texts = _label_texts
+
+# Core panels, in page order (contract SC4). Positions between them are free for later panels.
+register_panel("header", 100, _header)
+register_panel("equation", 200, _equation)
+register_panel("kpis", 300, _kpis)
+register_panel("price", 400, _price_panel)
+register_panel("exposures", 500, _exposures_panel)
+register_panel("returns", 600, _return_panel)
+register_panel("risk", 700, _risk_panel)
+register_panel("rolling", 800, _rolling_panel)
+register_panel("data", 900, _data_panel)
+register_panel("regression_detail", 1000, _detail_panel)
+register_panel("colophon", 1100, _colophon)
+
+
 def render_report_html(report: FactorReport) -> str:
-    """Render ``report`` as a single self-contained HTML document (no external resources)."""
+    """Render ``report`` as a single self-contained HTML document (no external resources).
+
+    Draws every registered panel in position order; a panel that returns ``None`` (an absent
+    optional section) adds nothing, not even its stylesheet.
+    """
     title = f"{report.ticker} factor profile"
     windows = [w.window for w in report.rolling]
-    body = "\n".join(
-        [
-            HATCH_DEFS,
-            '<main class="report">',
-            _header(report),
-            _equation(report),
-            _kpis(report),
-            _price_panel(report),
-            _exposures_panel(report),
-            _return_panel(report),
-            _risk_panel(report),
-            _rolling_panel(report),
-            _data_panel(report),
-            _detail_panel(report),
-            _colophon(report),
-            "</main>",
-        ]
-    )
+    drawn = [(spec, spec.render(report)) for spec in registered_panels()]
+    panels = [html_text for _, html_text in drawn if html_text is not None]
+    panel_css = "".join(spec.css for spec, html_text in drawn if html_text is not None)
+    body = "\n".join([HATCH_DEFS, '<main class="report">', *panels, "</main>"])
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<meta name="color-scheme" content="light dark">'
         f"<title>{esc(title)}</title><style>\n{font_faces()}{base_css()}\n"
-        f"{_window_css(windows)}</style></head>\n<body>\n{_add_roles(body)}\n</body></html>\n"
+        f"{_window_css(windows)}{panel_css}</style></head>\n<body>\n{_add_roles(body)}\n"
+        "</body></html>\n"
     )
 
 
