@@ -1,8 +1,8 @@
-"""Contrast table for the rev 3 prototype tokens (stdlib only).
+"""Contrast table for the rev 3 prototype tokens (stdlib only). Light theme only.
 
-Reads the token blocks at the top of report-v3.css (light, then dark), and prints the WCAG 2
-contrast ratio of every text/background pair the stylesheet uses, plus the UI-boundary pairs
-(controls, switch track, chart marks) that need 3:1.
+Reads the token block at the top of report-v3.css and prints the WCAG 2 contrast ratio of every
+text/background pair the stylesheet uses, plus the UI pairs (controls, switch track, chart marks)
+that need 3:1. Exit code 1 if any pair fails.
 
     python docs/design/prototype/contrast_v3.py
 """
@@ -17,11 +17,10 @@ HERE = Path(__file__).resolve().parent
 CSS = (HERE / "report-v3.css").read_text(encoding="utf-8")
 
 
-def block(marker: str) -> dict[str, str]:
-    """Custom properties of the first rule whose selector contains ``marker``."""
-    m = re.search(re.escape(marker) + r"[^{]*\{(.*?)\}", CSS, flags=re.S)
+def tokens() -> dict[str, str]:
+    m = re.search(r":root\s*\{(.*?)\}", CSS, flags=re.S)
     if not m:
-        sys.exit(f"token block {marker!r} not found")
+        sys.exit("token block not found")
     return dict(re.findall(r"--([\w-]+):\s*(#[0-9a-fA-F]{6})", m.group(1)))
 
 
@@ -40,69 +39,52 @@ def ratio(a: str, b: str) -> float:
 
 
 # (foreground token, background token, minimum, what uses it)
-TEXT = [
+PAIRS = [
     ("ink", "page", 4.5, "header text on the grey page"),
-    ("ink", "surface", 4.5, "body text in panels"),
-    ("ink", "soft", 4.5, "text in soft boxes"),
-    ("ink", "hi-50", 4.5, "verdict headline on the band"),
-    ("hi", "hi-50", 4.5, "indigo text on the band"),
-    ("ink-2", "page", 4.5, "secondary text on the page"),
+    ("ink", "surface", 4.5, "body text, verdict headline"),
+    ("ink-2", "page", 4.5, "header subline"),
     ("ink-2", "surface", 4.5, "secondary text in panels"),
-    ("ink-2", "hi-50", 4.5, "verdict basis line"),
     ("ink-3", "surface", 4.5, "axis labels, footnotes"),
-    ("ink-3", "soft", 4.5, "muted text in soft boxes"),
-    ("accent", "surface", 4.5, "links, How this is computed"),
+    ("ink-3", "soft", 4.5, "labels over the not-analysed zone"),
+    ("accent", "surface", 4.5, "links, Details, How this is computed"),
     ("accent", "page", 4.5, "links on the page"),
-    ("accent", "accent-50", 4.5, "teal text on the teal tint"),
-    ("ink", "accent-50", 4.5, "world tile, callouts"),
+    ("accent", "accent-50", 4.5, "targeted table row"),
+    ("ink", "accent-50", 4.5, "targeted table row text"),
     ("on-accent", "accent", 4.5, "selected segment, primary button"),
-    ("pos", "surface", 4.5, "positive words"),
-    ("pos", "pos-50", 4.5, "positive pill"),
-    ("neg", "surface", 4.5, "negative values"),
-    ("neg", "neg-50", 4.5, "negative pill"),
-    ("caution", "caution-50", 4.5, "notice band label, warning chip"),
-    ("ink", "caution-50", 4.5, "notice band text"),
-    ("slate", "slate-50", 4.5, "neutral pill"),
+    ("pos", "surface", 4.5, "positive labels"),
+    ("neg", "surface", 4.5, "negative labels, worst fall"),
+    ("caution", "surface", 4.5, "warning label, demo note"),
+    ("caution", "page", 4.5, "warnings link in the header"),
     ("rail-text", "rail", 4.5, "rail text"),
     ("rail-2", "rail", 4.5, "rail secondary text"),
-    ("rail-cyan", "rail", 4.5, "current section, switch on"),
+    ("rail-cyan", "rail", 4.5, "current section"),
     ("rail-cyan", "rail-hover", 4.5, "current section on its highlight"),
     ("rail-text", "rail-hover", 4.5, "hovered section"),
-    ("rail", "rail-cyan", 4.5, "Factor it button, selected range"),
+    ("rail", "rail-cyan", 4.5, "Factor it, selected range"),
     ("rail-field-text", "rail-field", 4.5, "inputs in the rail"),
-]
-UI = [
-    ("control-line", "surface", 3.0, "segment and input borders"),
-    ("rail-track", "rail", 3.0, "switch track, off"),
-    ("rail-cyan", "rail", 3.0, "switch track on, rail focus ring"),
-    ("accent", "surface", 3.0, "focus ring in the canvas"),
-    ("accent", "page", 3.0, "focus ring on the page"),
-    ("pos", "surface", 3.0, "positive bars"),
-    ("neg", "surface", 3.0, "negative bars"),
-    ("hi", "surface", 3.0, "estimate dots, meters"),
-    ("axis", "surface", 3.0, "zero line"),
+    ("control-line", "surface", 3.0, "UI: segment and input borders"),
+    ("rail-track", "rail", 3.0, "UI: switch track off, segment border in the rail"),
+    ("rail-cyan", "rail", 3.0, "UI: switch track on, rail focus ring"),
+    ("accent", "surface", 3.0, "UI: focus ring, verdict rule"),
+    ("caution", "surface", 3.0, "UI: data-quality note rule"),
+    ("pos", "surface", 3.0, "UI: positive bars"),
+    ("neg", "surface", 3.0, "UI: negative bars"),
+    ("ink", "surface", 3.0, "UI: estimate dots, meters"),
+    ("axis", "surface", 3.0, "UI: zero line"),
 ]
 
 
-def table(name: str, tokens: dict[str, str]) -> bool:
+def main() -> None:
+    t = tokens()
     ok = True
-    print(f"\n{name}")
-    print(f"{'foreground':<14}{'background':<12}{'fg':>9}{'bg':>9}{'ratio':>8}{'min':>6}  use")
-    for group in (TEXT, UI):
-        for fg, bg, need, use in group:
-            if fg not in tokens or bg not in tokens:
-                print(f"{fg:<14}{bg:<12}  missing token")
-                ok = False
-                continue
-            r = ratio(tokens[fg], tokens[bg])
-            flag = "" if r >= need else "  FAIL"
-            ok &= r >= need
-            print(f"{fg:<14}{bg:<12}{tokens[fg]:>9}{tokens[bg]:>9}{r:>8.2f}{need:>6.1f}  {use}{flag}")
-    return ok
+    print(f"{'foreground':<16}{'background':<12}{'fg':>9}{'bg':>9}{'ratio':>8}{'min':>6}  use")
+    for fg, bg, need, use in PAIRS:
+        r = ratio(t[fg], t[bg])
+        ok &= r >= need
+        print(f"{fg:<16}{bg:<12}{t[fg]:>9}{t[bg]:>9}{r:>8.2f}{need:>6.1f}  {use}{'' if r >= need else '  FAIL'}")
+    print("\nall pairs pass" if ok else "\nsome pairs fail")
+    sys.exit(0 if ok else 1)
 
 
-light = block(":root")
-dark = {**light, **block(":root[data-theme=\"dark\"]")}
-good = table("Light theme", light) & table("Dark theme", dark)
-print("\nall pairs pass" if good else "\nsome pairs fail")
-sys.exit(0 if good else 1)
+if __name__ == "__main__":
+    main()
