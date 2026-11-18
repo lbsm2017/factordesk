@@ -22,6 +22,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from factordesk.report.base import FACTOR_NAMES, FrozenModel, SectionModel, SectionSpec
+from factordesk.report.kalman_text import kalman_text
 
 KalmanLabelKey = Literal["L-KF", "L-KBAND", "L-KTAIL"]
 """Footnote keys of this section (texts in ``KALMAN_SECTION.label_text``)."""
@@ -29,13 +30,8 @@ KalmanErrorModel = Literal["gaussian", "student_t5"]
 LambdaBound = Literal["zero", "upper", "none"]
 
 WARNING_UPPER_BOUND = "kalman_lambda_at_upper_bound"
-WARNING_TEXT: dict[str, str] = {
-    WARNING_UPPER_BOUND: (
-        "For at least one yearly re-estimate the filter follows daily noise; the estimate is not "
-        "meaningful."
-    ),
-}
-"""Warning codes a section can carry, with the sentence a panel shows."""
+WARNING_TEXT: dict[str, str] = dict(kalman_text()["warnings"])
+"""Warning codes a section can carry, with the sentence a panel shows (``kalman_text.json``)."""
 
 L_KF = (
     "Kalman-filter beta: each point uses only data up to that date. It follows gradual changes "

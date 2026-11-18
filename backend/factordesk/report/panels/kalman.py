@@ -20,6 +20,7 @@ import math
 from collections.abc import Sequence
 from datetime import date
 
+from factordesk.report.kalman_text import fill, kalman_text
 from factordesk.report.panel_registry import register_panel
 from factordesk.report.render_html import (
     PLAIN,
@@ -40,28 +41,18 @@ from factordesk.report.sections.kalman import (
     KalmanVintage,
 )
 
+TEXT = kalman_text()
+"""Every sentence and header of the panel, shared with the React panel (``kalman_text.json``)."""
+
 PANEL_ID = "kalman"
-TITLE = "Kalman-filter betas"
-QUESTION = "How did the exposures move, using only data up to each date?"
+TITLE: str = TEXT["title"]
+QUESTION: str = TEXT["question"]
 
 MAX_POINTS = 300
 """Points per series after thinning (the thinned series has at most this many plus two)."""
 
-NEXT_STEP = {
-    "insufficient_data": (
-        "This view needs a longer history. Choose an earlier start date so the sample has at "
-        "least {rows} trading days."
-    ),
-    "failed": (
-        "Check the price and factor data for gaps or constant values, or choose a different "
-        "date range."
-    ),
-}
-
-BOUND_WORDS = {
-    "upper": "at its upper limit: the filter follows daily noise",
-    "zero": "at zero: no drift found",
-}
+NEXT_STEP: dict[str, str] = {k: TEXT["empty"][k] for k in ("insufficient_data", "failed")}
+BOUND_WORDS: dict[str, str] = TEXT["bound"]
 
 CSS = """
 .bars.cols-3.kalman .plot.mini { margin-left: 52px; }
@@ -74,6 +65,7 @@ CSS = """
 .kalman-vintages { margin-top: var(--s-2); }
 .kalman-vintages .reg { min-width: 640px; }
 .kalman-vintages td.num .sub { white-space: nowrap; }
+.kalman-band-sw { fill: var(--ink-3); fill-opacity: 0.25; }
 """
 
 Point = tuple[int, float, float, float]
@@ -136,8 +128,8 @@ def _slot(name: str) -> int:
 
 
 def _empty_panel(section: KalmanBetaSeries) -> str:
-    step = NEXT_STEP.get(section.status, NEXT_STEP["failed"]).format(rows=section.training_rows)
-    return empty_state(section.reason or "The Kalman-filter betas were not computed.", step)
+    step = fill(NEXT_STEP.get(section.status, NEXT_STEP["failed"]), rows=section.training_rows)
+    return empty_state(section.reason or TEXT["empty"]["not_computed"], step)
 
 
 def _chart_rows(section: KalmanBetaSeries) -> tuple[list[str], str, date] | None:
@@ -236,7 +228,7 @@ def _chart_rows(section: KalmanBetaSeries) -> tuple[list[str], str, date] | None
 def _vintage_row(v: KalmanVintage) -> str:
     bound = BOUND_WORDS.get(v.lam_at_bound, "")
     flag = f'<span class="sub">{esc(bound)}</span>' if bound else ""
-    window = "n/a" if v.w_eq is None else f"{v.w_eq:,.0f}"
+    window = TEXT["window_none"] if v.w_eq is None else f"{v.w_eq:,.0f}"
     return (
         f'<tr><th scope="row">{v.rows:,}</th>'
         f'<td class="num">{esc(_lam(v.lam))}{flag}</td>'
@@ -250,19 +242,11 @@ def _vintage_row(v: KalmanVintage) -> str:
 
 
 def _vintage_table(section: KalmanBetaSeries) -> str:
-    heads = (
-        "Rows used",
-        "Drift rate",
-        "Equivalent window, days",
-        "Residual volatility, a year",
-        "Valid from",
-        "Valid to",
-    )
-    cols = "".join(f'<th scope="col">{esc(h)}</th>' for h in heads)
+    cols = "".join(f'<th scope="col">{esc(h)}</th>' for h in TEXT["vintage_heads"])
     body = "".join(_vintage_row(v) for v in section.vintages)
-    label = "Yearly re-estimates of the drift rate"
+    label = TEXT["vintage_title"]
     return (
-        "<h3>Yearly re-estimates</h3>"
+        f"<h3>{esc(label)}</h3>"
         '<div class="scroll-x kalman-vintages" tabindex="0" role="region" '
         f'aria-label="{esc(label)}, scrolls sideways"><table class="reg"><thead><tr>{cols}'
         f"</tr></thead><tbody>{body}</tbody></table></div>"
@@ -272,19 +256,23 @@ def _vintage_table(section: KalmanBetaSeries) -> str:
 def _fold(section: KalmanBetaSeries) -> list[str]:
     texts = KALMAN_SECTION.label_text
     more = [texts[k] for k in section.labels if k in texts and k != "L-KTAIL"]
-    more.append(
-        "Every row uses the same vertical span, centred on its own values, so wiggles compare "
-        "across factors."
-    )
-    more.append(
-        "The drift rate is the weight the filter gives to a new day. It is re-estimated each "
-        "year from the data up to that date, and the equivalent window is the rolling window "
-        "that would smooth about as much. Each row of the table gives the estimate in force "
-        "between its two dates."
-    )
+    more.extend(TEXT["fold"][k] for k in ("span", "thinning", "drift_rate"))
     more.extend(texts[k] for k in section.labels if k == "L-KTAIL" and k in texts)
     more.extend(WARNING_TEXT.get(w, w) for w in section.warnings)
     return more
+
+
+def _legend() -> str:
+    swatches = (
+        '<svg class="sw" aria-hidden="true"><line class="total-line" x1="0" x2="14" y1="5" y2="5"/>'
+        "</svg>",
+        '<svg class="sw" aria-hidden="true"><rect class="kalman-band-sw" width="14" height="10" '
+        'rx="2"/></svg>',
+        '<svg class="sw" aria-hidden="true"><line class="cutline" x1="7" x2="7" y1="0" y2="10"/>'
+        "</svg>",
+    )
+    items = "".join(f"<li>{s}{esc(t)}</li>" for s, t in zip(swatches, TEXT["legend"], strict=True))
+    return f'<ul class="legend" aria-label="Legend">{items}</ul>'
 
 
 def render_kalman_panel(report: FactorReport) -> str | None:
@@ -292,39 +280,41 @@ def render_kalman_panel(report: FactorReport) -> str | None:
     section = report.kalman_betas
     if section is None:
         return None
-    head = panel_head(PANEL_ID, TITLE, QUESTION)
     drawn = _chart_rows(section) if section.status == "ok" else None
     if drawn is None:
+        head = panel_head(PANEL_ID, TITLE, QUESTION)
         body = (
             _empty_panel(section)
             if section.status != "ok"
-            else empty_state(
-                "No estimate yet: every date is still in warm-up.",
-                "Choose an earlier start date so the sample is longer.",
-            )
+            else empty_state(TEXT["empty"]["warm_up_reason"], TEXT["empty"]["warm_up_step"])
         )
         return panel_section(PANEL_ID, head, body)
+    head = panel_head(PANEL_ID, TITLE, QUESTION, _legend())
     rows, xlab, first = drawn
+    h = TEXT["beta_heads"]
+    caption = fill(TEXT["table_caption"], last=date_long(section.dates[-1]))
     table = (
         '<table class="bars cols-3 rolling kalman">'
-        '<caption class="vh">Kalman-filter beta per factor with a model-based 95% band; '
-        "latest value, its standard deviation and the band</caption>"
-        '<thead><tr><th scope="col">Factor</th><th scope="col" class="plot-h">'
-        '<span class="vh">Chart</span></th><th scope="col" class="num">Latest</th>'
-        '<th scope="col" class="num" title="Model standard deviation of the latest beta">sd</th>'
-        '<th scope="col" class="num">95% band</th>'
+        f'<caption class="vh">{esc(caption)}</caption>'
+        f'<thead><tr><th scope="col">{esc(h["factor"])}</th><th scope="col" class="plot-h">'
+        f'<span class="vh">{esc(h["chart"])}</span></th>'
+        f'<th scope="col" class="num">{esc(h["latest"])}</th>'
+        f'<th scope="col" class="num" title="{esc(TEXT["sd_title"])}">{esc(h["sd"])}</th>'
+        f'<th scope="col" class="num">{esc(h["band"])}</th>'
         f"</tr></thead><tbody>{''.join(rows)}</tbody>"
         '<tfoot><tr class="axis-row" aria-hidden="true"><td></td>'
         f'<td class="axis time"><div class="kx">{xlab}</div></td><td colspan="3"></td>'
         "</tr></tfoot></table>"
     )
-    visible = (
-        f"Each point uses only data up to its date, so the chart starts at the first estimate, "
-        f"{date_long(first)}. Latest is stamped {date_long(section.dates[-1])}. Dashed vertical "
-        "lines mark the yearly re-estimates, where a line can jump."
+    visible = fill(
+        TEXT["footnote"],
+        first=date_long(first),
+        last=date_long(section.dates[-1]),
+        rows=section.training_rows,
     )
+    reading = f'<p class="reading">{esc(TEXT["reading"])}</p>'
     note = footnote(visible, _fold(section))
-    return panel_section(PANEL_ID, head, table + _vintage_table(section) + note)
+    return panel_section(PANEL_ID, head, reading + table + _vintage_table(section) + note)
 
 
 register_panel("kalman", 810, render_kalman_panel, css=CSS)

@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import type { FactorReport, KalmanBetaSeries } from "../../../api/types";
 import type { components } from "../../../api/types.gen";
 import { count, dateLong, num, pct, signed } from "../../../format";
-import { dateTicks, factorOrder, finite, isoMs, labelTexts, sci, slotOf } from "../../../report/derive";
+import { dateTicks, factorOrder, finite, isoMs, labelTexts, slotOf } from "../../../report/derive";
+import text from "../../../text/kalman.json";
 import { PLAIN } from "../../../text/plain";
 import { KeySwatch } from "../barParts";
 import { Panel } from "../Panel";
@@ -15,8 +16,17 @@ import "./KalmanPanel.css";
 type KalmanVintage = components["schemas"]["KalmanVintage"];
 type KalmanLatest = components["schemas"]["KalmanLatest"];
 
-const TITLE = "Kalman-filter betas";
-const QUESTION = "How did the exposures move, using only data up to each date?";
+/**
+ * Every sentence, header and flag below comes from `text/kalman.json`, a copy of the backend file
+ * `report/kalman_text.json` that the static panel reads too (a test on each side compares them).
+ * Placeholders are written `{name}`.
+ */
+const TITLE = text.title;
+const QUESTION = text.question;
+
+function fill(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce((out, [key, value]) => out.replaceAll(`{${key}}`, String(value)), template);
+}
 
 /** Same padding on the common vertical span as the rolling panel. */
 const SPAN_PADDING = 1.08;
@@ -26,16 +36,10 @@ export const MAX_DRAWN_POINTS = 1500;
 export const THIN_BUCKETS = 300;
 
 /** Sentences for the warning codes of the section (backend `WARNING_TEXT`). */
-const WARNING_TEXT: Record<string, string> = {
-  kalman_lambda_at_upper_bound:
-    "For at least one yearly re-estimate the filter follows daily noise; the estimate is not meaningful.",
-};
+const WARNING_TEXT: Record<string, string> = text.warnings;
 
-const BOUND_WORDS: Record<KalmanVintage["lam_at_bound"], string> = {
-  zero: "At zero: no drift detected, so the filter uses all data so far.",
-  upper: "At the upper limit: the filter follows daily noise; the estimate is not meaningful.",
-  none: "Within limits.",
-};
+/** The flag of a drift rate at a limit; a rate within limits has none. */
+const BOUND_WORDS: Record<KalmanVintage["lam_at_bound"], string> = { ...text.bound, none: "" };
 
 // ---------------------------------------------------------------------------- thinning
 
@@ -202,7 +206,14 @@ function bandText(l: KalmanLatest | null): string {
 }
 
 function windowText(v: KalmanVintage): string {
-  return v.w_eq === null ? "All data so far" : `${count(Math.round(v.w_eq))} days`;
+  return v.w_eq === null ? text.window_none : count(Math.round(v.w_eq));
+}
+
+/** The drift rate as a plain decimal to two significant digits (0.00000095). */
+export function plainRate(x: number): string {
+  if (!Number.isFinite(x)) return "n/a";
+  if (x <= 0) return "0";
+  return x.toFixed(Math.max(0, 1 - Math.floor(Math.log10(x))));
 }
 
 // ---------------------------------------------------------------------------- axis
@@ -299,26 +310,23 @@ function BetaTable({ model }: { model: KalmanModel }) {
   const wide = spacedTicks(placed);
   return (
     <table role="table" className="bars cols-3 rolling kalman-betas">
-      <caption className="vh">
-        Kalman-filter beta per factor with a model-based 95% band, latest at {dateLong(model.last)}: latest beta, standard
-        deviation, and the band from low to high
-      </caption>
+      <caption className="vh">{fill(text.table_caption, { last: dateLong(model.last) })}</caption>
       <thead role="rowgroup">
         <tr role="row">
           <th role="columnheader" scope="col">
-            Factor
+            {text.beta_heads.factor}
           </th>
           <th role="columnheader" scope="col" className="plot-h">
-            <span className="vh">Chart</span>
+            <span className="vh">{text.beta_heads.chart}</span>
           </th>
           <th role="columnheader" scope="col" className="num">
-            Latest beta
+            {text.beta_heads.latest}
+          </th>
+          <th role="columnheader" scope="col" className="num" title={text.sd_title}>
+            {text.beta_heads.sd}
           </th>
           <th role="columnheader" scope="col" className="num">
-            sd
-          </th>
-          <th role="columnheader" scope="col" className="num">
-            Band low to high
+            {text.beta_heads.band}
           </th>
         </tr>
       </thead>
@@ -353,26 +361,18 @@ function BetaTable({ model }: { model: KalmanModel }) {
   );
 }
 
-const VINTAGE_HEADS = [
-  "Rows used",
-  "Drift rate (lambda)",
-  "Behaves like a window of",
-  "Residual volatility a year",
-  "Valid from",
-  "Valid to",
-  "Limit",
-] as const;
+const VINTAGE_HEADS = text.vintage_heads;
 
 function VintageTable({ vintages }: { vintages: readonly KalmanVintage[] }) {
   const heads = VINTAGE_HEADS;
   return (
     <div className="kalman-vint">
-      <h3 className="kalman-sub">Yearly re-estimates of the drift rate</h3>
-      <table role="table" className="kalman-vt" aria-label="Yearly re-estimates of the drift rate">
+      <h3 className="kalman-sub">{text.vintage_title}</h3>
+      <table role="table" className="kalman-vt" aria-label={text.vintage_title}>
         <thead role="rowgroup">
           <tr role="row">
             {heads.map((h, i) => (
-              <th key={h} role="columnheader" scope="col" className={i === 0 || i === heads.length - 1 ? undefined : "num"}>
+              <th key={h} role="columnheader" scope="col" className={i === 0 ? undefined : "num"}>
                 {h}
               </th>
             ))}
@@ -380,12 +380,13 @@ function VintageTable({ vintages }: { vintages: readonly KalmanVintage[] }) {
         </thead>
         <tbody role="rowgroup">
           {vintages.map((v) => (
-            <tr role="row" key={v.index} className={v.lam_at_bound === "none" ? undefined : "bound"}>
+            <tr role="row" key={v.index}>
               <th role="rowheader" scope="row">
-                {count(v.rows)} rows
+                {count(v.rows)}
               </th>
               <td role="cell" className="num" data-label={heads[1]}>
-                {sci(v.lam)}
+                {plainRate(v.lam)}
+                {BOUND_WORDS[v.lam_at_bound] ? <span className="sub">{BOUND_WORDS[v.lam_at_bound]}</span> : null}
               </td>
               <td role="cell" className="num" data-label={heads[2]}>
                 {windowText(v)}
@@ -394,13 +395,10 @@ function VintageTable({ vintages }: { vintages: readonly KalmanVintage[] }) {
                 {pct(v.resid_vol_ann, 1, false)}
               </td>
               <td role="cell" className="num" data-label={heads[4]}>
-                {v.valid_from}
+                <time dateTime={v.valid_from}>{dateLong(v.valid_from)}</time>
               </td>
               <td role="cell" className="num" data-label={heads[5]}>
-                {v.valid_to}
-              </td>
-              <td role="cell" className="lim" data-label={heads[6]}>
-                {BOUND_WORDS[v.lam_at_bound]}
+                <time dateTime={v.valid_to}>{dateLong(v.valid_to)}</time>
               </td>
             </tr>
           ))}
@@ -411,8 +409,6 @@ function VintageTable({ vintages }: { vintages: readonly KalmanVintage[] }) {
 }
 
 // ---------------------------------------------------------------------------- panel
-
-const EMPTY_ACTION = "Choose an earlier start date; the filter needs at least 504 trading days.";
 
 /** Panel 810: Kalman-filter betas. Five 56 px rows, numbers beside them, the yearly re-estimates below. */
 export function KalmanPanel({ report }: ReportPanelProps) {
@@ -430,8 +426,10 @@ export function KalmanPanel({ report }: ReportPanelProps) {
         title={TITLE}
         question={QUESTION}
         empty={{
-          reason: section.reason ?? "Insufficient data: the Kalman-filter betas could not be computed.",
-          action: EMPTY_ACTION,
+          reason: section.reason ?? text.empty.not_computed,
+          action: fill(section.status === "insufficient_data" ? text.empty.insufficient_data : text.empty.failed, {
+            rows: section.training_rows,
+          }),
         }}
       />
     );
@@ -442,10 +440,7 @@ export function KalmanPanel({ report }: ReportPanelProps) {
         id="kalman"
         title={TITLE}
         question={QUESTION}
-        empty={{
-          reason: "Insufficient data: every Kalman-filter estimate is still in warm-up (no value yet).",
-          action: EMPTY_ACTION,
-        }}
+        empty={{ reason: text.empty.warm_up_reason, action: text.empty.warm_up_step }}
       />
     );
   }
@@ -456,27 +451,35 @@ export function KalmanPanel({ report }: ReportPanelProps) {
         <svg className="sw" aria-hidden="true">
           <line className="total-line" x1="0" x2="14" y1="5" y2="5" />
         </svg>
-        Kalman-filter beta
+        {text.legend[0]}
       </li>
       <li>
         <svg className="sw" aria-hidden="true">
           <rect className="kalman-band-sw" width="14" height="10" rx="2" />
         </svg>
-        Model-based 95% band
+        {text.legend[1]}
       </li>
       <li>
         <svg className="sw" aria-hidden="true">
           <line className="cutline" x1="7" x2="7" y1="0" y2="10" />
         </svg>
-        Yearly re-estimate
+        {text.legend[2]}
       </li>
     </ul>
   );
 
   const how = [
-    "Every row uses the same vertical span, centred on its own band, so wiggles compare across factors.",
-    "The chart draws a thinned copy of the daily series that keeps every high and low; the numbers use all of it.",
-    ...labelTexts(report, section.labels),
+    ...labelTexts(
+      report,
+      section.labels.filter((k) => k !== "L-KTAIL"),
+    ),
+    text.fold.span,
+    text.fold.thinning,
+    text.fold.drift_rate,
+    ...labelTexts(
+      report,
+      section.labels.filter((k) => k === "L-KTAIL"),
+    ),
     ...section.warnings.map((code) => WARNING_TEXT[code] ?? code),
   ].join(" ");
 
@@ -486,8 +489,12 @@ export function KalmanPanel({ report }: ReportPanelProps) {
       title={TITLE}
       question={QUESTION}
       legend={legend}
-      reading="Each day's estimate combines the previous day's estimate with that day's return, so every point uses only data up to its date. Compare the lines with the rolling betas."
-      footnote={`The chart starts at ${dateLong(model.first)}, the first date with ${count(section.training_rows)} trading days of history. Latest is stamped ${dateLong(model.last)}. The band is a model-based 95% interval, not a Newey-West (HAC) interval.`}
+      reading={text.reading}
+      footnote={fill(text.footnote, {
+        first: dateLong(model.first),
+        last: dateLong(model.last),
+        rows: count(section.training_rows),
+      })}
       how={how}
     >
       <BetaTable model={model} />

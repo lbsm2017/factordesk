@@ -18,8 +18,7 @@
 .kalman-vt thead th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); border-bottom-color: var(--border); vertical-align: bottom; }
 .kalman-vt .num { text-align: right; white-space: nowrap; }
 .kalman-vt thead th.num { white-space: normal; }
-.kalman-vt td.lim { color: var(--ink-2); font-size: var(--fs-1); max-width: 26ch; }
-.kalman-vt tr.bound td.lim { color: var(--ink); font-weight: 560; }
+.kalman-vt td .sub { white-space: nowrap; }
 
 @media screen and (max-width: 719px) {
   .kalman-betas .axis.time .xl-wrap { margin-left: 0; }
@@ -33,10 +32,9 @@
   .kalman-vt tbody tr { display: block; padding: var(--s-2) 0; border-bottom: 1px solid var(--grid); }
   .kalman-vt tbody th { display: block; padding: 0 0 var(--s-1); border: 0; font-weight: 600; }
   .kalman-vt tbody td {
-    display: flex; justify-content: space-between; gap: var(--s-3); padding: 1px 0; border: 0;
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 var(--s-3); padding: 1px 0; border: 0;
     text-align: right; white-space: normal;
   }
+  .kalman-vt td .sub { flex: 0 0 100%; white-space: normal; }
   .kalman-vt tbody td[data-label]::before { content: attr(data-label); color: var(--ink-2); text-align: left; flex: none; }
-  .kalman-vt td.lim { display: block; max-width: none; text-align: left; padding-top: var(--s-1); }
-  .kalman-vt td.lim::before { display: none; }
 }

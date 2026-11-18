@@ -7,6 +7,7 @@ import {
   KalmanPanel,
   MAX_DRAWN_POINTS,
   buildKalmanModel,
+  plainRate,
   spacedTicks,
   thinIndices,
 } from "./KalmanPanel";
@@ -38,16 +39,16 @@ describe("KalmanPanel absent or not ok", () => {
   });
 
   it.each([
-    ["insufficient_data", "Insufficient data: kalman_needs_504_rows"],
-    ["failed", "Failed: singular_burn_in"],
-  ] as const)("shows the reason as the empty state for status %s, with one next step and no numbers", (status, reason) => {
+    ["insufficient_data", "Insufficient data: kalman_needs_504_rows", /at least 504 trading days/],
+    ["failed", "Failed: singular_burn_in", /Check the price and factor data/],
+  ] as const)("shows the reason as the empty state for status %s, with one next step and no numbers", (status, reason, step) => {
     const report = withKalman((s) => {
       s.status = status;
       s.reason = reason;
     });
     const { container } = renderPanel(report);
     expect(screen.getByText(reason)).toBeTruthy();
-    expect(container.querySelector(".empty-do")?.textContent).toMatch(/earlier start date/);
+    expect(container.querySelector(".empty-do")?.textContent).toMatch(step);
     expect(container.querySelector("table")).toBeNull();
     expect(container.textContent).not.toMatch(/\d\.\d{3}/);
   });
@@ -82,12 +83,13 @@ describe("KalmanPanel numbers", () => {
     const body = Array.from(table.querySelectorAll("tbody tr")).map((tr) =>
       Array.from(tr.children).map((c) => c.textContent ?? ""),
     );
-    expect(body.map((r) => r[0])).toEqual(["504 rows", "756 rows", "1,008 rows", "1,260 rows"]);
-    expect(body.map((r) => r[2])).toEqual(["2,052 days", "854 days", "580 days", "611 days"]);
+    expect(body.map((r) => r[0])).toEqual(["504", "756", "1,008", "1,260"]);
+    expect(body.map((r) => r[2])).toEqual(["2,052", "854", "580", "611"]);
     expect(body.map((r) => r[3])).toEqual(["18.4%", "18.4%", "18.7%", "19.0%"]);
-    expect(body.map((r) => r[4])).toEqual(["2023-09-12", "2024-08-29", "2025-08-18", "2026-08-05"]);
-    expect(body[0]?.[1]).toBe("9.5e-07");
-    expect(body.every((r) => r[6] === "Within limits.")).toBe(true);
+    expect(body.map((r) => r[4])).toEqual(["12 Sep 2023", "29 Aug 2024", "18 Aug 2025", "5 Aug 2026"]);
+    expect(body.map((r) => r[1])).toEqual(["0.00000095", "0.0000055", "0.000012", "0.000011"]);
+    expect(table.querySelector("time")?.getAttribute("datetime")).toBe("2023-09-12");
+    expect(table.querySelector(".sub")).toBeNull();
   });
 
   it("flags a lambda at the bound in words and shows the warning text in the folded part", () => {
@@ -102,10 +104,9 @@ describe("KalmanPanel numbers", () => {
     });
     const { container } = renderPanel(report);
     const rows = container.querySelectorAll(".kalman-vt tbody tr");
-    expect(rows[2]?.textContent).toMatch(/At the upper limit: the filter follows daily noise/);
-    expect(rows[2]?.classList.contains("bound")).toBe(true);
-    expect(rows[1]?.textContent).toMatch(/At zero: no drift detected/);
-    expect(rows[1]?.textContent).toMatch(/All data so far/);
+    expect(rows[2]?.textContent).toContain("At the upper limit: the filter follows daily noise.");
+    expect(rows[1]?.textContent).toContain("At zero: no drift found.");
+    expect(rows[1]?.textContent).toContain("All data so far");
     const how = container.querySelector("details.how") as HTMLElement;
     expect(how.textContent).toMatch(/the estimate is not meaningful/);
   });
@@ -237,9 +238,9 @@ describe("KalmanPanel accessibility", () => {
     expect(within(main).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Factor",
       "Chart",
-      "Latest beta",
+      "Latest",
       "sd",
-      "Band low to high",
+      "95% band",
     ]);
     for (const svg of container.querySelectorAll("svg.kalman-svg")) expect(svg.getAttribute("aria-hidden")).toBe("true");
     expect(container.querySelector("tfoot tr.axis-row")?.getAttribute("aria-hidden")).toBe("true");
@@ -260,6 +261,15 @@ describe("KalmanPanel accessibility", () => {
   it("has no scroll region that would take a focus stop (the tables fit the page)", () => {
     const { container } = renderPanel(withKalman());
     expect(container.querySelectorAll("[tabindex]")).toHaveLength(0);
+  });
+});
+
+describe("plain drift rate", () => {
+  it("prints two significant digits as a decimal", () => {
+    expect(plainRate(9.5e-7)).toBe("0.00000095");
+    expect(plainRate(5.5e-6)).toBe("0.0000055");
+    expect(plainRate(0.01)).toBe("0.010");
+    expect(plainRate(0)).toBe("0");
   });
 });
 

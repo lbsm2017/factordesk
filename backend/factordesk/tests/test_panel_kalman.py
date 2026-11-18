@@ -103,7 +103,7 @@ def test_latest_numbers_as_printed(panel: str) -> None:
 
 
 def test_vintage_table_numbers_as_printed(panel: str) -> None:
-    body = re.search(r"<h3>Yearly re-estimates</h3>.*?</table>", panel, re.S)
+    body = re.search(r"<h3>Yearly re-estimates of the drift rate</h3>.*?</table>", panel, re.S)
     assert body is not None
     text = _text(body.group(0))
     for needle in ("504", "756", "1,008", "1,260"):
@@ -117,7 +117,7 @@ def test_vintage_table_numbers_as_printed(panel: str) -> None:
     for d in ("12 Sep 2023", "29 Aug 2024", "18 Aug 2025", "5 Aug 2026"):
         assert d in text
     assert 'datetime="2023-09-12"' in body.group(0)
-    assert "at its upper limit" not in text  # no vintage of the fixture is at a bound
+    assert "At the upper limit" not in text  # no vintage of the fixture is at a bound
 
 
 def test_warm_up_nulls_do_not_draw(report: FactorReport, panel: str) -> None:
@@ -126,7 +126,7 @@ def test_warm_up_nulls_do_not_draw(report: FactorReport, panel: str) -> None:
     first = next(i for i, b in enumerate(full.betas["Mkt-RF"]) if b is not None)
     assert first == 503
     # The date axis starts at the first estimate: its date is in the caption, an earlier one is not.
-    assert f"starts at the first estimate, {full.dates[first].day} " in panel
+    assert f"The chart starts at {full.dates[first].day} " in panel
     # No point is drawn left of the first estimate: every path starts at x = 0.0.
     for d in re.findall(r'<path class="rline c\d" d="M([\d.]+),', panel):
         assert float(d) == 0.0
@@ -186,8 +186,9 @@ def test_lambda_at_bound_is_flagged_in_words(base: FactorReport) -> None:
     )
     assert html is not None
     text = _text(html)
-    assert "at its upper limit: the filter follows daily noise" in text
-    assert "at zero: no drift found" in text
+    assert "At the upper limit: the filter follows daily noise." in text
+    assert "At zero: no drift found." in text
+    assert "All data so far" in text
     # The model's warning sentence sits in the folded "How this is computed" part.
     fold = html.split("<details", 1)[1]
     assert "the filter follows daily noise; the estimate is not meaningful" in fold
