@@ -5,7 +5,6 @@ import { Colophon } from "./Colophon";
 import { DataAuditPanel } from "./DataAuditPanel";
 import { Equation } from "./Equation";
 import { ExposuresPanel } from "./ExposuresPanel";
-import { GateCallout } from "./GateCallout";
 import { Header } from "./Header";
 import { KpiStrip } from "./KpiStrip";
 import { Notice } from "./Notice";
@@ -39,7 +38,6 @@ export function ReportView({ report, downloadHref, win, onWinChange, busy = fals
       <Notice report={report} />
       <Equation report={report} />
       <KpiStrip report={report} />
-      <GateCallout report={report} />
       <PricePanel report={report} />
       <ExposuresPanel report={report} />
       <ReturnPanel report={report} />

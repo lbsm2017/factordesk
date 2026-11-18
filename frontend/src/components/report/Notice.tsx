@@ -1,6 +1,7 @@
 import type { FactorReport } from "../../api/types";
 import { num, pct, pval, tstat } from "../../format";
-import { warningText } from "../../text/plain";
+import { tagText, warningText } from "../../text/plain";
+import { GateEvidence } from "./GateEvidence";
 import { fin, noticeItems } from "./leadHelpers";
 import type { ReportPanelProps } from "./types";
 import "./lead.css";
@@ -24,7 +25,7 @@ function GateDetail({ report }: ReportPanelProps) {
     return (
       <p>
         5-day estimate ({five.n_blocks.toLocaleString("en-US")} blocks): alpha {alpha === null ? "n/a" : pct(alpha)} a
-        year, t {z === null ? "n/a" : tstat(z)}, p {p === null ? "n/a" : pval(p)}, {five.alpha_tag ?? "n/a"}; R²{" "}
+        year, t {z === null ? "n/a" : tstat(z)}, p {p === null ? "n/a" : pval(p)}, {tagText(five.alpha_tag)}; R²{" "}
         {r2 === null ? "n/a" : num(r2, 4)}. The full table is under <a href="#regression-detail">Regression detail</a>.
       </p>
     );
@@ -62,6 +63,7 @@ export function Notice({ report }: { report: FactorReport }) {
               <li key={`${it.code}-${i}`}>{it.message}</li>
             ))}
           </ul>
+          <GateEvidence report={report} />
           <GateDetail report={report} />
         </details>
       </div>

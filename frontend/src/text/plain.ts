@@ -31,6 +31,13 @@ export const TILT: Record<string, readonly [string, string]> = {
   CMA: ["firms that invest conservatively", "firms that invest aggressively"],
 };
 
+/** Reader-facing word for an estimate tag: "significant" or "not significant" (never "reliable" or "noise"). */
+export function tagText(tag: string | null | undefined): string {
+  if (tag === "reliable") return "significant";
+  if (tag === "noise") return "not significant";
+  return "n/a";
+}
+
 export function plainName(name: string): string {
   return PLAIN[name] ?? name;
 }

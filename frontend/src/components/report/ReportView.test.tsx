@@ -16,7 +16,6 @@ describe("ReportView", () => {
       "notice",
       "equation",
       "kpis",
-      "gate",
       "price",
       "exposures",
       "returns",
