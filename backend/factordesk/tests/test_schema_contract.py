@@ -215,12 +215,19 @@ def _assemble(**kwargs: Any) -> FactorReport:
     )
 
 
-def test_pipeline_leaves_every_section_absent() -> None:
+BUILT_SECTIONS = ("residual",)
+"""Fields whose feature is built: its hook fills the field on every report."""
+
+
+def test_pipeline_leaves_unbuilt_sections_absent() -> None:
     rep = _assemble()
     assert rep.schema_version == SCHEMA_VERSION
     for name in SECTION_FIELDS:
-        assert getattr(rep, name) is None
-    assert rep.label_text == LABEL_TEXT
+        assert (getattr(rep, name) is not None) is (name in BUILT_SECTIONS), name
+    present = {name: getattr(rep, name) for name in SECTION_FIELDS}
+    assert rep.label_text == report_label_text(present)
+    if not BUILT_SECTIONS:
+        assert rep.label_text == LABEL_TEXT
 
 
 def test_hooks_get_the_finished_core_report(monkeypatch: pytest.MonkeyPatch) -> None:
