@@ -7,6 +7,12 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (bibliography)
+
+- References verified: 52 bibliography entries, each checked against Crossref (48 by the new script, which also uses arXiv for one preprint) or by hand against the page or file (4), and 11 items listed as unverified. See [references](../docs/references.md), [references.bib](../docs/references.bib) and the rule in [no citation without verification](decision-citations-and-verification.md).
+- Findings: Chung (2024) is now published (Critical Finance Review 15(2), 133-155); no terms-of-use page or citation request was found on the Ken French library pages, although this wiki and earlier text say the library asks for both (not changed here); the Newey-West lag rule's attribution to the 1994 paper and the claim that Yahoo's adjustment follows the CRSP method have no source in the repository.
+- Added `scripts/check_references.py` and `CITATION.cff`.
+
 ## 2026-11-18 (owner re-rank)
 
 - Rank 7 (one-shot install and run) moved to very later. The work is built and stays in PR #1; only the release is deferred. See [the roadmap](../docs/ROADMAP.md#changes-in-this-update-update-2).
