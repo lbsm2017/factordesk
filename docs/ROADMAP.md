@@ -22,8 +22,8 @@ test written down first, logged, independently reviewed) before it ships.
 - **Specified, not built:** report redesign (`docs/design/report-design.md`), regional datasets
   (`docs/methodology-datasets.md`).
 - **Owner ranking (2026-11-18, re-scored in update 2):** 16 epics are ranked in the priority ranking
-  below. Item 1 is Now, items 2 to 4 are Done, items 5, 7, 8, 12 and 14 are Next, items 6, 9, 10,
-  11 and 15 are Later, and items 13 and 16 are Very later. Fragility score and lead-lag betas have
+  below. Item 1 is Now, items 2 to 4 are Done, items 5, 8, 12 and 14 are Next, items 6, 9, 10,
+  11 and 15 are Later, and items 7, 13 and 16 are Very later. Fragility score and lead-lag betas have
   specs ready. One new proposal (a nightly workflow) is listed under the table and is not ranked.
 
 ## Priority ranking (owner, 2026-11-18)
@@ -39,7 +39,7 @@ gave them.
 | 4 | Schema contract (ships as schema version 4) | - | - | - | - | - | Must | deliver and close | Done: five optional sections, panel registries on both renderers, four briefs; in PR #1 | none |
 | 5 | First GitHub CI run | - | - | - | - | - | Should | next | Done: run 1 failed on one float comparison in a fixture, fixed; run 2 green (3 min 30 s). Open: Playwright cache hit path needs a third run; nightly slow tests need an owner decision | PR #1 |
 | 6 | Fragility score | 6 | 2 | 0.8 | 5 | 1.9 | Should | later | Not started; spec ready; the hardening deferral D-1 (influence diagnostic) folds in here | Schema contract (done): unblocked |
-| 7 | One-shot install and run | 8 | 1 | 0.7 | 5 | 1.1 | Should | next | Built, in PR #1; not released: the owner runs `docs/release-checklist.md`; installer URL and a real install on a machine without uv unverified | PyPI release (owner) |
+| 7 | One-shot install and run | 8 | 1 | 0.7 | 5 | 1.1 | Should | very later (was next) | Built, in PR #1; not released: the owner runs `docs/release-checklist.md`; installer URL and a real install on a machine without uv unverified | PyPI release (owner) |
 | 8 | Residual alpha analysis | 6 | 2 | 0.8 | 8 | 1.2 | Should | next | In progress: analytics step (agent resumed after a network error); then pipeline, static panel, React panel, independent validation | Schema contract (done) |
 | 9 | Lead-lag betas | 4 | 2 | 0.7 | 8 | 0.7 | Could | later | Not started; spec ready | Schema contract (done); hardening gate (done); gate threshold calibration (owner) |
 | 10 | Dead-code cleanup | 2 | 0.25 | 1.0 | 1 | 0.5 | Could | later | Not started | none |
@@ -77,12 +77,11 @@ Item 1 of the priority ranking.
 
 ## Next
 
-Items 5, 7, 8, 12 and 14 of the priority ranking, in owner order.
+Items 5, 8, 12 and 14 of the priority ranking, in owner order.
 
 | Item | Why it matters | Status | Depends on |
 |---|---|---|---|
 | First GitHub CI run (rank 5) | Runs the checks on GitHub for every pull request | Done: run 1 failed on one float comparison in a fixture, fixed; run 2 green (3 min 30 s). Open: Playwright cache hit path needs a third run; nightly slow tests need an owner decision | PR #1 |
-| One-shot install-and-run command (rank 7) | A single line per OS that installs uv if missing and opens a report (`uvx factordesk report SPY --open`); a short bootstrap script pinned to a release tag, readable, with a published checksum | Built, in PR #1; not released (no publishing) | PyPI release (owner); first tagged release |
 | Residual alpha analysis (rank 8) | Shows how much alpha holds up with point-in-time betas | In progress: analytics step (agent resumed after a network error); then pipeline, static panel, React panel, independent validation | Schema contract (done) |
 | Shrunk betas (rank 12) | Pull noisy style betas toward a prior; report how much data would make an effect detectable | In progress: analytics step; then pipeline, panels, validation | Schema contract (done) |
 | Kalman-filter betas (rank 14) | Time-varying betas with proper uncertainty, using past data only | In progress: analytics step; runtime budget a couple of seconds; goes before the Later items | Schema contract (done) |
@@ -101,10 +100,11 @@ Items 6, 9, 10, 11 and 15 of the priority ranking, in owner order.
 
 ## Very later
 
-Items 13 and 16 of the priority ranking.
+Items 7, 13 and 16 of the priority ranking.
 
 | Item | Why it matters | Status | Depends on |
 |---|---|---|---|
+| One-shot install-and-run command (rank 7) | A single line per OS that installs uv if missing and opens a report (`uvx factordesk report SPY --open`); a short bootstrap script pinned to a release tag, readable, with a published checksum | Built, in PR #1; not released (no publishing) | PyPI release (owner); first tagged release |
 | Peer comparison (rank 13) | Where a stock's betas sit within its sector | Not started; the batch fetch exists but nothing calls it | Cointegration (not built) |
 | Alpaca adapter (rank 16) | Optional cross-check and fallback from 2016, returns rebuilt from raw closes and dividends (`sip` feed); check Alpaca's "user application" notice before shipping | Not started | — |
 
@@ -176,6 +176,7 @@ and regime betas (specified in `docs/methodology.md`, not yet scheduled).
 
 What moved, and why:
 
+- Owner moved rank 7 (one-shot install and run) from Next to very later on 2026-11-18. The work is built and stays in PR #1; only the release is deferred.
 - New information: PR #1 is open with CI green on four jobs (run 44350980579). The schema contract
   landed (as schema version 4), the SPY hardening closed, the rolling speed-up conditions were met,
   and the three feature agents started.
