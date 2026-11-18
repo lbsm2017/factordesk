@@ -57,7 +57,10 @@ def test_fixture_validates_round_trips_and_attaches_to_the_mock_report() -> None
     assert report.kalman_betas == section
     assert FactorReport.model_validate_json(report.model_dump_json()) == report
     # nothing else in the report changes
-    assert report.model_copy(update={"kalman_betas": None}) == load_report(MOCK)
+    base = load_report(MOCK)
+    assert report.label_text == {**base.label_text, **KALMAN_SECTION.label_text}
+    stripped = report.model_copy(update={"kalman_betas": None, "label_text": base.label_text})
+    assert stripped == base
 
 
 def test_fixture_shape_and_nulls() -> None:

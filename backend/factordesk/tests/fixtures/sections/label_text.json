@@ -1,6 +1,12 @@
 {
   "lead_lag": {},
-  "shrunk_betas": {},
+  "shrunk_betas": {
+    "L-SHRINK": "Pulled toward typical: each beta is moved toward the beta of the market portfolio (Mkt-RF 1, others 0), more when it is noisy. How far depends on how much betas differ across Ken French industry and size portfolios. A model-based view, not a test; the bars show the estimates from this stock's data.",
+    "L-SHRINK-PRIOR": "Prior: centre 1 for Mkt-RF and 0 for the other betas, spread from the Ken French industry and size portfolios (values above). Portfolios differ less than single stocks, so this pull may be too strong for unusual stocks.",
+    "L-CRED": "95% credible interval under the stated prior; based on the HAC (Newey-West) uncertainty of the estimate.",
+    "L-CORR-MOVE": "Moved away from its typical value because it is estimated jointly with correlated factors.",
+    "L-MDE": "Smallest beta that the test behind the reliable tags would detect with 80% power, after correcting for testing 5 betas. It describes that test, not the shrunk estimate, and assumes the standard error keeps shrinking like one over the square root of the data."
+  },
   "fragility": {},
   "residual": {
     "L-INSAMPLE": "In-sample: betas are fitted on this same period.",
@@ -8,5 +14,9 @@
     "L-DESC-PIT": "Descriptive and point-in-time, not predictive.",
     "L-HEDGE": "Compounded daily: a paper long-short hedge, rebalanced daily, before trading costs, financing and borrowing fees."
   },
-  "kalman_betas": {}
+  "kalman_betas": {
+    "L-KF": "Kalman-filter beta: each point uses only data up to that date. It follows gradual changes smoothly, but reacts slowly to sudden changes; compare with the 126-day line. The drift rate is re-estimated once a year from past data, so the line can jump at those dates (marked).",
+    "L-KBAND": "Model-based 95% band. It assumes normal, independent daily errors with constant variance and treats the estimated drift rate as known. It is not a Newey-West (HAC) interval and is not comparable to the rolling-beta bands. After a sudden change it is too narrow.",
+    "L-KTAIL": "Daily price changes for this ticker partly reverse the next day (see the data-quality check). The filter ignores that, so the band is too narrow for this ticker."
+  }
 }

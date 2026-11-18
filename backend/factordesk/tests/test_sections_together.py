@@ -12,11 +12,13 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
 from factordesk.pipeline import assemble_report
 from factordesk.report import load_report, render_report_html
+from factordesk.report.base import SectionModel
 from factordesk.report.panel_registry import registered_panels
 from factordesk.report.schema import FactorReport
 from factordesk.section_hooks import kalman as kalman_hook
@@ -137,8 +139,8 @@ def test_one_section_failing_alone_leaves_the_others_intact(
     broken = FAILERS[field](monkeypatch)
 
     # The failed section says so in the schema and on the page, and the file still round-trips.
-    failed = getattr(broken, field)
-    entries = failed if isinstance(failed, list) else [failed]
+    failed: Any = getattr(broken, field)
+    entries = cast(list[SectionModel], failed if isinstance(failed, list) else [failed])
     assert all(entry.status == "failed" and entry.reason for entry in entries), field
     assert FactorReport.model_validate_json(broken.model_dump_json()) == broken
     assert f'id="{PANEL_ID[field]}"' in render_report_html(broken)
