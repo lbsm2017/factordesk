@@ -55,9 +55,10 @@ Confidence / Effort. Effort counts agent sessions of about 30 minutes each. The 
 on 2026-11-18 because the schema contract landed: confidence was raised on ranks 6, 8, 9, 12 and 14.
 Ranks 2 to 5 show a dash because they are done.
 
-New, proposed, needs an owner decision (not ranked): a nightly workflow for the 202 slow tests
+New, not ranked: a nightly workflow for the 202 slow tests
 (about 1.5 min on ubuntu), plus an allowed-to-fail job for the 3 live tests. Reach 5, impact 1,
-confidence 0.8, effort 1, RICE 4.0, MoSCoW Could. Status: proposed. Depends on PR #1.
+confidence 0.8, effort 1, RICE 4.0, MoSCoW Could. Status: approved by the owner on 2026-11-18;
+workflow written in a pull request stacked on PR #1, not yet run on GitHub.
 
 ## Now
 

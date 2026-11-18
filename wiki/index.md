@@ -50,6 +50,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [No citation without verification](decision-citations-and-verification.md) [Decided]: every source is looked up and checked by a script, and what we cannot check is listed as unverified.
 - [Precision of the fast rolling regression](decision-rolling-fast-path-precision.md) [Decided-pending-implementation]: the fast path is about 1e-12 from the exact one on real data; its safety check is tighter and costs no speed.
 - [One contract for the five new report sections](decision-schema-v3-contract.md) [Decided-pending-implementation]: optional sections, one file per feature and layer, panel registries, report format version 4.
+- [Nightly run of the slow and live tests](decision-nightly-slow-tests.md) [Decided-pending-implementation]: a daily workflow for the statistical tests CI skips; the live job may fail.
 
 ### Open source
 
