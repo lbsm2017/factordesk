@@ -26,6 +26,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
+from build_prototype import date_ticks as _date_ticks
 from build_prototype import (  # rev 2 helpers, unchanged
     FACTORS,
     MINUS,
@@ -35,7 +36,6 @@ from build_prototype import (  # rev 2 helpers, unchanged
     WARN_PLAIN,
     _quantile,
     d_long,
-    date_ticks,
     edge,
     make_empty,
     nice_domain,
@@ -76,6 +76,13 @@ PERFORMANCE = {
 WORLD = {
     "ZM": {"acwi": (1.31, 1.05, 1.57), "acwi_r2": 0.34, "us": (1.42, 1.12, 1.72), "us_r2": 0.38, "days": 1254},
     "SPY": {"acwi": (1.05, 1.01, 1.09), "acwi_r2": 0.91, "us": (1.00, 0.99, 1.01), "us_r2": 0.99, "days": 559},
+}
+
+# Notice band: one short plain line per warning, so two warnings fit in two lines.
+NOTICE_PLAIN = {
+    "residual_reversal": "Daily prices partly reverse the next day, so R\u00b2 is probably understated.",
+    "short_history": "The history is short, so the betas rest on a small sample.",
+    "audit_errors": "The price audit found errors; see Data and audit before reading the numbers.",
 }
 
 PILL = {
@@ -131,6 +138,24 @@ MARK = (
 
 
 # ----------------------------------------------------------------------------- small helpers
+def date_ticks(dates: list[str]) -> list[tuple[int, str, bool]]:
+    """Quarterly ticks; only January and the first tick carry the year, so labels never crowd."""
+    out = _date_ticks(dates)
+    return [(i, lab if (major or k == 0) else lab.split()[0], major) for k, (i, lab, major) in enumerate(out)]
+
+
+def time_labels(xt: list[tuple[int, str, bool]], xpct, gap: float = 16.0) -> str:
+    """HTML labels for a time axis; January ticks win, a label closer than ``gap`` % to a kept one is dropped."""
+    kept: list[tuple[float, str, bool]] = []
+    for i, lab, major in sorted(xt, key=lambda t: not t[2]):
+        x = xpct(i)
+        if all(abs(x - k[0]) >= gap for k in kept):
+            kept.append((x, lab, major))
+    return "".join(
+        f'<span class="xl {edge(x)}" style="left:{x:.2f}%">{lab}</span>' for x, lab, _ in sorted(kept)
+    )
+
+
 def plural(n: int, one: str, many: str | None = None) -> str:
     return f"{n:,} {one if n == 1 else (many or one + 's')}"
 
@@ -170,12 +195,14 @@ def empty_state(reason: str, action: str) -> str:
     return f'<div class="empty" role="note"><p class="empty-what">{e(reason)}</p><p class="empty-do">{e(action)}</p></div>'
 
 
-def sec(sid: str, title: str, outcome: str, main: str, side: str = "", two: bool = True, extra: str = "") -> str:
+def sec(sid: str, title: str, outcome: str, main: str, side: str = "", two: bool | str = True, extra: str = "") -> str:
+    """two=True: two-up from 1440 px; two="xl": two-up from 1760 px (tables with many number columns)."""
     body = f'<div class="sec-main">{main}</div>' + (f'<div class="sec-side">{side}</div>' if side else "")
+    layout = (" two-xl" if two == "xl" else " two") if (two and side) else ""
     return f"""
 <section class="sec" id="{sid}" aria-labelledby="{sid}-t">
   <header class="sec-head"><div><h2 id="{sid}-t">{e(title)}</h2><p class="outcome">{outcome}</p></div>{extra}</header>
-  <div class="sec-body{' two' if two and side else ''}">{body}</div>
+  <div class="sec-body{layout}">{body}</div>
 </section>"""
 
 
@@ -195,16 +222,26 @@ def bar(v: float, lo: float, hi: float, cls: str) -> str:
     return f'<rect class="{cls}" x="{a}%" y="31%" width="{max(b - a, 0.0)}%" height="38%" rx="3"/>'
 
 
-def axis_row(ticks: list[float], lo: float, hi: float, fmt, ncols: int) -> str:
-    k0 = next((k for k, t in enumerate(ticks) if abs(t) < 1e-12), 0)
+def axis_row(ticks: list[float], lo: float, hi: float, fmt, ncols: int = 0) -> str:
+    """Tick labels under the plot column. A label closer than 20% of the width to a kept one is
+    dropped (zero always stays). No trailing cells, so hidden statistics columns stay collapsed."""
+    kept: list[float] = [t for t in ticks if abs(t) < 1e-12]
+    ticks = [t for t in ticks if 4 <= pos(t, lo, hi) <= 96 or abs(t) < 1e-12]
+    for t in sorted(ticks, key=abs):
+        if all(abs(pos(t, lo, hi) - pos(k, lo, hi)) >= 20 for k in kept):
+            kept.append(t)
     labels = "".join(
-        f'<span class="{edge(pos(t, lo, hi))}{" alt" if ((k - k0) % 2 and len(ticks) > 5) else ""}" style="left:{pos(t, lo, hi)}%">{fmt(t)}</span>'
-        for k, t in enumerate(ticks)
+        f'<span class="{edge(pos(t, lo, hi))}" style="left:{pos(t, lo, hi)}%">{fmt(t)}</span>' for t in sorted(kept)
     )
-    return (
-        f'<tr class="axis-row" aria-hidden="true"><td></td><td class="axis"><div>{labels}</div></td>'
-        f'<td colspan="{ncols}"></td></tr>'
-    )
+    return f'<tr class="axis-row" aria-hidden="true"><td></td><td class="axis"><div>{labels}</div></td></tr>'
+
+
+def tick(t: float) -> str:
+    """Signed tick label with the fewest decimals that keep it exact (0.25 stays 0.25)."""
+    if abs(t) < 1e-12:
+        return "0"
+    s = f"{abs(t):.2f}".rstrip("0").rstrip(".")
+    return ("+" if t > 0 else MINUS) + s
 
 
 def sure_word(tag: str | None) -> str:
@@ -288,30 +325,30 @@ def sidebar(r: dict, nav: list[tuple[str, str, str]]) -> str:
     return f"""
 <aside class="side" id="sidebar" aria-label="Controls and sections">
   <div class="side-scroll">
-    <div class="side-top"><a class="mark" href="#summary">{MARK}<span>factordesk</span></a>
+    <div class="side-top"><a class="mark" href="#summary">{MARK}<span translate="no">factordesk</span></a>
       <label class="drawer-close" for="nav-open">{icon("close")}<span class="vh">Close menu</span></label></div>
     <form class="side-group" role="search" onsubmit="return false">
       <label class="side-label" for="tk">Ticker</label>
-      <div class="search"><input class="field" id="tk" type="text" value="{e(r['ticker'])}" autocomplete="off" spellcheck="false">
+      <div class="search"><input class="field" id="tk" name="ticker" type="text" value="{e(r['ticker'])}" placeholder="e.g. AAPL…" autocomplete="off" autocapitalize="characters" spellcheck="false" translate="no">
         <button class="btn" type="submit">Factor it</button></div>
     </form>
     <fieldset class="side-group">
       <legend class="side-label">Date range</legend>
       <div class="seg fill" role="radiogroup" aria-label="Date range preset">{seg}</div>
       <div class="dates">
-        <label>From<input class="field" type="date" value="{d['actual_start']}" max="{d['factors_last_date']}"></label>
-        <label>To<input class="field" type="date" value="{d['actual_end']}" max="{d['factors_last_date']}"></label>
+        <label>From<input class="field" name="from" type="date" value="{d['actual_start']}" max="{d['factors_last_date']}"></label>
+        <label>To<input class="field" name="to" type="date" value="{d['actual_end']}" max="{d['factors_last_date']}"></label>
       </div>
       <p class="side-note" aria-live="polite">Analysed <b>{d_long(d['actual_start'])} to {d_long(d['actual_end'])}</b>, {d['n_obs']:,} trading days{f", {excl} left out" if excl else ""}.</p>
     </fieldset>
     <div class="side-group">
       <p class="side-label">Factor data</p>
-      <p class="side-note"><b>Up to {d_long(d['factors_last_date'])}</b>, {d['factors_days_behind']} days old. The Fama&#8211;French library updates about once a month.</p>
+      <p class="side-note"><b>Up to {d_long(d['factors_last_date'])}</b>, {d['factors_days_behind']} days old</p>
       <button class="linkbtn" type="button">{icon("refresh")}Check for newer data</button>
     </div>
     <div class="side-group">
       <label class="switch"><input type="checkbox" role="switch" id="sw-stats"><span class="track"><span class="thumb"></span></span>
-        <span class="switch-text">Show statistics<span class="sw-hint">t-statistics, p-values, intervals</span></span></label>
+        <span class="switch-text">Show statistics<span class="sw-hint">Tests, p-values, intervals</span></span></label>
       <label class="switch"><input type="checkbox" role="switch" id="sw-dark"><span class="track"><span class="thumb"></span></span>
         <span class="switch-text">Dark theme</span></label>
     </div>
@@ -320,7 +357,7 @@ def sidebar(r: dict, nav: list[tuple[str, str, str]]) -> str:
       <ol>{''.join(items)}</ol>
     </nav>
   </div>
-  <div class="side-foot"><a class="btn quiet block" href="#" download>{icon("download")}Download report</a></div>
+  <div class="side-foot"><a class="btn quiet block" href="report-v3.html" download="{e(r['ticker'])}-factor-report.html">{icon("download")}Download report</a></div>
 </aside>"""
 
 
@@ -329,8 +366,8 @@ def topbar(r: dict) -> str:
     return f"""
 <header class="topbar">
   <label class="menu-btn" for="nav-open">{icon("menu")}<span class="vh">Open menu</span></label>
-  <a class="mark" href="#summary">{MARK}<span>factordesk</span></a>
-  <p class="where"><b>{e(r['ticker'])}</b>, {d_long(d['actual_start'])} to {d_long(d['actual_end'])}</p>
+  <a class="mark" href="#summary">{MARK}<span translate="no">factordesk</span></a>
+  <p class="where"><b>{e(r['ticker'])}</b></p>
 </header>
 <label class="scrim" for="nav-open" aria-hidden="true"></label>"""
 
@@ -339,7 +376,7 @@ def topbar(r: dict) -> str:
 def header(r: dict) -> str:
     d, ws = r["data"], r["warnings"]
     s = SECURITY.get(r["ticker"], {})
-    name = f'<span class="name">{e(s["name"])}</span>' if s.get("name") else ""
+    name = f'<span class="name" translate="no">{e(s["name"])}</span>' if s.get("name") else ""
     listing = ""
     if s.get("exchange"):
         cur = CURRENCY_PLAIN.get(s.get("currency", ""), s.get("currency", ""))
@@ -349,22 +386,24 @@ def header(r: dict) -> str:
         chips += f'<a class="chip warn" href="#notice">{icon("warn")}{plural(len(ws), "warning")}</a>'
     return f"""
 <div class="head">
-  <div><h1><span class="ticker">{e(r['ticker'])}</span>{name}</h1>{listing}</div>
+  <div><h1><span class="ticker" translate="no">{e(r['ticker'])}</span>{name}</h1>{listing}</div>
   <div class="chips">{chips}</div>
 </div>"""
 
 
 def alpha_range_svg(g: dict) -> str:
     lo_ci, hi_ci, a = g["alpha_ci_low_annual"], g["alpha_ci_high_annual"], g["alpha_annual"]
-    lo, hi, _ = nice_domain(min(lo_ci, 0.0), max(hi_ci, 0.0), 4)
-    x = lambda v: pos(v, lo, hi) * 0.92 + 4  # noqa: E731  keep 4% margins for the end labels
+    lo, hi = min(lo_ci, 0.0), max(hi_ci, 0.0)
+    x = lambda v: pos(v, lo, hi) * 0.96 + 2  # noqa: E731
     z = x(0.0)
     return (
         '<svg class="range-svg" aria-hidden="true">'
         f'<line class="z" x1="{z}%" x2="{z}%" y1="2" y2="26"/>'
         f'<line class="rng" x1="{x(lo_ci)}%" x2="{x(hi_ci)}%" y1="14" y2="14"/>'
         f'<circle class="pt" cx="{x(a)}%" cy="14" r="6"/></svg>'
-        f'<div class="range-labels"><span>{pct(lo_ci, 1)}</span><span>likely range</span><span>{pct(hi_ci, 1)}</span></div>'
+        f'<div class="range-labels" aria-hidden="true"><span style="left:{x(lo_ci)}%">{pct(lo_ci, 1)}</span>'
+        f'<span class="zl" style="left:{z}%">0</span><span class="end" style="left:{x(hi_ci)}%">{pct(hi_ci, 1)}</span></div>'
+        f'<p class="vh">Likely range {pct(lo_ci, 1)} to {pct(hi_ci, 1)} a year.</p>'
     )
 
 
@@ -372,9 +411,9 @@ def verdict(r: dict) -> str:
     g, d, rk = r["regression"], r["data"], r["risk_contribution"]
     line = verdict_sentence(r)
     basis = (
-        f"Based on {d['n_obs']:,} trading days from {d_long(d['actual_start'])} to {d_long(d['actual_end'])}. "
-        "It describes the past; it is not a forecast."
-    )
+        f"{d['n_obs']:,} trading days, {d_long(d['actual_start'])} to {d_long(d['actual_end'])}. "
+        "Past data, not a forecast."
+    ) if g["status"] == "ok" else "The summary appears once the range holds enough trading days."
     if g["status"] != "ok":
         tiles = empty_state(g["reason"], "Widen the date range in the sidebar and run the report again.")
     else:
@@ -397,7 +436,7 @@ def verdict(r: dict) -> str:
         tiles = f"""
   <div class="tiles">
     <section class="tile" aria-labelledby="t-alpha">
-      <h2 id="t-alpha">Beyond its risks</h2>
+      <h3 id="t-alpha">Beyond its risks</h3>
       <p class="v{' quiet' if ns else ''}">{pct(a)}<small>a year</small></p>
       <span class="pill {a_pill}">{a_word}</span>
       <div class="instrument">{alpha_range_svg(g)}</div>
@@ -405,7 +444,7 @@ def verdict(r: dict) -> str:
       {stat(f"t {tstat(g['alpha_z'])}, p {pval(g['alpha_p'])}, 95% interval {pct(g['alpha_ci_low_annual'])} to {pct(g['alpha_ci_high_annual'])}", "p")}
     </section>
     <section class="tile" aria-labelledby="t-r2">
-      <h2 id="t-r2">How much the model explains</h2>
+      <h3 id="t-r2">How much the model explains</h3>
       <p class="v">{share(r2)}<small>of daily moves</small></p>
       <div class="instrument"><div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{r2 * 100:.1f}" aria-label="Share of daily moves explained"><span style="width:{r2 * 100:.2f}%"></span></div>
         <div class="meter-key"><span>Explained by the factors</span><span>Specific</span></div></div>
@@ -413,7 +452,7 @@ def verdict(r: dict) -> str:
       {stat(f"R&#178; {r2:.4f}, adjusted {g['adj_r2']:.4f}", "p")}
     </section>
     <section class="tile" aria-labelledby="t-risk">
-      <h2 id="t-risk">Stock-specific risk</h2>
+      <h3 id="t-risk">Stock-specific risk</h3>
       <p class="v">{p1(g['sigma_e_annual'])}<small>a year</small></p>
       <div class="instrument"><div class="meter idio" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{(idio or 0) * 100:.1f}" aria-label="Stock-specific share of variance"><span style="width:{max((idio or 0) * 100, 1.2):.2f}%"></span></div>
         <div class="meter-key"><span>{share(idio) if idio is not None else ''} of the variance</span><span>Total {p1(total) if total else ''}</span></div></div>
@@ -434,8 +473,8 @@ def notice(r: dict) -> str:
     ws = r["warnings"]
     if not ws:
         return ""
-    first = WARN_PLAIN.get(ws[0]["code"], ws[0]["message"])
-    rest = " ".join(WARN_PLAIN.get(w["code"], w["message"]) for w in ws[1:2])
+    first = NOTICE_PLAIN.get(ws[0]["code"], WARN_PLAIN.get(ws[0]["code"], ws[0]["message"]))
+    rest = " ".join(NOTICE_PLAIN.get(w["code"], WARN_PLAIN.get(w["code"], w["message"])) for w in ws[1:2])
     more = "".join(f"<li>{e(w['message'])}</li>" for w in ws)
     return f"""
 <aside class="notice" id="notice" aria-label="Data quality">{icon("warn")}
@@ -572,7 +611,7 @@ def world_panel(r: dict) -> str:
     <thead><tr><th scope="col">Against</th><th scope="col" class="plot-h"><span class="vh">Chart</span></th>
       <th scope="col" class="num">Beta</th><th scope="col" class="num w-wide">95% interval</th><th scope="col" class="num">R&#178;</th><th scope="col" class="num">Days</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
-    <tfoot>{axis_row(ticks, lo, hi, lambda v: num(v, 1) if v else "0", 4)}</tfoot>
+    <tfoot>{axis_row(ticks, lo, hi, tick)}</tfoot>
   </table>"""
     side = (
         f'<p class="reading">A beta of 1 means the stock moved one-for-one with that index. The intervals '
@@ -582,7 +621,7 @@ def world_panel(r: dict) -> str:
               "US market row, with Newey&#8211;West intervals.")
         + '<p class="demo">Demo values: the fixture has no world beta yet.</p>'
     )
-    return sec("world", "World beta (quick estimate)", e(outcome), main, side)
+    return sec("world", "World beta (quick estimate)", e(outcome), main, side, two="xl")
 
 
 # ----------------------------------------------------------------------------- price and performance
@@ -611,10 +650,7 @@ def price_panel(r: dict) -> str:
         + (f'<path class="price-tail" d="{path_xy(*zip(*tail))}"/>' if len(tail) > 1 else "") + "</svg>"
     )
     ylab = "".join(f'<span class="yl" style="top:{Y(t):.2f}%">{t:,.0f}</span>' for t in ticks)
-    xlab = "".join(
-        f'<span class="xl{"" if major else " minor"} {edge(X(i) / 10)}" style="left:{X(i) / 10:.2f}%">{lab}</span>'
-        for i, lab, major in date_ticks(dates)
-    )
+    xlab = time_labels(date_ticks(dates), lambda i: X(i) / 10)
     zone = f'<span class="zone-label">Not analysed: after {d_long(cov)}</span>' if cut < n else ""
     first, at_cut, last = pts[0][1], px[cut], pts[-1][1]
     chg = at_cut / first - 1
@@ -687,6 +723,7 @@ def performance_panel(r: dict) -> str:
     dd = [None if x is None else max(x * k, -0.99) for x in raw]
     eps = episodes(dd, dates[: cut + 1])[:3]
     lo, _, ticks = nice_domain(min(x for x in dd if x is not None), 0.0, 4)
+    ticks = [t for t in ticks if t <= 1e-12]
     hi = 0.0
     n = cut
     X = lambda i: i / max(n, 1) * 1000  # noqa: E731
@@ -700,10 +737,7 @@ def performance_panel(r: dict) -> str:
         '<line class="zero" x1="0" x2="1000" y1="0" y2="0"/></svg>'
     )
     ylab = "".join(f'<span class="yl" style="top:{Y(t):.2f}%">{pct(t, 0) if t else "0%"}</span>' for t in ticks)
-    xlab = "".join(
-        f'<span class="xl{"" if major else " minor"} {edge(X(i) / 10)}" style="left:{X(i) / 10:.2f}%">{lab}</span>'
-        for i, lab, major in date_ticks(dates[: cut + 1])
-    )
+    xlab = time_labels(date_ticks(dates[: cut + 1]), lambda i: X(i) / 10)
     rows = "".join(
         f'<tr><td>{pct(z["depth"], 1)}</td><td>{d_long(z["peak_d"])}</td><td>{d_long(z["trough_d"])}</td>'
         f'<td>{d_long(z["rec_d"]) if z["rec_d"] else "Not yet"}</td>'
@@ -793,7 +827,7 @@ def exposures_panel(r: dict) -> str:
       <th scope="col" class="num">Beta</th><th scope="col" class="num w-word">How sure</th>
       <th scope="col" class="num stat">t</th><th scope="col" class="num stat">p, adjusted</th><th scope="col" class="num stat">Avg {win}d</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
-    <tfoot>{axis_row(ticks, lo, hi, lambda t: sgn(t, 2) if t else "0", 5)}</tfoot>
+    <tfoot>{axis_row(ticks, lo, hi, tick)}</tfoot>
   </table>"""
     side = (
         legend
@@ -860,7 +894,8 @@ def risk_panel(r: dict) -> str:
         return sec_empty("risk", "Where the risk comes from", rk["reason"], "Widen the date range and run the report again.")
     det = {d["name"]: d for d in rk["details"]}
     shares = {**rk["factors"], "Idiosyncratic": rk["idiosyncratic"]}
-    lo, hi, ticks = nice_domain(min(0.0, min(shares.values())), max(1.0, max(shares.values())), 4)
+    low = min(shares.values())
+    lo, hi, ticks = nice_domain(low if low < -0.02 else 0.0, max(1.0, max(shares.values())), 4)
     rows = []
     for n in rk["order"]:
         v = shares[n]
@@ -944,9 +979,7 @@ def rolling_block(w: dict, avg: dict | None) -> str:
             f'<td class="num strong">{sgn(vals[-1])}</td><td class="num">{sgn(mean)}</td>'
             f'<td class="num stat">{sgn(p10, 2)} to {sgn(p90, 2)}</td></tr>'
         )
-    xlab = "".join(
-        f'<span class="xl{"" if major else " minor"} {edge(X(i) / 10)}" style="left:{X(i) / 10:.2f}%">{lab}</span>' for i, lab, major in xt
-    )
+    xlab = time_labels(xt, lambda i: X(i) / 10, gap=20)
     win = w["window"]
     return f"""
 <div class="win w-{win}">
@@ -955,7 +988,7 @@ def rolling_block(w: dict, avg: dict | None) -> str:
     <thead><tr><th scope="col">Factor</th><th scope="col" class="plot-h"><span class="vh">Chart</span></th>
       <th scope="col" class="num">Latest</th><th scope="col" class="num">Average</th><th scope="col" class="num stat w-wide">Middle 80%</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
-    <tfoot><tr class="axis-row" aria-hidden="true"><td></td><td class="axis time"><div style="margin-left:56px">{xlab}</div></td><td colspan="3"></td></tr></tfoot>
+    <tfoot><tr class="axis-row" aria-hidden="true"><td></td><td class="axis time"><div style="margin-left:60px">{xlab}</div></td></tr></tfoot>
   </table>
   <p class="foot">Each point uses the previous {win} trading days; the chart starts at the first full window, {d_long(dates[i0])}.</p>
 </div>"""
@@ -996,7 +1029,7 @@ def rolling_panel(r: dict, win126: bool = False) -> str:
               "About 1 point in 20 falls outside the band even when the true beta is constant. Overlapping windows share most of their data. "
               "Every row uses the same vertical span, centred on its own values, so wiggles compare across factors.")
     )
-    return sec("rolling", "Exposure over time", e(outcome), main, side, extra=extra)
+    return sec("rolling", "Exposure over time", e(outcome), main, side, two="xl", extra=extra)
 
 
 # ----------------------------------------------------------------------------- condensed demo panels
@@ -1024,7 +1057,7 @@ def residual_panel(r: dict) -> str:
            f'<path class="band hi" d="{band}"/><path class="rline hi" d="{line}"/></svg>')
     ylab = "".join(f'<span class="yl" style="top:{Y(t):.2f}%">{pct(t, 0) if t else "0%"}</span>' for t in ticks)
     xt = [(i - i0, lab, major) for i, lab, major in date_ticks(dates) if i >= i0]
-    xlab = "".join(f'<span class="xl{"" if major else " minor"} {edge(X(k) / 10)}" style="left:{X(k) / 10:.2f}%">{lab}</span>' for k, lab, major in xt)
+    xlab = time_labels(xt, lambda k: X(k) / 10)
     years = [("2024", "partial, 100 days", 0.006, 0.011), ("2025", "250 days", 0.003, 0.009), ("2026", "partial, 188 days", -0.001, 0.010)]
     yrows = "".join(
         f'<tr><th scope="row">{y}<span class="sub">{note}</span></th><td>{pct(s, 1)}</td><td class="stat">{pct(sd, 1, False)}</td>'
@@ -1094,7 +1127,7 @@ def kalman_panel(r: dict) -> str:
     <thead><tr><th scope="col">Factor</th><th scope="col" class="plot-h"><span class="vh">Chart</span></th>
       <th scope="col" class="num">Latest</th><th scope="col" class="num">Full sample</th><th scope="col" class="num stat w-wide">Band</th><th scope="col" class="num stat">Drift</th><th scope="col" class="num w-word">Changed?</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
-    <tfoot>{axis_row(ticks, lo, hi, lambda t: sgn(t, 1) if t else "0", 5)}</tfoot>
+    <tfoot>{axis_row(ticks, lo, hi, tick)}</tfoot>
   </table>"""
     side = (
         '<ul class="legend" aria-label="Legend"><li><svg class="sw" aria-hidden="true"><circle class="dot-new" cx="8" cy="5" r="5"/></svg>Latest, tracked day by day</li>'
@@ -1104,7 +1137,7 @@ def kalman_panel(r: dict) -> str:
               "Random-walk betas with a constant alpha, estimated by a Kalman filter and re-estimated every 252 rows after a 504-row training period.")
         + '<p class="demo">Demo values: the mock fixture has no Kalman section.</p>'
     )
-    return sec("kalman", "Exposure tracked day by day", e(outcome), main, side)
+    return sec("kalman", "Exposure tracked day by day", e(outcome), main, side, two="xl")
 
 
 def shrunk_panel(r: dict) -> str:
@@ -1138,7 +1171,7 @@ def shrunk_panel(r: dict) -> str:
     <thead><tr><th scope="col">Factor</th><th scope="col" class="plot-h"><span class="vh">Chart</span></th>
       <th scope="col" class="num">Measured</th><th scope="col" class="num">Adjusted</th><th scope="col" class="num">Change</th><th scope="col" class="num stat">Pull</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
-    <tfoot>{axis_row(ticks, lo, hi, lambda t: sgn(t, 1) if t else "0", 4)}</tfoot>
+    <tfoot>{axis_row(ticks, lo, hi, tick)}</tfoot>
   </table>"""
     side = (
         '<ul class="legend" aria-label="Legend"><li><svg class="sw" aria-hidden="true"><circle class="dot-ols" cx="8" cy="5" r="4.5"/></svg>Measured</li>'
@@ -1149,7 +1182,7 @@ def shrunk_panel(r: dict) -> str:
               "Bayesian shrinkage toward a prior from Fama&#8211;French portfolio betas; the pull is the posterior weight on the prior.")
         + '<p class="demo">Demo values: the mock fixture has no shrunk section.</p>'
     )
-    return sec("shrunk", "Exposures adjusted for noise", e(outcome), main, side)
+    return sec("shrunk", "Exposures adjusted for noise", e(outcome), main, side, two="xl")
 
 
 # ----------------------------------------------------------------------------- data and audit, regression detail
@@ -1206,7 +1239,8 @@ def detail_panel(r: dict) -> str:
             f'<td class="stat">{pval(f["p"])}</td><td class="stat">{pval(f["p_adj_bh"])}</td>'
             f'<td class="stat">{sgn(f["ci_low"])} to {sgn(f["ci_high"])}</td><td class="stat">{vif.get(f["name"], 0):.2f}</td>{word_cell(ok)}</tr>'
         )
-    clear = [PLAIN[f["name"]] for f in g["factors"] if f["tag"] == "reliable"]
+    clear = [PLAIN[f["name"]] if k == 0 else PLAIN[f["name"]].lower()
+             for k, f in enumerate(x for x in g["factors"] if x["tag"] == "reliable")]
     noise = [PLAIN[f["name"]].lower() for f in g["factors"] if f["tag"] != "reliable"]
     outcome = (f"{and_list(clear)} {'are' if len(clear) > 1 else 'is'} statistically clear; "
                f"{and_list(noise + (['the return beyond the factors'] if g['alpha_tag'] != 'reliable' else []))} could be noise.")
@@ -1258,8 +1292,8 @@ def page(r: dict, on: set[str]) -> str:
     nav = [
         ("summary", "Summary", ""), ("drivers", "What drives it", ""), ("world", "World beta", ""),
         ("price", "Price", ""), ("performance", "Performance", ""), ("exposures", "Factor exposures", ""),
-        ("returns", "Where the return came from", ""), ("risk", "Where the risk comes from", ""),
-        ("rolling", "Exposure over time", ""), ("residual", "Return beyond the factors", ""),
+        ("returns", "Return sources", ""), ("risk", "Risk sources", ""),
+        ("rolling", "Exposure over time", ""), ("residual", "Beyond the factors", ""),
         ("kalman", "Tracked day by day", ""), ("shrunk", "Adjusted for noise", ""),
         ("data", "Data and audit", f"{nwarn} findings" if nwarn else ""), ("detail", "Regression detail", ""),
     ]
@@ -1274,11 +1308,12 @@ def page(r: dict, on: set[str]) -> str:
         f'<footer class="colophon"><p>factordesk report, schema v{e(str(r["schema_version"]))}, generated {gen_stamp(r)}. '
         "Descriptive statistics on past data; nothing here is a forecast or advice.</p></footer>",
     ])
-    body = add_roles(f"""{hatch}
+    body = add_roles(f"""<a class="skip" href="#summary">Skip to the report</a>
+{hatch}
 <input class="vh" type="checkbox" id="nav-open" aria-controls="sidebar" aria-label="Menu">
 {topbar(r)}
 {sidebar(r, nav)}
-<div class="canvas"><main>{main}</main></div>""")
+<div class="canvas"><main id="main">{main}</main></div>""")
     for key, el in (("dark", "sw-dark"), ("stats", "sw-stats"), ("menu", "nav-open")):
         if key in on:
             body = body.replace(f'id="{el}"', f'id="{el}" checked', 1)
@@ -1289,6 +1324,7 @@ def page(r: dict, on: set[str]) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#141A33">
 <title>{e(r['ticker'])} factor profile{f" - {e(sec_name)}" if sec_name else ""}</title>
 <style>
 {font_face()}
