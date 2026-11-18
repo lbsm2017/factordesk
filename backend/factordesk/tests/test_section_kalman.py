@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import pytest
 from pydantic import ValidationError
 
@@ -322,3 +323,46 @@ def test_tkb23_downstream_statistics_do_not_import_kalman() -> None:
         if path.name in ("kalman.py", "__init__.py"):
             continue
         assert "kalman" not in path.read_text(encoding="utf-8").lower(), path.name
+
+
+# ============================================================ validation: TKB13 at report level
+def _kalman_stamped(rep: FactorReport, cutoff: date) -> dict[str, list[float | int | None]]:
+    """Every Kalman payload value stamped on or before ``cutoff``, keyed by series and factor."""
+    sec = rep.kalman_betas
+    assert sec is not None and sec.status == "ok"
+    k = sum(1 for d in sec.dates if d <= cutoff)
+    out: dict[str, list[float | int | None]] = {
+        "alpha": list(sec.alpha[:k]),
+        "vintage_index": list(sec.vintage_index[:k]),
+    }
+    for kind in ("betas", "band_low", "band_high", "ex_ante_betas"):
+        for name, series in getattr(sec, kind).items():
+            out[f"{kind}/{name}"] = list(series[:k])
+    return out
+
+
+@pytest.mark.parametrize("variant", [False, True], ids=["redraw", "redraw+back-adjust"])
+def test_tkb13_report_level_perturbation_with_dividend_and_split(variant: bool) -> None:
+    """Spec TKB13 at report level: rows after t* redrawn (returns, factors, RF) with a dividend
+    and a split after t*; every Kalman payload value stamped up to t* and every finished vintage
+    is unchanged. Reuses the inputs of the core look-ahead test T102."""
+    from factordesk.tests.test_lookahead import T_STAR, _perturbed  # pyright: ignore[reportPrivateUsage]
+
+    hist, fac, hist2, fac2 = _perturbed(variant)
+    cutoff = pd.Timestamp(fac.index[T_STAR - 1]).date()
+    rep = assemble_report("SYN", hist, fac, now=NOW, factors_downloaded_at=None)
+    rep2 = assemble_report("SYN", hist2, fac2, now=NOW, factors_downloaded_at=None)
+    a, b = _kalman_stamped(rep, cutoff), _kalman_stamped(rep2, cutoff)
+    assert a.keys() == b.keys()
+    for key in a:
+        assert a[key] == b[key], key
+    s1, s2 = rep.kalman_betas, rep2.kalman_betas
+    assert s1 is not None and s2 is not None
+    done = [v for v in s1.vintages if v.estimated_through <= cutoff]
+    assert len(done) >= 2
+    for v1, v2 in zip(done, s2.vintages, strict=False):
+        assert v1.lam == pytest.approx(v2.lam, rel=1e-12, abs=1e-300)
+        assert v1.resid_var == pytest.approx(v2.resid_var, rel=1e-12)
+    # not vacuous: values after t* do change
+    k = sum(1 for d in s1.dates if d <= cutoff)
+    assert s1.betas["Mkt-RF"][k + 300] != s2.betas["Mkt-RF"][k + 300]
