@@ -149,6 +149,36 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AlphaWindow
+         * @description One disjoint one-year window of family FR1.
+         */
+        AlphaWindow: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** N */
+            n: number;
+            /** Alpha Annual */
+            alpha_annual: number | null;
+            /** Se Annual */
+            se_annual: number | null;
+            /** Z */
+            z: number | null;
+            /** P */
+            p: number | null;
+            /** P Adj Bh */
+            p_adj_bh: number | null;
+            /** Tag */
+            tag: ("reliable" | "noise") | null;
+        };
+        /**
          * ApiError
          * @description Every error body: ``message`` says what went wrong, ``action`` what to do.
          */
@@ -872,6 +902,41 @@ export interface components {
             factors: components["schemas"]["FactorStat"][];
         };
         /**
+         * NonOverlappingAlpha
+         * @description Family FR1 (R5.2): disjoint 252-row windows tiled from the end of S.
+         */
+        NonOverlappingAlpha: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /** Window */
+            window: number;
+            /** Family Size */
+            family_size: number;
+            /** N Reliable */
+            n_reliable: number;
+            /**
+             * Windows
+             * @description Most recent first.
+             */
+            windows: components["schemas"]["AlphaWindow"][];
+        };
+        /**
          * PowerStatement
          * @description What the test behind the tags can detect for one factor (SB5).
          */
@@ -1120,8 +1185,61 @@ export interface components {
             message: string;
         };
         /**
+         * ResidualAlphaDiagnostics
+         * @description Ljung-Box, Jarque-Bera and ARCH checks of one residual series (R6).
+         */
+        ResidualAlphaDiagnostics: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "in_sample" | "point_in_time";
+            /** Ljung Box Lags */
+            ljung_box_lags: number;
+            /** Ljung Box Stat */
+            ljung_box_stat: number | null;
+            /** Ljung Box P */
+            ljung_box_p: number | null;
+            /** Jarque Bera Stat */
+            jarque_bera_stat: number | null;
+            /** Jarque Bera P */
+            jarque_bera_p: number | null;
+            /** Arch Lags */
+            arch_lags: number;
+            /** Arch Lm Stat */
+            arch_lm_stat: number | null;
+            /** Arch Lm P */
+            arch_lm_p: number | null;
+            /**
+             * Findings
+             * @description One plain sentence per test (R6); empty if not ok.
+             */
+            findings: string[];
+        };
+        /**
          * ResidualAnalysis
          * @description Residual return with in-sample and point-in-time betas, gap, stability (R0.1).
+         *
+         *     ``status`` is ``ok`` when the M3 regression is ok and ``failed`` otherwise (R8.4); the nested
+         *     statistics have their own statuses (point-in-time ``insufficient_data`` for a short span).
          */
         ResidualAnalysis: {
             /**
@@ -1135,6 +1253,86 @@ export interface components {
              */
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
+            /**
+             * Question
+             * @description R8.1 subtitle.
+             */
+            question: string;
+            /**
+             * Beta Window
+             * @description W, the report's beta window.
+             */
+            beta_window: number;
+            in_sample: components["schemas"]["ResidualStats"];
+            point_in_time: components["schemas"]["ResidualStats"];
+            gap: components["schemas"]["ResidualGap"];
+            chart: components["schemas"]["ResidualChart"];
+            rolling_alpha: components["schemas"]["RollingResidualAlpha"];
+            non_overlapping: components["schemas"]["NonOverlappingAlpha"];
+            split_half: components["schemas"]["SplitHalfAlpha"];
+            calendar_years: components["schemas"]["ResidualYears"];
+            /**
+             * Diagnostics
+             * @description [in_sample, point_in_time].
+             */
+            diagnostics: components["schemas"]["ResidualAlphaDiagnostics"][];
+            /**
+             * Caveats
+             * @description R8.5, in display order.
+             */
+            caveats: string[];
+            /** Warnings */
+            warnings: components["schemas"]["ReportWarning"][];
+        };
+        /**
+         * ResidualChart
+         * @description Cumulative (compounded) residual lines on the dates of S (R2.3).
+         */
+        ResidualChart: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /** Dates */
+            dates: string[];
+            /** In Sample Full */
+            in_sample_full: (number | null)[];
+            /**
+             * Comparison Start
+             * @description Date of row W (anchor); None if PIT not ok.
+             */
+            comparison_start: string | null;
+            /** In Sample Compare */
+            in_sample_compare: (number | null)[];
+            /** Point In Time Compare */
+            point_in_time_compare: (number | null)[];
+            /**
+             * Point In Time Status
+             * @enum {string}
+             */
+            point_in_time_status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /** Point In Time Reason */
+            point_in_time_reason: string | null;
+            /** N Excluded In Span */
+            n_excluded_in_span: number;
+            /** N Uncovered */
+            n_uncovered: number;
+            /** Uncovered From */
+            uncovered_from: string | null;
         };
         /**
          * ResidualDiagnostics
@@ -1188,6 +1386,238 @@ export interface components {
              * @description HAC is used whatever the tests show.
              */
             note: string;
+        };
+        /**
+         * ResidualGap
+         * @description Same-days comparison of in-sample and point-in-time residual returns on S_c (R4.7).
+         */
+        ResidualGap: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /** Beta Window */
+            beta_window: number;
+            /** In Sample Same Days Annual */
+            in_sample_same_days_annual: number | null;
+            /** Point In Time Annual */
+            point_in_time_annual: number | null;
+            /** Gap Annual */
+            gap_annual: number | null;
+            /**
+             * Gap Se Annual
+             * @description Approximate (R4.7).
+             */
+            gap_se_annual: number | null;
+            /** Gap Z */
+            gap_z: number | null;
+            /** Gap P */
+            gap_p: number | null;
+            /**
+             * Comparison Share Of Alpha
+             * @description q; None if alpha_ann is 0.
+             */
+            comparison_share_of_alpha: number | null;
+            /**
+             * Survival Ratio
+             * @description s; None if the same-days return is 0.
+             */
+            survival_ratio: number | null;
+            /**
+             * Verdict
+             * @description None exactly when status is not ok.
+             */
+            verdict: ("no_reliable_alpha" | "point_in_time_only" | "concentrated_in_warmup" | "reversed" | "mostly_disappears" | "survives_not_significant" | "survives") | null;
+            /** Severity */
+            severity: ("info" | "warning" | "error") | null;
+            /**
+             * Message
+             * @description The R4.8 copy, filled.
+             */
+            message: string | null;
+        };
+        /**
+         * ResidualStats
+         * @description Summary of one residual series (R3). In-sample: span S. Point-in-time: span S_c.
+         */
+        ResidualStats: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "in_sample" | "point_in_time";
+            /**
+             * Beta Window
+             * @description None for in_sample; W for point_in_time.
+             */
+            beta_window: number | null;
+            /**
+             * Hac Lags
+             * @description In-sample: L(n) of M3; point-in-time: L(m_c).
+             */
+            hac_lags: number | null;
+            /**
+             * Residual Return Annual
+             * @description Decimal per year, A x mean.
+             */
+            residual_return_annual: number | null;
+            /** Residual Return Se Annual */
+            residual_return_se_annual: number | null;
+            /** Residual Return Ci Low Annual */
+            residual_return_ci_low_annual: number | null;
+            /** Residual Return Ci High Annual */
+            residual_return_ci_high_annual: number | null;
+            /** Z */
+            z: number | null;
+            /**
+             * P
+             * @description Two-sided, normal reference.
+             */
+            p: number | null;
+            /** Tag */
+            tag: ("reliable" | "noise") | null;
+            /** Residual Vol Annual */
+            residual_vol_annual: number | null;
+            /**
+             * Information Ratio
+             * @description Per square root of a year.
+             */
+            information_ratio: number | null;
+            /**
+             * Information Ratio Ci Low
+             * @description Approximate (R3.3).
+             */
+            information_ratio_ci_low: number | null;
+            /** Information Ratio Ci High */
+            information_ratio_ci_high: number | null;
+            /**
+             * Cumulative Return
+             * @description Compounded over the span (R2).
+             */
+            cumulative_return: number | null;
+            /**
+             * Compound Growth Annual
+             * @description Q^(A/m) - 1.
+             */
+            compound_growth_annual: number | null;
+            /** Hit Rate */
+            hit_rate: number | null;
+            /** Max Drawdown */
+            max_drawdown: number | null;
+            /**
+             * Max Drawdown Peak
+             * @description None: the start of the span, or no fall.
+             */
+            max_drawdown_peak: string | null;
+            /** Max Drawdown Trough */
+            max_drawdown_trough: string | null;
+            /**
+             * Max Drawdown Recovery
+             * @description None: not recovered, or no fall.
+             */
+            max_drawdown_recovery: string | null;
+            /** Noise Drawdown Reference */
+            noise_drawdown_reference: number | null;
+            /** Skew */
+            skew: number | null;
+            /** Excess Kurtosis */
+            excess_kurtosis: number | null;
+            /**
+             * Wiped Out
+             * @description R2.6: a daily residual of -100% or worse.
+             */
+            wiped_out: boolean;
+        };
+        /**
+         * ResidualYear
+         * @description One calendar year of residual sums.
+         */
+        ResidualYear: {
+            /** Year */
+            year: number;
+            /** N */
+            n: number;
+            /**
+             * Partial
+             * @description n < 200.
+             */
+            partial: boolean;
+            /** In Sample Sum */
+            in_sample_sum: number;
+            /** In Sample Noise Sd */
+            in_sample_noise_sd: number;
+            /** N Point In Time */
+            n_point_in_time: number;
+            /** Point In Time Partial */
+            point_in_time_partial: boolean;
+            /**
+             * Point In Time Sum
+             * @description None if no point-in-time rows.
+             */
+            point_in_time_sum: number | null;
+            /** Point In Time Noise Sd */
+            point_in_time_noise_sd: number | null;
+        };
+        /**
+         * ResidualYears
+         * @description Calendar-year residual sums (R5.4). Arithmetic within-year sums, no tests.
+         */
+        ResidualYears: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /**
+             * Years
+             * @description Ascending; empty unless status is ok.
+             */
+            years: components["schemas"]["ResidualYear"][];
         };
         /**
          * ReturnContribution
@@ -1333,6 +1763,49 @@ export interface components {
              * @description Correlation of the factor with the systematic return beta'f.
              */
             rho_sys: number | null;
+        };
+        /**
+         * RollingResidualAlpha
+         * @description Trailing 252-row alpha from M4 (R5.1). Lists align with dates; None in warm-up.
+         */
+        RollingResidualAlpha: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /** Window */
+            window: number;
+            /** Hac Lags */
+            hac_lags: number;
+            /** N Stamps */
+            n_stamps: number;
+            /** Dates */
+            dates: string[];
+            /** Alpha Annual */
+            alpha_annual: (number | null)[];
+            /** Ci Low Annual */
+            ci_low_annual: (number | null)[];
+            /** Ci High Annual */
+            ci_high_annual: (number | null)[];
+            /**
+             * Share Excluding Zero
+             * @description Descriptive, not a test (R5.1).
+             */
+            share_excluding_zero: number | null;
         };
         /**
          * RollingWindow
@@ -1578,6 +2051,76 @@ export interface components {
             power: components["schemas"]["PowerStatement"][];
             /** Labels */
             labels: ("L-DESC" | "L-SHRINK" | "L-SHRINK-PRIOR" | "L-CRED" | "L-CORR-MOVE" | "L-MDE")[];
+        };
+        /**
+         * SplitHalfAlpha
+         * @description One prespecified split at the middle of S (R5.3).
+         */
+        SplitHalfAlpha: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /** Labels */
+            labels: ("L-DESC" | "L-BAND" | "L-OVERLAP" | "L-VINTAGE" | "L-INSAMPLE" | "L-PIT" | "L-DESC-PIT" | "L-HEDGE")[];
+            /**
+             * Caption
+             * @description Section-specific label text (methodology wording).
+             */
+            caption: string;
+            /**
+             * First Start
+             * Format: date
+             */
+            first_start: string;
+            /**
+             * First End
+             * Format: date
+             */
+            first_end: string;
+            /**
+             * Second Start
+             * Format: date
+             */
+            second_start: string;
+            /**
+             * Second End
+             * Format: date
+             */
+            second_end: string;
+            /** N First */
+            n_first: number;
+            /** N Second */
+            n_second: number;
+            /** Hac Lags */
+            hac_lags: number | null;
+            /** Alpha First Annual */
+            alpha_first_annual: number | null;
+            /** Alpha First Ci Low Annual */
+            alpha_first_ci_low_annual: number | null;
+            /** Alpha First Ci High Annual */
+            alpha_first_ci_high_annual: number | null;
+            /** Alpha Second Annual */
+            alpha_second_annual: number | null;
+            /** Alpha Second Ci Low Annual */
+            alpha_second_ci_low_annual: number | null;
+            /** Alpha Second Ci High Annual */
+            alpha_second_ci_high_annual: number | null;
+            /** Difference Annual */
+            difference_annual: number | null;
+            /** Difference Se Annual */
+            difference_se_annual: number | null;
+            /** Difference Z */
+            difference_z: number | null;
+            /** Difference P */
+            difference_p: number | null;
         };
         /** TickerSuggestion */
         TickerSuggestion: {

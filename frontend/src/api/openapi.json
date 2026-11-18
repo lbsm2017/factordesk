@@ -532,6 +532,109 @@
   },
   "components": {
     "schemas": {
+      "AlphaWindow": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "alpha_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Annual"
+          },
+          "se_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Se Annual"
+          },
+          "z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z"
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P"
+          },
+          "p_adj_bh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Adj Bh"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reliable",
+                  "noise"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "n",
+          "alpha_annual",
+          "se_annual",
+          "z",
+          "p",
+          "p_adj_bh",
+          "tag"
+        ],
+        "title": "AlphaWindow",
+        "description": "One disjoint one-year window of family FR1."
+      },
       "ApiError": {
         "properties": {
           "code": {
@@ -2229,6 +2332,92 @@
         "title": "MultiDayRegression",
         "description": "Regression on sums over non-overlapping 5-day blocks (M3.6); only when the gate fired."
       },
+      "NonOverlappingAlpha": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "window": {
+            "type": "integer",
+            "title": "Window"
+          },
+          "family_size": {
+            "type": "integer",
+            "title": "Family Size"
+          },
+          "n_reliable": {
+            "type": "integer",
+            "title": "N Reliable"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/AlphaWindow"
+            },
+            "type": "array",
+            "title": "Windows",
+            "description": "Most recent first."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "window",
+          "family_size",
+          "n_reliable",
+          "windows"
+        ],
+        "title": "NonOverlappingAlpha",
+        "description": "Family FR1 (R5.2): disjoint 252-row windows tiled from the end of S."
+      },
       "PowerStatement": {
         "properties": {
           "factor": {
@@ -2875,6 +3064,168 @@
         "title": "ReportWarning",
         "description": "A report-level warning (short history, collinearity, audit status, data lag, ...)."
       },
+      "ResidualAlphaDiagnostics": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "in_sample",
+              "point_in_time"
+            ],
+            "title": "Basis"
+          },
+          "ljung_box_lags": {
+            "type": "integer",
+            "title": "Ljung Box Lags"
+          },
+          "ljung_box_stat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ljung Box Stat"
+          },
+          "ljung_box_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ljung Box P"
+          },
+          "jarque_bera_stat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jarque Bera Stat"
+          },
+          "jarque_bera_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jarque Bera P"
+          },
+          "arch_lags": {
+            "type": "integer",
+            "title": "Arch Lags"
+          },
+          "arch_lm_stat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arch Lm Stat"
+          },
+          "arch_lm_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arch Lm P"
+          },
+          "findings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Findings",
+            "description": "One plain sentence per test (R6); empty if not ok."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "basis",
+          "ljung_box_lags",
+          "ljung_box_stat",
+          "ljung_box_p",
+          "jarque_bera_stat",
+          "jarque_bera_p",
+          "arch_lags",
+          "arch_lm_stat",
+          "arch_lm_p",
+          "findings"
+        ],
+        "title": "ResidualAlphaDiagnostics",
+        "description": "Ljung-Box, Jarque-Bera and ARCH checks of one residual series (R6)."
+      },
       "ResidualAnalysis": {
         "properties": {
           "status": {
@@ -2901,6 +3252,63 @@
           },
           "sample": {
             "$ref": "#/components/schemas/SampleInfo"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "description": "R8.1 subtitle."
+          },
+          "beta_window": {
+            "type": "integer",
+            "title": "Beta Window",
+            "description": "W, the report's beta window."
+          },
+          "in_sample": {
+            "$ref": "#/components/schemas/ResidualStats"
+          },
+          "point_in_time": {
+            "$ref": "#/components/schemas/ResidualStats"
+          },
+          "gap": {
+            "$ref": "#/components/schemas/ResidualGap"
+          },
+          "chart": {
+            "$ref": "#/components/schemas/ResidualChart"
+          },
+          "rolling_alpha": {
+            "$ref": "#/components/schemas/RollingResidualAlpha"
+          },
+          "non_overlapping": {
+            "$ref": "#/components/schemas/NonOverlappingAlpha"
+          },
+          "split_half": {
+            "$ref": "#/components/schemas/SplitHalfAlpha"
+          },
+          "calendar_years": {
+            "$ref": "#/components/schemas/ResidualYears"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/ResidualAlphaDiagnostics"
+            },
+            "type": "array",
+            "title": "Diagnostics",
+            "description": "[in_sample, point_in_time]."
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats",
+            "description": "R8.5, in display order."
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/ReportWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
           }
         },
         "additionalProperties": false,
@@ -2908,10 +3316,201 @@
         "required": [
           "status",
           "reason",
-          "sample"
+          "sample",
+          "question",
+          "beta_window",
+          "in_sample",
+          "point_in_time",
+          "gap",
+          "chart",
+          "rolling_alpha",
+          "non_overlapping",
+          "split_half",
+          "calendar_years",
+          "diagnostics",
+          "caveats",
+          "warnings"
         ],
         "title": "ResidualAnalysis",
-        "description": "Residual return with in-sample and point-in-time betas, gap, stability (R0.1)."
+        "description": "Residual return with in-sample and point-in-time betas, gap, stability (R0.1).\n\n``status`` is ``ok`` when the M3 regression is ok and ``failed`` otherwise (R8.4); the nested\nstatistics have their own statuses (point-in-time ``insufficient_data`` for a short span)."
+      },
+      "ResidualChart": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "in_sample_full": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "In Sample Full"
+          },
+          "comparison_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Start",
+            "description": "Date of row W (anchor); None if PIT not ok."
+          },
+          "in_sample_compare": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "In Sample Compare"
+          },
+          "point_in_time_compare": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Point In Time Compare"
+          },
+          "point_in_time_status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Point In Time Status"
+          },
+          "point_in_time_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point In Time Reason"
+          },
+          "n_excluded_in_span": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Excluded In Span"
+          },
+          "n_uncovered": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Uncovered"
+          },
+          "uncovered_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncovered From"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "dates",
+          "in_sample_full",
+          "comparison_start",
+          "in_sample_compare",
+          "point_in_time_compare",
+          "point_in_time_status",
+          "point_in_time_reason",
+          "n_excluded_in_span",
+          "n_uncovered",
+          "uncovered_from"
+        ],
+        "title": "ResidualChart",
+        "description": "Cumulative (compounded) residual lines on the dates of S (R2.3)."
       },
       "ResidualDiagnostics": {
         "properties": {
@@ -3051,6 +3650,736 @@
         ],
         "title": "ResidualDiagnostics",
         "description": "Diagnostics of the full-sample regression residuals (M3.5)."
+      },
+      "ResidualGap": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "beta_window": {
+            "type": "integer",
+            "title": "Beta Window"
+          },
+          "in_sample_same_days_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Sample Same Days Annual"
+          },
+          "point_in_time_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point In Time Annual"
+          },
+          "gap_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap Annual"
+          },
+          "gap_se_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap Se Annual",
+            "description": "Approximate (R4.7)."
+          },
+          "gap_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap Z"
+          },
+          "gap_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap P"
+          },
+          "comparison_share_of_alpha": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Share Of Alpha",
+            "description": "q; None if alpha_ann is 0."
+          },
+          "survival_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Survival Ratio",
+            "description": "s; None if the same-days return is 0."
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "no_reliable_alpha",
+                  "point_in_time_only",
+                  "concentrated_in_warmup",
+                  "reversed",
+                  "mostly_disappears",
+                  "survives_not_significant",
+                  "survives"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict",
+            "description": "None exactly when status is not ok."
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "error"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "The R4.8 copy, filled."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "beta_window",
+          "in_sample_same_days_annual",
+          "point_in_time_annual",
+          "gap_annual",
+          "gap_se_annual",
+          "gap_z",
+          "gap_p",
+          "comparison_share_of_alpha",
+          "survival_ratio",
+          "verdict",
+          "severity",
+          "message"
+        ],
+        "title": "ResidualGap",
+        "description": "Same-days comparison of in-sample and point-in-time residual returns on S_c (R4.7)."
+      },
+      "ResidualStats": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "in_sample",
+              "point_in_time"
+            ],
+            "title": "Basis"
+          },
+          "beta_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Window",
+            "description": "None for in_sample; W for point_in_time."
+          },
+          "hac_lags": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hac Lags",
+            "description": "In-sample: L(n) of M3; point-in-time: L(m_c)."
+          },
+          "residual_return_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Return Annual",
+            "description": "Decimal per year, A x mean."
+          },
+          "residual_return_se_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Return Se Annual"
+          },
+          "residual_return_ci_low_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Return Ci Low Annual"
+          },
+          "residual_return_ci_high_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Return Ci High Annual"
+          },
+          "z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z"
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P",
+            "description": "Two-sided, normal reference."
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reliable",
+                  "noise"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          },
+          "residual_vol_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Vol Annual"
+          },
+          "information_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Information Ratio",
+            "description": "Per square root of a year."
+          },
+          "information_ratio_ci_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Information Ratio Ci Low",
+            "description": "Approximate (R3.3)."
+          },
+          "information_ratio_ci_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Information Ratio Ci High"
+          },
+          "cumulative_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Return",
+            "description": "Compounded over the span (R2)."
+          },
+          "compound_growth_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compound Growth Annual",
+            "description": "Q^(A/m) - 1."
+          },
+          "hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown"
+          },
+          "max_drawdown_peak": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Peak",
+            "description": "None: the start of the span, or no fall."
+          },
+          "max_drawdown_trough": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Trough"
+          },
+          "max_drawdown_recovery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Recovery",
+            "description": "None: not recovered, or no fall."
+          },
+          "noise_drawdown_reference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Drawdown Reference"
+          },
+          "skew": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skew"
+          },
+          "excess_kurtosis": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Kurtosis"
+          },
+          "wiped_out": {
+            "type": "boolean",
+            "title": "Wiped Out",
+            "description": "R2.6: a daily residual of -100% or worse."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "basis",
+          "beta_window",
+          "hac_lags",
+          "residual_return_annual",
+          "residual_return_se_annual",
+          "residual_return_ci_low_annual",
+          "residual_return_ci_high_annual",
+          "z",
+          "p",
+          "tag",
+          "residual_vol_annual",
+          "information_ratio",
+          "information_ratio_ci_low",
+          "information_ratio_ci_high",
+          "cumulative_return",
+          "compound_growth_annual",
+          "hit_rate",
+          "max_drawdown",
+          "max_drawdown_peak",
+          "max_drawdown_trough",
+          "max_drawdown_recovery",
+          "noise_drawdown_reference",
+          "skew",
+          "excess_kurtosis",
+          "wiped_out"
+        ],
+        "title": "ResidualStats",
+        "description": "Summary of one residual series (R3). In-sample: span S. Point-in-time: span S_c."
+      },
+      "ResidualYear": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "description": "n < 200."
+          },
+          "in_sample_sum": {
+            "type": "number",
+            "title": "In Sample Sum"
+          },
+          "in_sample_noise_sd": {
+            "type": "number",
+            "title": "In Sample Noise Sd"
+          },
+          "n_point_in_time": {
+            "type": "integer",
+            "title": "N Point In Time"
+          },
+          "point_in_time_partial": {
+            "type": "boolean",
+            "title": "Point In Time Partial"
+          },
+          "point_in_time_sum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point In Time Sum",
+            "description": "None if no point-in-time rows."
+          },
+          "point_in_time_noise_sd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point In Time Noise Sd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "year",
+          "n",
+          "partial",
+          "in_sample_sum",
+          "in_sample_noise_sd",
+          "n_point_in_time",
+          "point_in_time_partial",
+          "point_in_time_sum",
+          "point_in_time_noise_sd"
+        ],
+        "title": "ResidualYear",
+        "description": "One calendar year of residual sums."
+      },
+      "ResidualYears": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "years": {
+            "items": {
+              "$ref": "#/components/schemas/ResidualYear"
+            },
+            "type": "array",
+            "title": "Years",
+            "description": "Ascending; empty unless status is ok."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "years"
+        ],
+        "title": "ResidualYears",
+        "description": "Calendar-year residual sums (R5.4). Arithmetic within-year sums, no tests."
       },
       "ReturnContribution": {
         "properties": {
@@ -3398,6 +4727,150 @@
         ],
         "title": "RiskFactorDetail",
         "description": "Exposure x volatility x correlation view of one factor's risk share (M7)."
+      },
+      "RollingResidualAlpha": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "window": {
+            "type": "integer",
+            "title": "Window"
+          },
+          "hac_lags": {
+            "type": "integer",
+            "title": "Hac Lags"
+          },
+          "n_stamps": {
+            "type": "integer",
+            "title": "N Stamps"
+          },
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "alpha_annual": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Alpha Annual"
+          },
+          "ci_low_annual": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Ci Low Annual"
+          },
+          "ci_high_annual": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Ci High Annual"
+          },
+          "share_excluding_zero": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Excluding Zero",
+            "description": "Descriptive, not a test (R5.1)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "window",
+          "hac_lags",
+          "n_stamps",
+          "dates",
+          "alpha_annual",
+          "ci_low_annual",
+          "ci_high_annual",
+          "share_excluding_zero"
+        ],
+        "title": "RollingResidualAlpha",
+        "description": "Trailing 252-row alpha from M4 (R5.1). Lists align with dates; None in warm-up."
       },
       "RollingWindow": {
         "properties": {
@@ -3969,6 +5442,234 @@
         ],
         "title": "ShrunkBetas",
         "description": "OLS betas pulled toward a stated prior, with a power statement per factor (SB0.1)."
+      },
+      "SplitHalfAlpha": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-DESC",
+                "L-BAND",
+                "L-OVERLAP",
+                "L-VINTAGE",
+                "L-INSAMPLE",
+                "L-PIT",
+                "L-DESC-PIT",
+                "L-HEDGE"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Section-specific label text (methodology wording)."
+          },
+          "first_start": {
+            "type": "string",
+            "format": "date",
+            "title": "First Start"
+          },
+          "first_end": {
+            "type": "string",
+            "format": "date",
+            "title": "First End"
+          },
+          "second_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Second Start"
+          },
+          "second_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Second End"
+          },
+          "n_first": {
+            "type": "integer",
+            "title": "N First"
+          },
+          "n_second": {
+            "type": "integer",
+            "title": "N Second"
+          },
+          "hac_lags": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hac Lags"
+          },
+          "alpha_first_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha First Annual"
+          },
+          "alpha_first_ci_low_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha First Ci Low Annual"
+          },
+          "alpha_first_ci_high_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha First Ci High Annual"
+          },
+          "alpha_second_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Second Annual"
+          },
+          "alpha_second_ci_low_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Second Ci Low Annual"
+          },
+          "alpha_second_ci_high_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Second Ci High Annual"
+          },
+          "difference_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Annual"
+          },
+          "difference_se_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Se Annual"
+          },
+          "difference_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Z"
+          },
+          "difference_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference P"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "labels",
+          "caption",
+          "first_start",
+          "first_end",
+          "second_start",
+          "second_end",
+          "n_first",
+          "n_second",
+          "hac_lags",
+          "alpha_first_annual",
+          "alpha_first_ci_low_annual",
+          "alpha_first_ci_high_annual",
+          "alpha_second_annual",
+          "alpha_second_ci_low_annual",
+          "alpha_second_ci_high_annual",
+          "difference_annual",
+          "difference_se_annual",
+          "difference_z",
+          "difference_p"
+        ],
+        "title": "SplitHalfAlpha",
+        "description": "One prespecified split at the middle of S (R5.3)."
       },
       "TickerSuggestion": {
         "properties": {

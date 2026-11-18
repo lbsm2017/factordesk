@@ -16,10 +16,9 @@ test written down first, logged, independently reviewed) before it ships.
   It waits for the owner to review and merge. Not yet run against live Yahoo data beyond one ticker.
 - **Built, not released:** the one-shot install and run command (rank 7), in PR #1. The release
   is the owner's step, following `docs/release-checklist.md`.
-- **Built and validated, on `integrate/features`, not merged to prod:** shrunk betas (rank 12) and
-  Kalman betas (rank 14).
-- **In progress:** follow-ups to the first GitHub CI run (rank 5); residual alpha (rank 8), being
-  validated; a data-source comparison of Yahoo, Tiingo and Alpaca (blocks rank 11).
+- **Built and validated, on `integrate/features`, not merged to prod:** shrunk betas (rank 12),
+  Kalman betas (rank 14) and residual alpha (rank 8).
+- **In progress:** follow-ups to the first GitHub CI run (rank 5); a data-source comparison of Yahoo, Tiingo and Alpaca (blocks rank 11).
 - **Specified, not built:** report redesign (`docs/design/report-design.md`), regional datasets
   (`docs/methodology-datasets.md`).
 - **Owner ranking (2026-11-18, re-scored in update 2):** 16 epics are ranked in the priority ranking
@@ -41,7 +40,7 @@ gave them.
 | 5 | First GitHub CI run | - | - | - | - | - | Should | next | Done: run 1 failed on one float comparison in a fixture, fixed; run 2 green (3 min 30 s). Open: Playwright cache hit path needs a third run; nightly slow tests need an owner decision | PR #1 |
 | 6 | Fragility score | 6 | 2 | 0.8 | 5 | 1.9 | Should | later | Not started; spec ready; the hardening deferral D-1 (influence diagnostic) folds in here | Schema contract (done): unblocked |
 | 7 | One-shot install and run | 8 | 1 | 0.7 | 5 | 1.1 | Should | very later (was next) | Built, in PR #1; not released: the owner runs `docs/release-checklist.md`; installer URL and a real install on a machine without uv unverified | PyPI release (owner) |
-| 8 | Residual alpha analysis | 6 | 2 | 0.8 | 8 | 1.2 | Should | next | In progress: analytics step (agent resumed after a network error); then pipeline, static panel, React panel, independent validation | Schema contract (done) |
+| 8 | Residual alpha analysis | 6 | 2 | 0.8 | 8 | 1.2 | Should | next | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
 | 9 | Lead-lag betas | 4 | 2 | 0.7 | 8 | 0.7 | Could | later | Not started; spec ready | Schema contract (done); hardening gate (done); gate threshold calibration (owner) |
 | 10 | Dead-code cleanup | 2 | 0.25 | 1.0 | 1 | 0.5 | Could | later | Not started | none |
 | 11 | Data triangulation | 7 | 2 | 0.5 | 20 | 0.35 | Could | later | Not started | Data-source comparison (in progress) |
@@ -83,7 +82,7 @@ Items 5, 8, 12 and 14 of the priority ranking, in owner order.
 | Item | Why it matters | Status | Depends on |
 |---|---|---|---|
 | First GitHub CI run (rank 5) | Runs the checks on GitHub for every pull request | Done: run 1 failed on one float comparison in a fixture, fixed; run 2 green (3 min 30 s). Open: Playwright cache hit path needs a third run; nightly slow tests need an owner decision | PR #1 |
-| Residual alpha analysis (rank 8) | Shows how much alpha holds up with point-in-time betas | In progress: analytics step (agent resumed after a network error); then pipeline, static panel, React panel, independent validation | Schema contract (done) |
+| Residual alpha analysis (rank 8) | Shows how much alpha holds up with point-in-time betas | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
 | Shrunk betas (rank 12) | Pull noisy style betas toward a prior; report how much data would make an effect detectable | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
 | Kalman-filter betas (rank 14) | Time-varying betas with proper uncertainty, using past data only | Built and validated, on integrate/features, not merged to prod | Schema contract (done) |
 

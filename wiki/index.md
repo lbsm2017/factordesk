@@ -11,7 +11,7 @@ Last updated 2026-11-18. This is the project's knowledge base. Its main purpose 
 
 ## Decisions
 
-Status in brackets: Decided, Proposed, or Decided-pending-implementation.
+Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implemented, not yet validated.
 
 ### Data
 
@@ -27,7 +27,7 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [No look-ahead rule](decision-no-look-ahead-rule.md) [Decided]: every dated result uses only data up to that date.
 - [Return and risk attribution](decision-return-and-risk-attribution.md) [Decided]: pieces that add up exactly to the total and to 100%.
 - [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) [Decided-pending-implementation]: why SPY's R-squared was 0.967 and the pre-set gate that flags it.
-- [Residual alpha analysis](decision-residual-alpha-analysis.md) [Decided-pending-implementation]: an in-sample and a point-in-time line, with the owner's four choices.
+- [Residual alpha analysis](decision-residual-alpha-analysis.md) [Implemented, not yet validated]: an in-sample and a point-in-time line, with the owner's four choices.
 - [Cointegration design](decision-cointegration-design.md) [Decided-pending-implementation]: an exploratory long-run link test that must hold on unseen data.
 - [Drift alerts and regime betas](decision-drift-alerts-and-regime-betas.md) [Decided-pending-implementation]: alerts when two of three conditions agree, and betas by market regime.
 - [Shrunk betas](decision-shrunk-betas.md) [Decided-pending-implementation]: a second beta pulled toward a typical stock by how noisy it is, plus power statements; the ordinary betas stay primary.

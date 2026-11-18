@@ -44,6 +44,11 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await expect(kpis).toContainText("R²");
   await expect(page.locator("#equation")).toBeVisible();
 
+  // The residual panel loads as its own chunk and shows the table and the stability section.
+  const residual = page.locator("#residual");
+  await expect(residual.getByRole("heading", { name: "In-sample against point-in-time", exact: true })).toBeVisible();
+  await expect(residual.getByRole("heading", { name: "Is the alpha stable?" })).toBeVisible();
+
   // Range chip.
   await page.getByRole("radio", { name: "3Y" }).check();
   await expect(page).toHaveURL(/[?&]range=3Y\b/);

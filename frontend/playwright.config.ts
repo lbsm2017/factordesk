@@ -22,6 +22,7 @@ const PORT = Number(process.env["E2E_PORT"] ?? portFor(repoRoot));
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./scripts/check-dist.mjs",
   outputDir: "./test-results",
   reporter: [["list"]],
   fullyParallel: false,
