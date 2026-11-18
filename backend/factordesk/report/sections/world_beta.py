@@ -39,9 +39,10 @@ LABEL_TEXT: dict[str, str] = {
         "exchange at the same close as US stocks."
     ),
     "L-WORLD-ASYNC": (
-        "A quick estimate, not a full model. ACWI holds mostly non-US stocks whose markets close "
-        "earlier than the US, so same-day co-movement with a US stock can be understated; this is "
-        "not corrected here. A stock with a short history has a wide interval."
+        "A quick estimate, not a full model. ACWI includes many non-US stocks (their share "
+        "varies over time) whose markets close earlier than the US, so same-day co-movement with "
+        "a US stock can be understated; this is not corrected here. A stock with a short history "
+        "has a wide interval."
     ),
 }
 """Footnote keys of this section and their texts."""
