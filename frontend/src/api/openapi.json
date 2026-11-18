@@ -1633,6 +1633,161 @@
           },
           "sample": {
             "$ref": "#/components/schemas/SampleInfo"
+          },
+          "model": {
+            "type": "string",
+            "const": "rw_betas_const_alpha_v1",
+            "title": "Model",
+            "description": "Random-walk betas, constant alpha, one scalar signal-to-noise ratio."
+          },
+          "error_model": {
+            "type": "string",
+            "enum": [
+              "gaussian",
+              "student_t5"
+            ],
+            "title": "Error Model"
+          },
+          "burn_in_rows": {
+            "type": "integer",
+            "title": "Burn In Rows",
+            "description": "Rows of the initial OLS fit (21)."
+          },
+          "training_rows": {
+            "type": "integer",
+            "title": "Training Rows",
+            "description": "Rows of the first estimate and first stamp (504)."
+          },
+          "reestimate_every": {
+            "type": "integer",
+            "title": "Reestimate Every",
+            "description": "Rows between re-estimates (252)."
+          },
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates",
+            "description": "Shared date axis: every row of the analysis sample."
+          },
+          "alpha": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Alpha",
+            "description": "Filtered alpha, decimal per day."
+          },
+          "betas": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Betas",
+            "description": "Filtered beta per factor (display names), aligned with ``dates``."
+          },
+          "band_low": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Band Low"
+          },
+          "band_high": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Band High"
+          },
+          "vintage_index": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Vintage Index",
+            "description": "Vintage that produced each stamp."
+          },
+          "vintages": {
+            "items": {
+              "$ref": "#/components/schemas/KalmanVintage"
+            },
+            "type": "array",
+            "title": "Vintages"
+          },
+          "latest": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/KalmanLatest"
+            },
+            "type": "object",
+            "title": "Latest",
+            "description": "Per factor, at the last date."
+          },
+          "labels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "L-KF",
+                "L-KBAND",
+                "L-KTAIL"
+              ]
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Codes of ``WARNING_TEXT``."
           }
         },
         "additionalProperties": false,
@@ -1640,10 +1795,144 @@
         "required": [
           "status",
           "reason",
-          "sample"
+          "sample",
+          "model",
+          "error_model",
+          "burn_in_rows",
+          "training_rows",
+          "reestimate_every",
+          "dates",
+          "alpha",
+          "betas",
+          "band_low",
+          "band_high",
+          "vintage_index",
+          "vintages",
+          "latest",
+          "labels",
+          "warnings"
         ],
         "title": "KalmanBetaSeries",
-        "description": "Filtered (point-in-time) Kalman betas per date, with model-based bands (KB0.1)."
+        "description": "Filtered (point-in-time) Kalman betas per date, with model-based bands (spec KB0.1).\n\nStatus values (spec KB8.3): ``ok``; ``insufficient_data`` when the sample has fewer than 504\nrows; ``failed`` when the first 21 rows do not identify the model (``singular_burn_in``) or a\nfactor covariance is singular (``singular_factor_covariance``). The reason of a not-ok\nsection names the code in parentheses."
+      },
+      "KalmanLatest": {
+        "properties": {
+          "beta": {
+            "type": "number",
+            "title": "Beta"
+          },
+          "sd": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Sd",
+            "description": "Model standard deviation sqrt(R_hat P_jj)."
+          },
+          "band_low": {
+            "type": "number",
+            "title": "Band Low"
+          },
+          "band_high": {
+            "type": "number",
+            "title": "Band High"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "beta",
+          "sd",
+          "band_low",
+          "band_high"
+        ],
+        "title": "KalmanLatest",
+        "description": "The filtered beta of one factor at the last date, with its model standard deviation."
+      },
+      "KalmanVintage": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index"
+          },
+          "estimated_through": {
+            "type": "string",
+            "format": "date",
+            "title": "Estimated Through",
+            "description": "Date of the last row used (row ``rows``)."
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Rows",
+            "description": "Rows ``1 .. rows`` of the sample were used."
+          },
+          "lam": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Lam",
+            "description": "Signal-to-noise ratio lambda (0: no drift detected)."
+          },
+          "lam_at_bound": {
+            "type": "string",
+            "enum": [
+              "zero",
+              "upper",
+              "none"
+            ],
+            "title": "Lam At Bound",
+            "description": "'zero' when lambda is 0, 'upper' at the largest grid value 1e-2, else 'none'."
+          },
+          "resid_var": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Resid Var",
+            "description": "Residual variance R_hat, decimal^2 per day."
+          },
+          "resid_vol_ann": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Resid Vol Ann",
+            "description": "sqrt(252 R_hat): residual volatility a year."
+          },
+          "w_eq": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W Eq",
+            "description": "Equivalent rolling window 2 / sqrt(lambda) in rows; null when lambda is 0."
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid To"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "estimated_through",
+          "rows",
+          "lam",
+          "lam_at_bound",
+          "resid_var",
+          "resid_vol_ann",
+          "w_eq",
+          "valid_from",
+          "valid_to"
+        ],
+        "title": "KalmanVintage",
+        "description": "Hyperparameters of one yearly re-estimate (spec KB2.4). Vintage ``j`` uses rows\n``1 .. rows`` only and supplies the stamps from ``valid_from`` to ``valid_to``."
       },
       "LeadLagSection": {
         "properties": {

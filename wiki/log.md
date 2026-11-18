@@ -23,6 +23,13 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 ## 2026-11-18 (shrunk betas)
 
 - Added [Shrunk betas](decision-shrunk-betas.md): a second, labelled beta pulled toward a typical stock, with power statements; ordinary betas stay primary. Built on branch `feat/shrunk-betas` (as of commit `b1331d8`, not merged); status Decided-pending-implementation until the independent validation of `docs/validation/shrunk-betas-handoff-2026-11-18.md` passes. Owner decision of 2026-11-18 recorded: download the four portfolio files and keep them fresh with the factor data.
+## 2026-11-18 (Kalman betas, after validation)
+
+- Updated [Kalman-filter betas as an extra line beside the rolling betas](decision-kalman-betas.md) after the independent validation: the drift-rate wording is corrected (the weight of a new day is about the square root of the rate), `ex_ante_betas` is dropped from the section (owner decision, section now about 1.45 MB), and the hook degrades to a failed section on any error. Earlier statements on the page are marked superseded, not rewritten.
+
+## 2026-11-18 (Kalman betas)
+
+- Added [Kalman-filter betas as an extra line beside the rolling betas](decision-kalman-betas.md) (Decided-pending-implementation) after the feature was built on branch `feat/kalman-betas` (stage 3, as of commit `4252e87`, not merged, not independently validated). The handoff for the validator is [docs/validation/kalman-betas-handoff-2026-11-18.md](../docs/validation/kalman-betas-handoff-2026-11-18.md): real SPY numbers, the payload question (`ex_ante_betas` repeats the beta series shifted by one day, about a fifth of the section) and open owner decisions.
 
 ## 2026-11-18 (owner ranking)
 

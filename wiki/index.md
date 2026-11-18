@@ -31,6 +31,7 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [Cointegration design](decision-cointegration-design.md) [Decided-pending-implementation]: an exploratory long-run link test that must hold on unseen data.
 - [Drift alerts and regime betas](decision-drift-alerts-and-regime-betas.md) [Decided-pending-implementation]: alerts when two of three conditions agree, and betas by market regime.
 - [Shrunk betas](decision-shrunk-betas.md) [Decided-pending-implementation]: a second beta pulled toward a typical stock by how noisy it is, plus power statements; the ordinary betas stay primary.
+- [Kalman-filter betas](decision-kalman-betas.md) [Decided-pending-implementation]: an extra time-varying beta line with a band, from a filter that learns its own drift rate; the rolling betas stay.
 
 ### Product and design
 

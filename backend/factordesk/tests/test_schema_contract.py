@@ -215,7 +215,7 @@ def _assemble(**kwargs: Any) -> FactorReport:
     )
 
 
-BUILT_SECTIONS: tuple[str, ...] = ()
+BUILT_SECTIONS: tuple[str, ...] = ("kalman_betas",)
 """Fields whose feature is built: the pipeline fills them. Each feature branch adds its field.
 
 Shrunk fills only online (from the portfolio files), so the offline pipeline leaves it absent.

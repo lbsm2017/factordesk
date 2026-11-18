@@ -13,9 +13,7 @@ from factordesk.report.schema import FactorReport
 
 PANEL_ID = "lead-lag"
 TITLE = "Timing-adjusted betas (lead-lag)"
-QUESTION = (
-    "Does part of the exposure show up on the factors' previous or next day?"
-)
+QUESTION = "Does part of the exposure show up on the factors' previous or next day?"
 
 
 def render_lead_lag_panel(report: FactorReport) -> str | None:

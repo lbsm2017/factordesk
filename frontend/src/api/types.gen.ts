@@ -605,7 +605,12 @@ export interface components {
         };
         /**
          * KalmanBetaSeries
-         * @description Filtered (point-in-time) Kalman betas per date, with model-based bands (KB0.1).
+         * @description Filtered (point-in-time) Kalman betas per date, with model-based bands (spec KB0.1).
+         *
+         *     Status values (spec KB8.3): ``ok``; ``insufficient_data`` when the sample has fewer than 504
+         *     rows; ``failed`` when the first 21 rows do not identify the model (``singular_burn_in``) or a
+         *     factor covariance is singular (``singular_factor_covariance``). The reason of a not-ok
+         *     section names the code in parentheses.
          */
         KalmanBetaSeries: {
             /**
@@ -619,6 +624,151 @@ export interface components {
              */
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
+            /**
+             * Model
+             * @description Random-walk betas, constant alpha, one scalar signal-to-noise ratio.
+             * @constant
+             */
+            model: "rw_betas_const_alpha_v1";
+            /**
+             * Error Model
+             * @enum {string}
+             */
+            error_model: "gaussian" | "student_t5";
+            /**
+             * Burn In Rows
+             * @description Rows of the initial OLS fit (21).
+             */
+            burn_in_rows: number;
+            /**
+             * Training Rows
+             * @description Rows of the first estimate and first stamp (504).
+             */
+            training_rows: number;
+            /**
+             * Reestimate Every
+             * @description Rows between re-estimates (252).
+             */
+            reestimate_every: number;
+            /**
+             * Dates
+             * @description Shared date axis: every row of the analysis sample.
+             */
+            dates: string[];
+            /**
+             * Alpha
+             * @description Filtered alpha, decimal per day.
+             */
+            alpha: (number | null)[];
+            /**
+             * Betas
+             * @description Filtered beta per factor (display names), aligned with ``dates``.
+             */
+            betas: {
+                [key: string]: (number | null)[];
+            };
+            /** Band Low */
+            band_low: {
+                [key: string]: (number | null)[];
+            };
+            /** Band High */
+            band_high: {
+                [key: string]: (number | null)[];
+            };
+            /**
+             * Vintage Index
+             * @description Vintage that produced each stamp.
+             */
+            vintage_index: (number | null)[];
+            /** Vintages */
+            vintages: components["schemas"]["KalmanVintage"][];
+            /**
+             * Latest
+             * @description Per factor, at the last date.
+             */
+            latest: {
+                [key: string]: components["schemas"]["KalmanLatest"];
+            };
+            /** Labels */
+            labels: ("L-KF" | "L-KBAND" | "L-KTAIL")[];
+            /**
+             * Warnings
+             * @description Codes of ``WARNING_TEXT``.
+             */
+            warnings: string[];
+        };
+        /**
+         * KalmanLatest
+         * @description The filtered beta of one factor at the last date, with its model standard deviation.
+         */
+        KalmanLatest: {
+            /** Beta */
+            beta: number;
+            /**
+             * Sd
+             * @description Model standard deviation sqrt(R_hat P_jj).
+             */
+            sd: number;
+            /** Band Low */
+            band_low: number;
+            /** Band High */
+            band_high: number;
+        };
+        /**
+         * KalmanVintage
+         * @description Hyperparameters of one yearly re-estimate (spec KB2.4). Vintage ``j`` uses rows
+         *     ``1 .. rows`` only and supplies the stamps from ``valid_from`` to ``valid_to``.
+         */
+        KalmanVintage: {
+            /** Index */
+            index: number;
+            /**
+             * Estimated Through
+             * Format: date
+             * @description Date of the last row used (row ``rows``).
+             */
+            estimated_through: string;
+            /**
+             * Rows
+             * @description Rows ``1 .. rows`` of the sample were used.
+             */
+            rows: number;
+            /**
+             * Lam
+             * @description Signal-to-noise ratio lambda (0: no drift detected).
+             */
+            lam: number;
+            /**
+             * Lam At Bound
+             * @description 'zero' when lambda is 0, 'upper' at the largest grid value 1e-2, else 'none'.
+             * @enum {string}
+             */
+            lam_at_bound: "zero" | "upper" | "none";
+            /**
+             * Resid Var
+             * @description Residual variance R_hat, decimal^2 per day.
+             */
+            resid_var: number;
+            /**
+             * Resid Vol Ann
+             * @description sqrt(252 R_hat): residual volatility a year.
+             */
+            resid_vol_ann: number;
+            /**
+             * W Eq
+             * @description Equivalent rolling window 2 / sqrt(lambda) in rows; null when lambda is 0.
+             */
+            w_eq: number | null;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /**
+             * Valid To
+             * Format: date
+             */
+            valid_to: string;
         };
         /**
          * LeadLagSection

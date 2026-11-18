@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "sync:kalman-text": "node scripts/sync-kalman-text.mjs",
     "gen:types": "openapi-typescript src/api/openapi.json -o src/api/types.gen.ts",
     "e2e": "playwright test --grep-invert @shots",
     "e2e:install": "playwright install --with-deps chromium"
