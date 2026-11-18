@@ -400,3 +400,39 @@ def test_tp24_sd_floor_is_the_sample_floor() -> None:
     from factordesk.analytics.sample import MIN_RETURN_SD
 
     assert SD_FLOOR == MIN_RETURN_SD
+
+
+# ------------------------------------------------------------------------- validator additions
+def test_tp52_peak_is_the_last_day_at_the_high_and_trough_the_first_day_at_the_low() -> None:
+    # Path 1, 1.05, 1.05, 1.05, 0.945, 0.945, 0.945, 1.134, ...: a flat top on points 1 to 3 and a
+    # flat bottom on points 4 to 6. The fall starts from the last day at the high (point 3), the
+    # trough is the first day at the low (point 4) and the path regains the high at point 7.
+    r = [0.05, 0.0, 0.0, -0.10, 0.0, 0.0, 0.2] + [0.001] * 53
+    ret, rf = _series(r)
+    origin = ret.index[0] - pd.offsets.BDay(1)
+    res = performance_stats(ret, rf, origin=origin)
+    (ep,) = res.episodes
+    pts = [origin, *ret.index]
+    assert ep.depth == pytest.approx(-0.10)
+    assert ep.peak_date == pts[3].date()
+    assert ep.trough_date == pts[4].date()
+    assert ep.recovery_date == pts[7].date()
+    assert (ep.days_peak_to_trough, ep.days_trough_to_recovery) == (1, 3)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="validation finding F1: the regained-peak test is an exact float comparison, so a "
+    "price that returns exactly to its old high can leave the compounded path 1 ulp below it",
+)
+def test_tp53_a_price_back_exactly_at_its_old_high_counts_as_recovered() -> None:
+    # Closing prices 11.96, 105.40, 95.91, 183.85, 127.70, 105.25, 183.85: the last price equals
+    # the earlier high, so the fall from 183.85 is recovered on the last price date.
+    prices = [11.96, 105.40, 95.91, 183.85, 127.70, 105.25, 183.85]
+    moves = [prices[i + 1] / prices[i] - 1.0 for i in range(len(prices) - 1)]
+    r = [0.0] * 54 + moves
+    ret, rf = _series(r)
+    res = performance_stats(ret, rf)
+    deepest = res.episodes[0]
+    assert deepest.depth == pytest.approx(105.25 / 183.85 - 1.0)
+    assert deepest.recovery_date == ret.index[-1].date()
