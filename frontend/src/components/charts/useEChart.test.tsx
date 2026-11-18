@@ -48,6 +48,46 @@ describe("useEChart", () => {
     expect(fake.instance.setOption).not.toHaveBeenCalled();
   });
 
+  it("keeps a group connected until its last chart unmounts", async () => {
+    const a = render(<Probe option={{}} group="shared" />);
+    const b = render(<Probe option={{}} group="shared" />);
+    await waitFor(() => expect(fake.init).toHaveBeenCalledTimes(2));
+    a.unmount();
+    expect(fake.disconnect).not.toHaveBeenCalled();
+    b.unmount();
+    expect(fake.disconnect).toHaveBeenCalledTimes(1);
+    expect(fake.disconnect).toHaveBeenCalledWith("shared");
+  });
+
+  it("keeps the page alive when the chart option is rejected", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    fake.instance.setOption.mockImplementationOnce(() => {
+      throw new Error("bad option");
+    });
+    render(<Probe option={{ series: [] }} />);
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+    warn.mockRestore();
+  });
+
+  it("keeps the page alive when ECharts cannot start", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    fake.init.mockImplementationOnce(() => {
+      throw new Error("no renderer");
+    });
+    const { unmount } = render(<Probe option={{ series: [] }} />);
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(fake.instance.setOption).not.toHaveBeenCalled();
+    unmount();
+    expect(fake.instance.dispose).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("does not create an instance when unmounted before ECharts has loaded", () => {
+    const { unmount } = render(<Probe option={{}} />);
+    unmount();
+    return Promise.resolve().then(() => expect(fake.instance.dispose).not.toHaveBeenCalled());
+  });
+
   it("connects charts that share a group and disconnects on unmount", async () => {
     const { unmount } = render(<Probe option={{}} group="rolling" />);
     await waitFor(() => expect(fake.connect).toHaveBeenCalledWith("rolling"));
