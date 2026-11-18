@@ -56,6 +56,12 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await expect(ticker).not.toBeFocused();
   await page.keyboard.press("/");
   await expect(ticker).toBeFocused();
+  // It also works from a radio, which is not a text field.
+  await page.getByRole("radio", { name: "3Y" }).focus();
+  await expect(ticker).not.toBeFocused();
+  await page.keyboard.press("/");
+  await expect(ticker).toBeFocused();
+  await expect(ticker).not.toHaveValue(/\//);
 
   // Rolling window by keyboard: arrow keys move between the radios and change `win`.
   const rolling = page.getByRole("group", { name: "Rolling window length" });

@@ -108,6 +108,34 @@ describe("TickerSearch", () => {
     other.remove();
   });
 
+  it("focuses the field on / when a radio has focus, but not in a date field or textarea", () => {
+    const { input } = search();
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    document.body.append(radio);
+    radio.focus();
+    const onRadio = new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
+    radio.dispatchEvent(onRadio);
+    expect(onRadio.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+    radio.remove();
+
+    for (const make of [
+      () => Object.assign(document.createElement("input"), { type: "date" }),
+      () => Object.assign(document.createElement("input"), { type: "search" }),
+      () => document.createElement("textarea"),
+    ]) {
+      const field = make();
+      document.body.append(field);
+      field.focus();
+      const event = new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
+      field.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(field);
+      field.remove();
+    }
+  });
+
   it("shows an inline sentence for an error and marks the field invalid", () => {
     const { input } = search({ error: "BRK B is not a valid ticker." });
     expect(screen.getByRole("alert").textContent).toBe("BRK B is not a valid ticker.");
