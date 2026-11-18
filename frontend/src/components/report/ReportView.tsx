@@ -1,5 +1,6 @@
 import type { FactorReport } from "../../api/types";
 import type { RollingWindowDays } from "../../state/url";
+import "../../styles/frame.css";
 import { Hatch } from "../charts/Hatch";
 import { Colophon } from "./Colophon";
 import { DataAuditPanel } from "./DataAuditPanel";

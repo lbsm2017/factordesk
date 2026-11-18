@@ -119,19 +119,24 @@ Result in one line: the page is close to the approved design and every owner-fee
 
 1. **S1 (major).** Custom dates commit partial years: commit on blur or Enter, and validate the year range.
 2. **S2 (major).** Loading frame at final heights: reserve the header, notice and equation, and match the panel heights.
+   - Fixed 2026-11-18 (23e9643): the loading frame reserves the header, notice, equation, KPI notes, colophon and each panel at the rendered heights (`frontend/src/styles/frame.css`, seven width tiers). At 1440 the largest panel shift is 1513 px before and 0 px after; at 1024 it is 1656 and 17, at 900 it is 1764 and 1, at 390 it is 4514 and 2.
 3. **A1 (major).** `aria-hidden` on the rolling tfoot row, so axe has zero violations at 390.
 4. **A3 (major).** Control borders at 3:1: use `--axis` for inputs and chips.
 5. **DF1 (major).** Fold the gate callout into the notice Details, so nothing extra sits above the first chart.
 6. **S3 (minor).** Busy placeholders for the equation and the KPI notes.
+   - Fixed 2026-11-18 (20d4add): the equation terms and annotations and the KPI notes show the busy placeholder.
 7. **A4 (minor).** An h1 in the error and loading states.
+   - Fixed 2026-11-18 (d679f60): the loading frame keeps its h1 outside `aria-hidden`, and the error state shows the ticker as an h1 above the notice.
 8. **A2 (minor).** Accessible "Significant" headers at 390.
 9. **A5 (minor).** `/` works when a radio has focus.
 10. **DF3 (minor).** Regression-detail tables sized to their content; one scroll region.
 11. **DF7 (minor).** Gap between the notice and the KPI empty state.
+   - Fixed 2026-11-18 (e4909e1): the KPI strip gets a 16 px top margin after the notice or the header (notice bottom 375 px, KPI top 391 px).
 12. **S5 (minor).** Disable the range controls on the landing page.
 13. **DF5 and DF6 (minor).** Wording: no "reliable" or "noise", no "60 trading days". These also touch `render_html.py`, which DB0 keeps out of scope.
 14. **DF2, DF4, DF8 (minor).** Price y ticks, date format in Data and audit, rolling x labels at 390.
 15. **S4 and A6 (minor).** Stronger busy placeholder on the page background; Middle 80% detail as text.
+   - S4 fixed 2026-11-18 (30e9b9d): busy placeholders use `--border` (1.24:1 on `--page` in light, 1.54:1 in dark, against 1.07:1 and 1.28:1 with `--grid`). A6 is open.
 16. **P1 (minor).** Bundle budget and the ECharts weight decision.
 17. **C4 (minor).** Finish T10: e2e smoke test and CI job.
 18. **C1, C2, C3, C5, C6 (minor).** Shared helpers, data-theme observer, dead print rule, test-shell note, label consistency.
