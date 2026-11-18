@@ -125,16 +125,26 @@ def _hac_meat_batch(scores: FloatArray, lags: int) -> FloatArray:
 
 _FAST_MIN_SHARE = 1e-2
 """A window is estimated on the fast path only when every factor keeps at least this share of
-its variance after the constant and earlier factors (10,000 times the M3.1 limit, so the Gram
-solve keeps about twelve digits)."""
-_FAST_MIN_CENTRED = 1e-3
+its variance after the constant and earlier factors (10,000 times the M3.1 limit; two factors
+with correlation above about 0.995 fall back to QR)."""
+_FAST_MIN_CENTRED = 1e-2
 """... only when every factor's within-window variance is at least this fraction of its
 within-window mean square (a factor far from zero-mean with little spread would lose digits
 in the Gram solve; the M3.1 constant test fires at 1e-24) ..."""
-_FAST_MIN_WINDOW_SHARE = 1e-4
-"""... and only when each window sum of squares (factors and ``y``) is at least this fraction of
-the running sum up to the window end, which bounds the digits lost to the cumulative-sum
-difference. Every other window takes the per-window QR path."""
+_FAST_MIN_WINDOW_SHARE = 1e-3
+"""... and only when each window's centred sum of squares (factors) and sum of squares (``y``)
+is at least this fraction of the running sum of squares up to the window end, which bounds
+the digits lost to the cumulative-sum difference. Every other window takes the per-window QR
+path.
+
+Measured error of the fast path against the per-window QR path (which is itself about 1e-13
+relative from exact rational arithmetic): about 1e-12 absolute on betas and standard errors on
+real SPY data (about 1e-10 relative from exact at the worst SPY windows); at most 1e-11 on
+adversarial designs that these thresholds admit (volatility regimes up to 1,000-fold, factor
+means up to 30 standard deviations). With the earlier thresholds (1e-3 and 1e-4, and the
+uncentred sum of squares) such designs reached 2e-8 on betas and 1e-9 on standard errors
+(independent validation, 2026-11-18). All SPY and synthetic long-series windows still take the
+fast path, so tightening cost no speed there."""
 
 
 def _pivots(gram: FloatArray) -> FloatArray:
@@ -174,6 +184,17 @@ def rolling_ols_hac(
     QR-equivalent guard quantities); every other window, and every window near a guard limit,
     goes through the per-window QR path that decides the guard exactly. No quantity of a window
     uses a row after it.
+
+    Precision: the QR path is exact to about 1e-13 relative. The fast path carries the rounding
+    of the cumulative sums, so it is not bit-identical to QR: about 1e-12 absolute (about 1e-10
+    relative from exact rational arithmetic, worst windows) on real factor data, and at most
+    about 1e-11 on the adversarial designs the thresholds above admit (see ``_FAST_MIN_*``).
+    For the same reason a window's value depends, in the last bits, on rows before the
+    window: the cumulative sums start at the first row passed in, so a different first row
+    moves a window's value by up to about 1e-12 (measured 7.9e-13 on SPY; the previous per-
+    window implementation gave exactly 0; 1e-13 on synthetic data, up to 3e-11 on the volatility
+    regime design of ``test_rolling_equivalence``). A window never depends on a later row (no
+    look-ahead), and the dependence is far below the 6 significant digits the report keeps.
     """
     yv = np.asarray(y, dtype=np.float64)
     x = with_intercept(factors)
@@ -221,7 +242,7 @@ def rolling_ols_hac(
                 (
                     (css > _FAST_MIN_CENTRED * sq)
                     & (pivots > _FAST_MIN_SHARE * window)  # centred sum of squares is W when scaled
-                    & (sq > _FAST_MIN_WINDOW_SHARE * end[:, diag_at][:, 1:])
+                    & (css > _FAST_MIN_WINDOW_SHARE * end[:, diag_at][:, 1:])
                 ).all(axis=1)
                 & (yy > _FAST_MIN_WINDOW_SHARE * cum_yy[c0 + window : c1 + window])
             )
