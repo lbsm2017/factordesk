@@ -238,7 +238,7 @@ def test_tp60_sharpe_below_zero_and_no_interval_wording() -> None:
     )
     text = _text(_html(_with(report, sharpe=below)))
     assert "Below zero at the 5% level." in text and "Above zero" not in text
-    assert panel._sharpe_note(below.model_copy(update={"ci95_low": None})).endswith(
+    assert panel.sharpe_line(below.model_copy(update={"ci95_low": None})).endswith(
         "No interval available."
     )
 

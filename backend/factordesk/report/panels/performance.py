@@ -106,7 +106,7 @@ def _fall_note(dd: PerformanceDrawdown, end: date) -> str:
     return text + f"back at the peak by {date_long(dd.recovery_date)}"
 
 
-def _sharpe_note(sharpe: PerformanceSharpe) -> str:
+def sharpe_line(sharpe: PerformanceSharpe) -> str:
     """The Sharpe line: what it measures, then what the 95% interval allows (DV4.7 wording)."""
     if sharpe.ci95_low is None or sharpe.ci95_high is None:
         verdict = NOTES["sharpe_none"]
@@ -128,7 +128,7 @@ def _cells(section: PerformanceSection) -> list[tuple[str, str, str, str]]:
         sharpe_value, sharpe_note, sharpe_cls = "n/a", NOTES["sharpe_undefined"], "ns"
     else:
         sharpe_value = fmt_num(sharpe.ratio_annual, 2)
-        sharpe_note, sharpe_cls = _sharpe_note(sharpe), ""
+        sharpe_note, sharpe_cls = sharpe_line(sharpe), ""
     return [
         ("Return a year", fmt_pct(returns.cagr, 1), NOTES["return"], ""),
         (
