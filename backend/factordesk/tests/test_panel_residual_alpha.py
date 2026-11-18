@@ -86,9 +86,7 @@ def _pit_insufficient(payload: dict[str, Any]) -> dict[str, Any]:
             point_in_time_sum=None,
             point_in_time_noise_sd=None,
         )
-    diag = _null_numbers(
-        payload["diagnostics"][1], STAT_KEEP | {"ljung_box_lags", "arch_lags"}
-    )
+    diag = _null_numbers(payload["diagnostics"][1], STAT_KEEP | {"ljung_box_lags", "arch_lags"})
     diag.update(status="insufficient_data", reason=reason, findings=[])
     payload["diagnostics"][1] = diag
     return payload
@@ -203,7 +201,7 @@ def test_chart_draws_the_three_lines_and_the_rolling_band() -> None:
 
 def test_severity_is_a_word_and_a_glyph() -> None:
     markup = _panel(report_with_section(_mock(), "residual"))
-    assert '<span class="ra-sev">Info</span>' in markup
+    assert '<span class="ra-sev">Note</span>' in markup
     assert '<circle cx="8" cy="8" r="6.5"/>' in markup.split('class="notice ra-banner"')[1]
     payload = _fixture()
     payload["gap"].update(
@@ -307,3 +305,79 @@ def test_whole_report_renders_with_the_panel() -> None:
     page = render_report_html(report_with_section(_mock(), "residual"))
     ids = re.findall(r'<section class="panel[^"]*" id="([^"]+)"', page)
     assert ids.index("residual") == ids.index("risk") + 1
+
+
+# ------------------------------------------------------------------ wording shared with React
+WORDING = json.loads(
+    (Path(__file__).parent / "fixtures" / "sections" / "residual_alpha_wording.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"\s+", "", text)
+
+
+def test_wording_matches_the_react_panel() -> None:
+    """The words of ``residual_alpha_wording.json`` are printed; React reads the same file."""
+    from factordesk.report.panels import residual_alpha as panel
+
+    markup = _panel(report_with_section(_mock(), "residual"))
+    text = _squash(_text(markup))
+    for group in (
+        "headings",
+        "column_heads",
+        "row_labels",
+        "gap_rows",
+        "rolling_rows",
+        "legend",
+        "sentences",
+    ):
+        for phrase in WORDING[group]:
+            assert _squash(phrase) in text, (group, phrase)
+    titles = {html.unescape(m): None for m in re.findall(r'title="([^"]*)"', markup)}
+    for label, tip in WORDING["tooltips"].items():
+        assert tip in titles, label
+    assert WORDING["year_tooltip"] in titles
+    assert WORDING["next_step"] == panel.NEXT_STEP
+    assert WORDING["pit_next_step"] == panel.PIT_NEXT_STEP
+    assert WORDING["not_available"] == panel.NOT_AVAILABLE
+    assert WORDING["severity_words"] == panel.SEVERITY_WORD
+    for ratio, expected in WORDING["survival"]:
+        assert panel._kept(ratio) == expected, ratio  # pyright: ignore[reportPrivateUsage]
+    for ratio, expected in WORDING["share"]:
+        assert panel._share(ratio) == expected, ratio  # pyright: ignore[reportPrivateUsage]
+
+
+def test_wording_has_no_survives_and_no_old_labels() -> None:
+    text = _text(_panel(report_with_section(_mock(), "residual")))
+    for old in (
+        "survives",
+        "Largest fall",
+        "Information ratio ",
+        "Residual return a year",
+        "Alpha a year",
+    ):
+        assert old not in text, old
+
+
+def test_same_days_line_is_wide_light_and_dashed_under_the_thin_dark_line() -> None:
+    """Drawn first and wider, so its dashes stay visible where the point-in-time line covers it."""
+    css = _panel_css()
+    same = re.search(r"\.line-svg \.ra-l\.same \{([^}]*)\}", css)
+    pit = re.search(r"\.line-svg \.ra-l\.pit \{([^}]*)\}", css)
+    assert same is not None and pit is not None
+    assert "stroke-dasharray" in same.group(1)
+    assert float(re.search(r"stroke-width: ([\d.]+)", same.group(1)).group(1)) > float(  # type: ignore[union-attr]
+        re.search(r"stroke-width: ([\d.]+)", pit.group(1)).group(1)  # type: ignore[union-attr]
+    )
+    markup = _panel(report_with_section(_mock(), "residual"))
+    assert markup.index('class="ra-l same"') < markup.index('class="ra-l pit"')
+    assert "In-sample, same days as point-in-time" in _text(markup)
+
+
+def _panel_css() -> str:
+    from factordesk.report.panels.residual_alpha import PANEL_CSS
+
+    return PANEL_CSS

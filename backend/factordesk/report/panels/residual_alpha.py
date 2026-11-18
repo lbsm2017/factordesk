@@ -63,6 +63,42 @@ STABILITY_CAUTION = (
 YEARS_READING = (
     "A year within two noise standard deviations of zero is ordinary for a stock with no alpha."
 )
+CHECKS_NOTE = (
+    "With thousands of days these tests detect even small departures. A rejection makes intervals "
+    "approximate, not wrong."
+)
+NOISE_NOTE = "Pure noise with this volatility typically falls about {ref}."
+DRAG_NOTE = (
+    "The line compounds daily. It sits below the residual return in the table by about half the "
+    "residual variance a year ({drag} here)."
+)
+SEVERITY_WORD = {"info": "Note", "warning": "Warning", "error": "Error"}
+"""Word shown with the glyph of a message; the React panel uses the same words."""
+SEVERITY_WORD_FALLBACK = "Note"
+NOT_AVAILABLE = {
+    "compare": "Not available.",
+    "chart": "The chart is not available.",
+    "rolling": "The rolling alpha is not available.",
+    "windows": "The one-year windows are not available.",
+    "split": "The split-half alphas are not available.",
+    "years": "The calendar-year sums are not available.",
+    "checks": "Not available.",
+    "panel": "Residual analysis is unavailable.",
+}
+"""State texts when a block has no reason of its own; the React panel uses the same words."""
+HEADINGS = {
+    "compare": "In-sample against point-in-time",
+    "chart": "Cumulative residual return",
+    "gap": "In-sample against point-in-time, same days",
+    "stable": "Is the alpha stable?",
+    "rolling": "Rolling one-year alpha",
+    "windows": "Separate one-year windows",
+    "split": "First half against second half",
+    "years": "Calendar years",
+    "checks": "Checks on the residual returns",
+    "caveats": "What to keep in mind",
+}
+"""Headings of the panel; the React panel uses the same words."""
 FOLD_LABELS = (
     "L-DESC-PIT",
     "L-INSAMPLE",
@@ -73,7 +109,7 @@ FOLD_LABELS = (
     "L-OVERLAP",
 )
 READING = {
-    "Residual return a year": (
+    "Residual return, a year": (
         "What the stock earned per year beyond its factor exposures, alpha included. In-sample it "
         "equals the regression alpha exactly."
     ),
@@ -81,26 +117,30 @@ READING = {
         "Distance of the residual return from zero in standard errors. Between −2 and 2 (p above "
         "0.05), you cannot tell it from zero."
     ),
-    "Residual volatility a year": (
+    "Residual volatility, a year": (
         "How much the stock moves for reasons the five factors do not explain. Higher volatility "
         "makes alpha harder to measure."
     ),
-    "Information ratio": (
-        "Residual return per unit of residual risk. Do not compare it with a total-return Sharpe "
-        "ratio."
+    "Residual Sharpe (information ratio)": (
+        "Residual return per unit of residual risk. Do not compare it with a total-return Sharpe. "
+        "0.5 for 10 years is only about 1.6 standard errors."
     ),
-    "Cumulative, compounded": (
+    "Cumulative (compounded)": (
         "What the daily-rebalanced paper hedge compounded to, before costs."
     ),
-    "Compound growth a year": "Lower than the residual return by about half the residual variance.",
+    "Compound growth, a year": (
+        "Lower than the residual return by about half the residual variance a year. Shown beside "
+        "the arithmetic values, never added to them."
+    ),
     "Hit rate": (
         "Share of days the residual was positive. Near 50% is normal; it says how often, not how "
         "much."
     ),
-    "Largest fall": "Worst fall of the cumulative residual line from a previous high.",
+    "Max drawdown": "Worst fall of the cumulative residual line from a previous high.",
     "Skew": "Below 0: rare large residual losses. Above 0: rare large gains, often earnings days.",
     "Excess kurtosis": (
-        "Above 0: more extreme days than a normal distribution. Intervals are then approximate."
+        "Above 0: more extreme days than a normal distribution. Intervals here are then "
+        "approximate."
     ),
 }
 """Reading rules of R3.5, shown as tooltips on the row names."""
@@ -182,8 +222,8 @@ PANEL_CSS = """
 .ra-plot.short { height: 150px; }
 .line-svg .ra-l { fill: none; }
 .line-svg .ra-l.full { stroke: var(--ink-3); stroke-width: 1.5; }
-.line-svg .ra-l.same { stroke: var(--ink-2); stroke-width: 1.75; stroke-dasharray: 6 4; }
-.line-svg .ra-l.pit { stroke: var(--ink); stroke-width: 2; }
+.line-svg .ra-l.same { stroke: var(--ink-3); stroke-width: 4.5; stroke-dasharray: 9 6; }
+.line-svg .ra-l.pit { stroke: var(--ink); stroke-width: 1.75; }
 .line-svg .ra-l.roll { stroke: var(--ink); stroke-width: 1.75; }
 .line-svg path.ra-band { stroke: none; fill: var(--ink-3); fill-opacity: 0.16; }
 .ra-zone { fill: var(--grid); }
@@ -198,9 +238,10 @@ PANEL_CSS = """
 .ra-key-list li { display: inline-flex; align-items: center; }
 .ra-key line { stroke-width: 2; }
 .ra-key .ra-l.full { stroke: var(--ink-3); stroke-width: 1.5; }
-.ra-key .ra-l.same { stroke: var(--ink-2); stroke-dasharray: 5 3; }
-.ra-key .ra-l.pit { stroke: var(--ink); stroke-width: 2.5; }
+.ra-key .ra-l.same { stroke: var(--ink-3); stroke-width: 4.5; stroke-dasharray: 6 4; }
+.ra-key .ra-l.pit { stroke: var(--ink); stroke-width: 1.75; }
 .ra-find { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--s-6); }
+.ra-sec h4 { margin: var(--s-5) 0 var(--s-1); font-size: var(--fs-2); font-weight: 600; }
 .ra-find h4 { margin: var(--s-3) 0 var(--s-1); font-size: var(--fs-2); font-weight: 600; }
 .ra-find li { padding: 7px 0; border-bottom: 1px solid var(--grid); max-width: 60ch; }
 .ra-find li:last-child { border-bottom: 0; }
@@ -290,7 +331,7 @@ def _kv_rows(rows: Sequence[tuple[str, str]]) -> str:
 
 def _reason_block(reason: str | None, next_step: str = "") -> str:
     nxt = f'<p class="ra-next">{esc(next_step)}</p>' if next_step else ""
-    return f"<p>{esc(reason or 'Not available.')}</p>{nxt}"
+    return f"<p>{esc(reason or NOT_AVAILABLE['compare'])}</p>{nxt}"
 
 
 def _caption(text: str | None) -> str:
@@ -315,7 +356,7 @@ def _drawdown_cell(stats: ResidualStats) -> str:
         subs.append(f"Peak {peak}, trough {date_long(stats.max_drawdown_trough)}, {rec}.")
     if stats.noise_drawdown_reference is not None:
         ref = _pct_plain(stats.noise_drawdown_reference)
-        subs.append(f"Noise alone typically falls about {ref}.")
+        subs.append(NOISE_NOTE.format(ref=ref))
     return _cell(_pct(stats.max_drawdown), *subs)
 
 
@@ -354,14 +395,14 @@ def _column_cells(stats: ResidualStats) -> list[str]:
 
 _ROW_LABELS = (
     "Period",
-    "Residual return a year",
+    "Residual return, a year",
     "t-statistic",
-    "Residual volatility a year",
-    "Information ratio",
-    "Cumulative, compounded",
-    "Compound growth a year",
+    "Residual volatility, a year",
+    "Residual Sharpe (information ratio)",
+    "Cumulative (compounded)",
+    "Compound growth, a year",
     "Hit rate",
-    "Largest fall",
+    "Max drawdown",
     "Skew",
     "Excess kurtosis",
 )
@@ -572,9 +613,11 @@ def _line_row(cls: str, name: str, start: date, cells: Sequence[str]) -> str:
 def _chart_block(section: ResidualAnalysis) -> str:
     ch = section.chart
     if ch.status != "ok" or not ch.dates:
-        return empty_state(ch.reason or "The chart is not available.")
+        return empty_state(ch.reason or NOT_AVAILABLE["chart"])
     anchor = ch.comparison_start if ch.point_in_time_status == "ok" else None
     lines: list[tuple[str, Sequence[float | None]]] = [("full", ch.in_sample_full)]
+    # The same-days line is drawn wide and light, then the point-in-time line thin and dark on top,
+    # so the dashes stay visible where the two coincide.
     label = "Cumulative residual return, compounded daily: in-sample for the whole period"
     if anchor is not None:
         lines += [("same", ch.in_sample_compare), ("pit", ch.point_in_time_compare)]
@@ -634,7 +677,7 @@ def _chart_block(section: ResidualAnalysis) -> str:
     head = (
         '<th scope="col" class="c1">Line</th>'
         '<th scope="col" class="mid">Cumulative at the end</th>'
-        '<th scope="col" class="mid">Residual return a year</th>'
+        '<th scope="col" class="mid">Residual return, a year</th>'
         '<th scope="col" class="nar">t-statistic</th>'
     )
     table = _table(
@@ -644,6 +687,9 @@ def _chart_block(section: ResidualAnalysis) -> str:
         "".join(rows),
     )
     notes = [ch.caption]
+    drag_vol = pit.residual_vol_annual if anchor is not None else ins.residual_vol_annual
+    if drag_vol is not None:
+        notes.append(DRAG_NOTE.format(drag=_pct_plain(drag_vol * drag_vol / 2)))
     if anchor is not None:
         notes.append(WARMUP_CAPTION.format(w=section.beta_window) + " Shaded on the chart.")
     if ch.n_uncovered and ch.uncovered_from is not None:
@@ -652,6 +698,7 @@ def _chart_block(section: ResidualAnalysis) -> str:
     if ch.n_excluded_in_span:
         notes.append(EXCLUDED_NOTE.format(n=ch.n_excluded_in_span))
     return (
+        f"{_wipeout_banner(section.warnings)}"
         f'<ul class="ra-key-list" aria-label="Legend">{"".join(legend)}</ul>{plot}{table}'
         + "".join(_caption(t) for t in notes)
     )
@@ -661,12 +708,14 @@ def _gap_block(section: ResidualAnalysis) -> str:
     gap = section.gap
     if gap.status != "ok":
         if section.point_in_time.status == "ok":
-            return _caption(gap.reason)
+            state = empty_state(gap.reason or NOT_AVAILABLE["checks"])
+            return f"<h3>{esc(HEADINGS['gap'])}</h3>{state}"
         return ""
     sev = gap.severity or "info"
     verdict = (
         f'<div class="notice ra-banner" role="note">{GLYPHS.get(sev, "")}'
-        f'<p class="notice-sum"><span class="ra-sev">{esc(sev.capitalize())}</span>'
+        f'<p class="notice-sum"><span class="ra-sev">'
+        f"{esc(SEVERITY_WORD.get(sev, SEVERITY_WORD_FALLBACK))}</span>"
         f"{esc(gap.message or '')}</p></div>"
     )
     rows = [
@@ -692,14 +741,19 @@ def _gap_block(section: ResidualAnalysis) -> str:
         _kv_rows(rows),
         kv=True,
     )
-    return f"{verdict}{table}{_caption(gap.caption)}"
+    return f"<h3>{esc(HEADINGS['gap'])}</h3>{verdict}{table}{_caption(gap.caption)}"
 
 
 # ------------------------------------------------------------------------------- stability
+def _sub(heading: str, inner: str) -> str:
+    """A block of the stability section under its own heading."""
+    return f'<div class="ra-sec"><h4>{esc(heading)}</h4>{inner}</div>'
+
+
 def _rolling_block(section: ResidualAnalysis) -> str:
     r = section.rolling_alpha
     if r.status != "ok" or not r.dates:
-        return empty_state(r.reason or "The rolling alpha is not available.")
+        return _sub(HEADINGS["rolling"], empty_state(r.reason or NOT_AVAILABLE["rolling"]))
     present: list[tuple[int, float, float | None, float | None]] = []
     for i, (a, lo, hi) in enumerate(
         zip(r.alpha_annual, r.ci_low_annual, r.ci_high_annual, strict=True)
@@ -725,18 +779,18 @@ def _rolling_block(section: ResidualAnalysis) -> str:
         )
     rows.append(
         (
-            "Windows whose band excludes zero",
+            "Windows whose 95% band excludes zero",
             _cell(_pct_plain(r.share_excluding_zero), "A descriptive count, not a test."),
         )
     )
     table = _table("Rolling one-year alpha, summary of the estimates", "", _kv_rows(rows), kv=True)
-    return f"{plot}{table}{_caption(r.caption)}"
+    return _sub(HEADINGS["rolling"], f"{plot}{table}{_caption(r.caption)}")
 
 
 def _windows_block(section: ResidualAnalysis) -> str:
     na = section.non_overlapping
     if na.status != "ok":
-        return empty_state(na.reason or "The one-year windows are not available.")
+        return _sub(HEADINGS["windows"], empty_state(na.reason or NOT_AVAILABLE["windows"]))
     lead = (
         f"{na.n_reliable} of {na.family_size} separate one-year windows show an alpha different "
         f"from zero, after correcting for testing {na.family_size} windows."
@@ -752,7 +806,7 @@ def _windows_block(section: ResidualAnalysis) -> str:
         for w in na.windows
     )
     head = (
-        '<th scope="col" class="c1">Window</th><th scope="col" class="mid">Alpha a year</th>'
+        '<th scope="col" class="c1">Window</th><th scope="col" class="mid">Alpha, a year</th>'
         '<th scope="col" class="nar">z</th><th scope="col" class="nar">Adjusted p</th>'
         '<th scope="col" class="nar">Reading</th>'
     )
@@ -761,13 +815,15 @@ def _windows_block(section: ResidualAnalysis) -> str:
         head,
         rows,
     )
-    return f'<p class="ra-lead">{esc(lead)}</p>{table}{_caption(na.caption)}'
+    return _sub(
+        HEADINGS["windows"], f'<p class="ra-lead">{esc(lead)}</p>{table}{_caption(na.caption)}'
+    )
 
 
 def _split_block(section: ResidualAnalysis) -> str:
     sh = section.split_half
     if sh.status != "ok":
-        return empty_state(sh.reason or "The split-half alphas are not available.")
+        return _sub(HEADINGS["split"], empty_state(sh.reason or NOT_AVAILABLE["split"]))
 
     def half(
         a: date, b: date, n: int, alpha: float | None, lo: float | None, hi: float | None
@@ -797,22 +853,24 @@ def _split_block(section: ResidualAnalysis) -> str:
     table = _table(
         "Alpha in each half of the period",
         head,
-        f'<tr><th scope="row">Alpha a year</th>{first}{second}</tr>',
+        f'<tr><th scope="row">Alpha, a year</th>{first}{second}</tr>',
     )
     lead = (
         f"Second-half alpha minus first-half alpha: {_pct(sh.difference_annual)} a year "
         f"(p = {fmt_pval(sh.difference_p)})."
     )
-    return f'<p class="ra-lead">{esc(lead)}</p>{table}{_caption(sh.caption)}'
+    return _sub(
+        HEADINGS["split"], f'<p class="ra-lead">{esc(lead)}</p>{table}{_caption(sh.caption)}'
+    )
 
 
 def _years_block(section: ResidualAnalysis) -> str:
     cy = section.calendar_years
     if cy.status != "ok" or not cy.years:
-        return empty_state(cy.reason or "The calendar-year sums are not available.")
+        return _sub(HEADINGS["years"], empty_state(cy.reason or NOT_AVAILABLE["years"]))
     rows: list[str] = []
     for y in cy.years:
-        part = ", part year" if y.partial else ""
+        part = ", partial year" if y.partial else ""
         ins = _td(
             _cell(_pct(y.in_sample_sum), f"noise {_pct_plain(y.in_sample_noise_sd)}"),
             f"Sum {y.in_sample_sum:.4f}, noise standard deviation {y.in_sample_noise_sd:.4f}",
@@ -836,7 +894,7 @@ def _years_block(section: ResidualAnalysis) -> str:
         '<th scope="col" class="vals">Point-in-time sum</th>'
     )
     table = _table("Sum of daily residual returns in each calendar year", head, "".join(rows))
-    return f"{table}{_caption(cy.caption)}{_caption(YEARS_READING)}"
+    return _sub(HEADINGS["years"], f"{table}{_caption(cy.caption)}{_caption(YEARS_READING)}")
 
 
 # ------------------------------------------------------------------------------- diagnostics
@@ -845,11 +903,11 @@ _TESTS = (("Ljung-Box", "ljung_box_p"), ("Jarque-Bera", "jarque_bera_p"), ("ARCH
 
 def _findings(d: ResidualAlphaDiagnostics, title: str) -> str:
     if d.status != "ok":
-        return f"<div><h4>{esc(title)}</h4>{empty_state(d.reason or 'Not available.')}</div>"
+        return f"<div><h4>{esc(title)}</h4>{empty_state(d.reason or NOT_AVAILABLE['checks'])}</div>"
     with_p = len(d.findings) == len(_TESTS)
     items: list[str] = []
     for i, text in enumerate(d.findings):
-        p = f" ({_TESTS[i][0]} p = {fmt_pval(getattr(d, _TESTS[i][1]))})" if with_p else ""
+        p = f" ({_TESTS[i][0]}, p = {fmt_pval(getattr(d, _TESTS[i][1]))})" if with_p else ""
         items.append(f"<li>{esc(text)}{esc(p)}</li>")
     return f"<div><h4>{esc(title)}</h4><ul>{''.join(items)}</ul></div>"
 
@@ -860,20 +918,24 @@ def _diagnostics_block(section: ResidualAnalysis) -> str:
     if not cols:
         return ""
     cap = next((d.caption for d in section.diagnostics if d.caption), None)
-    return f'<div class="ra-find">{cols}</div>{_caption(cap)}'
+    return f'<div class="ra-find">{cols}</div>{_caption(cap)}{_caption(CHECKS_NOTE)}'
 
 
 # ------------------------------------------------------------------------------- the panel
-def _warnings(warnings: Sequence[ReportWarning]) -> tuple[str, str]:
-    """(banner above the table for a wipe-out, list under the caveats for every other warning)."""
-    banner = "".join(
+def _wipeout_banner(warnings: Sequence[ReportWarning]) -> str:
+    """The banner above the chart for a wipe-out (R8.4)."""
+    return "".join(
         f'<div class="notice ra-banner" role="note">{GLYPHS["warning"]}'
         f'<p class="notice-sum"><span class="ra-sev">Warning</span>{esc(w.message)}</p></div>'
         for w in warnings
         if w.code == "residual_wipeout"
     )
+
+
+def _other_warnings(warnings: Sequence[ReportWarning]) -> str:
+    """The list under the caveats: every warning but the wipe-out."""
     items = "".join(f"<li>{esc(w.message)}</li>" for w in warnings if w.code != "residual_wipeout")
-    return banner, (f'<ul class="notes">{items}</ul>' if items else "")
+    return f'<ul class="notes">{items}</ul>' if items else ""
 
 
 def _fold(section: ResidualAnalysis, report: FactorReport) -> str:
@@ -900,26 +962,25 @@ def render_residual_alpha_panel(report: FactorReport) -> str | None:
         return None
     head = panel_head(PANEL_ID, TITLE, section.question or QUESTION)
     if section.status != "ok":
-        reason = section.reason or "Residual analysis is unavailable."
+        reason = section.reason or NOT_AVAILABLE["panel"]
         return panel_section(PANEL_ID, head, empty_state(reason, NEXT_STEP))
-    banner, other_warnings = _warnings(section.warnings)
+    other_warnings = _other_warnings(section.warnings)
     caveats = "".join(f"<li>{esc(c)}</li>" for c in section.caveats)
     body = (
-        f"{banner}"
-        "<h3>In-sample against point-in-time</h3>"
+        f"<h3>{esc(HEADINGS['compare'])}</h3>"
         f"{_compare_table(section)}"
-        "<h3>Cumulative residual return</h3>"
+        f"<h3>{esc(HEADINGS['chart'])}</h3>"
         f"{_chart_block(section)}"
         f"{_gap_block(section)}"
-        "<h3>Is the alpha stable?</h3>"
+        f"<h3>{esc(HEADINGS['stable'])}</h3>"
         f"{_rolling_block(section)}"
         f"{_windows_block(section)}"
         f"{_split_block(section)}"
         f"{_years_block(section)}"
         f"{_caption(STABILITY_CAUTION)}"
-        "<h3>Checks on the residual returns</h3>"
+        f"<h3>{esc(HEADINGS['checks'])}</h3>"
         f"{_diagnostics_block(section)}"
-        "<h3>What to keep in mind</h3>"
+        f"<h3>{esc(HEADINGS['caveats'])}</h3>"
         f'<ul class="notes">{caveats}</ul>{other_warnings}'
         f"{_fold(section, report)}"
     )

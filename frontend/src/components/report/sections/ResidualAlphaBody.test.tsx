@@ -1,9 +1,22 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { FactorReport, ResidualAnalysis } from "../../../api/types";
 import { cloneReport } from "../../../test/fixture";
 import { withSection } from "../../../test/sectionFixtures";
-import { ResidualAlphaBody as ResidualAlphaPanel, keptText } from "./ResidualAlphaBody";
+import wording from "@fixtures/sections/residual_alpha_wording.json";
+
+import {
+  NEXT_STEP,
+  NOT_AVAILABLE,
+  PIT_NEXT_STEP,
+  READING,
+  ResidualAlphaBody as ResidualAlphaPanel,
+  SEVERITY_WORD,
+  keptText,
+  shareText,
+} from "./ResidualAlphaBody";
 
 /** The label texts the backend adds to a report that has the residual section (SC3.1). The section fixture carries them. */
 const LABELS = {
@@ -31,6 +44,19 @@ function rowText(container: HTMLElement, label: string): string[] {
   );
   if (!th) throw new Error(`no row ${label}`);
   return Array.from(th.parentElement?.querySelectorAll("td") ?? []).map((c) => c.textContent ?? "");
+}
+
+/** The table whose hidden caption starts with `start`. */
+function tableByCaption(container: HTMLElement, start: string): HTMLElement {
+  const found = Array.from(container.querySelectorAll<HTMLElement>("table")).find((t) =>
+    (t.querySelector("caption")?.textContent ?? "").startsWith(start),
+  );
+  if (!found) throw new Error(`no table ${start}`);
+  return found;
+}
+
+function bodyRows(table: HTMLElement): (string | null)[][] {
+  return Array.from(table.querySelectorAll("tbody tr")).map((r) => Array.from(r.children).map((c) => c.textContent));
 }
 
 /** Set every number and date of a statistic to null, as the backend does when it is not ok. */
@@ -93,24 +119,27 @@ describe("ResidualAlphaPanel: in-sample against point-in-time table", () => {
   it("prints both columns as the fixture says", () => {
     const { container } = mount();
     expect(rowText(container, "Residual return, a year")).toEqual([
-      "+27.2% (15.4% to 39.1%)",
-      "+25.4% (8.0% to 42.9%)",
+      "+27.2%95% interval 15.4% to 39.1%",
+      "+25.4%95% interval 8.0% to 42.9%",
     ]);
-    expect(rowText(container, "t-statistic")).toEqual(["4.51 reliable", "2.86 reliable"]);
-    expect(rowText(container, "Residual volatility")).toEqual(["10.3%", "10.9%"]);
-    expect(rowText(container, "Residual Sharpe")).toEqual(["2.64 (1.50 to 3.79)", "2.33 (0.73 to 3.93)"]);
-    expect(rowText(container, "Cumulative")).toEqual(["+80.8%", "+35.3%"]);
-    expect(rowText(container, "Compound growth")).toEqual(["+30.6%", "+28.2%"]);
+    expect(rowText(container, "t-statistic")).toEqual(["4.51reliable", "2.86reliable"]);
+    expect(rowText(container, "Residual volatility, a year")).toEqual(["10.3%", "10.9%"]);
+    expect(rowText(container, "Residual Sharpe (information ratio)")).toEqual([
+      "2.6495% interval 1.50 to 3.79",
+      "2.3395% interval 0.73 to 3.93",
+    ]);
+    expect(rowText(container, "Cumulative (compounded)")).toEqual(["+80.8%", "+35.3%"]);
+    expect(rowText(container, "Compound growth, a year")).toEqual(["+30.6%", "+28.2%"]);
     expect(rowText(container, "Hit rate")).toEqual(["56.7%", "55.0%"]);
     expect(rowText(container, "Skew")).toEqual(["−0.13", "−0.14"]);
-    expect(rowText(container, "Excess kurtosis")).toEqual(["0.56", "0.71"]);
+    expect(rowText(container, "Excess kurtosis")).toEqual(["+0.56", "+0.71"]);
   });
 
   it("states each column's dates and number of days", () => {
     const { container } = mount();
     expect(rowText(container, "Period")).toEqual([
-      "8 Aug 2024 to 30 Sep 2026, 559 days",
-      "29 Jul 2025 to 30 Sep 2026, 307 days",
+      "8 Aug 2024 to 30 Sep 2026559 trading days",
+      "29 Jul 2025 to 30 Sep 2026307 trading days",
     ]);
     const heads = Array.from(container.querySelectorAll(".res-table thead th")).map((h) => h.textContent);
     expect(heads).toContain("In-sample (static betas)");
@@ -120,9 +149,12 @@ describe("ResidualAlphaPanel: in-sample against point-in-time table", () => {
   it("gives the drawdown with true minus signs, its three dates and the noise reference as text", () => {
     const { container } = mount();
     const [ins, pit] = rowText(container, "Max drawdown");
-    expect(ins).toBe("−6.5%Peak 22 Dec 2025Trough 12 Jan 2026Recovered 19 May 2026");
-    expect(pit).toBe("−6.4%Peak 22 Dec 2025Trough 12 Jan 2026Recovered 15 May 2026");
-    expect(rowText(container, "Drawdown of pure noise")).toEqual(["−17.5%", "−14.0%"]);
+    expect(ins).toBe(
+      "−6.5%Peak 22 Dec 2025, trough 12 Jan 2026, recovered 19 May 2026.Pure noise with this volatility typically falls about −17.5%.",
+    );
+    expect(pit).toBe(
+      "−6.4%Peak 22 Dec 2025, trough 12 Jan 2026, recovered 15 May 2026.Pure noise with this volatility typically falls about −14.0%.",
+    );
     expect(container.textContent).not.toMatch(/(^|[\s(])-\d/);
   });
 
@@ -132,8 +164,7 @@ describe("ResidualAlphaPanel: in-sample against point-in-time table", () => {
       s.in_sample.max_drawdown_recovery = null;
     });
     const [ins] = rowText(container, "Max drawdown");
-    expect(ins).toContain("Peak start of period");
-    expect(ins).toContain("Not recovered");
+    expect(ins).toContain("Peak the start, trough 12 Jan 2026, not recovered.");
   });
 
   it("marks a series with no drawdown without dates", () => {
@@ -143,14 +174,14 @@ describe("ResidualAlphaPanel: in-sample against point-in-time table", () => {
       s.in_sample.max_drawdown_trough = null;
       s.in_sample.max_drawdown_recovery = null;
     });
-    expect(rowText(container, "Max drawdown")[0]).toBe("0.0%");
+    expect(rowText(container, "Max drawdown")[0]).toMatch(/^0\.0%No fall from a previous high\./);
   });
 
   it("uses a word, not colour, for the tag", () => {
     const { container } = mount((s) => {
       s.point_in_time.tag = "noise";
     });
-    expect(rowText(container, "t-statistic")[1]).toBe("2.86 noise");
+    expect(rowText(container, "t-statistic")[1]).toBe("2.86noise");
   });
 
   it("shows the reading rules as tooltips on the row names", () => {
@@ -171,12 +202,12 @@ describe("ResidualAlphaPanel: gap and verdict", () => {
       d.querySelector("dd")?.textContent,
     ]);
     expect(facts).toEqual([
-      ["Same days", "29 Jul 2025 to 30 Sep 2026, 307 days"],
-      ["In-sample on these days", "+25.8% a year"],
-      ["Point-in-time", "+25.4% a year"],
-      ["Gap", "+0.4% a year (approximate test: z 0.42, p 0.675)"],
-      ["Share of the full-period alpha (+27.2%) earned on these days", "95%"],
-      ["Kept with point-in-time betas", "100% kept"],
+      ["Days compared", "29 Jul 2025 to 30 Sep 2026307 days"],
+      ["In-sample betas, same days", "+25.8% a year"],
+      ["Point-in-time betas", "+25.4% a year"],
+      ["Gap", "+0.4% a yearApproximate: z 0.42, p 0.675."],
+      ["Share of the full-period alpha earned on these days", "95%"],
+      ["Survival of the alpha with point-in-time betas", "100% kept"],
     ]);
   });
 
@@ -216,16 +247,23 @@ describe("ResidualAlphaPanel: gap and verdict", () => {
     });
     expect(container.querySelector(".res-gap .res-verdict")).toBeNull();
     const facts = container.querySelector(".res-gap .res-facts")?.textContent ?? "";
-    expect(facts).toContain("Kept with point-in-time betasn/a");
+    expect(facts).toContain("Survival of the alpha with point-in-time betasn/a");
     expect(facts).toContain("earned on these daysn/a");
   });
 
   it("rounds what is kept to 5 points and caps it at more than 200%", () => {
     expect(keptText(0.9837)).toBe("100% kept");
     expect(keptText(0.47)).toBe("45% kept");
-    expect(keptText(-0.36)).toBe("−35% kept");
+    expect(keptText(-0.36)).toBe("−35% kept (the sign reversed)");
+    expect(keptText(-0.01)).toBe("0% kept");
+    expect(keptText(0.025)).toBe("5% kept");
+    expect(keptText(2)).toBe("200% kept");
     expect(keptText(2.4)).toBe("more than 200% kept");
     expect(keptText(null)).toBe("n/a");
+    expect(keptText(Number.NaN)).toBe("n/a");
+    expect(shareText(0.95)).toBe("95%");
+    expect(shareText(-0.4)).toBe("−40%");
+    expect(shareText(2.5)).toBe("more than 200%");
   });
 });
 
@@ -276,18 +314,16 @@ describe("ResidualAlphaPanel: chart that is also a table", () => {
     expect(radios.every((r) => (r as HTMLInputElement).tabIndex !== -1)).toBe(true);
   });
 
-  it("carries the line values in a table: lowest, highest and the end", () => {
+  it("carries the line values in a table: the end of each line, its yearly rate and its t-statistic", () => {
     const report = reportWith();
     const { container } = render(<ResidualAlphaPanel report={report} />);
-    const table = Array.from(container.querySelectorAll("table.res-mini")).find((t) =>
-      (t.querySelector("caption")?.textContent ?? "").startsWith("Lowest, highest"),
-    ) as HTMLElement;
+    const table = tableByCaption(container, "Cumulative residual return at the end");
     const rows = Array.from(table.querySelectorAll("tbody tr"));
     expect(rows).toHaveLength(3);
     const chart = (report.residual as ResidualAnalysis).chart;
     const last = (xs: (number | null)[]) => xs.filter((x): x is number => x !== null).slice(-1)[0] as number;
     const fmt = (x: number) => (x < 0 ? "−" : "+") + (Math.abs(x) * 100).toFixed(1) + "%";
-    const ends = rows.map((r) => r.querySelector("td.strong")?.textContent);
+    const ends = rows.map((r) => r.querySelector("td")?.textContent);
     expect(ends).toEqual([
       fmt(last(chart.in_sample_full)),
       fmt(last(chart.in_sample_compare)),
@@ -298,11 +334,27 @@ describe("ResidualAlphaPanel: chart that is also a table", () => {
     expect(ends[2]).toBe("+35.3%");
   });
 
-  it("annotates the lines with the same-days rates and t-statistics", () => {
+  it("names the lines in the legend and gives their rates and t-statistics in the table", () => {
     const { container } = mount();
-    const legend = container.querySelector(".res-legend")?.textContent ?? "";
-    expect(legend).toContain("In-sample (static betas): +25.8% a year on these days (full-period alpha +27.2%, t = 4.51)");
-    expect(legend).toContain("Point-in-time: +25.4% a year, t = 2.86");
+    const legend = Array.from(container.querySelectorAll(".res-legend li")).map((li) => li.textContent);
+    expect(legend).toEqual(["In-sample, same days as point-in-time", "Point-in-time"]);
+    const table = tableByCaption(container, "Cumulative residual return at the end");
+    expect(bodyRows(table).map((r) => r.slice(1))).toEqual([
+      ["+80.8%", "+27.2%", "4.51"],
+      ["+36.0%", "+25.8%", "n/a"],
+      ["+35.3%", "+25.4%", "2.86"],
+    ]);
+  });
+
+  it("draws the same-days line wide, light and dashed under the thin dark point-in-time line", () => {
+    const { container } = mount();
+    const order = Array.from(screen.getByTestId("residual-chart").querySelectorAll("path[data-line]")).map((p) =>
+      p.getAttribute("class"),
+    );
+    expect(order).toEqual(["res-line ins", "res-line pit"]);
+    // The legend has a swatch with the same classes, so the key and the line look alike.
+    const keys = Array.from(container.querySelectorAll(".res-legend .res-key")).map((k) => k.getAttribute("class"));
+    expect(keys).toEqual(["res-key ins", "res-key pit"]);
   });
 
   it("states the compounding drag and the chart caption", () => {
@@ -344,7 +396,7 @@ describe("ResidualAlphaPanel: chart that is also a table", () => {
     const { container } = mount((s) => {
       s.chart.n_excluded_in_span = 3;
     });
-    expect(container.querySelector(".foot > p")?.textContent).toBe(
+    expect(container.querySelector(".res-chart")?.textContent).toContain(
       "Skips 3 excluded days (listed under sample details).",
     );
   });
@@ -363,12 +415,17 @@ describe("ResidualAlphaPanel: stability", () => {
     const plot = screen.getByTestId("residual-rolling-chart");
     expect(plot.querySelector("path.res-band")?.getAttribute("d")?.length).toBeGreaterThan(100);
     expect(plot.querySelector("path[data-line='rolling_alpha']")).not.toBeNull();
-    const dds = Array.from(container.querySelectorAll("dl[aria-label='Rolling one-year alpha, summary'] > div")).map(
-      (d) => [d.querySelector("dt")?.textContent, d.querySelector("dd")?.textContent],
-    );
-    expect(dds[3]).toEqual(["Points whose 95% band excludes zero", "97.7%"]);
-    expect(dds[0]?.[1]).toMatch(/^[+−]\d+\.\d% \(/);
-    expect(container.textContent).toContain("Pointwise 95% band.");
+    const dds = Array.from(
+      container.querySelectorAll("dl[aria-label='Rolling one-year alpha, summary of the estimates'] > div"),
+    ).map((d) => [d.querySelector("dt")?.textContent, d.querySelector("dd")?.textContent]);
+    expect(dds.map((d) => d[0])).toEqual([
+      "Latest one-year alpha",
+      "Lowest and highest",
+      "Windows whose 95% band excludes zero",
+    ]);
+    expect(dds[2]?.[1]).toBe("97.7%A descriptive count, not a test.");
+    expect(dds[0]?.[1]).toMatch(/^[+−]\d+\.\d% a yearPointwise band \d+\.\d% to \d+\.\d%, ending 30 Sep 2026\.$/);
+    expect(dds[1]?.[1]).toMatch(/^[+−]?\d+\.\d% to [+−]?\d+\.\d%$/);
   });
 
   it("lists the separate one-year windows with the corrected p and the count sentence", () => {
@@ -376,36 +433,38 @@ describe("ResidualAlphaPanel: stability", () => {
     expect(container.textContent).toContain(
       "2 of 2 separate one-year windows show an alpha different from zero, after correcting for testing 2 windows.",
     );
-    const rows = Array.from(container.querySelectorAll("table[aria-labelledby='residual-windows-h'] tbody tr")).map(
-      (r) => Array.from(r.children).map((c) => c.textContent),
-    );
+    const rows = bodyRows(tableByCaption(container, "Separate one-year windows"));
     expect(rows).toEqual([
-      ["14 Oct 2025 to 30 Sep 2026252 days", "+19.5%", "9.4%", "2.09", "0.037", "0.037", "reliable"],
-      ["24 Oct 2024 to 13 Oct 2025252 days", "+34.6%", "9.0%", "3.83", "<0.001", "<0.001", "reliable"],
+      ["14 Oct 2025 to 30 Sep 2026252 days", "+19.5%std. error 9.4%", "2.09p 0.037", "0.037", "reliable"],
+      ["24 Oct 2024 to 13 Oct 2025252 days", "+34.6%std. error 9.0%", "3.83p <0.001", "<0.001", "reliable"],
     ]);
   });
 
   it("shows the split halves, their difference and the sentence", () => {
     const { container } = mount();
-    const rows = Array.from(container.querySelectorAll("table[aria-labelledby='residual-split-h'] tbody tr")).map((r) =>
-      Array.from(r.children).map((c) => c.textContent),
-    );
-    expect(rows[0]).toEqual(["First half8 Aug 2024 to 3 Sep 2025, 279 days", "+32.2%", "16.4% to 48.0%"]);
-    expect(rows[1]).toEqual(["Second half4 Sep 2025 to 30 Sep 2026, 280 days", "+23.5%", "5.4% to 41.6%"]);
-    expect(rows[2]).toEqual(["Second minus first", "−8.7%", "z −0.71, p 0.477"]);
+    const rows = bodyRows(tableByCaption(container, "Alpha in each half"));
+    expect(rows).toEqual([
+      [
+        "Alpha, a year",
+        "+32.2%95% interval 16.4% to 48.0%8 Aug 2024 to 3 Sep 2025, 279 days",
+        "+23.5%95% interval 5.4% to 41.6%4 Sep 2025 to 30 Sep 2026, 280 days",
+      ],
+    ]);
     expect(container.textContent).toContain("Second-half alpha minus first-half alpha: −8.7% a year (p = 0.477).");
   });
 
   it("sums residuals by calendar year with the noise sd, marking partial years", () => {
     const { container } = mount();
-    const rows = Array.from(container.querySelectorAll("table[aria-labelledby='residual-years-h'] tbody tr")).map((r) =>
-      Array.from(r.children).map((c) => c.textContent),
-    );
-    expect(rows).toEqual([
-      ["2024103 days, partial year", "+0.1703", "0.0658", "none", "n/a"],
-      ["2025261 days", "+0.3001", "0.1048", "+0.1778112 days, partial", "0.0727"],
-      ["2026195 days, partial year", "+0.1337", "0.0906", "+0.1320195 days, partial", "0.0960"],
+    const table = tableByCaption(container, "Sum of daily residual returns");
+    expect(bodyRows(table)).toEqual([
+      ["2024103 days, partial year", "+17.0%noise 6.6%", "n/aNo point-in-time days."],
+      ["2025261 days", "+30.0%noise 10.5%", "+17.8%noise 7.3%, 112 days"],
+      ["2026195 days, partial year", "+13.4%noise 9.1%", "+13.2%noise 9.6%, 195 days"],
     ]);
+    // The decimals stay in the tooltip of the cell, with the plain minus the backend writes.
+    expect(table.querySelector("tbody tr td")?.getAttribute("title")).toBe(
+      "Sum 0.1703, noise standard deviation 0.0658",
+    );
     expect(container.textContent).toContain(
       "A year within two noise standard deviations of zero is ordinary for a stock with no alpha.",
     );
@@ -439,8 +498,8 @@ describe("ResidualAlphaPanel: stability", () => {
       s.non_overlapping.family_size = 0;
     });
     expect(container.textContent).toContain("Too short for two separate windows.");
-    expect(container.querySelector("table[aria-labelledby='residual-windows-h']")).toBeNull();
-    expect(container.querySelector("table[aria-labelledby='residual-split-h']")).not.toBeNull();
+    expect(() => tableByCaption(container, "Separate one-year windows")).toThrow();
+    expect(() => tableByCaption(container, "Alpha in each half")).not.toThrow();
   });
 });
 
@@ -500,11 +559,11 @@ describe("ResidualAlphaPanel: statuses", () => {
     const { container } = mount(pitUnavailable);
     const reason = "Point-in-time residual needs at least 756 trading days; this period has 559.";
     // In-sample column intact.
-    expect(rowText(container, "Residual return, a year")).toEqual(["+27.2% (15.4% to 39.1%)"]);
-    expect(rowText(container, "Cumulative")).toEqual(["+80.8%"]);
+    expect(rowText(container, "Residual return, a year")).toEqual(["+27.2%95% interval 15.4% to 39.1%"]);
+    expect(rowText(container, "Cumulative (compounded)")).toEqual(["+80.8%"]);
     // The point-in-time column is one cell with the reason and a next step, no numbers.
     const missing = container.querySelector("td.res-missing") as HTMLElement;
-    expect(missing.getAttribute("rowspan")).toBe("12");
+    expect(missing.getAttribute("rowspan")).toBe("11");
     expect(missing.querySelector(".empty-what")?.textContent).toBe(reason);
     expect(missing.querySelector(".empty-do")?.textContent).toBe("Choose a shorter beta window or a longer period.");
     expect(missing.textContent).not.toMatch(/\d\.\d/);
@@ -520,10 +579,11 @@ describe("ResidualAlphaPanel: statuses", () => {
       "in_sample_full",
     ]);
     expect(plot.textContent).not.toContain("Warm-up");
-    expect(container.querySelector(".res-chart .res-empty")?.textContent).toContain("needs at least 756 trading days");
-    // The chart table lists only the in-sample line.
+    // The chart table lists the in-sample line and, for point-in-time, the reason and the next step.
     const miniRows = container.querySelectorAll(".res-chart table.res-mini tbody tr");
-    expect(miniRows).toHaveLength(1);
+    expect(miniRows).toHaveLength(2);
+    expect(miniRows[1]?.textContent).toContain("needs at least 756 trading days");
+    expect(miniRows[1]?.textContent).toContain("Choose a shorter beta window or a longer period.");
     // Stability stays: the rolling alpha and the calendar years (point-in-time cells empty).
     expect(screen.getByTestId("residual-rolling-chart")).not.toBeNull();
     expect(container.textContent).toContain("2025261 days");
@@ -548,7 +608,7 @@ describe("ResidualAlphaPanel: statuses", () => {
       blank(s.in_sample, STATS_KEEP);
     });
     expect(container.querySelector("td.res-missing[data-basis='in_sample']")?.textContent).toContain("Residual is constant.");
-    expect(rowText(container, "Residual return, a year")).toEqual(["+25.4% (8.0% to 42.9%)"]);
+    expect(rowText(container, "Residual return, a year")).toEqual(["+25.4%95% interval 8.0% to 42.9%"]);
   });
 
   it("shows a chart that is not ok as its reason", () => {
@@ -609,5 +669,60 @@ describe("ResidualAlphaPanel: accessibility and layout", () => {
     const labels = Array.from(plot.querySelectorAll(".xlabels .xl"));
     expect(labels[0]?.classList.contains("keep")).toBe(true);
     expect(labels[labels.length - 1]?.classList.contains("keep")).toBe(true);
+  });
+});
+
+describe("ResidualAlphaPanel: the words of the static panel", () => {
+  const squash = (t: string) => t.replace(/\s+/g, "");
+
+  it("prints every word in residual_alpha_wording.json, the file the static panel test reads", () => {
+    const { container } = mount();
+    const text = squash(container.textContent ?? "");
+    const groups = ["headings", "column_heads", "row_labels", "gap_rows", "rolling_rows", "legend", "sentences"] as const;
+    for (const group of groups) {
+      for (const phrase of wording[group]) expect(text, `${group}: ${phrase}`).toContain(squash(phrase));
+    }
+    const titles = new Set(Array.from(container.querySelectorAll("[title]")).map((e) => e.getAttribute("title")));
+    for (const [label, tip] of Object.entries(wording.tooltips)) expect(titles.has(tip), label).toBe(true);
+    expect(titles.has(wording.year_tooltip)).toBe(true);
+  });
+
+  it("uses the same state texts, next steps, severity words and survival rounding", () => {
+    expect(NEXT_STEP).toBe(wording.next_step);
+    expect(PIT_NEXT_STEP).toBe(wording.pit_next_step);
+    expect(NOT_AVAILABLE).toEqual(wording.not_available);
+    expect(SEVERITY_WORD).toEqual(wording.severity_words);
+    expect(READING).toEqual(wording.tooltips);
+    for (const [ratio, expected] of wording.survival as [number | null, string][]) {
+      expect(keptText(ratio), String(ratio)).toBe(expected);
+    }
+    for (const [ratio, expected] of wording.share as [number | null, string][]) {
+      expect(shareText(ratio), String(ratio)).toBe(expected);
+    }
+  });
+
+  it("never says survives and keeps none of the old labels", () => {
+    const { container } = mount();
+    const text = container.textContent ?? "";
+    for (const old of ["survives", "Drawdown of pure noise", "Kept with point-in-time betas", "Points whose 95% band"]) {
+      expect(text, old).not.toContain(old);
+    }
+  });
+
+  it("shows calendar-year sums as percent, with the decimals in the tooltip", () => {
+    const { container } = mount();
+    const table = tableByCaption(container, "Sum of daily residual returns");
+    const first = table.querySelector("tbody tr td") as HTMLElement;
+    expect(first.textContent).toBe("+17.0%noise 6.6%");
+    expect(first.getAttribute("title")).toBe("Sum 0.1703, noise standard deviation 0.0658");
+  });
+
+  it("gives the same-days line its own legend entry and a style that stays visible under the other line", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/components/report/sections/ResidualAlphaPanel.css"), "utf8");
+    const same = /\.res-line\.ins \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    const pit = /\.res-line\.pit \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(same).toMatch(/stroke-dasharray/);
+    const width = (rule: string) => Number(/stroke-width: ([\d.]+)/.exec(rule)?.[1]);
+    expect(width(same)).toBeGreaterThan(width(pit));
   });
 });

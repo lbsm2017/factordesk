@@ -19,7 +19,7 @@ describe("ResidualAlphaPanel (lazy wrapper)", () => {
     expect(frame?.querySelector(".q")?.textContent).toMatch(/^What did this stock return/);
     expect(frame?.querySelector("table")).toBeNull();
     // Then the chunk arrives and the same element holds the table.
-    expect(await screen.findByRole("table", { name: /Residual return, in-sample with static betas/ })).not.toBeNull();
+    expect(await screen.findByRole("table", { name: /Residual return of the stock, in-sample against point-in-time/ })).not.toBeNull();
     expect(container.querySelectorAll("section#residual")).toHaveLength(1);
   });
 });
