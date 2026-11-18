@@ -22,13 +22,18 @@ const PORT = Number(process.env["E2E_PORT"] ?? portFor(repoRoot));
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./scripts/check-dist.mjs",
   outputDir: "./test-results",
   reporter: [["list"]],
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 60_000,
-  expect: { timeout: 15_000 },
+  // The first report of a run is computed from scratch (about 5 s on a quiet machine, the Kalman
+  // section being the largest part) and the machine may be busy with other work: 3 to 4 times
+  // slower made the smoke test fail on a first run and pass on the second. Generous limits cost
+  // nothing when the page is fast.
+  timeout: 180_000,
+  expect: { timeout: 30_000 },
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     ...(process.env["CI"] ? {} : { channel: "chrome" }),

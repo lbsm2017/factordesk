@@ -71,8 +71,17 @@ describe("panel registry", () => {
     for (const field of SECTION_FIELDS) {
       const { id, after } = SECTION_PANELS[field];
       expect(order.indexOf(id)).toBe(order.indexOf(after) + 1);
+      // A feature with a populated fixture (residual) has no placeholder state to check.
+      if (field === "residual") continue;
       const panel = container.querySelector(`#${id}`);
-      expect(panel?.querySelector(".empty-what")?.textContent).toMatch(/^Placeholder \(schema v3 contract\)/);
+      // A feature that has filled its fixture in no longer shows the placeholder empty state.
+      const value = report[field] as unknown;
+      const items = (Array.isArray(value) ? value : [value]) as { reason?: string | null }[];
+      if (items.some((item) => item.reason?.startsWith("Placeholder (schema v3 contract)"))) {
+        expect(panel?.querySelector(".empty-what")?.textContent).toMatch(/^Placeholder \(schema v3 contract\)/);
+      } else {
+        expect(panel).not.toBeNull();
+      }
     }
   });
 });

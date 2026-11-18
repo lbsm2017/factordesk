@@ -13,9 +13,7 @@ from factordesk.report.schema import FactorReport
 
 PANEL_ID = "fragility"
 TITLE = "Fragility"
-QUESTION = (
-    "How many trading days does each significant result rest on?"
-)
+QUESTION = "How many trading days does each significant result rest on?"
 
 
 def render_fragility_panel(report: FactorReport) -> str | None:

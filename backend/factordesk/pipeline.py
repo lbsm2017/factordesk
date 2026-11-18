@@ -916,7 +916,11 @@ def build_report(
     inputs = (
         section_inputs
         if section_inputs is not None
-        else load_section_inputs(now_utc, offline=factors is not None)
+        else load_section_inputs(
+            now_utc,
+            offline=factors is not None,
+            factor_last_date=pd.Timestamp(factor_frame.index[-1]).date(),
+        )
     )
     return assemble_report(
         symbol,

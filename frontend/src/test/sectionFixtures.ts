@@ -5,6 +5,7 @@
  */
 import type { FactorReport } from "../api/types";
 import fragility from "@fixtures/sections/fragility.json";
+import labels from "@fixtures/sections/label_text.json";
 import kalman from "@fixtures/sections/kalman.json";
 import leadLag from "@fixtures/sections/lead_lag.json";
 import residual from "@fixtures/sections/residual_alpha.json";
@@ -22,9 +23,10 @@ const PAYLOADS: Record<SectionField, unknown> = {
   kalman_betas: kalman,
 };
 
-/** A deep copy of `report` with the fixture of `field` attached. */
+/** A deep copy of `report` with the fixture of `field` attached and the footnote texts of that section added. */
 export function withSection<F extends SectionField>(report: FactorReport, field: F): FactorReport {
   const copy = structuredClone(report);
   copy[field] = structuredClone(PAYLOADS[field]) as FactorReport[F];
+  copy.label_text = { ...copy.label_text, ...(labels as Record<string, Record<string, string>>)[field] };
   return copy;
 }

@@ -92,6 +92,8 @@ class Runtime:
 
     async def _download(self) -> FactorDataStatus:
         await self.run(self.deps.load_factors, True, self.deps.now())
+        if self.deps.refresh_portfolios is not None:  # the shrunk-betas prior follows the factors
+            await self.run(self.deps.refresh_portfolios, self.deps.now())
         return await self.factor_status()
 
     def _finished(self, task: asyncio.Task[FactorDataStatus]) -> None:

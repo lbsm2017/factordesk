@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+const FIRST_REPORT_MS = 120_000;
 const SHOTS = fileURLToPath(new URL("../shots/", import.meta.url));
 
 async function noSideScroll(page: Page): Promise<void> {
@@ -37,10 +38,16 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await ticker.press("Enter");
   await expect(page).toHaveURL(/[?&]t=SYN\b/);
   const kpis = page.locator("#kpis");
-  await expect(kpis).toBeVisible();
+  // The first report of a run is computed from scratch and can take long on a busy machine.
+  await expect(kpis).toBeVisible({ timeout: FIRST_REPORT_MS });
   await expect(kpis).toContainText("Alpha, a year");
   await expect(kpis).toContainText("R²");
   await expect(page.locator("#equation")).toBeVisible();
+
+  // The residual panel loads as its own chunk and shows the table and the stability section.
+  const residual = page.locator("#residual");
+  await expect(residual.getByRole("heading", { name: "In-sample against point-in-time", exact: true })).toBeVisible();
+  await expect(residual.getByRole("heading", { name: "Is the alpha stable?" })).toBeVisible();
 
   // Range chip.
   await page.getByRole("radio", { name: "3Y" }).check();
