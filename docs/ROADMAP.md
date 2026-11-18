@@ -9,6 +9,8 @@ test written down first, logged, independently reviewed) before it ships.
 - **Done:** the SPY thin slice (factor download, prices, date matching, HAC regression, rolling
   betas, return and risk attribution, offline HTML report), independently validated
   (`docs/validation/spy-slice-validation.md`, verdict "ship with changes").
+- **Built, in review:** the dashboard (local FastAPI server and React page, one-command start,
+  fake-backend browser test and CI). Not yet run against live Yahoo data.
 - **In progress:** hardening from the validation findings (residual diagnostics, quality gate,
   bad-input handling); a data-source comparison of Yahoo, Tiingo and Alpaca.
 - **Specified, not built:** report redesign (`docs/design/report-design.md`), residual alpha
@@ -28,6 +30,7 @@ test written down first, logged, independently reviewed) before it ships.
 | Kalman-filter betas | Time-varying betas with proper uncertainty, using past data only | Spec in progress | — |
 | Shrunk betas | Pull noisy style betas toward a prior; report how much data would make an effect detectable | Spec in progress | — |
 | Data-quality plan (triangulation) | A written plan for multi-source consensus returns and per-day agreement scores | Waits for the source comparison | Data-source comparison |
+| Dashboard (FastAPI + React) | Search bar, range chips (3Y, 5Y, Full history) and custom dates, factor refresh; the report as an app. Runbook: `docs/dashboard.md`; spec: `docs/specs/dashboard.md` | Built, in review: tickets T1 to T10 done as of commit f36255e on `feat/report-ui-feedback`, not merged to `dev`. Left: a smoke test on live Yahoo data, fixes from the T11 design and accessibility review, peer comparison using the batch price fetch | Review; merge of `feat/report-ui-feedback` into `dev` |
 | Config key names | Code reads the `.env` names actually used (`ALPACA_KEY`, `ALPACA_SECRET`, `TIINGO_KEY`); Alpaca feed `sip` | Not Started | First commit |
 | Total returns from Close + Dividends | factordesk computes total return itself (CRSP convention) for every source; vendor Adj Close becomes a reported cross-check (owner decision 2026-11-18) | Not Started | Schema v3 contract; methodology update |
 
@@ -41,7 +44,6 @@ test written down first, logged, independently reviewed) before it ships.
 | Data triangulation build | Consensus returns from Yahoo, Tiingo and Alpaca; flagged disagreement days | Data-quality plan |
 | European mode | Regional French factors, USD conversion, currency regressor | Dataset docs; owner decisions D16 (RF source, ECB FX, regressor default, Canada) |
 | Peer comparison | Where a stock's betas sit within its sector | — |
-| Dashboard (FastAPI + React) | Search bar, "Factor it", range chips and custom dates, refresh; the report as an app (controls specified in `docs/design/report-design.md` section I) | Report redesign (specified; renderer port pending) |
 | Alpaca adapter | Optional cross-check and fallback from 2016, returns rebuilt from raw closes and dividends (`sip` feed); check Alpaca's "user application" notice before shipping | Data-quality plan |
 | One-shot install-and-run command | A single line per OS that installs uv if missing and opens a report (`uvx factordesk report SPY --open`); a short bootstrap script pinned to a release tag, readable, with a published checksum | Publish to PyPI; first tagged release |
 
@@ -69,3 +71,4 @@ and regime betas (specified in `docs/methodology.md`, not yet scheduled).
 - Added to Now: lead-lag betas, fragility score, Kalman betas, shrunk betas, data-quality plan.
 - Added to Next: placebo calibration CLI (multi-core), block bootstrap, specification curve.
 - Moved factor-mimicking hedge and model comparison to Later (owner triage earlier the same day).
+- Moved the dashboard from Next to Now: built and in review (see its row for what is left).
