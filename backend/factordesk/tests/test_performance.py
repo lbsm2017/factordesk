@@ -220,6 +220,11 @@ def test_tp08_constant_prices_give_no_sharpe_and_no_nan() -> None:
     assert res.cagr == 0.0 and res.cumulative_return == 0.0
     assert res.max_drawdown == 0.0 and res.episodes == ()
     assert math.isfinite(res.mean_excess_annual)
+    # A flat price against a moving risk-free rate: the excess return varies, the stock does not.
+    moving = [0.0001 + 0.00005 * (i % 3) for i in range(100)]
+    ret2, rf2 = _series([0.0] * 100, rf=moving)
+    flat = performance_stats(ret2, rf2)
+    assert flat.sharpe_annual is None and flat.sharpe_ci95 is None
 
 
 def test_tp09_constant_nonzero_return_matches_the_closed_form() -> None:

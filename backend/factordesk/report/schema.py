@@ -25,6 +25,10 @@ sections, each defined in its own module under ``report/sections/`` and ``None``
 reason ``lead_after_sample_end``. Version 3 files still load (SC5). The shared building blocks
 (``SampleInfo``, the statistic base, the status and label types) live in ``report/base.py`` and
 are re-exported here.
+
+Version 5 adds the optional ``performance`` section (historical return, volatility, Sharpe ratio
+and maximum drawdown; ``report/sections/performance.py``). An older file loads unchanged with the
+field ``None``.
 """
 
 from __future__ import annotations
@@ -54,18 +58,20 @@ from factordesk.report.base import Tag as Tag
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
+from factordesk.report.sections.performance import PERFORMANCE_SECTION, PerformanceSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
 
-SCHEMA_VERSION = "4"
+SCHEMA_VERSION = "5"
 """Version written by this code (the schema v3 contract; contract SC5)."""
 
-SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4")
+SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4", "5")
 """Versions this code reads. Version 3 files have no optional sections; they load unchanged."""
 
 AuditStatus = Literal["clean", "warnings", "errors"]
 
 SECTIONS: tuple[SectionSpec, ...] = (
+    PERFORMANCE_SECTION,
     LEAD_LAG_SECTION,
     SHRUNK_SECTION,
     FRAGILITY_SECTION,
@@ -407,6 +413,10 @@ class FactorReport(FrozenModel):
     )
     # Optional sections of the schema v3 contract (docs/specs/schema-v3-contract.md), in panel
     # order. None: the feature did not run for this report (always None in version 3 files).
+    performance: PerformanceSection | None = Field(
+        default=None,
+        description="Historical return, volatility, Sharpe ratio and maximum drawdown.",
+    )
     lead_lag: LeadLagSection | None = Field(
         default=None, description="Lead-lag betas (docs/specs/lead-lag-betas.md)."
     )

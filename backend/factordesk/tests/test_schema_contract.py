@@ -38,8 +38,16 @@ MOCK = FIXTURES / "mock_report.json"
 MOCK_V3 = FIXTURES / "mock_report_v3.json"
 NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
 
-SECTION_FIELDS = ("lead_lag", "shrunk_betas", "fragility", "residual", "kalman_betas")
-"""The five optional fields, in panel order (contract SC2, SC4)."""
+SECTION_FIELDS = (
+    "performance",
+    "lead_lag",
+    "shrunk_betas",
+    "fragility",
+    "residual",
+    "kalman_betas",
+)
+"""The six optional fields, in panel order (contract SC2, SC4; performance is the sixth, see
+docs/validation/performance-contract-note-2026-11-18.md)."""
 
 
 def _optional_parts(annotation: Any) -> tuple[Any, ...]:
@@ -51,7 +59,7 @@ def _optional_parts(annotation: Any) -> tuple[Any, ...]:
 
 
 # ----------------------------------------------------------------------------- fields and specs
-def test_sections_are_the_five_optional_fields() -> None:
+def test_sections_are_the_six_optional_fields() -> None:
     assert tuple(spec.report_field for spec in SECTIONS) == SECTION_FIELDS
     for spec in SECTIONS:
         info = FactorReport.model_fields[spec.report_field]
@@ -107,10 +115,10 @@ def test_report_label_text_adds_only_present_sections() -> None:
 
 
 # ----------------------------------------------------------------------------- versions
-def test_mock_fixture_is_version_4_with_null_sections() -> None:
+def test_mock_fixture_is_version_5_with_null_sections() -> None:
     rep = load_report(MOCK)
-    assert rep.schema_version == SCHEMA_VERSION == "4"
-    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4")
+    assert rep.schema_version == SCHEMA_VERSION == "5"
+    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4", "5")
     for name in SECTION_FIELDS:
         assert getattr(rep, name) is None
     payload = json.loads(MOCK.read_text(encoding="utf-8"))
@@ -139,10 +147,10 @@ def test_version_3_file_still_loads() -> None:
     assert "schema v3," in render_report_html(old)
 
 
-@pytest.mark.parametrize("version", ["2", "5", "", "v4"])
+@pytest.mark.parametrize("version", ["2", "6", "", "v5"])
 def test_unknown_versions_are_refused(version: str) -> None:
     text = MOCK.read_text(encoding="utf-8").replace(
-        '"schema_version":"4"', f'"schema_version":"{version}"'
+        '"schema_version":"5"', f'"schema_version":"{version}"'
     )
     with pytest.raises(ValidationError, match="supported"):
         FactorReport.model_validate_json(text)
@@ -224,7 +232,7 @@ def _assemble(**kwargs: Any) -> FactorReport:
     )
 
 
-BUILT_SECTIONS: tuple[str, ...] = ("residual", "kalman_betas")
+BUILT_SECTIONS: tuple[str, ...] = ("performance", "residual", "kalman_betas")
 """Fields whose feature is built: the offline pipeline fills them. Each feature branch adds its
 field.
 

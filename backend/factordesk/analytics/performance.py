@@ -15,9 +15,11 @@ Inputs and definitions (owner-approved wording of 2026-11-18; they are proposals
   cumulative total return ``prod(1 + r_t) - 1`` and the arithmetic mean ``A * mean(r_t)``.
 * Volatility a year: ``sqrt(A) * sd(r_t)``, sample standard deviation (``ddof = 1``).
 * Sharpe ratio: ``sqrt(A) * mean(x_t) / sd(x_t)`` (``ddof = 1``) with the risk-free rate of the
-  factor file. Not defined (``None``) when the daily excess returns do not vary
-  (``sd(x_t) < SD_FLOOR``). Its standard error ``sharpe_se_iid = sqrt(A) * sqrt((1 + SR_d^2 / 2)
-  / n)`` (``SR_d`` the daily Sharpe ratio) is the closed form of Lo (2002) for independent,
+  factor file. Not defined (``None``) when the daily returns or the daily excess returns do not
+  vary (``sd(r_t) < SD_FLOOR`` or ``sd(x_t) < SD_FLOOR``; a flat price against a moving RF would
+  otherwise give a huge, meaningless ratio). Its standard error is
+  ``sharpe_se_iid = sqrt(A) * sqrt((1 + SR_d^2 / 2) / n)`` (``SR_d`` the daily Sharpe ratio), the
+  closed form of Lo (2002) for independent,
   identically distributed returns. It assumes iid returns, ignores autocorrelation, fat tails and
   volatility clustering, and is approximate. The 95% interval is ``SR +/- 1.96 * SE``.
 * Drawdown: the compounded return path starts at 1.0 on ``origin`` (the price date before the
@@ -197,7 +199,7 @@ def performance_stats(
     mean_x = float(np.mean(x))
     sharpe_d = sharpe_a = se = None
     ci: tuple[float, float] | None = None
-    if sd_x >= SD_FLOOR:
+    if sd_x >= SD_FLOOR and sd_ret >= SD_FLOOR:
         sharpe_d = mean_x / sd_x
         sharpe_a = math.sqrt(A) * sharpe_d
         se = math.sqrt(A) * math.sqrt((1.0 + 0.5 * sharpe_d * sharpe_d) / n)

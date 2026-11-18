@@ -434,6 +434,42 @@ export interface components {
             reading: string;
         };
         /**
+         * DrawdownEpisodeInfo
+         * @description One fall of the compounded return path from a running peak, and its recovery.
+         */
+        DrawdownEpisodeInfo: {
+            /**
+             * Depth
+             * @description Trough value / peak value - 1; negative.
+             */
+            depth: number;
+            /**
+             * Peak Date
+             * Format: date
+             */
+            peak_date: string;
+            /**
+             * Trough Date
+             * Format: date
+             */
+            trough_date: string;
+            /**
+             * Recovery Date
+             * @description First date after the trough where the path regains the peak; None when it has not.
+             */
+            recovery_date: string | null;
+            /**
+             * Days Peak To Trough
+             * @description Trading days from peak to trough.
+             */
+            days_peak_to_trough: number;
+            /**
+             * Days Trough To Recovery
+             * @description Trading days from trough to recovery; None when not recovered.
+             */
+            days_trough_to_recovery: number | null;
+        };
+        /**
          * ExcludedRow
          * @description One return row left out of the analysis sample, with the reason (M2).
          */
@@ -476,7 +512,7 @@ export interface components {
         FactorReport: {
             /**
              * Schema Version
-             * @default 4
+             * @default 5
              */
             schema_version: string;
             /** Ticker */
@@ -515,6 +551,8 @@ export interface components {
             label_text: {
                 [key: string]: string;
             };
+            /** @description Historical return, volatility, Sharpe ratio and maximum drawdown. */
+            performance: components["schemas"]["PerformanceSection"] | null;
             /** @description Lead-lag betas (docs/specs/lead-lag-betas.md). */
             lead_lag: components["schemas"]["LeadLagSection"] | null;
             /**
@@ -935,6 +973,157 @@ export interface components {
              * @description Most recent first.
              */
             windows: components["schemas"]["AlphaWindow"][];
+        };
+        /**
+         * PerformanceDrawdown
+         * @description Maximum drawdown and the deepest episodes.
+         */
+        PerformanceDrawdown: {
+            /**
+             * Max Drawdown
+             * @description Deepest fall from a running peak; 0 when the path never fell.
+             */
+            max_drawdown: number;
+            /**
+             * Peak Date
+             * @description None when there was no drawdown.
+             */
+            peak_date: string | null;
+            /** Trough Date */
+            trough_date: string | null;
+            /**
+             * Recovery Date
+             * @description None when not recovered or no drawdown.
+             */
+            recovery_date: string | null;
+            /** Days Peak To Trough */
+            days_peak_to_trough: number | null;
+            /** Days Trough To Recovery */
+            days_trough_to_recovery: number | null;
+            /**
+             * Episodes
+             * @description Up to three distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown.
+             */
+            episodes: components["schemas"]["DrawdownEpisodeInfo"][];
+        };
+        /**
+         * PerformancePeriods
+         * @description The analysed span.
+         */
+        PerformancePeriods: {
+            /**
+             * N Days
+             * @description Daily observations of the analysed sample.
+             */
+            n_days: number;
+            /**
+             * Start
+             * Format: date
+             * @description First analysed date.
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             * @description Last analysed date.
+             */
+            end: string;
+            /**
+             * Years
+             * @description n_days / 252.
+             */
+            years: number;
+        };
+        /**
+         * PerformanceReturns
+         * @description Growth of the stock over the window (simple daily total returns, M1.3).
+         */
+        PerformanceReturns: {
+            /**
+             * Cagr
+             * @description Compound annual growth rate: prod(1 + r)^(252 / n) - 1.
+             */
+            cagr: number;
+            /**
+             * Cumulative Return
+             * @description prod(1 + r) - 1 over the window.
+             */
+            cumulative_return: number;
+            /**
+             * Mean Return Annual
+             * @description Arithmetic mean of daily returns times 252; ignores compounding.
+             */
+            mean_return_annual: number;
+        };
+        /**
+         * PerformanceSection
+         * @description Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed stock.
+         *
+         *     Descriptive and in-sample: it says what happened over the window, not what will happen.
+         *     Statuses: ``ok``; ``insufficient_data`` (fewer than 60 daily observations); ``failed``.
+         */
+        PerformanceSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            periods: components["schemas"]["PerformancePeriods"] | null;
+            returns: components["schemas"]["PerformanceReturns"] | null;
+            /**
+             * Volatility Annual
+             * @description sqrt(252) x sample sd (ddof 1) of daily simple returns.
+             */
+            volatility_annual: number | null;
+            sharpe: components["schemas"]["PerformanceSharpe"] | null;
+            drawdown: components["schemas"]["PerformanceDrawdown"] | null;
+        };
+        /**
+         * PerformanceSharpe
+         * @description Sharpe ratio of the daily excess returns (stock return minus the factor file's RF).
+         */
+        PerformanceSharpe: {
+            /**
+             * Ratio Annual
+             * @description sqrt(252) x mean(excess) / sd(excess), ddof 1; None when the excess returns do not vary (the ratio is not defined).
+             */
+            ratio_annual: number | null;
+            /**
+             * Ratio Daily
+             * @description mean(excess) / sd(excess); None as above.
+             */
+            ratio_daily: number | null;
+            /**
+             * Mean Excess Annual
+             * @description 252 x mean of daily excess returns.
+             */
+            mean_excess_annual: number;
+            /**
+             * Sharpe Se Iid
+             * @description Approximate standard error of the annual ratio, sqrt(252) x sqrt((1 + SR_daily^2 / 2) / n) (Lo 2002). Assumes independent, identically distributed returns.
+             */
+            sharpe_se_iid: number | null;
+            /**
+             * Ci95 Low
+             * @description ratio_annual - 1.96 x sharpe_se_iid.
+             */
+            ci95_low: number | null;
+            /**
+             * Ci95 High
+             * @description ratio_annual + 1.96 x sharpe_se_iid.
+             */
+            ci95_high: number | null;
+            /**
+             * Ci Includes Zero
+             * @description True when the 95% interval contains 0; None when the ratio is not defined.
+             */
+            ci_includes_zero: boolean | null;
         };
         /**
          * PowerStatement
