@@ -208,7 +208,7 @@ export function priceOption(model: PriceModel, tokens: ChartTokens, { full }: Pr
       scale: true,
       axisLine: { show: false },
       axisTick: { show: false },
-      splitNumber: 4,
+      splitNumber: 2,
       splitLine: { lineStyle: { color: tokens.grid, width: 1 } },
       axisLabel: { ...label, margin: 8, formatter: (v: number) => priceLabel(v) },
     },

@@ -1,0 +1,16 @@
+/* "Significant" column header: under 720 px report.css hides .long, which left the header empty for
+   assistive technology. Keep the full word in the accessibility tree and show "Sig." beside it. */
+@media screen and (max-width: 719px) {
+  .bars thead th .long {
+    display: inline;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { mockReport } from "../test/fixture";
-import { exposureReading, plainName, WARN_PLAIN, warningSummary } from "./plain";
+import { exposureReading, plainName, tagText, WARN_PLAIN, warningSummary } from "./plain";
 
 describe("plain text", () => {
+  it("words estimate tags as significant or not significant", () => {
+    expect(tagText("reliable")).toBe("significant");
+    expect(tagText("noise")).toBe("not significant");
+    expect(tagText(null)).toBe("n/a");
+  });
+
   it("names factors in plain words", () => {
     expect(plainName("Mkt-RF")).toBe("Market");
     expect(plainName("XYZ")).toBe("XYZ");

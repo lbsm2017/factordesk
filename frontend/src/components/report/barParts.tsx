@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import { MINUS, num, pct, signed } from "../../format";
 import { position } from "../charts/BarCell";
+import "./barParts.css";
 
 /** "n/a" for a missing value. */
 export function signedN(x: number | null | undefined, digits = 3): string {
@@ -126,5 +127,20 @@ export function AxisRow({
       </td>
       <td role="cell" colSpan={columns} />
     </tr>
+  );
+}
+
+/**
+ * Content of the "Significant" column header. Under 720 px the full word is visually hidden
+ * (barParts.css) and "Sig." shows, so the header keeps an accessible name at every width.
+ */
+export function SigHead() {
+  return (
+    <>
+      <span className="long">Significant</span>
+      <span className="short" aria-hidden="true">
+        Sig.
+      </span>
+    </>
   );
 }

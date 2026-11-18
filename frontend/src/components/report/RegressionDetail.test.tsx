@@ -55,13 +55,20 @@ describe("RegressionDetail", () => {
     expect(hml?.querySelector("td.sig")?.textContent).toBe("No");
   });
 
-  it("renders the 5-day and diagnostics tables in their own labelled regions", () => {
+  it("keeps one scroll region: the 5-day and diagnostics tables are labelled tables that fit the page", () => {
+    const { container } = render(<RegressionDetail report={mockReport} />);
+    expect(container.querySelectorAll(".scroll-x")).toHaveLength(1);
+    expect(container.querySelectorAll("[tabindex=\"0\"][role=\"region\"]")).toHaveLength(1);
+    expect(container.querySelector("table.reg:not(.fit)")).not.toBeNull();
+    expect(container.querySelectorAll("table.reg.fit")).toHaveLength(2);
+  });
+
+  it("renders the 5-day and diagnostics tables with their own names", () => {
     render(<RegressionDetail report={mockReport} />);
-    const five = screen.getByRole("region", { name: "5-day estimate table, scrolls sideways" });
-    expect(five.getAttribute("tabindex")).toBe("0");
+    const five = screen.getByRole("table", { name: "5-day estimate table" });
     expect(rowsOf(five)).toHaveLength(6);
     expect(screen.getByRole("heading", { level: 3, name: /^5-day estimate \(111 blocks\)$/ })).toBeTruthy();
-    const diag = screen.getByRole("region", { name: "Residual diagnostics table, scrolls sideways" });
+    const diag = screen.getByRole("table", { name: "Residual diagnostics table" });
     const rows = rowsOf(diag);
     expect(rows[0]?.slice(0, 4)).toEqual(["Lag-1 autocorrelation", "−0.310", "z −6.2", "<0.001"]);
     expect(rows[0]?.[4]).toBe("MOCK: lag-1 autocorrelation of the residuals is -0.31.");
@@ -73,7 +80,7 @@ describe("RegressionDetail", () => {
     const report = cloneReport();
     report.five_day_regression.status = "not_applicable";
     render(<RegressionDetail report={report} />);
-    expect(screen.queryByRole("region", { name: /5-day estimate/ })).toBeNull();
+    expect(screen.queryByRole("table", { name: /5-day estimate/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: /5-day estimate/ })).toBeNull();
   });
 
@@ -82,7 +89,7 @@ describe("RegressionDetail", () => {
     report.residual_diagnostics.status = "insufficient_data";
     report.residual_diagnostics.reason = "Too few days for the tests.";
     const { container } = render(<RegressionDetail report={report} />);
-    expect(screen.queryByRole("region", { name: /Residual diagnostics/ })).toBeNull();
+    expect(screen.queryByRole("table", { name: /Residual diagnostics/ })).toBeNull();
     expect(screen.getByRole("heading", { level: 3, name: "Residual diagnostics" })).toBeTruthy();
     expect(container.querySelector(".empty-what")?.textContent).toBe("Too few days for the tests.");
     expect(screen.getByRole("region", { name: /Regression detail table/ })).toBeTruthy();

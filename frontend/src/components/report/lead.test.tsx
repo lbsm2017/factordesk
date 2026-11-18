@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
 import { Colophon } from "./Colophon";
 import { Equation } from "./Equation";
-import { GateCallout } from "./GateCallout";
+import { GateEvidence } from "./GateEvidence";
 import { Header } from "./Header";
 import { KpiStrip } from "./KpiStrip";
 import { Notice } from "./Notice";
@@ -181,20 +181,35 @@ describe("KpiStrip", () => {
   });
 });
 
-describe("GateCallout", () => {
-  it("shows the gate evidence when it fired", () => {
-    const { container } = render(<GateCallout report={mockReport} />);
-    expect(screen.getByRole("heading", { level: 2, name: "Residual quality gate" })).toBeTruthy();
-    const text = container.textContent ?? "";
+describe("Gate evidence inside the notice", () => {
+  it("is a paragraph under Details, with no separate block or heading", () => {
+    const { container } = render(<Notice report={mockReport} />);
+    const text = container.querySelector("details.how .gate-evidence")?.textContent ?? "";
     expect(text).toContain("−0.31 (robust z −6.2)");
     expect(text).toContain("62%");
+    expect(container.querySelector(".gate-callout")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Residual quality gate" })).toBeNull();
     expect(container.querySelector("a")?.getAttribute("href")).toBe("#regression-detail");
   });
 
-  it("renders nothing when the gate did not fire", () => {
+  it("keeps the evidence before the 5-day line", () => {
+    const { container } = render(<Notice report={mockReport} />);
+    const paras = Array.from(container.querySelectorAll("details.how > p")).map((p) => p.className || p.textContent);
+    expect(paras[0]).toBe("gate-evidence");
+    expect(paras[1]).toContain("5-day estimate");
+  });
+
+  it("prints the 5-day tag as a plain word, never the raw tag", () => {
+    const { container } = render(<Notice report={mockReport} />);
+    const text = container.querySelector("details.how")?.textContent ?? "";
+    expect(text).not.toMatch(/reliable|noise/);
+    expect(text).toMatch(/, (not )?significant; R²/);
+  });
+
+  it("renders nothing on its own when the gate did not fire", () => {
     const r = cloneReport();
     r.quality_gate.fired = false;
-    const { container } = render(<GateCallout report={r} />);
+    const { container } = render(<GateEvidence report={r} />);
     expect(container.firstChild).toBeNull();
   });
 });

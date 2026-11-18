@@ -1,13 +1,13 @@
 import { num, signed, tstat } from "../../format";
 import { fin } from "./leadHelpers";
 import type { ReportPanelProps } from "./types";
-import "./lead.css";
 
 /**
- * The residual quality gate (M3.6) with its numbers, shown only when it fired. The notice carries
- * the plain sentence; this callout adds the evidence and points to the 5-day estimate.
+ * The residual quality gate (M3.6) with its numbers, shown inside the notice's Details and only
+ * when the gate fired. The notice summary carries the plain sentence; this paragraph adds the
+ * evidence, so nothing extra sits above the first chart (review DF1).
  */
-export function GateCallout({ report }: ReportPanelProps) {
+export function GateEvidence({ report }: ReportPanelProps) {
   const gate = report.quality_gate;
   if (gate.status !== "ok" || !gate.fired) return null;
   const rho = fin(gate.lag1_autocorrelation);
@@ -25,19 +25,9 @@ export function GateCallout({ report }: ReportPanelProps) {
       ? ` Under the simple model of the method, about ${num(share * 100, 0)}% of residual variance is a price error that reverses the next day.`
       : "";
   return (
-    <section className="gate-callout" id="gate" aria-labelledby="gate-title">
-      <svg className="glyph" aria-hidden="true" viewBox="0 0 16 16">
-        <circle cx="8" cy="8" r="6.5" />
-        <path className="cut" d="M8 7v4.5M8 4.6v.9" />
-      </svg>
-      <div>
-        <h2 id="gate-title">Residual quality gate</h2>
-        <p>
-          {measured}
-          {shareText} R² and residual volatility are probably understated; the 5-day estimate under{" "}
-          <a href="#regression-detail">Regression detail</a> is less affected.
-        </p>
-      </div>
-    </section>
+    <p className="gate-evidence">
+      {measured}
+      {shareText}
+    </p>
   );
 }

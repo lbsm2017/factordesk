@@ -51,11 +51,11 @@ function plural(n: number, one: string, many: string): string {
   return `${count(n)} ${n === 1 ? one : many}`;
 }
 
-/** "2026-11-01T00:00:00Z" as "2026-11-01 00:00 UTC" (the API sends UTC). */
+/** "2026-11-01T00:00:00Z" as "1 Nov 2026, 00:00 UTC" (the API sends UTC). */
 function downloadedText(iso: string | null): string {
   if (!iso) return "Injected, not downloaded";
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(iso);
-  return m ? `${m[1]} ${m[2]} UTC` : iso;
+  return m ? `${dateLong(m[1] as string)}, ${m[2]} UTC` : iso;
 }
 
 function coverage(d: DataInfo): [string, string][] {

@@ -6,6 +6,7 @@ import { exposureReading, plainName } from "../../text/plain";
 import { BarCell } from "../charts/BarCell";
 import { axisLabels, exposureModel, exposuresUnavailable } from "./exposureModel";
 import type { ExposureModel } from "./exposureModel";
+import { SigHead } from "./barParts";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
 
@@ -75,10 +76,7 @@ function ExposureTable({ model }: { model: ExposureModel }) {
             t
           </th>
           <th role="columnheader" scope="col" className="num">
-            <span className="long">Significant</span>
-            <span className="short" aria-hidden="true">
-              Sig.
-            </span>
+            <SigHead />
           </th>
           <th role="columnheader" scope="col" className="num">{`Avg ${window}d`}</th>
         </tr>
@@ -140,7 +138,7 @@ function footnotes(report: FactorReport, window: number): { footnote: string; ho
   const texts = report.label_text;
   const desc = texts["L-DESC"] ?? DEFAULT_DESC;
   const more = [
-    "Reliable means the Benjamini-Hochberg adjusted p is below 0.05 (Yes in the Significant column); noise means it is not (No, shown faded).",
+    "Significance uses the Benjamini-Hochberg adjusted p: below 0.05 reads Yes in the Significant column, otherwise No and the row is shown faded.",
     g.caption,
     `The diamond and the Avg ${window}d column are the mean of the overlapping rolling estimates.`,
     ...g.labels.filter((k) => k !== "L-DESC").flatMap((k) => (texts[k] ? [texts[k]] : [])),

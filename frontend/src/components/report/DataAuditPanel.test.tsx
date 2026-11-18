@@ -22,8 +22,14 @@ describe("DataAuditPanel", () => {
     expect(f["After factor data"]).toBe("32 price days (raw return +1.23%, not analysed)");
     expect(f["Before factor data"]).toBe("0 price days");
     expect(f["Factor data ends"]).toBe("30 Sep 2026, 49 days before the report");
-    expect(f["Factor file downloaded"]).toBe("2026-11-01 00:00 UTC");
+    expect(f["Factor file downloaded"]).toBe("1 Nov 2026, 00:00 UTC");
     expect(f["Prices"]).toBe("MOCK price source (Adj Close)");
+  });
+
+  it("writes the download time like the other dates, never as an ISO stamp", () => {
+    const { container } = render(<DataAuditPanel report={mockReport} />);
+    const f = facts(container);
+    expect(f["Factor file downloaded"]).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
   it("shows the factor source URL as plain text, not a link", () => {

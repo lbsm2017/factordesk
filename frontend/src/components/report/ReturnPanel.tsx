@@ -4,7 +4,7 @@ import { PLAIN } from "../../text/plain";
 import { describe, factorOrder, finite, labelTexts, niceDomain, sci } from "../../report/derive";
 import { pct } from "../../format";
 import { BarCell } from "../charts/BarCell";
-import { AxisRow, Legend, NameCell, pctN, Swatch, TotalSwatch } from "./barParts";
+import { AxisRow, Legend, NameCell, pctN, SigHead, Swatch, TotalSwatch } from "./barParts";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
 
@@ -153,10 +153,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
               % a year
             </th>
             <th role="columnheader" scope="col" className="num">
-              <span className="long">Significant</span>
-              <span className="short" aria-hidden="true">
-                Sig.
-              </span>
+              <SigHead />
             </th>
           </tr>
         </thead>

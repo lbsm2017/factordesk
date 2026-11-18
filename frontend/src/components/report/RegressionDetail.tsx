@@ -1,6 +1,9 @@
+/* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role --
+   DB7 asks for explicit table roles: the narrow-screen CSS restyles rows as blocks, which can drop table semantics. */
 import type { ReactNode } from "react";
 import type { FactorReport, FactorStat, MultiDayRegression, ResidualDiagnostics } from "../../api/types";
 import { num, pct, pval, signed, tstat } from "../../format";
+import "./regression.css";
 import { EmptyState } from "./EmptyState";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
@@ -14,8 +17,7 @@ function or(x: number | null | undefined, f: (v: number) => string): string {
 
 const sgn = (x: number | null | undefined, digits = 3) => or(x, (v) => signed(v, digits));
 const plain = (x: number | null | undefined, digits = 3) => or(x, (v) => num(v, digits));
-const pctText = (x: number | null | undefined, digits = 2, withSign = true) =>
-  or(x, (v) => pct(v, digits, withSign));
+const pctText = (x: number | null | undefined, digits = 2, withSign = true) => or(x, (v) => pct(v, digits, withSign));
 const pText = (x: number | null | undefined) => or(x, pval);
 const tText = (x: number | null | undefined) => or(x, tstat);
 
@@ -25,28 +27,43 @@ interface TableProps {
   heads: readonly string[];
   /** Index of the left-aligned reading column, if any. */
   readingCol?: number;
+  /**
+   * Put the table in the focusable scroll region. Only the main regression table does (DB5);
+   * the 5-day and diagnostics tables fit the page and wrap their cells on a phone.
+   */
+  scroll?: boolean;
   children: ReactNode;
 }
 
-/** A table inside a focusable, labelled scroll region: the only thing that scrolls sideways. */
-function RegTable({ label, heads, readingCol, children }: TableProps) {
-  return (
-    // A keyboard user has to be able to scroll the table, so the region takes focus.
+/** A regression-style table; the main one sits in a focusable, labelled scroll region, the only one that scrolls sideways. */
+function RegTable({ label, heads, readingCol, scroll = false, children }: TableProps) {
+  const table = (
+    <table role="table" className={scroll ? "reg" : "reg fit"} aria-label={scroll ? undefined : label}>
+      <thead role="rowgroup">
+        <tr role="row">
+          {heads.map((h, i) => (
+            <th
+              key={h}
+              role="columnheader"
+              scope="col"
+              className={i === 0 ? undefined : i === readingCol ? "rd" : "num"}
+            >
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody role="rowgroup">{children}</tbody>
+    </table>
+  );
+  // A keyboard user has to be able to scroll the table, so the region takes focus.
+  return scroll ? (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
     <div className="scroll-x" tabIndex={0} role="region" aria-label={`${label}, scrolls sideways`}>
-      <table className="reg">
-        <thead>
-          <tr>
-            {heads.map((h, i) => (
-              <th key={h} scope="col" className={i === 0 ? undefined : i === readingCol ? "rd" : "num"}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
+      {table}
     </div>
+  ) : (
+    table
   );
 }
 
@@ -61,39 +78,56 @@ interface TermFit {
   factors: readonly FactorStat[];
 }
 
+/** One number cell; `label` is the column name, shown beside the value on a phone (regression.css). */
+function Num({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
+  return (
+    <td role="cell" data-label={label} className={`num${className}`}>
+      {children}
+    </td>
+  );
+}
+
 /** Alpha row, then one row per factor. `vif` is null for the 5-day table, which has no VIF column. */
 function TermRows({ fit, vif }: { fit: TermFit; vif: Record<string, number | null> | null }) {
   const alphaNs = fit.alpha_tag !== "reliable";
   return (
     <>
-      <tr className={alphaNs ? "ns" : ""}>
-        <th scope="row">Alpha, a year</th>
-        <td className="num">{pctText(fit.alpha_annual)}</td>
-        <td className="num">{pctText(fit.alpha_se_annual, 2, false)}</td>
-        <td className="num">{tText(fit.alpha_z)}</td>
-        <td className="num">{pText(fit.alpha_p)}</td>
-        <td className="num">single test</td>
-        <td className="num">
+      <tr role="row" className={alphaNs ? "ns" : ""}>
+        <th role="rowheader" scope="row">
+          Alpha, a year
+        </th>
+        <Num label="Estimate">{pctText(fit.alpha_annual)}</Num>
+        <Num label="Std. error">{pctText(fit.alpha_se_annual, 2, false)}</Num>
+        <Num label="t">{tText(fit.alpha_z)}</Num>
+        <Num label="p">{pText(fit.alpha_p)}</Num>
+        <Num label="p, adjusted">single test</Num>
+        <Num label="95% interval">
           {pctText(fit.alpha_ci_low_annual)} to {pctText(fit.alpha_ci_high_annual)}
-        </td>
-        {vif !== null ? <td className="num">{"–"}</td> : null}
-        <td className="num sig">{alphaNs ? "No" : "Yes"}</td>
+        </Num>
+        {vif !== null ? <Num label="VIF">{"–"}</Num> : null}
+        <Num label="Significant" className=" sig">
+          {alphaNs ? "No" : "Yes"}
+        </Num>
       </tr>
       {fit.factors.map((s) => {
         const ns = s.tag !== "reliable";
         return (
-          <tr key={s.name} className={ns ? "ns" : ""}>
-            <th scope="row">{s.name}</th>
-            <td className="num">{sgn(s.beta)}</td>
-            <td className="num">{plain(s.se, 4)}</td>
-            <td className="num">{tText(s.z)}</td>
-            <td className="num">{pText(s.p)}</td>
-            <td className="num">{pText(s.p_adj_bh)}</td>
-            <td className="num">
+          <tr key={s.name} role="row" className={ns ? "ns" : ""}>
+            <th role="rowheader" scope="row">
+              {s.name}
+            </th>
+            <Num label="Estimate">{sgn(s.beta)}</Num>
+            <Num label="Std. error">{plain(s.se, 4)}</Num>
+            <Num label="t">{tText(s.z)}</Num>
+            <Num label="p">{pText(s.p)}</Num>
+            <Num label="p, adjusted">{pText(s.p_adj_bh)}</Num>
+            <Num label="95% interval">
               {sgn(s.ci_low)} to {sgn(s.ci_high)}
-            </td>
-            {vif !== null ? <td className="num">{plain(vif[s.name], 2)}</td> : null}
-            <td className="num sig">{ns ? "No" : "Yes"}</td>
+            </Num>
+            {vif !== null ? <Num label="VIF">{plain(vif[s.name], 2)}</Num> : null}
+            <Num label="Significant" className=" sig">
+              {ns ? "No" : "Yes"}
+            </Num>
           </tr>
         );
       })}
@@ -142,20 +176,28 @@ function DiagnosticsTable({ rd }: { rd: ResidualDiagnostics }) {
         heads={["Test", "Statistic", "Reference", "p", "Reading"]}
         readingCol={4}
       >
-        <tr>
-          <th scope="row">Lag-1 autocorrelation</th>
-          <td className="num">{sgn(rd.lag1_autocorrelation)}</td>
-          <td className="num">z {tText(rd.lag1_z)}</td>
-          <td className="num">{pText(rd.lag1_p)}</td>
-          <td className="rd">{rd.lag1_reading ?? ""}</td>
+        <tr role="row">
+          <th role="rowheader" scope="row">
+            Lag-1 autocorrelation
+          </th>
+          <Num label="Statistic">{sgn(rd.lag1_autocorrelation)}</Num>
+          <Num label="Reference">z {tText(rd.lag1_z)}</Num>
+          <Num label="p">{pText(rd.lag1_p)}</Num>
+          <td role="cell" className="rd">
+            {rd.lag1_reading ?? ""}
+          </td>
         </tr>
         {rd.tests.map((t) => (
-          <tr key={t.code}>
-            <th scope="row">{t.name}</th>
-            <td className="num">{plain(t.statistic, 2)}</td>
-            <td className="num">{t.df === null ? "" : `df ${t.df}`}</td>
-            <td className="num">{pText(t.p)}</td>
-            <td className="rd">{t.reading}</td>
+          <tr key={t.code} role="row">
+            <th role="rowheader" scope="row">
+              {t.name}
+            </th>
+            <Num label="Statistic">{plain(t.statistic, 2)}</Num>
+            <Num label="Reference">{t.df === null ? "" : `df ${t.df}`}</Num>
+            <Num label="p">{pText(t.p)}</Num>
+            <td role="cell" className="rd">
+              {t.reading}
+            </td>
           </tr>
         ))}
       </RegTable>
@@ -204,7 +246,7 @@ export function RegressionDetail({ report }: ReportPanelProps) {
     .join(" ");
   return (
     <Panel id="regression-detail" title={title} question={question} footnote={footnote} how={how}>
-      <RegTable label="Regression detail table" heads={MAIN_HEADS}>
+      <RegTable label="Regression detail table" heads={MAIN_HEADS} scroll>
         <TermRows fit={rg} vif={rg.vif} />
       </RegTable>
       {rg.alpha_sentence ? <p className="reading">{rg.alpha_sentence}</p> : null}

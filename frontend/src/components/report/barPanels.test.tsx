@@ -166,13 +166,11 @@ describe("RollingPanel", () => {
     const { container } = render(<RollingPanel report={mockReport} win={252} onWinChange={vi.fn()} />);
     const rows = Array.from(container.querySelectorAll("tbody tr"));
     expect(rows).toHaveLength(5);
-    expect(cells(rows[0] as Element).filter((_, i) => i !== 1)).toEqual([
-      "Mkt-RFMarket",
-      "+0.997",
-      "+0.998",
-      "+0.99 to +1.01",
-    ]);
-    expect(cells(rows[1] as Element).slice(2)).toEqual(["−0.160", "−0.146", "−0.21 to −0.07"]);
+    const rangeOf = (row?: Element) => row?.querySelector("td.range")?.firstChild?.textContent;
+    expect(cells(rows[0] as Element).filter((_, i) => i !== 1).slice(0, 3)).toEqual(["Mkt-RFMarket", "+0.997", "+0.998"]);
+    expect(rangeOf(rows[0])).toBe("+0.99 to +1.01");
+    expect(cells(rows[1] as Element).slice(2, 4)).toEqual(["−0.160", "−0.146"]);
+    expect(rangeOf(rows[1])).toBe("−0.21 to −0.07");
     const title = rows[1]?.querySelector("td.range")?.getAttribute("title") ?? "";
     expect(title).toMatch(/^Spread \d\.\d{3}, lowest [+−]\d\.\d{3}, highest [+−]\d\.\d{3}, above zero in \d+% of windows$/);
     expect(rows[0]?.querySelector("td.range")?.getAttribute("title")).toContain("above zero in 100% of windows");

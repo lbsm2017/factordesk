@@ -294,13 +294,33 @@ function RollingRow({ block, row, tokens, onChart, onZoom }: RowProps) {
         {signed(s.mean)}
       </td>
       <td role="cell" className="num range" title={tip}>
-        {signed(s.p10, 2)} to {signed(s.p90, 2)}
+        {`${signed(s.p10, 2)} to ${signed(s.p90, 2)}`}
+        <span className="vh">. {tip}</span>
       </td>
     </tr>
   );
 }
 
 // ---------------------------------------------------------------------------- one window
+
+/** Plot width in percent that one label needs on a phone ("Jan 2026" in a plot about 300 px wide). */
+const NARROW_GAP = 24;
+
+/**
+ * Indices of the x labels kept under 720 px: the first and the last always, then the major ones
+ * that clear every label already kept. Fixes a phone showing a single label (review DF8).
+ */
+export function narrowTicks(ticks: { x: number; major: boolean }[]): Set<number> {
+  const rank = (i: number) => (i === 0 ? 0 : i === ticks.length - 1 ? 1 : ticks[i]?.major ? 2 : 3);
+  const order = ticks.map((_, i) => i).filter((i) => rank(i) < 3);
+  order.sort((a, b) => rank(a) - rank(b) || a - b);
+  const kept: number[] = [];
+  for (const i of order) {
+    const x = (ticks[i] as { x: number }).x;
+    if (kept.every((k) => Math.abs((ticks[k] as { x: number }).x - x) >= NARROW_GAP)) kept.push(i);
+  }
+  return new Set(kept);
+}
 
 function RollingBlock({
   block,
@@ -340,6 +360,7 @@ function RollingBlock({
 
   const ticks = dateTicks(from, to);
   const pos = (ms: number) => ((ms - from) / Math.max(to - from, 1)) * 100;
+  const narrow = narrowTicks(ticks.map((t) => ({ x: pos(t.ms), major: t.major })));
   const k = block.window;
 
   return (
@@ -380,16 +401,16 @@ function RollingBlock({
           ))}
         </tbody>
         <tfoot role="rowgroup">
-          <tr role="row" className="axis-row">
+          <tr role="row" className="axis-row" aria-hidden="true">
             <td role="cell" />
-            <td role="cell" className="axis time" aria-hidden="true">
+            <td role="cell" className="axis time">
               <div className="xl-wrap">
-                {ticks.map((t) => {
+                {ticks.map((t, i) => {
                   const x = pos(t.ms);
                   return (
                     <span
                       key={t.ms}
-                      className={`xl${t.major ? "" : " minor"}${x < 3 ? " edge-l" : x > 97 ? " edge-r" : ""}`}
+                      className={`xl${t.major ? "" : " minor"}${narrow.has(i) ? " keep" : ""}${x < 3 ? " edge-l" : x > 97 ? " edge-r" : ""}`}
                       style={{ left: `${x.toFixed(2)}%` }}
                     >
                       {t.label}
