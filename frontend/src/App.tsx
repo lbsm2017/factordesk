@@ -22,8 +22,8 @@ import { useUrlState } from "./state/useUrlState";
 import "./styles/controls.css";
 
 /** Development only: `/?demo=1` renders the mock report so the panels can be seen without the API. */
-function isDemo(): boolean {
-  return import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo") === "1";
+function demoRequested(): boolean {
+  return new URLSearchParams(window.location.search).get("demo") === "1";
 }
 
 function DemoPage() {
@@ -98,5 +98,5 @@ function Dashboard() {
 }
 
 export function App() {
-  return isDemo() ? <DemoPage /> : <Dashboard />;
+  return import.meta.env.DEV && demoRequested() ? <DemoPage /> : <Dashboard />;
 }
