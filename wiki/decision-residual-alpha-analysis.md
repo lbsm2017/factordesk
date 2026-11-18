@@ -64,3 +64,17 @@ A real holdout design (such as walk-forward scoring), which the specification de
 - [No look-ahead rule](decision-no-look-ahead-rule.md)
 - [Which betas count as reliable](decision-which-betas-count-as-reliable.md)
 - [Return and risk attribution](decision-return-and-risk-attribution.md)
+
+## After validation (2026-11-18)
+
+An independent validation recomputed the numbers and found the statistics right. It found five things to fix, now fixed on `feat/residual-alpha` (details in `docs/validation/residual-alpha-handoff-2026-11-18.md`, section 6):
+
+- The verdict now reads the same quality-gated alpha tag as the chip in the table, so a "noise" chip can no longer sit under a verdict that says the alpha is distinguishable from zero.
+- If a factor is constant in one half of the period, only the split-half part says it could not be fitted. The rest of the section still builds.
+- If the residual panel fails to load or crashes, it shows "This section could not be shown." in its own frame. The rest of the dashboard stays on screen.
+- The row "Survival of the alpha ..." is now "Kept with point-in-time betas". When the verdict says the alpha cannot be told apart from zero, the share and kept rows print "n/a, the in-sample alpha is not distinguishable from zero".
+- The verdict message and both tables round to the nearest 5 points the same way, halves away from zero.
+
+Superseded: the two bullets above under "What is not done or not validated" that say the section is not validated and that the table still shows a survival ratio for noise. The section has been independently validated (merge with conditions); the survival-ratio problem is fixed and the one open condition is the deferral below. The first bullet under "What it costs us" about "Built ... not yet validated" is also out of date. The older text is kept as it was written.
+
+Still open: owner choice 2 (use earlier data before a later start date) is deferred, 2026-11-18, until the owner confirms it. The validator accepted a merge only with the owner's agreement to that deferral. The owner accepted the edits to shared contract files earlier. The methodology still says "survives", "Survival" and the old verdict rule; the changes above are proposals for it and are not written into `docs/methodology*.md`.

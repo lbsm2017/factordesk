@@ -155,3 +155,29 @@ Further checks that need no author number:
 - **Mutation testing** (`wiki/decision-independent-validation-and-mutation-testing.md`): the validator picks its own mutants of the residual modules; suggested targets are the lag of the beta window (off by one), a missing `RF` subtraction, filling a gap row with zero, a changed HAC lag, and the sign of the gap.
 
 Report back with: the sample check (n, dates), a table of expected against recomputed values, any mismatch above tolerance, and the validator's own TR26 rate.
+
+## 6. After validation (2026-11-18)
+
+The independent validation (`docs/reviews/residual-alpha-validation-2026-11-18.md`, verdict: merge with conditions) was merged into this branch together with its two added tests. The fixes below follow its findings. The earlier sections of this document are kept as written; where they are overtaken, this section says so.
+
+| Finding | Fix | Where |
+| --- | --- | --- |
+| F1 verdict ignored the quality gate | `decide_verdict` takes `in_sample_reliable`; `gap_statistics` passes `reg.alpha_tag == "reliable"`, the tag the in-sample chip shows, so chip and verdict cannot disagree. The daily p-value stays for display. Test with a gated regression whose daily p is far below 0.05. | `analytics/residual.py`, `tests/test_residual.py` |
+| F2 degenerate half stopped the report | `split_half_alpha` returns status `failed` with the reason "The split-half regression could not be fitted (singular factor design in one half)." The rest of the section builds. Test: CMA zero on rows 1 to 700 of 1,300. | `analytics/residual_stability.py`, `tests/test_section_residual_alpha.py` |
+| F3 a panel failure blanked the dashboard | New `PanelBoundary` (error boundary that falls back to the common `Panel` frame with its empty state: "This section could not be shown."), used around the lazy body. Tested with a throwing child and with a throwing body. | `components/report/PanelBoundary.tsx`, `ResidualAlphaPanel.tsx` |
+| F4 "Survival" printed for noise | Row renamed "Kept with point-in-time betas". When the verdict is `no_reliable_alpha` or `point_in_time_only`, the share row and the kept row print "n/a, the in-sample alpha is not distinguishable from zero". Both panels and the wording file changed together; both equality tests pass. The old-label list of the React test now forbids "Survival of the alpha" and no longer lists "Kept with point-in-time betas". | both panels, `residual_alpha_wording.json` |
+| F5 rounding of half points | One rule, `factordesk/rounding.py` (`round_to_five_points`, nearest 5 points, halves away from zero, 1e-9 tolerance), used by the verdict message and the static table; the React `round5` is the same rule. `ratio_text` no longer prints "-0%" for a tiny negative ratio. Edge values (12.5, 37.5, negatives, exactly 100, over 200, 0.4749999999999999) are in the wording file and in a test on each side. | `rounding.py`, both panels |
+
+Not changed, on purpose:
+- **F6 and F7 are not changed.** The edits to contract files (`BUILT_SECTIONS` tuple, panel registry tests, section fixtures, `label_text.json`, smoke test and its setup) were accepted by the owner earlier. `label_text.json` still needs a line in the SC7 table (append-only); that file is a spec and was not edited here.
+- **Owner decision 2 (earlier data before a later start date) is deferred, 2026-11-18, pending the owner's confirmation.** Nothing printed is wrong while it is not built: the point-in-time line starts `W` rows after the chosen start and uses no earlier data.
+- F8 (test gaps) is covered for the two survived mutants by the validator's tests, which were kept. TR15 (c) and TR12 are unchanged.
+- F9: `ruff format --check backend` fails on four files this branch does not touch: `report/panel_registry.py`, `report/panels/fragility.py`, `report/panels/kalman.py`, `report/panels/lead_lag.py`. They were not formatted here. Every file changed by this branch is formatted.
+
+Methodology proposals, not applied (`docs/methodology*.md` was not edited):
+- R4.8: when the quality gate of M3.6 fires, "in-sample alpha reliable" means the gated alpha tag, not `p_is < 0.05` (F1; the code now behaves this way).
+- R4.7 and R8: the share and survival rows print "n/a, the in-sample alpha is not distinguishable from zero" when the verdict is `no_reliable_alpha` or `point_in_time_only` (F4; section 4, item 2 above is now built as proposed). The row name is "Kept with point-in-time betas".
+- R4.7: one rounding helper for message and table, with a tolerance on the half point (F5). Ratios below -200% are not capped, as R4.7 says; this is unchanged.
+- R5.3: a half whose factor design is singular gives a not-fitted split-half result, not an error (F2).
+
+Gate results after the fixes: `uv run pytest -q` 637 passed (210 deselected by the `live` and `slow` markers); `ruff check backend` clean; `ruff format --check backend` fails only on the four files above; `pyright` 0 errors; `npm run typecheck` and `lint` clean; `npm test` 448 passed in 31 files; `npm run build` and `size` within budget (initial script 377.5 kB raw, 116.2 kB gzip against 400 and 125); `npm run e2e` 1 passed.
