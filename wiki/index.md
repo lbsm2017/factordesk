@@ -45,6 +45,7 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [No data and no secrets in the repository](decision-no-data-and-no-secrets-in-the-repo.md) [Decided]: data downloaded at run time, keys only in `.env`.
 - [Branches and pull requests](decision-branches-and-pull-requests.md) [Decided]: `prod`, `dev`, feature and fix branches, maintainer merges.
 - [Independent validation and mutation testing](decision-independent-validation-and-mutation-testing.md) [Decided]: a second recomputation plus deliberately injected bugs.
+- [No citation without verification](decision-citations-and-verification.md) [Decided]: every source is looked up and checked by a script, and what we cannot check is listed as unverified.
 - [Precision of the fast rolling regression](decision-rolling-fast-path-precision.md) [Decided-pending-implementation]: the fast path is about 1e-12 from the exact one on real data; its safety check is tighter and costs no speed.
 - [One contract for the five new report sections](decision-schema-v3-contract.md) [Decided-pending-implementation]: optional sections, one file per feature and layer, panel registries, report format version 4.
 

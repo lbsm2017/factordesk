@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use factordesk in your work, please cite it as below. The methods it implements are cited in docs/references.md."
+type: software
+title: factordesk
+abstract: "Fama-French 5-factor analyzer for single tickers. Fits daily excess returns on the five Ken French factors with Newey-West standard errors and reports betas, alpha, rolling exposures, risk and return attribution and residual diagnostics."
+authors:
+  - name: "factordesk contributors"
+repository-code: "https://github.com/lbsm2017/factordesk"
+url: "https://github.com/lbsm2017/factordesk"
+license: MIT
+keywords:
+  - Fama-French
+  - factor model
+  - asset pricing
+  - regression
+  - Newey-West
