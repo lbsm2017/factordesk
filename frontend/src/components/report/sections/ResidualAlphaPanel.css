@@ -1,0 +1,105 @@
+/* Residual return panel. Colours come from tokens.css only; shared classes (panel, seg, legend,
+   notes, scroll-x, glyph, line-svg, grid, zero, tailzone, ylabels, xlabels) are in report.css. */
+
+/* ------------------------------------------------------------------ the table */
+.res-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: var(--s-3); }
+.res-table thead th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 0 6px var(--s-3); border-bottom: 1px solid var(--border); vertical-align: bottom; }
+.res-table thead th.lab { width: 26%; padding-left: 0; }
+.res-table tbody th { text-align: left; font-weight: 500; color: var(--ink-2); padding: 7px var(--s-3) 7px 0; vertical-align: top; border-bottom: 1px solid var(--grid); }
+.res-table tbody td { padding: 7px 0 7px var(--s-3); vertical-align: top; border-bottom: 1px solid var(--grid); }
+.res-table tbody tr:last-child > * { border-bottom: 0; }
+.res-table .strong, .res-mini .strong { font-weight: 560; color: var(--ink); }
+.ci { font-size: var(--fs-1); color: var(--ink-3); font-weight: 400; }
+.res-table .ci.d { display: block; line-height: 1.35; }
+.res-missing { background: var(--sunk); padding: var(--s-4) !important; border-bottom: 0 !important; }
+.res-tag { display: inline-block; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; font-size: var(--fs-1); line-height: 1.5; color: var(--ink-3); }
+.res-tag.reliable { color: var(--ink); font-weight: 560; border-color: var(--ink); }
+.res-empty { margin-top: var(--s-3); padding: var(--s-4); background: var(--sunk); border: 1px solid var(--grid); border-radius: 4px; }
+.res-empty .empty-what { font-weight: 560; }
+.res-empty .empty-do { color: var(--ink-2); margin-top: var(--s-1); }
+
+/* ------------------------------------------------------------------ gap and verdict */
+.res-facts > div { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: var(--s-3); padding: 6px 0; border-bottom: 1px solid var(--grid); }
+.res-facts dt { color: var(--ink-2); }
+.res-facts dd { font-weight: 500; overflow-wrap: anywhere; }
+.res-verdict { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: var(--s-3); align-items: start; margin-top: var(--s-3); padding: var(--s-3) var(--s-4); background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--ink-2); border-radius: 4px; }
+.res-verdict.warning { border-left-color: var(--neg); }
+.res-verdict .glyph { transform: translateY(4px); }
+.res-verdict p { max-width: 76ch; }
+.res-sev { font-weight: 640; }
+
+/* ------------------------------------------------------------------ charts */
+.res-chart-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--s-2) var(--s-4); }
+.res-chart-head h3 { margin-bottom: var(--s-2); }
+.res-plot { height: 220px; margin: 18px 4px 32px 48px; border-bottom: 1px solid var(--axis); }
+.res-plot .line-svg { position: absolute; inset: 0; }
+.res-line { stroke-width: 1.75; }
+.res-line.ins { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 5 3; }
+.res-line.pit, .res-line.full, .res-line.roll { stroke: var(--ink); }
+.line-svg path.res-band { fill: var(--ink-3); fill-opacity: 0.2; stroke: none; }
+.res-key { stroke-width: 2; }
+.res-key.ins { stroke: var(--ink-3); stroke-dasharray: 5 3; }
+.res-key.pit, .res-key.full { stroke: var(--ink); }
+.res-zone { position: absolute; top: 4px; font-size: var(--fs-1); color: var(--ink-2); white-space: nowrap; }
+.res-zone.l { left: 6px; }
+.res-zone.r { right: 6px; }
+.res-legend { justify-content: flex-start; max-width: none; margin-top: var(--s-2); flex-direction: column; gap: var(--s-1); }
+.res-legend li { align-items: flex-start; }
+.res-legend .sw { margin-top: 4px; flex: none; }
+
+.res-scroll { margin-top: var(--s-3); }
+.res-mini { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
+.res-mini.wide { min-width: 600px; }
+.res-mini thead th { font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 0 6px var(--s-3); border-bottom: 1px solid var(--border); vertical-align: bottom; }
+.res-mini thead th:first-child { padding-left: 0; }
+.res-mini thead th.num { text-align: right; }
+.res-mini tbody th { text-align: left; font-weight: 500; padding: 6px var(--s-3) 6px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+.res-mini tbody td { padding: 6px 0 6px var(--s-3); border-bottom: 1px solid var(--grid); vertical-align: top; }
+.res-mini td.num { text-align: right; white-space: nowrap; color: var(--ink-2); }
+.res-mini td.num.strong { color: var(--ink); }
+.res-mini .sub { font-weight: 400; }
+.res-cap { margin-top: var(--s-2); font-size: var(--fs-1); color: var(--ink-3); max-width: 76ch; line-height: 1.45; }
+.res-cap:empty { display: none; }
+.res-sentence { margin-top: var(--s-2); max-width: 76ch; }
+
+/* ------------------------------------------------------------------ stability section */
+details.res-stab { margin-top: var(--s-5); border-top: 1px solid var(--border); }
+details.res-stab > summary { display: block; cursor: pointer; padding: var(--s-3) 0; font-weight: 600; list-style: none; }
+details.res-stab > summary::-webkit-details-marker { display: none; }
+details.res-stab > summary::before { content: "+"; display: inline-block; width: 1em; }
+details.res-stab[open] > summary::before { content: "\2212"; }
+.res-sub { margin-top: var(--s-4); }
+.res-sub h3 { margin-top: 0; }
+.res-checks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-2) var(--s-5); }
+.res-checks h4 { margin: 0 0 var(--s-1); font-size: var(--fs-2); font-weight: 600; }
+.res-checks .notes li { font-size: var(--fs-1); }
+.res-caution { margin-top: var(--s-5); max-width: 76ch; font-size: var(--fs-1); color: var(--ink-2); line-height: 1.45; }
+.res-caveats { margin-top: var(--s-4); }
+.res-caveats li { font-size: var(--fs-1); color: var(--ink-2); }
+
+/* ------------------------------------------------------------------ narrow screens */
+@media screen and (max-width: 719px) {
+  .res-table thead th.lab { width: 30%; }
+  .res-table tbody th { font-size: var(--fs-1); }
+  .res-table tbody td { padding-left: var(--s-2); overflow-wrap: anywhere; }
+  .res-table thead th { padding-left: var(--s-2); }
+  .res-table .ci { display: block; line-height: 1.35; }
+  .res-table .res-tag { margin-top: 2px; }
+  .res-missing { padding: var(--s-3) !important; }
+  .res-facts > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .res-plot { height: 170px; margin: 18px 2px 32px 40px; }
+  .res-plot .xlabels .xl.keep { display: block; }
+  .res-plot .xlabels .xl:not(.keep) { display: none; }
+  .res-chart-head .seg { width: 100%; }
+  .res-chart-head .seg-btns { display: flex; width: 100%; }
+  .res-chart-head .seg label { flex: 1 1 0; justify-content: center; text-align: center; padding: 0 6px; }
+  .res-checks { grid-template-columns: minmax(0, 1fr); }
+  .res-mini.wide { min-width: 560px; }
+  details.res-stab > summary { min-height: 44px; }
+}
+
+@media print {
+  .res-chart-head .seg { display: none; }
+  details.res-stab::details-content { content-visibility: visible; display: block; }
+  .res-verdict, .res-table, .res-plot { break-inside: avoid; }
+}
