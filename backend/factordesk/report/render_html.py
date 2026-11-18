@@ -56,7 +56,10 @@ WARN_PLAIN = {
     ),
     "short_history": "The history is short, so the betas rest on a small sample.",
     "collinearity": "Some factors move together in this sample, so single betas are less precise.",
-    "audit_errors": "The price audit found errors; the analysis still uses prices as published.",
+    "audit_errors": (
+        "The price audit found errors, so the headline numbers are not interpretable until "
+        "they are explained; see Data and audit."
+    ),
     "audit_warnings": "The price audit flagged some unusual price moves; see Data and audit.",
     "factor_data_lag": (
         "The factor data stops before the latest prices, so the newest days are charted but "
@@ -588,7 +591,13 @@ def _kpis(report: FactorReport) -> str:
             "Widen the date range and run the report again.",
         )
         return f'<section class="kpis" aria-label="Headline statistics">{body}</section>'
-    if g.alpha_tag == "reliable":
+    # Validation F4: with audit errors one bad row can dominate every fitted number, so the
+    # fitted tiles are muted and alpha carries no significance claim (the values stay shown).
+    audit_errors = d.audit_status == "errors"
+    fit_cls = "ns" if audit_errors else ""
+    if audit_errors:
+        alpha_note, alpha_cls = "Not interpretable: the price audit found errors", "ns"
+    elif g.alpha_tag == "reliable":
         alpha_note, alpha_cls = "Distinguishable from zero at 5%", ""
     elif g.alpha_tag == "noise":
         alpha_note, alpha_cls = "Not distinguishable from zero", "ns"
@@ -599,12 +608,12 @@ def _kpis(report: FactorReport) -> str:
     )
     cells = [
         ("Alpha, a year", esc(_pct(g.alpha_annual)), alpha_note, alpha_cls),
-        ("R&#178;", esc(_num(g.r2, 4)), "Share of daily variance the factors explain", ""),
+        ("R&#178;", esc(_num(g.r2, 4)), "Share of daily variance the factors explain", fit_cls),
         (
             "Residual volatility",
             esc(_pct(g.sigma_e_annual, 1, False)),
             "A year, left unexplained by the factors",
-            "",
+            fit_cls,
         ),
         ("Observations", f"{d.n_obs:,}", excl, ""),
         (

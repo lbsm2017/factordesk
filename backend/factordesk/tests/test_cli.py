@@ -258,6 +258,9 @@ def test_t126_degenerate_inputs_end_cleanly(
         assert len(dup) == 1 and dup[0].severity == "error"
         assert dup[0].dates == [history.frame.index[399].date()]
         assert rep.data.n_obs == 800
+        # Validation F4: the audit warning says the headline is not interpretable.
+        audit_warning = next(w for w in rep.warnings if w.code == "audit_errors")
+        assert "not interpretable" in audit_warning.message
 
 
 def test_unexpected_numerical_error_is_one_line(

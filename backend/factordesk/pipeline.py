@@ -676,7 +676,9 @@ def _warnings(
                 code="audit_errors",
                 message=(
                     f"The price audit reported {n_err} error finding(s); see Audit findings. "
-                    "The analysis still uses Adj Close as published."
+                    "The analysis still uses Adj Close as published, so a single bad row can "
+                    "dominate alpha, the betas and R²: treat the headline numbers as not "
+                    "interpretable until the findings are explained."
                 ),
             )
         )

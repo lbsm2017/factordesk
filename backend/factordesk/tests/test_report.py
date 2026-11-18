@@ -760,6 +760,39 @@ def test_render_five_kpi_cells() -> None:
     assert "Data audit" not in kpis and "Adjusted R" not in kpis
 
 
+def _kpi_cells(page: str) -> dict[str, tuple[str, str, str]]:
+    """KPI label -> (class attribute, value, note) from a rendered page."""
+    kpis = page.split('aria-label="Headline statistics"')[1].split("</section>")[0]
+    cells = re.findall(
+        r'<div class="(kpi[^"]*)"><dt>(.*?)</dt><dd class="v">(.*?)</dd><dd class="n">(.*?)</dd>',
+        kpis,
+    )
+    return {label: (cls, value, note) for cls, label, value, note in cells}
+
+
+def test_render_audit_errors_mute_the_headline() -> None:
+    """Validation F4: audit errors mute the fitted tiles and drop alpha's significance claim."""
+    rep = build_mock_report()
+    clean = _kpi_cells(render_report_html(rep))
+    assert "Not interpretable" not in clean["Alpha, a year"][2]
+    assert clean["R&#178;"][0] == "kpi " and clean["Residual volatility"][0] == "kpi "
+    bad = rep.model_copy(
+        update={
+            "data": rep.data.model_copy(update={"audit_status": "errors"}),
+            "warnings": [ReportWarning(code="audit_errors", message="MOCK audit.")],
+        }
+    )
+    page = render_report_html(bad)
+    summary = page.split('class="notice-sum"')[1].split("</p>")[0]
+    assert "headline numbers are not interpretable" in summary
+    cells = _kpi_cells(page)
+    alpha_cls, alpha_value, alpha_note = cells["Alpha, a year"]
+    assert (alpha_cls, alpha_note) == ("kpi ns", "Not interpretable: the price audit found errors")
+    assert alpha_value == clean["Alpha, a year"][1]  # the number itself stays shown
+    assert cells["R&#178;"][0] == "kpi ns" and cells["Residual volatility"][0] == "kpi ns"
+    assert cells["Observations"][0] == "kpi "  # counts and dates are not fitted numbers
+
+
 def test_render_header_chips_and_notice_details() -> None:
     page = render_report_html(build_mock_report())
     assert page.count('class="chip') == 2  # factor data end, warnings
