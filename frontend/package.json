@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently --kill-others --names api,web \"uv run factordesk serve --dev\" \"vite\"",
     "build": "tsc --noEmit && vite build",
+    "size": "node scripts/size.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",

@@ -11,6 +11,10 @@ export default tseslint.config(
   jsxA11y.flatConfigs.recommended,
   reactHooks.configs.flat.recommended,
   {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: { globals: { console: "readonly", process: "readonly", URL: "readonly" } },
+  },
+  {
     files: ["src/**/*.{ts,tsx}"],
     plugins: { react },
     rules: {
