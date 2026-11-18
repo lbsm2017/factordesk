@@ -25,6 +25,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend/factordesk"]
+# The report renderer reads its stylesheet and fonts from the package directory.
+artifacts = ["backend/factordesk/report/report.css", "backend/factordesk/report/fonts/*"]
 
 [dependency-groups]
 dev = [
