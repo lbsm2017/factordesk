@@ -7,18 +7,33 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import re
 import tempfile
-from collections.abc import Callable
+import threading
+import time
+from collections.abc import Callable, Sequence
+from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 import numpy as np
 import pandas as pd
 
 from factordesk.config import get_settings
+from factordesk.data.throttle import (
+    RATE_LIMIT_MESSAGE,
+    BatchSettings,
+    CircuitBreaker,
+    JitterSource,
+    RateLimiter,
+    backoff_delay,
+    is_rate_limited,
+    is_transient,
+    retry_after_seconds,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +95,90 @@ class PriceHistory:
 
 class PriceProvider(Protocol):
     def fetch(self, ticker: str) -> PriceHistory: ...
+
+
+FailureReason = Literal[
+    "invalid_ticker",  # not a safe symbol; no request was made
+    "no_data",  # Yahoo answered but the history is missing, empty or unusable
+    "rate_limited",  # Yahoo kept limiting this ticker until the attempts ran out
+    "skipped_rate_limited",  # never requested: the batch stopped after repeated rate limits
+    "network",  # timeouts or connection errors until the attempts ran out
+    "unexpected",  # anything else; logged with its traceback
+]
+
+
+@dataclass(frozen=True)
+class PriceFailure:
+    """Why one ticker has no history: a reason code and one plain sentence."""
+
+    ticker: str
+    reason: FailureReason
+    message: str
+
+
+@dataclass(frozen=True)
+class TickerOutcome:
+    """The result for one ticker: exactly one of ``history`` or ``failure``."""
+
+    ticker: str
+    history: PriceHistory | None = None
+    failure: PriceFailure | None = None
+    from_cache: bool = False
+
+    def __post_init__(self) -> None:
+        if (self.history is None) == (self.failure is None):
+            raise ValueError("a TickerOutcome holds exactly one of history or failure")
+
+
+@dataclass(frozen=True)
+class BatchResult:
+    """Everything a multi-ticker download produced, in the order the tickers were asked for.
+
+    ``outcomes`` has one entry per distinct ticker (first occurrence order, including invalid
+    ones). Repeated tickers are not downloaded twice; they are listed in ``duplicates`` so
+    nothing disappears silently.
+    """
+
+    outcomes: tuple[TickerOutcome, ...]
+    duplicates: tuple[str, ...]
+    elapsed_seconds: float
+
+    @property
+    def histories(self) -> dict[str, PriceHistory]:
+        return {o.ticker: o.history for o in self.outcomes if o.history is not None}
+
+    @property
+    def failures(self) -> tuple[PriceFailure, ...]:
+        return tuple(o.failure for o in self.outcomes if o.failure is not None)
+
+    @property
+    def cache_hits(self) -> int:
+        return sum(1 for o in self.outcomes if o.history is not None and o.from_cache)
+
+    @property
+    def downloaded(self) -> int:
+        return sum(1 for o in self.outcomes if o.history is not None and not o.from_cache)
+
+    @property
+    def skipped(self) -> int:
+        return sum(1 for f in self.failures if f.reason == "skipped_rate_limited")
+
+    @property
+    def failed(self) -> int:
+        return len(self.failures) - self.skipped
+
+    @property
+    def rate_limited(self) -> bool:
+        return any(f.reason in ("rate_limited", "skipped_rate_limited") for f in self.failures)
+
+    @property
+    def message(self) -> str | None:
+        """A plain-words note for the user when Yahoo limited the batch, else None."""
+        return RATE_LIMIT_MESSAGE if self.rate_limited else None
+
+
+class BatchPriceProvider(Protocol):
+    def fetch_many(self, tickers: Sequence[str]) -> BatchResult: ...
 
 
 def validate_ticker(ticker: str) -> str:
@@ -214,15 +313,36 @@ def _atomic_write_parquet(frame: pd.DataFrame, path: Path) -> None:
 
 
 class YFinanceProvider:
-    """Fetches full daily history from Yahoo Finance with a same-day parquet cache."""
+    """Fetches full daily history from Yahoo Finance with a same-day parquet cache.
+
+    ``fetch`` loads one ticker. ``fetch_many`` loads several in small chunks on a few threads
+    with spaced requests, retries and a circuit breaker (see data/throttle.py).
+    """
 
     def __init__(
         self,
         cache_dir: Path | None = None,
         now: Callable[[], datetime] | None = None,
+        *,
+        settings: BatchSettings | None = None,
+        download: Callable[[str], pd.DataFrame] | None = None,
+        monotonic: Callable[[], float] | None = None,
+        sleep: Callable[[float], None] | None = None,
+        rng: JitterSource | None = None,
+        executor_factory: Callable[[int], Executor] | None = None,
     ) -> None:
         self._cache_dir = cache_dir
         self._now: Callable[[], datetime] = now or (lambda: datetime.now(UTC))
+        self._settings = settings
+        self._download: Callable[[str], pd.DataFrame] = download or _download_history
+        self._monotonic: Callable[[], float] = monotonic or time.monotonic
+        self._sleep: Callable[[float], None] = sleep or time.sleep
+        self._rng: JitterSource = rng or random.Random()
+        self._executor_factory: Callable[[int], Executor] = executor_factory or (
+            lambda workers: ThreadPoolExecutor(max_workers=workers, thread_name_prefix="prices")
+        )
+        self._locks_guard = threading.Lock()
+        self._symbol_locks: dict[str, threading.Lock] = {}
 
     @property
     def cache_dir(self) -> Path:
@@ -266,17 +386,9 @@ class YFinanceProvider:
         logger.info("Price cache hit for %s", ticker)
         return PriceHistory(ticker, frame, fetched_at, SOURCE_YFINANCE, duplicates)
 
-    def fetch(self, ticker: str) -> PriceHistory:
-        symbol = validate_ticker(ticker)
-        now_utc = self._now()
-        path = self._cache_path(symbol, now_utc.date())
-        cached = self._read_cache(symbol, path)
-        if cached is not None:
-            return cached
-
-        # Always the full history: adjusted history is rewritten at every dividend, so
-        # appending increments to an older download would mix adjustment bases.
-        raw = _download_history(symbol)
+    def _normalize_and_store(
+        self, raw: pd.DataFrame, symbol: str, now_utc: datetime, path: Path
+    ) -> PriceHistory:
         frame, duplicates = normalize_frame(raw, symbol, now_utc)
 
         to_store = frame.copy()
@@ -288,6 +400,169 @@ class YFinanceProvider:
         except OSError:
             logger.warning("Could not write price cache for %s", symbol, exc_info=True)
         return PriceHistory(symbol, frame, now_utc, SOURCE_YFINANCE, duplicates)
+
+    def fetch(self, ticker: str) -> PriceHistory:
+        symbol = validate_ticker(ticker)
+        now_utc = self._now()
+        path = self._cache_path(symbol, now_utc.date())
+        cached = self._read_cache(symbol, path)
+        if cached is not None:
+            return cached
+
+        # Always the full history: adjusted history is rewritten at every dividend, so
+        # appending increments to an older download would mix adjustment bases.
+        raw = self._download(symbol)
+        return self._normalize_and_store(raw, symbol, now_utc, path)
+
+    # ------------------------------------------------------------ batch download
+
+    def _symbol_lock(self, symbol: str) -> threading.Lock:
+        with self._locks_guard:
+            return self._symbol_locks.setdefault(symbol, threading.Lock())
+
+    def fetch_many(self, tickers: Sequence[str]) -> BatchResult:
+        """Load several tickers: cache first, then chunked, spaced, retried downloads.
+
+        Every distinct ticker gets an outcome, in first-seen order. One bad ticker never fails
+        the batch; a rate limit that persists stops new requests and reports the rest as
+        skipped. Each ticker is still one full-history request (adjustment base unchanged).
+        """
+        started = self._monotonic()
+        settings = self._settings or _settings_from_config()
+
+        outcomes: dict[str, TickerOutcome] = {}
+        order: list[str] = []
+        duplicates: list[str] = []
+        valid: set[str] = set()
+        for raw_ticker in tickers:
+            try:
+                key = validate_ticker(raw_ticker)
+                valid.add(key)
+            except PriceDataError as exc:
+                key = str(raw_ticker)
+                if key not in outcomes:
+                    outcomes[key] = _failed(key, "invalid_ticker", str(exc))
+            if key in order:
+                duplicates.append(key)
+            else:
+                order.append(key)
+
+        now_utc = self._now()
+        misses: list[str] = []
+        for symbol in order:
+            if symbol not in valid:
+                continue
+            cached = self._read_cache(symbol, self._cache_path(symbol, now_utc.date()))
+            if cached is not None:
+                outcomes[symbol] = TickerOutcome(symbol, history=cached, from_cache=True)
+            else:
+                misses.append(symbol)
+
+        if misses:
+            limiter = RateLimiter(
+                settings.min_interval_seconds, self._monotonic, self._sleep, self._rng
+            )
+            breaker = CircuitBreaker(settings.breaker_threshold)
+            size = settings.chunk_size
+            chunks = [misses[i : i + size] for i in range(0, len(misses), size)]
+            workers = min(settings.max_workers, len(chunks))
+
+            def run_chunk(chunk: list[str]) -> list[TickerOutcome]:
+                return [
+                    self._download_one(symbol, now_utc, settings, limiter, breaker)
+                    for symbol in chunk
+                ]
+
+            with self._executor_factory(workers) as pool:
+                for chunk_outcomes in pool.map(run_chunk, chunks):
+                    for outcome in chunk_outcomes:
+                        outcomes[outcome.ticker] = outcome
+
+        result = BatchResult(
+            outcomes=tuple(outcomes[key] for key in order),
+            duplicates=tuple(duplicates),
+            elapsed_seconds=self._monotonic() - started,
+        )
+        logger.info(
+            "Price batch: %d from cache, %d downloaded, %d failed, %d skipped in %.2fs",
+            result.cache_hits,
+            result.downloaded,
+            result.failed,
+            result.skipped,
+            result.elapsed_seconds,
+        )
+        return result
+
+    def _download_one(
+        self,
+        symbol: str,
+        now_utc: datetime,
+        settings: BatchSettings,
+        limiter: RateLimiter,
+        breaker: CircuitBreaker,
+    ) -> TickerOutcome:
+        """Download one ticker with retries. Never raises for a data or network problem."""
+        path = self._cache_path(symbol, now_utc.date())
+        with self._symbol_lock(symbol):  # the same ticker twice at once downloads once
+            cached = self._read_cache(symbol, path)
+            if cached is not None:
+                return TickerOutcome(symbol, history=cached, from_cache=True)
+
+            for attempt in range(1, settings.max_attempts + 1):
+                if breaker.tripped:
+                    return _failed(symbol, "skipped_rate_limited", RATE_LIMIT_MESSAGE)
+                limiter.wait()
+                try:
+                    raw = self._download(symbol)
+                    history = self._normalize_and_store(raw, symbol, now_utc, path)
+                except PriceDataError as exc:
+                    breaker.record_answered()  # Yahoo replied; the problem is this ticker
+                    return _failed(symbol, "no_data", str(exc))
+                except Exception as exc:
+                    # Sorted into a typed failure below; nothing is swallowed.
+                    if is_rate_limited(exc):
+                        tripped = breaker.record_rate_limited()
+                        if tripped or attempt == settings.max_attempts:
+                            logger.warning("%s: rate limited by Yahoo (try %d)", symbol, attempt)
+                            return _failed(symbol, "rate_limited", RATE_LIMIT_MESSAGE)
+                    elif is_transient(exc):
+                        if attempt == settings.max_attempts:
+                            logger.warning("%s: network error, giving up", symbol, exc_info=True)
+                            return _failed(
+                                symbol,
+                                "network",
+                                f"Could not reach Yahoo for {symbol} after {attempt} tries. "
+                                "Check the connection and try again.",
+                            )
+                    else:
+                        logger.warning("%s: unexpected download error", symbol, exc_info=True)
+                        return _failed(
+                            symbol,
+                            "unexpected",
+                            f"Downloading {symbol} failed unexpectedly ({type(exc).__name__}).",
+                        )
+                    self._sleep(backoff_delay(attempt, retry_after_seconds(exc), self._rng))
+                else:
+                    breaker.record_answered()
+                    return TickerOutcome(symbol, history=history)
+            # The last attempt always returns above; kept so a later change to the loop cannot
+            # fall through silently.
+            return _failed(symbol, "unexpected", f"Downloading {symbol} did not finish.")
+
+
+def _failed(ticker: str, reason: FailureReason, message: str) -> TickerOutcome:
+    return TickerOutcome(ticker, failure=PriceFailure(ticker, reason, message))
+
+
+def _settings_from_config() -> BatchSettings:
+    cfg = get_settings()
+    return BatchSettings(
+        chunk_size=cfg.price_chunk_size,
+        max_workers=cfg.price_max_workers,
+        min_interval_seconds=cfg.price_min_interval_seconds,
+        max_attempts=cfg.price_max_attempts,
+        breaker_threshold=cfg.price_breaker_threshold,
+    )
 
 
 class AlpacaProvider:

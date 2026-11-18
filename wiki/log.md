@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (parallel price downloads)
+
+- Added [parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) after the owner asked for chunked, parallel Yahoo downloads with care over throttling. Status Decided-pending-implementation until merged. No Yahoo limit is claimed: the repo records none as published.
+
 ## 2026-11-18 (dashboard)
 
 - Added [dashboard server and interface](decision-dashboard-server-and-interface.md) after the owner approved building it. Spec: `docs/specs/dashboard.md`. Dropped Tailwind and shadcn/ui, dropped the YTD and 1Y chips (the pipeline needs 504 days).

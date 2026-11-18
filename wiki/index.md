@@ -17,6 +17,7 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 
 - [Factor data source: the Ken French Data Library](decision-factor-data-source-french-library.md) [Decided]: one public library is the single source of truth for factors.
 - [Prices from Yahoo, with adjusted-close care](decision-prices-from-yahoo-with-adjusted-close-care.md) [Decided]: raw bars, total return from adjusted close, independent recomputation, same-day cache.
+- [Parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) [Decided-pending-implementation]: a few tickers at a time, spaced requests, slow retries and a stop switch, because Yahoo publishes no rate limit.
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md) [Proposed]: regional factor files, US dollar conversion and an optional currency regressor.
 
 ### Statistics
