@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (residual alpha built)
+
+- Updated `decision-residual-alpha-analysis.md` with an "As of commit 4518e38" block: the residual return panel is built in both renderers on branch `feat/residual-alpha`, not yet independently validated, owner choice 2 not implemented. The handoff for the validator is `docs/validation/residual-alpha-handoff-2026-11-18.md`.
+
 ## 2026-11-18 (owner ranking)
 
 - The owner ranked 16 epics on 2026-11-18. The [priority ranking](../docs/ROADMAP.md#priority-ranking-owner-2026-11-18) is in the roadmap, and Now, Next, Later and Very later follow that order.

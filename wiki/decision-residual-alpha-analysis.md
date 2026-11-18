@@ -1,7 +1,7 @@
 # Decision: residual (alpha) analysis with an in-sample and a point-in-time line
 
 Date: 2026-11-18
-Status: Decided-pending-implementation
+Status: Implemented on branch `feat/residual-alpha`; not yet independently validated; not merged
 
 ## In one sentence
 
@@ -31,10 +31,23 @@ A static-beta residual line always drifts by the regression alpha, because the b
 
 ## What it costs us
 
-- The owner's wording "holds up out-of-sample" can still be over-read as a real holdout, which is why the caveat is required. The specification body still uses "survives" and "holds up with point-in-time betas"; strings must be updated.
+- The owner's wording "holds up out-of-sample" can still be over-read as a real holdout, which is why the caveat is required. The specification body still uses "survives"; the code keeps "survives" only as an internal verdict name and the user-facing strings say "holds up out-of-sample".
 - Using earlier data for the first year loosens the link between the panel and the selected period.
 - Compounded lines describe a paper strategy that ignores trading, financing and borrowing costs.
-- Not implemented as of 2026-11-18; schema and label changes are still to be made.
+- Built on branch `feat/residual-alpha` on 2026-11-18, not yet validated by an independent check (see "As of commit 4518e38" below).
+
+## As of commit 4518e38 (2026-11-18): built, not yet validated
+
+What is built:
+- The calculation (`analytics/residual.py`, `analytics/residual_stability.py`), the report section and its hook, the static HTML panel and the dashboard panel. Both panels print the same headings, row names, survival wording ("100% kept", "more than 200% kept"), notes and caveats, and a test on each side reads one shared wording file.
+- 40 oracle tests (TR01 to TR40) plus panel tests. The slow simulation tests were rerun on 2026-11-18 and pass; the measured rates are in `docs/validation/residual-alpha-handoff-2026-11-18.md`.
+- The live smoke test (TR40) ran once on the cached SPY series from 2010-01-04. SPY showed no residual return distinguishable from zero in either line (in-sample -0.12% a year, point-in-time -0.22% a year), which is the expected answer for an index fund.
+
+What is not done or not validated:
+- Not validated: an independent recomputation without reading the implementation is the next step. Until it is done, treat the numbers as the author's own.
+- Owner choice 2 (use data from before a later start date to warm up the first year) is not implemented. A later start date gives fewer point-in-time days, with no footnote about earlier data.
+- When neither line differs from zero, the table still shows a survival ratio (for SPY "more than 200% kept"). That figure is a ratio of two numbers near zero and means nothing; a fix is proposed in the handoff.
+- Both panels are built and tested on synthetic data plus the one cached SPY series. Nothing else was checked on real tickers, and no AAPL data was cached for the smoke test.
 
 ## What would change our mind
 
