@@ -1,4 +1,3 @@
-import "./RegressionDetail.css";
 import type { ReactNode } from "react";
 import type { FactorReport, FactorStat, MultiDayRegression, ResidualDiagnostics } from "../../api/types";
 import { num, pct, pval, signed, tstat } from "../../format";

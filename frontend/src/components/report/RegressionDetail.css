@@ -1,6 +1,0 @@
-/* Rules the detail tables need from the rev 2 report stylesheet that styles/report.css (prototype port) lacks. */
-.reg thead th { text-align: right; }
-.reg thead th:first-child, .reg thead th.rd { text-align: left; }
-.reg td.rd { white-space: normal; min-width: 280px; color: var(--ink-2); text-align: left; }
-.reg-title { margin-top: var(--s-5); }
-.scroll-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

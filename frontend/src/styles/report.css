@@ -218,7 +218,11 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .reg th, .reg td { padding: 7px 0 7px var(--s-3); border-bottom: 1px solid var(--grid); white-space: nowrap; }
 .reg th:first-child { padding-left: 0; text-align: left; font-weight: 500; }
 .reg thead th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); border-bottom-color: var(--border); }
+.reg thead th { text-align: right; }
+.reg thead th:first-child, .reg thead th.rd { text-align: left; }
+.reg td.rd { white-space: normal; min-width: 280px; color: var(--ink-2); text-align: left; }
 .reg td.num { color: var(--ink); }
+.reg-title { margin-top: var(--s-5); }
 .reg tr.ns td { color: var(--ink-2); }
 .colophon { margin-top: var(--s-5); font-size: var(--fs-1); color: var(--ink-3); }
 
