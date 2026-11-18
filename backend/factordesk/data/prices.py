@@ -15,9 +15,10 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, runtime_checkable
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -95,6 +96,28 @@ class PriceHistory:
 
 class PriceProvider(Protocol):
     def fetch(self, ticker: str) -> PriceHistory: ...
+
+
+RefreshAction = Literal["cached", "incremental", "full", "stale"]
+"""What ``fetch_incremental`` did: ``cached`` no network call, ``incremental`` only the new days,
+``full`` the whole history, ``stale`` the refresh failed and the older cache was served."""
+
+
+@dataclass(frozen=True)
+class HistoryRefresh:
+    """The result of ``fetch_incremental``: the history, what was done, and a note on a failure."""
+
+    history: PriceHistory
+    action: RefreshAction
+    note: str | None = None
+    """Set exactly when ``action`` is ``stale``: where the data ends and why it is not newer."""
+
+
+@runtime_checkable
+class IncrementalPriceProvider(Protocol):
+    """A provider that can bring a cached history up to date by fetching only the new days."""
+
+    def fetch_incremental(self, ticker: str) -> HistoryRefresh: ...
 
 
 FailureReason = Literal[
@@ -191,6 +214,16 @@ def validate_ticker(ticker: str) -> str:
 
 
 def _download_history(ticker: str) -> pd.DataFrame:
+    """Full daily history through ``_yf_history`` (``period="max"``)."""
+    return _yf_history(ticker, period="max")
+
+
+def _download_history_since(ticker: str, start: date) -> pd.DataFrame:
+    """Daily history from ``start`` (inclusive) through ``_yf_history``."""
+    return _yf_history(ticker, start=start.isoformat())
+
+
+def _yf_history(ticker: str, **window: str) -> pd.DataFrame:
     """Thin typed wrapper over yfinance (whose surface is untyped).
 
     Ticker.history() returns single-level columns reliably (yf.download needs
@@ -208,7 +241,7 @@ def _download_history(ticker: str) -> pd.DataFrame:
     try:
         ticker_obj = yf.Ticker(ticker)  # pyright: ignore[reportUnknownMemberType]
         raw = ticker_obj.history(  # pyright: ignore[reportUnknownMemberType]
-            period="max",
+            **window,
             interval="1d",
             auto_adjust=False,
             actions=True,
@@ -326,6 +359,7 @@ class YFinanceProvider:
         *,
         settings: BatchSettings | None = None,
         download: Callable[[str], pd.DataFrame] | None = None,
+        download_since: Callable[[str, date], pd.DataFrame] | None = None,
         monotonic: Callable[[], float] | None = None,
         sleep: Callable[[float], None] | None = None,
         rng: JitterSource | None = None,
@@ -335,6 +369,9 @@ class YFinanceProvider:
         self._now: Callable[[], datetime] = now or (lambda: datetime.now(UTC))
         self._settings = settings
         self._download: Callable[[str], pd.DataFrame] = download or _download_history
+        self._download_since: Callable[[str, date], pd.DataFrame] = (
+            download_since or _download_history_since
+        )
         self._monotonic: Callable[[], float] = monotonic or time.monotonic
         self._sleep: Callable[[float], None] = sleep or time.sleep
         self._rng: JitterSource = rng or random.Random()
@@ -386,11 +423,15 @@ class YFinanceProvider:
         logger.info("Price cache hit for %s", ticker)
         return PriceHistory(ticker, frame, fetched_at, SOURCE_YFINANCE, duplicates)
 
-    def _normalize_and_store(
-        self, raw: pd.DataFrame, symbol: str, now_utc: datetime, path: Path
-    ) -> PriceHistory:
-        frame, duplicates = normalize_frame(raw, symbol, now_utc)
-
+    def _store(
+        self,
+        frame: pd.DataFrame,
+        duplicates: tuple[date, ...],
+        symbol: str,
+        now_utc: datetime,
+        path: Path,
+    ) -> None:
+        """Write ``frame`` as the cache of ``symbol`` for ``path``'s day; failures are logged."""
         to_store = frame.copy()
         to_store.attrs["fetched_at"] = now_utc.isoformat()
         to_store.attrs["duplicate_dates"] = ",".join(d.isoformat() for d in duplicates)
@@ -399,6 +440,12 @@ class YFinanceProvider:
             self._cleanup_old(symbol, keep=path)
         except OSError:
             logger.warning("Could not write price cache for %s", symbol, exc_info=True)
+
+    def _normalize_and_store(
+        self, raw: pd.DataFrame, symbol: str, now_utc: datetime, path: Path
+    ) -> PriceHistory:
+        frame, duplicates = normalize_frame(raw, symbol, now_utc)
+        self._store(frame, duplicates, symbol, now_utc, path)
         return PriceHistory(symbol, frame, now_utc, SOURCE_YFINANCE, duplicates)
 
     def fetch(self, ticker: str) -> PriceHistory:
@@ -500,8 +547,15 @@ class YFinanceProvider:
         settings: BatchSettings,
         limiter: RateLimiter,
         breaker: CircuitBreaker,
+        *,
+        request: Callable[[], pd.DataFrame] | None = None,
+        finish: Callable[[pd.DataFrame], PriceHistory] | None = None,
     ) -> TickerOutcome:
-        """Download one ticker with retries. Never raises for a data or network problem."""
+        """Download one ticker with retries. Never raises for a data or network problem.
+
+        ``request`` and ``finish`` replace the full-history download and its normalise-and-store
+        step (the incremental refresh passes its own); both keep the retry and throttle rules.
+        """
         path = self._cache_path(symbol, now_utc.date())
         with self._symbol_lock(symbol):  # the same ticker twice at once downloads once
             cached = self._read_cache(symbol, path)
@@ -513,8 +567,12 @@ class YFinanceProvider:
                     return _failed(symbol, "skipped_rate_limited", RATE_LIMIT_MESSAGE)
                 limiter.wait()
                 try:
-                    raw = self._download(symbol)
-                    history = self._normalize_and_store(raw, symbol, now_utc, path)
+                    raw = request() if request is not None else self._download(symbol)
+                    history = (
+                        finish(raw)
+                        if finish is not None
+                        else self._normalize_and_store(raw, symbol, now_utc, path)
+                    )
                 except PriceDataError as exc:
                     breaker.record_answered()  # Yahoo replied; the problem is this ticker
                     return _failed(symbol, "no_data", str(exc))
@@ -548,6 +606,180 @@ class YFinanceProvider:
             # The last attempt always returns above; kept so a later change to the loop cannot
             # fall through silently.
             return _failed(symbol, "unexpected", f"Downloading {symbol} did not finish.")
+
+    # ------------------------------------------------------------ incremental refresh
+
+    def _latest_cache(self, symbol: str) -> PriceHistory | None:
+        """The newest cache file of ``symbol`` (any day) if it is readable, else ``None``."""
+        if not self.cache_dir.is_dir():
+            return None
+        pattern = re.compile(rf"^{re.escape(symbol)}_\d{{4}}-\d{{2}}-\d{{2}}\.parquet$")
+        files = sorted(
+            (p for p in self.cache_dir.iterdir() if pattern.fullmatch(p.name)),
+            key=lambda p: p.name,
+            reverse=True,
+        )
+        return self._read_cache(symbol, files[0]) if files else None
+
+    def fetch_incremental(self, ticker: str) -> HistoryRefresh:
+        """The history of ``ticker``, brought up to date by fetching only the days it lacks.
+
+        * A cache file of today, or an older one whose last bar is the latest completed trading
+          day, is served with no network call.
+        * Otherwise only the days after the last cached date are requested, with an overlap of
+          ``REFRESH_OVERLAP_DAYS`` calendar days. If the overlap does not match the cache (a
+          dividend or split rebased the adjusted prices, so old and new rows would mix bases) the
+          whole history is downloaded again.
+        * No usable cache (none, or an unreadable file): the whole history is downloaded once.
+        * A failed refresh keeps the cache: the older history is returned with ``action``
+          ``stale`` and a note saying where it ends. Without any cache a ``PriceDataError`` says
+          why nothing could be loaded.
+
+        Requests follow the throttle, retry and rate-limit rules of ``fetch_many``.
+        """
+        symbol = validate_ticker(ticker)
+        now_utc = self._now()
+        path = self._cache_path(symbol, now_utc.date())
+        with self._symbol_lock(f"{symbol}#refresh"):
+            today_cache = self._read_cache(symbol, path)
+            if today_cache is not None:
+                return HistoryRefresh(today_cache, "cached")
+            prior = self._latest_cache(symbol)
+            if prior is not None and _last_date(prior.frame) >= latest_completed_session(now_utc):
+                return HistoryRefresh(prior, "cached")
+            settings = self._settings or _settings_from_config()
+            limiter = RateLimiter(
+                settings.min_interval_seconds, self._monotonic, self._sleep, self._rng
+            )
+            breaker = CircuitBreaker(settings.breaker_threshold)
+            if prior is None:
+                return self._full_refresh(symbol, now_utc, settings, limiter, breaker)
+            return self._partial_refresh(symbol, prior, now_utc, settings, limiter, breaker)
+
+    def _full_refresh(
+        self,
+        symbol: str,
+        now_utc: datetime,
+        settings: BatchSettings,
+        limiter: RateLimiter,
+        breaker: CircuitBreaker,
+    ) -> HistoryRefresh:
+        outcome = self._download_one(symbol, now_utc, settings, limiter, breaker)
+        if outcome.history is None:
+            assert outcome.failure is not None
+            raise PriceDataError(outcome.failure.message)
+        return HistoryRefresh(outcome.history, "full")
+
+    def _partial_refresh(
+        self,
+        symbol: str,
+        prior: PriceHistory,
+        now_utc: datetime,
+        settings: BatchSettings,
+        limiter: RateLimiter,
+        breaker: CircuitBreaker,
+    ) -> HistoryRefresh:
+        last = _last_date(prior.frame)
+        start = last - timedelta(days=REFRESH_OVERLAP_DAYS)
+
+        def request() -> pd.DataFrame:
+            return self._download_since(symbol, start)
+
+        def finish(raw: pd.DataFrame) -> PriceHistory:
+            if raw.empty:  # no new bar: legitimate, the cache is already complete
+                return PriceHistory(symbol, prior.frame.iloc[0:0], now_utc, SOURCE_YFINANCE)
+            frame, duplicates = normalize_frame(raw, symbol, now_utc)
+            return PriceHistory(symbol, frame, now_utc, SOURCE_YFINANCE, duplicates)
+
+        def stale(why: str) -> HistoryRefresh:
+            note = (
+                f"{symbol} data ends {last}; the refresh did not complete "
+                f"({why.rstrip('.')}), so the cached history was used."
+            )
+            logger.warning("%s: refresh failed, serving the cache that ends %s", symbol, last)
+            return HistoryRefresh(prior, "stale", note)
+
+        outcome = self._download_one(
+            symbol, now_utc, settings, limiter, breaker, request=request, finish=finish
+        )
+        if outcome.history is None:
+            assert outcome.failure is not None
+            return stale(outcome.failure.message)
+        fresh = outcome.history
+        if not fresh.frame.empty and rebased(prior.frame, fresh.frame):
+            logger.info("%s: adjusted prices were rebased; downloading the full history", symbol)
+            try:
+                return self._full_refresh(symbol, now_utc, settings, limiter, breaker)
+            except PriceDataError as exc:
+                return stale(str(exc))
+        merged = merge_histories(prior.frame, fresh.frame)
+        duplicates = tuple(sorted(set(prior.duplicate_dates) | set(fresh.duplicate_dates)))
+        self._store(merged, duplicates, symbol, now_utc, self._cache_path(symbol, now_utc.date()))
+        return HistoryRefresh(
+            PriceHistory(symbol, merged, now_utc, SOURCE_YFINANCE, duplicates), "incremental"
+        )
+
+
+REFRESH_OVERLAP_DAYS = 7
+"""Calendar days before the last cached date that an incremental refresh asks for again, to check
+that the adjusted prices were not rebased since the cache was written."""
+REBASE_TOLERANCE = 1e-6
+"""Relative difference of ``adj_close`` or ``close`` above which an overlap row changed."""
+_NEW_YORK = ZoneInfo("America/New_York")
+
+
+def _last_date(frame: pd.DataFrame) -> date:
+    return pd.Timestamp(str(frame.index[-1])).date()
+
+
+def latest_completed_session(now_utc: datetime) -> date:
+    """The latest weekday before today in New York: the newest bar a cache can be expected to hold.
+
+    Today's bar is never stored (M1.3), and exchange holidays are not modelled: on a holiday the
+    refresh asks once, learns there is nothing new, and today's cache file records the check.
+    """
+    day = now_utc.astimezone(_NEW_YORK).date() - timedelta(days=1)
+    while day.weekday() >= 5:
+        day -= timedelta(days=1)
+    return day
+
+
+def rebased(cached: pd.DataFrame, fresh: pd.DataFrame) -> bool:
+    """True when the rows both frames hold differ in ``adj_close`` or ``close``.
+
+    Yahoo rewrites the whole adjusted history at every dividend and split, so rows fetched after
+    one cannot be appended to rows fetched before it. The overlap is the check; with no common
+    row nothing shows that the two bases agree, so that counts as rebased too.
+    """
+    common = cached.index.intersection(fresh.index)
+    if common.empty:
+        return True
+    for column in ("adj_close", "close"):
+        old = cached.loc[common, column].to_numpy(dtype=np.float64)
+        new = fresh.loc[common, column].to_numpy(dtype=np.float64)
+        same = np.isclose(old, new, rtol=REBASE_TOLERANCE, atol=0.0) | (
+            np.isnan(old) & np.isnan(new)
+        )
+        if not bool(same.all()):
+            return True
+    return False
+
+
+def merge_histories(cached: pd.DataFrame, fresh: pd.DataFrame) -> pd.DataFrame:
+    """Cached rows before the first fresh date plus every fresh row (fresh wins on a repeat)."""
+    if fresh.empty:
+        return cached
+    older = np.asarray(cached.index < fresh.index[0], dtype=bool)
+    kept = cached.iloc[np.flatnonzero(older)]
+    merged = pd.concat([kept, fresh]).sort_index(kind="stable")
+    merged = merged.loc[~merged.index.duplicated(keep="last")]
+    for column in _ZERO_FILLED:
+        if column in merged.columns:
+            merged[column] = merged[column].fillna(0.0)
+    order = [c for c in _COLUMN_ORDER if c in merged.columns]
+    out = merged[order].astype("float64")
+    out.index.name = "date"
+    return out
 
 
 def _failed(ticker: str, reason: FailureReason, message: str) -> TickerOutcome:
