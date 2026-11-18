@@ -613,3 +613,59 @@ def test_filter_path_is_a_named_result() -> None:
     assert isinstance(path, FilterPath) and path.states.shape == (200, 6)
     with pytest.raises(ValueError):
         filter_path(y, np.column_stack([f[:, :2], np.zeros(200), f[:, 3:]]), 1e-5, burn_in=21)
+
+
+# ============================================ validation: drifting betas in the default suite
+def _drifting(n: int, seed: int) -> tuple[FloatArray, FloatArray]:
+    """DGP-KB RW (lambda_true 1e-4): the betas drift, so the estimated lambda is positive."""
+    rng = np.random.default_rng(seed)
+    f = rng.multivariate_normal(MU, SIGMA_F, size=n)
+    steps = rng.multivariate_normal(
+        np.zeros(5), 1e-4 * KB_SIGMA_E**2 * np.linalg.inv(SIGMA_F), size=n
+    )
+    y = KB_ALPHA + np.einsum("ti,ti->t", f, KB_BETA + np.cumsum(steps, axis=0))
+    return y + rng.normal(0, KB_SIGMA_E, n), f
+
+
+def test_pipeline_matches_a_naive_reference_with_drifting_betas() -> None:
+    """The end-to-end reference check above, on data where every vintage has lambda > 0.
+
+    On DGP-A (constant betas) the grid picks lambda = 0 or nearly 0, so a wrong state-noise
+    term in the batched passes (dropped, rescaled, or different between the grid and the
+    output pass) goes unnoticed by the default suite. Here it cannot.
+    """
+    y, f = _drifting(1100, 20261118 + 690)
+    res = kalman_betas(y, f)
+    assert [v.rows for v in res.vintages] == [504, 756, 1008]
+    for v in res.vintages:
+        assert v.lam > 1e-6, v.lam
+        m_inv = _scale_m(f, v.rows)
+        loglik = np.array(
+            [reference_vintage_loglik(y, f, float(g), m_inv, v.rows) for g in LAMBDA_GRID]
+        )
+        lam, bound = refine_lambda(LAMBDA_GRID, loglik)
+        assert v.lam == pytest.approx(lam, rel=1e-8, abs=0.0)
+        assert v.lam_at_bound == bound
+        run = reference_filter(y, f, lam, 1.0, m_inv)
+        r_hat = float(np.mean(run.innov[B : v.rows] ** 2 / run.var[B : v.rows]))
+        assert v.resid_var == pytest.approx(r_hat, rel=1e-8)
+        lo, hi = v.valid_from - 1, v.valid_to
+        assert np.abs(res.betas[lo:hi] - run.states[lo:hi, 1:]).max() < 1e-8
+        sd = np.sqrt(r_hat * np.diagonal(run.cov[lo:hi], axis1=1, axis2=2)[:, 1:])
+        assert np.abs(res.band_low[lo:hi] - (run.states[lo:hi, 1:] - Z_975 * sd)).max() < 1e-8
+        assert np.abs(res.band_high[lo:hi] - (run.states[lo:hi, 1:] + Z_975 * sd)).max() < 1e-8
+
+
+def test_tkb13_causal_with_drifting_betas() -> None:
+    """TKB13 on drifting betas (lambda > 0 in every finished vintage)."""
+    y, f = _drifting(1600, 20261118 + 691)
+    star = 1100
+    y2, f2 = _perturbed(y, f, star, 691)
+    base, other = kalman_betas(y, f), kalman_betas(y2, f2)
+    done = [v for v in base.vintages if v.rows <= star]
+    assert len(done) == 3 and all(v.lam > 1e-6 for v in done)
+    _same_up_to(base, other, star, 1e-12)
+    for v0, v1 in zip(done, other.vintages, strict=False):
+        assert v0.lam == pytest.approx(v1.lam, rel=1e-12)
+        assert v0.resid_var == pytest.approx(v1.resid_var, rel=1e-12)
+    assert np.abs(base.betas[star:] - other.betas[star:]).max() > 1e-3
