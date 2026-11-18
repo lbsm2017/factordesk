@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
+from factordesk.analytics import kalman as kalman_module
+from factordesk.analytics.kalman import kalman_betas
+from factordesk.pipeline import assemble_report
 from factordesk.report.base import FACTOR_NAMES
 from factordesk.report.schema import FactorReport, load_report
 from factordesk.report.sections.kalman import (
@@ -21,6 +25,10 @@ from factordesk.report.sections.kalman import (
     WARNING_TEXT,
     KalmanBetaSeries,
 )
+from factordesk.section_hooks import kalman as kalman_hook
+from factordesk.section_hooks.context import SectionContext
+from factordesk.section_hooks.kalman import section_from_result
+from factordesk.tests.fixtures.dgp import Synthetic, dgp_a, dgp_n, rng_for
 from factordesk.tests.fixtures.sections import report_with_section, section_payload
 
 MOCK = Path(__file__).parent / "fixtures" / "mock_report.json"
@@ -199,3 +207,118 @@ def test_an_ok_section_has_a_reason_of_none_and_enough_rows() -> None:
     short["dates"] = short["dates"][:100]
     with pytest.raises(ValidationError):
         _model(short)
+
+
+# ---------------------------------------------------------------------------- pipeline hook
+NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
+ANALYTICS = Path(kalman_module.__file__).parent
+
+
+def _report(d: Synthetic) -> FactorReport:
+    return assemble_report("SYN", d.history, d.factors, now=NOW, factors_downloaded_at=None)
+
+
+def _section(report: FactorReport) -> KalmanBetaSeries:
+    assert report.kalman_betas is not None
+    return report.kalman_betas
+
+
+@pytest.fixture(scope="module")
+def dgp_report() -> FactorReport:
+    return _report(dgp_a(rng_for(650), n=800))
+
+
+def test_hook_fills_the_section_from_the_analysis_sample(dgp_report: FactorReport) -> None:
+    s = _section(dgp_report)
+    assert s.status == "ok" and s.sample == dgp_report.regression.sample
+    assert len(s.dates) == dgp_report.data.n_obs == 800
+    d = dgp_a(rng_for(650), n=800)
+    result = kalman_betas(d.ret - d.rf, d.f)
+    for k, name in enumerate(FACTOR_NAMES):
+        expected = [None if math.isnan(v) else float(f"{v:.6g}") for v in result.betas[:, k]]
+        assert s.betas[name] == expected
+    assert [v.rows for v in s.vintages] == [504, 756] and s.error_model == "gaussian"
+    assert s.vintages[0].estimated_through == s.dates[503]
+    assert s.vintages[0].resid_vol_ann == pytest.approx(math.sqrt(252 * s.vintages[0].resid_var))
+    assert dgp_report.quality_gate.fired is False and s.labels == ["L-KF", "L-KBAND"]
+    for key in ("L-KF", "L-KBAND", "L-KTAIL"):
+        assert key in dgp_report.label_text
+    assert s.warnings == []
+
+
+def test_series_are_rounded_to_six_significant_digits_and_json_has_no_nan(
+    dgp_report: FactorReport,
+) -> None:
+    s = _section(dgp_report)
+    values = [v for series in s.betas.values() for v in series if v is not None]
+    assert values and all(float(f"{v:.6g}") == v for v in values)
+    json.loads(dgp_report.model_dump_json(), parse_constant=_reject_constant)
+
+
+def test_gate_that_fires_adds_the_tail_label() -> None:
+    d = dgp_n(rng_for(651), n=800)
+    report = _report(d)
+    assert report.quality_gate.fired is True
+    assert _section(report).labels == ["L-KF", "L-KBAND", "L-KTAIL"]
+
+
+def test_n_504_gives_exactly_one_stamp() -> None:
+    s = _section(_report(dgp_a(rng_for(652), n=504)))
+    assert s.status == "ok" and len(s.dates) == 504
+    assert sum(v is not None for v in s.vintage_index) == 1 and s.vintage_index[503] == 0
+    assert len(s.vintages) == 1 and s.vintages[0].valid_from == s.vintages[0].valid_to
+    assert all(series[503] is not None for series in s.betas.values())
+    assert all(series[503] is None for series in s.ex_ante_betas.values())
+
+
+def test_singular_burn_in_is_a_failed_section() -> None:
+    d = dgp_a(rng_for(653), n=600)
+    f = d.f.copy()
+    f[:21, 1] = 0.0005  # a constant factor over rows 1..21 duplicates the intercept
+    s = _section(_report(dgp_a(rng_for(653), n=600, f=f)))
+    assert s.status == "failed" and s.reason is not None and "singular_burn_in" in s.reason
+    assert s.dates == [] and s.vintages == [] and s.labels == []
+    assert s.sample.n == 600
+
+
+def test_insufficient_sample_reason_names_the_code() -> None:
+    d = dgp_a(rng_for(654), n=520)
+    result = kalman_betas((d.ret - d.rf)[:503], d.f[:503])
+    info = _section(_report(d)).sample
+    s = section_from_result(result, d.dates[:503], info, gate_fired=False)
+    assert s.status == "insufficient_data" and s.reason is not None
+    assert "kalman_needs_504_rows" in s.reason and "503" in s.reason
+    assert s.betas == {} and s.latest == {}
+
+
+def test_a_failure_of_the_input_check_becomes_a_failed_section(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(*args: object, **kwargs: object) -> object:
+        raise ValueError("returns and factors must be finite")
+
+    monkeypatch.setattr(kalman_hook, "kalman_betas", boom)
+    s = _section(_report(dgp_a(rng_for(655), n=520)))
+    assert s.status == "failed" and s.reason is not None and "finite" in s.reason
+
+
+def test_tkb23_no_core_number_changes(monkeypatch: pytest.MonkeyPatch) -> None:
+    d = dgp_a(rng_for(656), n=700)
+    with_hook = _report(d)
+
+    def absent(ctx: SectionContext) -> None:
+        return None
+
+    monkeypatch.setattr(kalman_hook, "build_kalman_betas", absent)
+    without = _report(d)
+    assert without.kalman_betas is None and with_hook.kalman_betas is not None
+    stripped = with_hook.model_copy(update={"kalman_betas": None, "label_text": without.label_text})
+    assert stripped == without
+    assert stripped.model_dump_json() == without.model_dump_json()  # bitwise, as written
+
+
+def test_tkb23_downstream_statistics_do_not_import_kalman() -> None:
+    for path in sorted(ANALYTICS.glob("*.py")):
+        if path.name in ("kalman.py", "__init__.py"):
+            continue
+        assert "kalman" not in path.read_text(encoding="utf-8").lower(), path.name
