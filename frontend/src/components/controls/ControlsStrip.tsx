@@ -34,6 +34,7 @@ export interface ControlsStripProps {
 }
 
 const WHY_ID = "ctl-why";
+const LANDING_WHY = "Choose a ticker first. The date range applies to a loaded report.";
 
 /** The preset the chips show: custom dates clear it, and no range in the URL means Full history. */
 export function selectedPreset(state: UrlState): Preset | null {
@@ -64,6 +65,7 @@ export function ControlsStrip({
 
   const unavailable = ranges?.options.filter((o) => !o.available && o.reason !== null) ?? [];
   const max = ranges?.factors_last_date ?? factorStatus?.last_date ?? null;
+  const noTicker = state.ticker === null;
 
   return (
     <section className="controls" aria-label="Report controls">
@@ -92,18 +94,24 @@ export function ControlsStrip({
           options={ranges?.options}
           selected={selectedPreset(state)}
           onSelect={(preset) => onCommit({ range: preset, start: null, end: null })}
-          {...(unavailable.length > 0 ? { describedBy: WHY_ID } : {})}
+          disabled={noTicker}
+          {...(unavailable.length > 0 || noTicker ? { describedBy: WHY_ID } : {})}
         />
         <CustomRange
           start={state.start ?? report?.data.actual_start ?? ""}
           end={state.end ?? report?.data.actual_end ?? ""}
           max={max}
+          disabled={noTicker}
           onCommit={(start, end) => onCommit({ range: null, start, end })}
         />
       </div>
       <AnalysedRange report={report} />
       <FactorDataLine status={factorStatus} refreshing={refreshing} message={refreshMessage} onRefresh={onRefreshFactors} />
-      {unavailable.length > 0 ? (
+      {noTicker ? (
+        <div className="ctl-why" id={WHY_ID}>
+          <p>{LANDING_WHY}</p>
+        </div>
+      ) : unavailable.length > 0 ? (
         <div className="ctl-why" id={WHY_ID}>
           {unavailable.map((option) => (
             <p key={option.preset}>{option.reason}</p>

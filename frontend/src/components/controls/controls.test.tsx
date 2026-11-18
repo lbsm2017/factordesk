@@ -386,6 +386,26 @@ describe("ControlsStrip", () => {
     expect(document.getElementById("ctl-why")).toBeNull();
   });
 
+  it("disables the range chips and the date fields on the landing page and says why", () => {
+    strip({ state: EMPTY_URL_STATE, ranges: undefined, report: undefined });
+    for (const radio of screen.getAllByRole("radio")) {
+      expect((radio as HTMLInputElement).disabled).toBe(true);
+      expect((radio as HTMLInputElement).checked).toBe(false);
+    }
+    expect((screen.getByLabelText("From") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("To") as HTMLInputElement).disabled).toBe(true);
+    const reason = screen.getByText("Choose a ticker first. The date range applies to a loaded report.");
+    expect(reason.closest("[id]")?.id).toBe("ctl-why");
+    expect(screen.getByRole("group", { name: "Date range" }).getAttribute("aria-describedby")).toBe("ctl-why");
+  });
+
+  it("enables the range controls once a ticker is chosen", () => {
+    strip();
+    expect((screen.getByLabelText("From") as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole("radio", { name: "3Y" }) as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByText(/Choose a ticker first/)).toBeNull();
+  });
+
   it("selects Full history when the URL has no range, and the preset when it has one", () => {
     const { view, all } = strip();
     expect(screen.getByRole("radio", { name: "Full history" })).toHaveProperty("checked", true);

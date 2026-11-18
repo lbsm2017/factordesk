@@ -29,6 +29,10 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await page.goto("/");
   const ticker = page.getByRole("combobox", { name: "Ticker" });
   await expect(ticker).toBeVisible();
+  // No ticker yet: the range controls are disabled, with the reason as visible text.
+  await expect(page.getByRole("radio", { name: "3Y" })).toBeDisabled();
+  await expect(page.getByLabel("From")).toBeDisabled();
+  await expect(page.getByText("Choose a ticker first.")).toBeVisible();
   await ticker.fill("SYN");
   await ticker.press("Enter");
   await expect(page).toHaveURL(/[?&]t=SYN\b/);

@@ -26,6 +26,7 @@
 .btn-quiet:disabled { color: var(--ink-3); cursor: default; }
 .ctl-msg { color: var(--ink-2); }
 .controls .ctl-why p + p { margin-top: var(--s-1); }
+.controls .ctl-custom input:disabled { background: var(--sunk); color: var(--ink-3); cursor: not-allowed; }
 
 /* landing */
 .landing { padding-top: var(--s-4); }
