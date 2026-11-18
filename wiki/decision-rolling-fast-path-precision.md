@@ -21,6 +21,10 @@ The review found designs the old check let through where the fast path was off b
 
 We rejected loosening the claim only (documenting 2e-8 and moving on), because the tighter check was free. We rejected sending everything to the exact path because that is five times slower for no gain on real data.
 
+## How we check it
+
+`test_rolling_adversarial.py` feeds the fast path designs that sit next to its limits (two factors 99%, 99.9% and 99.99% correlated, factor means 5, 8 and 30 spreads from zero, one huge outlier, factors of very small and very large scale). Each result is compared with the exact path and with statsmodels, and the test checks which windows were sent to the exact path. Putting the old limits back makes it fail. `test_rolling_equivalence.py` bounds the start-date effect.
+
 ## What it costs us
 
 - A series with a very quiet stretch after a very loud one now takes the slower exact path for some windows. That is correct, only slower.
