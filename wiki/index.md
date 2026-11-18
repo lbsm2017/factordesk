@@ -30,6 +30,7 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [Residual alpha analysis](decision-residual-alpha-analysis.md) [Decided-pending-implementation]: an in-sample and a point-in-time line, with the owner's four choices.
 - [Cointegration design](decision-cointegration-design.md) [Decided-pending-implementation]: an exploratory long-run link test that must hold on unseen data.
 - [Drift alerts and regime betas](decision-drift-alerts-and-regime-betas.md) [Decided-pending-implementation]: alerts when two of three conditions agree, and betas by market regime.
+- [Shrunk betas](decision-shrunk-betas.md) [Decided-pending-implementation]: a second beta pulled toward a typical stock by how noisy it is, plus power statements; the ordinary betas stay primary.
 
 ### Product and design
 

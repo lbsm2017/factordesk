@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (shrunk betas)
+
+- Added [Shrunk betas](decision-shrunk-betas.md): a second, labelled beta pulled toward a typical stock, with power statements; ordinary betas stay primary. Built on branch `feat/shrunk-betas` (as of commit `b1331d8`, not merged); status Decided-pending-implementation until the independent validation of `docs/validation/shrunk-betas-handoff-2026-11-18.md` passes. Owner decision of 2026-11-18 recorded: download the four portfolio files and keep them fresh with the factor data.
+
 ## 2026-11-18 (owner ranking)
 
 - The owner ranked 16 epics on 2026-11-18. The [priority ranking](../docs/ROADMAP.md#priority-ranking-owner-2026-11-18) is in the roadmap, and Now, Next, Later and Very later follow that order.
