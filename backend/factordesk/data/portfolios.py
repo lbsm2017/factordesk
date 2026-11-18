@@ -50,6 +50,8 @@ MIN_ROWS = 10_000
 MAX_DECOMPRESSED_BYTES = 40 * 1024 * 1024
 STALE_AFTER_DAYS = 40
 RETRY_ATTEMPT_GAP = timedelta(hours=12)
+DOWNLOAD_GAP_S = 1.0
+"""Pause between two downloads: four files one after the other, never in parallel."""
 DOWNLOAD_RETRIES = 3
 DOWNLOAD_TIMEOUT_S = 60.0
 SENTINELS: tuple[float, ...] = (-99.99, -999.0)
@@ -61,8 +63,9 @@ _DATA_ROW = re.compile(r"^\s*\d{8}\s*,")
 _STAMP = re.compile(r"\b(\d{6})\s+CRSP\s+database", re.IGNORECASE)
 _USER_AGENT = "factordesk-portfolio-loader/0.1"
 
-Fetcher = Callable[[str], tuple[bytes, str | None]]
-"""``fetch(url) -> (content, Last-Modified header)``; raises ``PortfolioError`` on failure."""
+Fetcher = Callable[[str, str | None], tuple[bytes | None, str | None]]
+"""``fetch(url, if_modified_since) -> (content, Last-Modified header)``; the content is ``None``
+when the server says the cached copy is current (304). Raises ``PortfolioError`` on failure."""
 
 _LAST_ATTEMPT: dict[Path, datetime] = {}
 
@@ -162,22 +165,30 @@ def parse_portfolio_csv(
 
 
 # --------------------------------------------------------------------------- download and cache
-def http_fetch(url: str) -> tuple[bytes, str | None]:
-    """Download ``url`` with retries; returns the content and its ``Last-Modified`` header."""
+def http_fetch(url: str, if_modified_since: str | None = None) -> tuple[bytes | None, str | None]:
+    """Download ``url`` with retries; returns the content and its ``Last-Modified`` header.
+
+    With ``if_modified_since`` (the header of the cached copy) the request is conditional: a 304
+    answer returns ``(None, last_modified)`` and nothing is transferred. A server that ignores the
+    header simply sends the file.
+    """
     last_error = "unknown error"
+    headers = {"User-Agent": _USER_AGENT}
+    if if_modified_since:
+        headers["If-Modified-Since"] = if_modified_since
     for attempt in range(DOWNLOAD_RETRIES + 1):
         if attempt:
             time.sleep(2.0**attempt)
         try:
             with httpx.Client(
-                timeout=DOWNLOAD_TIMEOUT_S,
-                follow_redirects=True,
-                headers={"User-Agent": _USER_AGENT},
+                timeout=DOWNLOAD_TIMEOUT_S, follow_redirects=True, headers=headers
             ) as client:
                 resp = client.get(url)
         except httpx.HTTPError as exc:
             last_error = f"network error: {exc!r}"
             continue
+        if resp.status_code == 304:
+            return None, resp.headers.get("last-modified", if_modified_since)
         if resp.status_code == 429 or resp.status_code >= 500:
             last_error = f"HTTP {resp.status_code}"
             continue
@@ -224,9 +235,27 @@ def _stamped(frame: pd.DataFrame, key: str, meta: Mapping[str, Any]) -> pd.DataF
     return frame
 
 
-def _refresh(pdir: Path, key: str, now: datetime, fetch: Fetcher) -> pd.DataFrame:
+def _write_meta(pdir: Path, key: str, meta: Mapping[str, Any]) -> None:
+    _atomic_write(pdir / f"{key}.json", json.dumps(meta, indent=2).encode("utf-8"))
+
+
+def _refresh(
+    pdir: Path,
+    key: str,
+    now: datetime,
+    fetch: Fetcher,
+    cached: tuple[pd.DataFrame, dict[str, Any]] | None,
+) -> pd.DataFrame:
+    """Download one file (conditionally when a cached copy exists) and replace the cache."""
     _LAST_ATTEMPT[pdir / key] = now
-    raw_zip, last_modified = fetch(BASE_URL + DATASETS[key])
+    since = None if cached is None else cast("str | None", cached[1].get("last_modified"))
+    raw_zip, last_modified = fetch(BASE_URL + DATASETS[key], since)
+    if raw_zip is None:  # 304: the remote copy is not newer; keep the cache, note the check
+        if cached is None:
+            raise PortfolioError(f"the server sent no content for {key}")
+        touched = {**cached[1], "downloaded_at": now.astimezone(UTC).isoformat()}
+        _write_meta(pdir, key, touched)
+        return _stamped(cached[0], key, touched)
     parsed = parse_portfolio_csv(raw_zip)
     pdir.mkdir(parents=True, exist_ok=True)
     buf = io.BytesIO()
@@ -242,15 +271,21 @@ def _refresh(pdir: Path, key: str, now: datetime, fetch: Fetcher) -> pd.DataFram
         "first_date": cast(pd.Timestamp, parsed.frame.index[0]).date().isoformat(),
         "last_date": cast(pd.Timestamp, parsed.frame.index[-1]).date().isoformat(),
     }
+    # Parquet first, then meta; each replace is atomic and both payloads exist before either
+    # file is touched, as for the factor file.
     _atomic_write(pdir / f"{key}.parquet", buf.getvalue())
-    _atomic_write(pdir / f"{key}.json", json.dumps(meta, indent=2).encode("utf-8"))
+    _write_meta(pdir, key, meta)
     return _stamped(parsed.frame, key, meta)
 
 
-def _stale(meta: Mapping[str, Any], now: datetime) -> bool:
+def _stale(meta: Mapping[str, Any], now: datetime, factor_last_date: date | None) -> bool:
+    """Same policy as the factor file (more than 40 days behind today), plus: the cached files
+    end before the factor file does, i.e. the factor vintage moved on (SB2.3)."""
     try:
         last = date.fromisoformat(str(meta["last_date"]))
     except (KeyError, ValueError):
+        return True
+    if factor_last_date is not None and last < factor_last_date:
         return True
     return (now.astimezone(UTC).date() - last).days > STALE_AFTER_DAYS
 
@@ -271,29 +306,70 @@ def load_portfolio_frames(
     now: datetime,
     fetch: Fetcher | None = None,
     keys: tuple[str, ...] = tuple(DATASETS),
+    *,
+    factor_last_date: date | None = None,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, pd.DataFrame]:
     """The cached portfolio frames by dataset key, downloading what is missing or stale.
 
-    A file that is cached and at most 40 days behind ``now`` is used as is. A stale or absent file
-    is downloaded at most once every 12 hours (per process); when that fails, the cached copy is
-    served if there is one, and otherwise the key is left out. The caller decides what a missing key
-    means (the prior is then unavailable); this function never raises for data reasons.
+    Refreshed on the factor file's policy: a cached file is used as is unless it is more than
+    40 days behind ``now`` or ends before ``factor_last_date`` (the factor vintage moved on); a
+    stale or absent file is downloaded at most once every 12 hours per process (conditional on
+    the cached ``Last-Modified``); when that fails the cached copy is served if there is one, and
+    otherwise the key is left out. Downloads run one after the other with a pause between them.
+    The caller decides what a missing key means (the prior is then unavailable); this function
+    never raises for data reasons.
     """
     getter = http_fetch if fetch is None else fetch
     pdir = _dir(data_dir)
     out: dict[str, pd.DataFrame] = {}
+    downloaded = False
     for key in keys:
         cached = _read_cache(pdir, key)
         meta = None if cached is None else cached[1]
-        if cached is not None and meta is not None and not _stale(meta, now):
+        if cached is not None and meta is not None and not _stale(meta, now, factor_last_date):
             out[key] = _stamped(cached[0], key, meta)
             continue
         if _retry_allowed(pdir, key, meta, now):
+            if downloaded:
+                sleep(DOWNLOAD_GAP_S)
+            downloaded = True
             try:
-                out[key] = _refresh(pdir, key, now, getter)
+                out[key] = _refresh(pdir, key, now, getter, cached)
                 continue
             except (PortfolioError, httpx.HTTPError, OSError) as exc:
                 logger.warning("Portfolio file %s could not be refreshed: %s", key, exc)
         if cached is not None and meta is not None:
             out[key] = _stamped(cached[0], key, meta)
+    return out
+
+
+def refresh_portfolio_frames(
+    data_dir: Path,
+    now: datetime,
+    fetch: Fetcher | None = None,
+    keys: tuple[str, ...] = tuple(DATASETS),
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, pd.DataFrame]:
+    """Check every portfolio file against the site now (the manual refresh, like the factor file).
+
+    Each file is requested with ``If-Modified-Since``, so an unchanged file is not transferred
+    again. The requests run one after the other with a pause between them, and stop at the first
+    failure so an unreachable site is not hammered. The cache is left as it was for a file that
+    failed. Raises ``PortfolioError`` with a plain sentence when any file could not be refreshed.
+    """
+    getter = http_fetch if fetch is None else fetch
+    pdir = _dir(data_dir)
+    out: dict[str, pd.DataFrame] = {}
+    for position, key in enumerate(keys):
+        if position:
+            sleep(DOWNLOAD_GAP_S)
+        try:
+            out[key] = _refresh(pdir, key, now, getter, _read_cache(pdir, key))
+        except (PortfolioError, httpx.HTTPError, OSError) as exc:
+            raise PortfolioError(
+                f"The Ken French portfolio files could not be downloaded ({exc}). Check your "
+                "network connection; until they are available the shrunk betas are not shown."
+            ) from exc
     return out

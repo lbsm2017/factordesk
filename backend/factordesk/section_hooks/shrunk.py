@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -40,7 +40,7 @@ from factordesk.analytics.shrinkage_prior import (
     estimate_prior,
 )
 from factordesk.config import get_settings
-from factordesk.data.portfolios import Fetcher, load_portfolio_frames
+from factordesk.data.portfolios import Fetcher, load_portfolio_frames, refresh_portfolio_frames
 from factordesk.report.base import FACTOR_NAMES, SampleInfo, Status
 from factordesk.report.sections.shrunk import (
     DatasetStamp,
@@ -67,17 +67,31 @@ def load_shrinkage_inputs(
     offline: bool,
     data_dir: Path | None = None,
     fetch: Fetcher | None = None,
+    factor_last_date: date | None = None,
 ) -> Mapping[str, pd.DataFrame] | None:
     """The portfolio frames of the prior (SB2.2) by dataset key; ``None`` when not fetched.
 
     Offline (tests, injected factors): nothing is read or downloaded and the result is ``None``.
     Online: the cached files, downloading what is missing or stale; keys that could not be loaded
     are absent from the mapping (never an exception), so the hook reports ``prior_unavailable``.
+    ``factor_last_date`` (the last date of the cached factor file) makes files that end before it
+    count as stale: the portfolio files follow the factor vintage.
     """
     if offline:
         return None
     directory = Path(get_settings().data_dir) if data_dir is None else data_dir
-    return load_portfolio_frames(directory, now, fetch)
+    return load_portfolio_frames(directory, now, fetch, factor_last_date=factor_last_date)
+
+
+def refresh_shrinkage_inputs(
+    now: datetime, *, data_dir: Path | None = None, fetch: Fetcher | None = None
+) -> None:
+    """Check the four portfolio files against the site now, as the factor refresh does.
+
+    Raises ``PortfolioError`` with a plain sentence when a file could not be refreshed.
+    """
+    directory = Path(get_settings().data_dir) if data_dir is None else data_dir
+    refresh_portfolio_frames(directory, now, fetch)
 
 
 # ------------------------------------------------------------------------------------ vintage

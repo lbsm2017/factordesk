@@ -682,7 +682,7 @@ def test_the_hook_does_not_mutate_the_context_or_the_inputs() -> None:
 
 # ---- loader and dashboard wiring
 def test_offline_loader_fetches_nothing(tmp_path: Path) -> None:
-    def boom(url: str) -> tuple[bytes, str | None]:
+    def boom(url: str, since: str | None = None) -> tuple[bytes | None, str | None]:
         raise AssertionError("an offline load must not download")
 
     assert (
@@ -693,7 +693,7 @@ def test_offline_loader_fetches_nothing(tmp_path: Path) -> None:
 
 
 def test_online_loader_with_nothing_available_returns_an_empty_mapping(tmp_path: Path) -> None:
-    def refuse(url: str) -> tuple[bytes, str | None]:
+    def refuse(url: str, since: str | None = None) -> tuple[bytes | None, str | None]:
         raise PortfolioError("offline")
 
     got = shrunk_hook.load_shrinkage_inputs(NOW, offline=False, data_dir=tmp_path, fetch=refuse)

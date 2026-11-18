@@ -396,6 +396,11 @@ def test_factors_refresh(
     status = FactorStatus(date(2026, 9, 30), date(1963, 7, 1), 49, NOW, "u", True)
     monkeypatch.setattr(cli, "load_ff5_daily", fake_load)
     monkeypatch.setattr(cli, "factor_status", _returning(status))
+
+    def no_network(*args: object, **kwargs: object) -> dict[str, object]:
+        return {}
+
+    monkeypatch.setattr(cli, "refresh_portfolio_frames", no_network)
     assert cli.main(["factors", "refresh"], now=NOW) == cli.EXIT_OK
     assert calls == [True]
     assert "refreshed" in capsys.readouterr().out
