@@ -25,10 +25,11 @@ Inputs and definitions (owner-approved wording of 2026-11-18; they are proposals
 * Drawdown: the compounded return path starts at 1.0 on ``origin`` (the price date before the
   first analysed return, or the first analysed date when none is given) and
   ``W_j = prod_{i<=j}(1 + r_i)``. The drawdown at ``j`` is ``W_j / max_{i<=j} W_i - 1``. An
-  *episode* runs from a running peak until the path first regains that peak (``W >= peak``); it
-  is open when the path never regains it. Episodes never overlap. Its depth is the lowest
-  drawdown inside it, its trough the date of that low (first date on a tie). The maximum
-  drawdown is the deepest episode; ``top_drawdowns`` lists the three deepest, deepest first.
+  *episode* runs from a running peak until the path first regains that peak (``W >= peak``,
+  within ``PEAK_TOLERANCE``); it is open when the path never regains it. Episodes never
+  overlap. Its depth is the lowest drawdown inside it, its trough the date of that low (first
+  date on a tie). The maximum drawdown is the deepest episode; ``episodes`` lists the three
+  deepest, deepest first.
   A path that never falls below a previous peak has no episode: depth ``0.0`` and no dates.
   Day counts are trading days of the path (positions in the sample, the origin counting as 0).
   Rows excluded from ``S`` (M2) are not in the path.
@@ -61,6 +62,13 @@ SD_FLOOR = 1e-8
 Z95 = 1.959963984540054
 """Two-sided 95% normal quantile."""
 TOP_EPISODES = 3
+PEAK_TOLERANCE = 1e-9
+"""A path value within this fraction of the running peak is back at the peak (validation F1).
+
+The path is a product of thousands of daily ratios, so a price that returns exactly to an earlier
+high can land a few units in the last place below it. An exact ``>=`` would then call a recovered
+fall open. 1e-9 is far above that rounding (about 1e-12 over a long history) and far below any
+real price move (a one-cent move on a 100 price is 1e-4)."""
 
 
 class InsufficientObservations(ValueError):
@@ -138,11 +146,11 @@ def drawdown_episodes(path: FloatArray, dates: list[date]) -> list[DrawdownEpiso
     trough_i = -1
     for i in range(1, len(path)):
         value = float(path[i])
-        if value >= peak_value:
+        if value >= peak_value * (1.0 - PEAK_TOLERANCE):
             if trough_i >= 0:
                 episodes.append(_episode(path, dates, peak_i, trough_i, i))
                 trough_i = -1
-            peak_value, peak_i = value, i
+            peak_value, peak_i = max(peak_value, value), i
         elif trough_i < 0 or value < float(path[trough_i]):
             trough_i = i
     if trough_i >= 0:

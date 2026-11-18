@@ -420,11 +420,6 @@ def test_tp52_peak_is_the_last_day_at_the_high_and_trough_the_first_day_at_the_l
     assert (ep.days_peak_to_trough, ep.days_trough_to_recovery) == (1, 3)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="validation finding F1: the regained-peak test is an exact float comparison, so a "
-    "price that returns exactly to its old high can leave the compounded path 1 ulp below it",
-)
 def test_tp53_a_price_back_exactly_at_its_old_high_counts_as_recovered() -> None:
     # Closing prices 11.96, 105.40, 95.91, 183.85, 127.70, 105.25, 183.85: the last price equals
     # the earlier high, so the fall from 183.85 is recovered on the last price date.
@@ -436,3 +431,12 @@ def test_tp53_a_price_back_exactly_at_its_old_high_counts_as_recovered() -> None
     deepest = res.episodes[0]
     assert deepest.depth == pytest.approx(105.25 / 183.85 - 1.0)
     assert deepest.recovery_date == ret.index[-1].date()
+
+
+def test_tp55_a_price_seven_thousandths_of_a_percent_under_its_old_high_is_not_recovered() -> None:
+    # The tolerance covers float rounding only: a real shortfall of 0.007% (1.0999 against 1.1)
+    # leaves the fall open.
+    r = [0.0] * 57 + [0.10, -0.20, 0.2499]
+    ret, rf = _series(r)
+    res = performance_stats(ret, rf)
+    assert res.episodes[0].recovery_date is None
