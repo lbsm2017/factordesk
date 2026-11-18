@@ -799,6 +799,9 @@ def test_render_header_chips_and_notice_details() -> None:
     assert 'href="#notice"' in page and "2 warnings" in page
     notice = page.split('id="notice"')[1].split("</aside>")[0]
     assert "Prices look out of step with the factor data" in notice  # plain, by warning code
+    # M3.6: the transient noise inflates the residual variance, so R² is too low and residual
+    # volatility too high; the summary must not say both are understated.
+    assert "R² is probably understated and residual volatility overstated." in notice
     assert '<details class="how"><summary>Details</summary>' in notice
     assert "MOCK: short history." in notice  # the raw message sits behind Details
     rep = build_mock_report()

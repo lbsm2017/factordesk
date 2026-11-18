@@ -51,8 +51,8 @@ TILT = {
 }
 WARN_PLAIN = {
     "residual_reversal": (
-        "Prices look out of step with the factor data, so R² and residual volatility are "
-        "probably understated."
+        "Prices look out of step with the factor data, so R² is probably understated and "
+        "residual volatility overstated."
     ),
     "short_history": "The history is short, so the betas rest on a small sample.",
     "collinearity": "Some factors move together in this sample, so single betas are less precise.",
