@@ -23,7 +23,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.data.factors import FactorDataError, FactorDownloadError
-from factordesk.data.prices import PriceDataError, validate_ticker
+from factordesk.data.prices import PriceDataError, UnsupportedCurrencyError, validate_ticker
 from factordesk.report.schema import ApiError, ErrorCode
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ _STATUS: dict[ErrorCode, int] = {
     "bad_range": 400,
     "insufficient_history": 422,
     "degenerate_input": 422,
+    "unsupported_currency": 422,
     "factor_data_invalid": 502,
     "network": 503,
     "upstream_refused": 503,
@@ -115,6 +116,13 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
             "degenerate_input",
             f"Cannot analyse {who}: {one_line(exc.reason)}.",
             "Choose another ticker or range.",
+        )
+    if isinstance(exc, UnsupportedCurrencyError):
+        return ApiException(
+            "unsupported_currency",
+            str(exc),
+            "Choose a ticker quoted in US dollars. Other currencies need European factors, "
+            "which factordesk does not have yet.",
         )
     if isinstance(exc, PriceDataError):
         return ApiException(
@@ -259,6 +267,7 @@ async def _http_exception_handler(request: Request, exc: Exception) -> Response:
 _DOMAIN_EXCEPTIONS: tuple[type[Exception], ...] = (
     InsufficientHistoryError,
     DegenerateInputError,
+    UnsupportedCurrencyError,
     PriceDataError,
     FactorDataError,
     FactorDownloadError,

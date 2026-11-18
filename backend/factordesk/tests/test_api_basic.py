@@ -316,7 +316,7 @@ def test_tickers_prefix_match_newest_first(tmp_path: Path) -> None:
     with serve(create_app(deps)) as client:
         every = client.get("/api/tickers").json()["items"]
         assert [i["ticker"] for i in every] == ["AAPL", "SPY", "SPXS", "SPXL", "BRK-B"]
-        assert every[1] == {"ticker": "SPY", "last_fetched": "2026-11-18"}
+        assert every[1] == {"ticker": "SPY", "last_fetched": "2026-11-18", "name": None}
         assert [i["ticker"] for i in client.get("/api/tickers?q=sp").json()["items"]] == [
             "SPY",
             "SPXS",
@@ -341,7 +341,7 @@ def test_tickers_ignore_files_that_are_not_price_caches(tmp_path: Path) -> None:
     deps, _, _ = make_deps(tmp_path)
     with serve(create_app(deps)) as client:
         items = client.get("/api/tickers").json()["items"]
-    assert items == [{"ticker": "SPY", "last_fetched": "2026-11-18"}]
+    assert items == [{"ticker": "SPY", "last_fetched": "2026-11-18", "name": None}]
 
 
 def test_tickers_without_a_cache_directory_is_empty(client: ApiClient) -> None:
