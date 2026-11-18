@@ -9,8 +9,8 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 
 ## 2026-11-18 (bibliography)
 
-- References verified: 52 bibliography entries, each checked against Crossref (48 by the new script, which also uses arXiv for one preprint) or by hand against the page or file (4), and 11 items listed as unverified. See [references](../docs/references.md), [references.bib](../docs/references.bib) and the rule in [no citation without verification](decision-citations-and-verification.md).
-- Findings: Chung (2024) is now published (Critical Finance Review 15(2), 133-155); no terms-of-use page or citation request was found on the Ken French library pages, although this wiki and earlier text say the library asks for both (not changed here); the Newey-West lag rule's attribution to the 1994 paper and the claim that Yahoo's adjustment follows the CRSP method have no source in the repository.
+- References verified: 63 bibliography entries, each checked against Crossref or arXiv (58, by the new script) or by hand against the page or file (5). Of 11 items first listed as unverified, 4 are resolved with a source, 2 partly, and 5 have no source (listed with file and line in the references page). See [references](../docs/references.md), [references.bib](../docs/references.bib) and the rule in [no citation without verification](decision-citations-and-verification.md).
+- Findings: Chung (2024) is now published (Critical Finance Review 15(2), 133-155); the Ken French site states a copyright notice and no terms of use or citation request, although three wiki lines say the library asks for both (not changed here); Yahoo's own help page does describe its adjusted close as following CRSP standards; the Newey-West lag rule's attribution to the 1994 paper could not be confirmed.
 - Added `scripts/check_references.py` and `CITATION.cff`.
 
 ## 2026-11-18 (owner re-rank)

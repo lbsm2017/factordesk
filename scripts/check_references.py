@@ -134,6 +134,7 @@ def _ascii(text: str) -> str:
 
 def norm_title(text: str) -> str:
     text = re.sub(r"<[^>]+>", " ", text)
+    text = text.replace("\u2122", "").replace("\\texttrademark", "")
     text = text.replace("&amp;", "and").replace(r"\&", "and").replace("&", "and")
     text = _ascii(text).lower()
     text = re.sub(r"[^a-z0-9]+", " ", text)

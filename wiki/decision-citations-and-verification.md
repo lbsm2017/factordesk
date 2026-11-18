@@ -25,7 +25,7 @@ A statistics tool is only as credible as its sources. Before this decision the r
 - A new reference needs a DOI that resolves in Crossref, or an arXiv identifier, or a page or file that answers an HTTP request. Where Crossref gives only a start page, the end page comes from a second record (RePEc), and the entry says so.
 - The script reads the bib file, asks Crossref (or arXiv) for each entry and prints `OK`, `FAIL`, `ERROR` or `SKIP` per line. Exit code 0 means every checked entry matches, 1 a mismatch, 2 that the network failed for some entries. A failed lookup is never counted as a pass, and a network failure prints a message, not a traceback.
 - Entries with no DOI (a working paper, a web page) are skipped by the script and checked by hand; `docs/references.md` says how.
-- Result of the first run, 2026-11-18: 52 bibliography entries, 48 matched by the script, 0 mismatches, 4 checked by hand. 11 items are listed as unverified.
+- Result on 2026-11-18, after a second pass: 63 bibliography entries, 58 matched by the script, 0 mismatches, 5 checked by hand. Of 11 items first listed as unverified, 4 were resolved with a source, 2 partly, and 5 have no source; those are listed with file and line under "Claims in the repo without a source" in the references page, each with a recommendation (add a source, soften or remove).
 - Verification covers bibliographic data only. It does not mean we read the paper or that it says what a spec says it does.
 
 ## What it costs us
