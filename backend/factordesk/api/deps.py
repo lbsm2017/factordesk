@@ -12,12 +12,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from factordesk.config import get_settings
 from factordesk.data.factors import FactorStatus, factor_status, load_ff5_daily
 from factordesk.data.prices import PriceProvider, YFinanceProvider
+
+if TYPE_CHECKING:
+    from factordesk.section_hooks.context import SectionInputs
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +46,9 @@ class AppDeps:
     static_dir: Path | None
     max_workers: int = 2
     report_cache_size: int = 32
+    load_section_inputs: Callable[[datetime], SectionInputs] | None = None
+    """Extra data of the optional report sections (the portfolio files of the shrunk betas),
+    loaded once per day and vintage. ``None``: none, so those sections are not computed."""
 
     def __post_init__(self) -> None:
         if self.max_workers < 1:
@@ -61,6 +68,14 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
     def status(now: datetime) -> FactorStatus | None:
         return factor_status(data_dir=data_dir, now=now)
 
+    def section_inputs(now: datetime) -> SectionInputs:
+        from factordesk.section_hooks.context import SectionInputs
+        from factordesk.section_hooks.shrunk import load_shrinkage_inputs
+
+        return SectionInputs(
+            shrinkage_portfolios=load_shrinkage_inputs(now, offline=False, data_dir=data_dir)
+        )
+
     return AppDeps(
         price_provider=YFinanceProvider(cache_dir=data_dir / "prices", now=utc_now),
         load_factors=load_factors,
@@ -68,4 +83,5 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         now=utc_now,
         data_dir=data_dir,
         static_dir=static_dir,
+        load_section_inputs=section_inputs,
     )
