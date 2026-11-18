@@ -28,9 +28,15 @@ export function KpiStrip({ report }: ReportPanelProps) {
   const alpha = fin(g.alpha_annual);
   const r2 = fin(g.r2);
   const sigma = fin(g.sigma_e_annual);
+  // Validation F4: with audit errors one bad row can dominate every fitted number, so the fitted
+  // tiles are muted and alpha carries no significance claim (the values stay shown).
+  const auditErrors = d.audit_status === "errors";
+  const fitCls = auditErrors ? "ns" : "";
   let alphaNote = "Significance not available";
   let alphaCls = "ns";
-  if (g.alpha_tag === "reliable") {
+  if (auditErrors) {
+    alphaNote = "Not interpretable: the price audit found errors";
+  } else if (g.alpha_tag === "reliable") {
     alphaNote = "Distinguishable from zero at 5%";
     alphaCls = "";
   } else if (g.alpha_tag === "noise") {
@@ -42,13 +48,13 @@ export function KpiStrip({ report }: ReportPanelProps) {
       label: "R²",
       value: r2 === null ? "n/a" : num(r2, 4),
       note: "Share of daily variance the factors explain",
-      cls: "",
+      cls: fitCls,
     },
     {
       label: "Residual volatility",
       value: sigma === null ? "n/a" : pct(sigma, 1, false),
       note: "A year, left unexplained by the factors",
-      cls: "",
+      cls: fitCls,
     },
     {
       label: "Observations",

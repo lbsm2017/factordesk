@@ -35,6 +35,19 @@ describe("plain text", () => {
     expect(Object.keys(WARN_PLAIN).sort()).toEqual([...codes].sort());
   });
 
+  it("says residual volatility is overstated, not understated, when the gate fires (N1, M3.6)", () => {
+    expect(WARN_PLAIN.residual_reversal).toBe(
+      "Prices look out of step with the factor data, so R² is probably understated and residual volatility overstated.",
+    );
+    expect(WARN_PLAIN.residual_reversal).not.toMatch(/volatility are probably understated/);
+  });
+
+  it("words the audit-error summary like the static report (F4)", () => {
+    expect(WARN_PLAIN.audit_errors).toBe(
+      "The price audit found errors, so the headline numbers are not interpretable until they are explained; see Data and audit.",
+    );
+  });
+
   it("reads the exposures from the tags", () => {
     const text = exposureReading(mockReport.regression.factors);
     expect(text.startsWith("Over this window the stock ")).toBe(true);

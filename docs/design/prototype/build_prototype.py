@@ -162,8 +162,9 @@ def bar(v: float, lo: float, hi: float, cls: str) -> str:
 
 # ----------------------------------------------------------------------------- panels
 WARN_PLAIN = {
-    "residual_reversal": "Prices look out of step with the factor data, so R\u00b2 and residual volatility are probably understated.",
+    "residual_reversal": "Prices look out of step with the factor data, so R\u00b2 is probably understated and residual volatility overstated.",
     "short_history": "The history is short, so the betas rest on a small sample.",
+    "audit_errors": "The price audit found errors, so the headline numbers are not interpretable until they are explained; see Data and audit.",
 }
 GLYPH_WARN = (
     '<svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 1.5 15 14.5H1z"/>'
@@ -256,12 +257,18 @@ def kpis(r: dict) -> str:
     if g["status"] != "ok":
         return f'<section class="kpis" aria-label="Headline statistics">{empty_state(g["reason"], "Widen the date range and run the report again.")}</section>'
     a_ns = g["alpha_tag"] != "reliable"
-    alpha_note = "Not distinguishable from zero" if a_ns else "Distinguishable from zero at 5%"
+    # Validation F4: with audit errors the fitted tiles are muted and alpha makes no significance claim.
+    audit_errors = d["audit_status"] == "errors"
+    fit_cls = "ns" if audit_errors else ""
+    if audit_errors:
+        alpha_note, a_ns = "Not interpretable: the price audit found errors", True
+    else:
+        alpha_note = "Not distinguishable from zero" if a_ns else "Distinguishable from zero at 5%"
     excl = d["n_excluded"]
     cells = [
         ("Alpha, a year", pct(g["alpha_annual"]), alpha_note, "ns" if a_ns else ""),
-        ("R&#178;", f"{g['r2']:.4f}", "Share of daily variance the factors explain", ""),
-        ("Residual volatility", pct(g["sigma_e_annual"], 1, False), "A year, left unexplained by the factors", ""),
+        ("R&#178;", f"{g['r2']:.4f}", "Share of daily variance the factors explain", fit_cls),
+        ("Residual volatility", pct(g["sigma_e_annual"], 1, False), "A year, left unexplained by the factors", fit_cls),
         ("Observations", f"{d['n_obs']:,}", f"Trading days; {excl} excluded" if excl else "Trading days; none excluded", ""),
         ("Analysed range", f"{d_short(d['actual_start'])} to {d_short(d['actual_end'])}",
          f"Requested {d_long(d['requested_start'])} to {d_long(d['requested_end'])}", "dates"),

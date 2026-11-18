@@ -139,6 +139,20 @@ describe("errors", () => {
     expect(screen.queryByTestId("loading-frame")).toBeNull();
   });
 
+  it("shows the API's named cause for zero aligned rows unchanged (F14)", async () => {
+    const body = {
+      code: "insufficient_history",
+      message:
+        "SPY has 0 trading days in this range that line up with the factor data; at least 504 (about two years) are needed: every price in the requested range is missing.",
+      action: "Choose a longer range or Full history.",
+    };
+    server.use(http.get("*/api/report/:ticker", () => HttpResponse.json(body, { status: 422 })));
+    renderAt("/?t=SPY");
+    const notice = await screen.findByTestId("report-error");
+    expect(notice.querySelector(".notice-sum")?.textContent).toBe(`Error: ${body.message}`);
+    expect(notice.querySelector(".notice-do")?.textContent).toBe(body.action);
+  });
+
   it("never shows the previous report under an error", async () => {
     renderAt("/?t=SPY");
     await screen.findByTestId("report-ticker");

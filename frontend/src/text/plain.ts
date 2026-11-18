@@ -14,10 +14,11 @@ export const PLAIN: Record<string, string> = {
 /** Plain one-sentence warning summaries by code (H.9). Unknown codes fall back to `message`. */
 export const WARN_PLAIN: Record<string, string> = {
   residual_reversal:
-    "Prices look out of step with the factor data, so R² and residual volatility are probably understated.",
+    "Prices look out of step with the factor data, so R² is probably understated and residual volatility overstated.",
   short_history: "The history is short, so the betas rest on a small sample.",
   collinearity: "Some factors move together in this sample, so single betas are less precise.",
-  audit_errors: "The price audit found errors; the analysis still uses prices as published.",
+  audit_errors:
+    "The price audit found errors, so the headline numbers are not interpretable until they are explained; see Data and audit.",
   audit_warnings: "The price audit flagged some unusual price moves; see Data and audit.",
   factor_data_lag:
     "The factor data stops before the latest prices, so the newest days are charted but not analysed.",
