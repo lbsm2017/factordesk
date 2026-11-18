@@ -2,6 +2,13 @@
    App.tsx imports this file before report.css is evaluated, so rules that must beat a report.css rule
    carry the .controls prefix. */
 
+/* Control boundaries (WCAG 1.4.11): inputs, chips and recent-ticker buttons use --axis, which is at least
+   3:1 against --surface in light and dark; --border is only 1.4:1. The selectors are one class heavier than
+   the report.css rules they replace, because this file is evaluated first. */
+.controls .ctl-row input[type="text"], .controls .ctl-row input[type="date"] { border-color: var(--axis); }
+.controls .chip-opt span { border-color: var(--axis); }
+.landing button.chip { border-color: var(--axis); }
+
 .controls .ctl-row { align-items: flex-start; }
 .ctl-ticker { min-width: 0; }
 .controls .ctl-search { align-items: flex-start; }
@@ -10,7 +17,7 @@
 .controls .ctl-list {
   position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: 320px;
   margin: 0; padding: var(--s-1) 0; list-style: none;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--axis); border-radius: 4px;
 }
 .controls .ctl-list[hidden] { display: none; }
 .ctl-opt { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); min-height: 36px; padding: 0 var(--s-3); cursor: pointer; }
