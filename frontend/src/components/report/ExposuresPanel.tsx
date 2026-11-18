@@ -6,6 +6,7 @@ import { exposureReading, plainName } from "../../text/plain";
 import { BarCell } from "../charts/BarCell";
 import { axisLabels, exposureModel, exposuresUnavailable } from "./exposureModel";
 import type { ExposureModel } from "./exposureModel";
+import { SigHead } from "./barParts";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
 
@@ -75,10 +76,7 @@ function ExposureTable({ model }: { model: ExposureModel }) {
             t
           </th>
           <th role="columnheader" scope="col" className="num">
-            <span className="long">Significant</span>
-            <span className="short" aria-hidden="true">
-              Sig.
-            </span>
+            <SigHead />
           </th>
           <th role="columnheader" scope="col" className="num">{`Avg ${window}d`}</th>
         </tr>
