@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Panel } from "../Panel";
+import { PanelBoundary } from "../PanelBoundary";
 import type { ReportPanelProps } from "../types";
 
 export const TITLE = "Residual return";
@@ -12,14 +13,19 @@ const Body = lazy(() => import("./ResidualAlphaBody").then((m) => ({ default: m.
 /**
  * Panel of the `residual` section (contract SC2.5; spec `docs/methodology-residual-analysis.md`).
  * Registered in `panelRegistry.ts` at position 710. Renders nothing when the section is absent
- * (null); while the body chunk loads, the empty frame (title and question) holds its place.
+ * (null); while the body chunk loads, the empty frame (title and question) holds its place. A
+ * failure inside the body (or its chunk) shows a plain notice in the same frame and leaves the
+ * rest of the report on screen.
  */
 export function ResidualAlphaPanel({ report }: ReportPanelProps) {
   const section = report.residual;
   if (section === null) return null;
+  const question = section.question || DEFAULT_QUESTION;
   return (
-    <Suspense fallback={<Panel id="residual" title={TITLE} question={section.question || DEFAULT_QUESTION} />}>
-      <Body report={report} />
-    </Suspense>
+    <PanelBoundary id="residual" title={TITLE} question={question}>
+      <Suspense fallback={<Panel id="residual" title={TITLE} question={question} />}>
+        <Body report={report} />
+      </Suspense>
+    </PanelBoundary>
   );
 }
