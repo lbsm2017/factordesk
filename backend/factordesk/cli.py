@@ -3,7 +3,7 @@
 Usage::
 
     factordesk report TICKER [--out DIR] [--open] [--json]
-    factordesk factors refresh
+    factordesk factors refresh        (factor file and the portfolio files of the shrunk betas)
     factordesk factors status
     factordesk serve [--host HOST] [--port PORT] [--static DIR] [--dev] [--open]
 
@@ -40,6 +40,7 @@ from factordesk.data.factors import (
     factor_status,
     load_ff5_daily,
 )
+from factordesk.data.portfolios import PortfolioError, refresh_portfolio_frames
 from factordesk.data.prices import PriceDataError, PriceProvider, validate_ticker
 
 EXIT_OK = 0
@@ -134,7 +135,7 @@ def _parser() -> argparse.ArgumentParser:
 
     fac = sub.add_parser("factors", help="manage the cached Fama-French factor file")
     fac_sub = fac.add_subparsers(dest="factors_command", required=True, metavar="ACTION")
-    fac_sub.add_parser("refresh", help="download the latest factor file now")
+    fac_sub.add_parser("refresh", help="download the latest factor file and portfolio files now")
     fac_sub.add_parser("status", help="show the cached factor file's coverage and age")
 
     srv = sub.add_parser("serve", help="serve the local dashboard (API and built web page)")
@@ -198,6 +199,12 @@ def _cmd_factors(action: str, now: datetime) -> int:
         return EXIT_DATA
     print("Factor file refreshed.")
     _print_status(status)
+    try:  # the prior of the shrunk betas follows the factor data (one action refreshes both)
+        refresh_portfolio_frames(Path(get_settings().data_dir), now)
+    except PortfolioError as exc:
+        _err(f"{exc} The factor file was refreshed.")
+        return EXIT_NETWORK
+    print("Portfolio files for the shrunk betas refreshed.")
     return EXIT_OK
 
 

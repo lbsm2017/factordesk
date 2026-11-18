@@ -352,7 +352,7 @@ M0.9 labels L-SHRINK, L-SHRINK-PRIOR, L-CRED, L-CORR-MOVE, L-MDE; M0.7 rows for 
 ### SB10.4 Open questions for the owner
 
 1. **Prior spread for single stocks.** Portfolio dispersion understates single-stock dispersion (SB2.4), and the simulation shows the cost when the prior is too tight. Options: (a) ship as specified with the caveat; (b) inflate `tau` by a fixed factor (for example 2) until peers exist, which is a tuning choice we cannot verify today; (c) ship only the power statement now and the shrunk betas with the peer prior. Recommendation: (a) with the caveat, because the view is secondary and the `c = 0.5` case shows a conservative spread costs little.
-2. **Download size.** The prior needs 4 extra files (about 13.4 MB zipped, 76 MB unzipped [V]) per vintage. Acceptable?
+2. **Download size.** The prior needs 4 extra files (about 13.4 MB zipped, 76 MB unzipped [V]) per vintage. Acceptable? **Owner decision, 2026-11-18: approved.** The four files are refreshed together with the factor data: same staleness policy as the factor file (more than 40 days behind, at most one automatic attempt per 12 hours), re-downloaded when the factor vintage moves on, checked with `If-Modified-Since` on a manual refresh, downloaded one after the other, and refreshed by `factordesk factors refresh` and `POST /api/factors/refresh`. When the site cannot be reached the section is `failed` (`prior_unavailable`) and the rest of the report is unaffected.
 3. **`delta = 0.05`** for the "years to detect" sentence: keep fixed, or let the user choose (it would be a fourth tunable for the regression panel; M15 allows none today)?
 
 ---
@@ -367,7 +367,7 @@ Conventions as in `docs/test-oracle.md` section 0 (seed `20261118 + k` for test 
 - **TSB02 Dogmatic limit.** `tau = 1e-8`: `|b_post - m0| <= 1e-6`, `V_post <= 1e-15` elementwise.
 - **TSB03 Weight identities.** For random inputs: `b_post == (I - S_w) b + S_w m0` and `V_post V^-1 + S_w == I` (1e-12).
 - **TSB04 Scalar hand example.** One factor with `V = 0.04`, `tau^2 = 0.04`, `b = 0.6`, `m0 = 0`: `pull = 0.5`, `b_post = 0.3`, `V_post = 0.02` (1e-15). Diagonal 5x5 version: each coordinate equals the scalar formula `b_post = (tau^2 b + V m0)/(tau^2 + V)` (1e-12).
-- **TSB05 Correlated move away.** `V = [[0.04, 0.036], [0.036, 0.04]]` (correlation 0.9), `tau = (10, 0.1)` (first coefficient nearly free), `b = (0.5, 0.5)`, `m0 = (0, 0)`. Assert the first posterior coefficient moves away from 0 (`b_post[0] > 0.5`) and `moved_away` is true for it, false for the second. This pins L-CORR-MOVE.
+- **TSB05 Correlated move away.** `V = [[0.04, 0.036], [0.036, 0.04]]` (correlation 0.9), `tau = (10, 0.1)` (first coefficient nearly free), `b = (0.5, -0.5)`, `m0 = (0, 0)`. Assert the first posterior coefficient moves away from 0 (`b_post[0] > 0.5`, about 0.86) and `moved_away` is true for it, false for the second. This pins L-CORR-MOVE. Correction made at implementation: the first draft had `b = (0.5, 0.5)`, but with a positive covariance that input moves the first coefficient **toward** 0 (about 0.14); the estimates need opposite signs, as in RDDT (SMB positive, HML and RMW negative, SB8.2). A second case with `b = (0.5, 0.5)` asserts the move toward 0.
 - **TSB06 HAC block.** On DGP-A, `V` passed to the posterior equals the `[1:, 1:]` block of the reference call of M0.5 with `L(n)` (1e-10 relative); for the latest window it uses `L(W_p)`.
 
 ### Prior estimation

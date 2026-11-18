@@ -24,6 +24,7 @@ from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Hashable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
 
 import pandas as pd
 from fastapi import Request
@@ -33,6 +34,9 @@ from factordesk.api.runtime import Runtime
 from factordesk.data.prices import PriceHistory
 from factordesk.report.render_html import render_report_html
 from factordesk.report.schema import FactorReport, RangeOptions, RangePreset
+
+if TYPE_CHECKING:
+    from factordesk.section_hooks.context import SectionInputs
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,7 @@ def assemble_report(
     factors_downloaded_at: datetime | None,
     start: date | None = None,
     end: date | None = None,
+    section_inputs: SectionInputs | None = None,
 ) -> FactorReport:
     """``factordesk.pipeline.assemble_report``, imported on first use.
 
@@ -62,6 +67,7 @@ def assemble_report(
         factors_downloaded_at=factors_downloaded_at,
         start=start,
         end=end,
+        section_inputs=section_inputs,
     )
 
 
@@ -175,6 +181,7 @@ class ReportService:
         self.reports: SingleFlight[ReportKey, FactorReport] = SingleFlight(
             self.deps.report_cache_size
         )
+        self.inputs: SingleFlight[tuple[Vintage, date], SectionInputs | None] = SingleFlight(1)
         self.vintage: Vintage | None = None
 
     # ------------------------------------------------------------------ public
@@ -196,6 +203,8 @@ class ReportService:
         key: ReportKey = (ticker, first, last, loaded.vintage, now.date())
 
         async def make() -> FactorReport:
+            inputs = await self._section_inputs(loaded.vintage, now)
+
             def build() -> FactorReport:
                 return assemble_report(
                     ticker,
@@ -205,6 +214,7 @@ class ReportService:
                     factors_downloaded_at=loaded.vintage.downloaded_at,
                     start=first,
                     end=last,
+                    section_inputs=inputs,
                 )
 
             return await self.runtime.run(build)
@@ -259,6 +269,17 @@ class ReportService:
             last = pd.Timestamp(str(frame.index[-1])).date()
             return LoadedFactors(Vintage(last, None), frame)
         return LoadedFactors(Vintage(status.last_date, _utc(status.last_download_at)), frame)
+
+    async def _section_inputs(self, vintage: Vintage, now: datetime) -> SectionInputs | None:
+        """The extra data of the optional sections, once per vintage and day (None: not wired)."""
+        loader = self.deps.load_section_inputs
+        if loader is None:
+            return None
+
+        async def make() -> SectionInputs | None:
+            return await self.runtime.run(loader, now)
+
+        return await self.inputs.get((vintage, now.date()), make)
 
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:

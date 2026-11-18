@@ -215,12 +215,26 @@ def _assemble(**kwargs: Any) -> FactorReport:
     )
 
 
-def test_pipeline_leaves_every_section_absent() -> None:
+BUILT_SECTIONS: tuple[str, ...] = ()
+"""Fields whose feature is built: the pipeline fills them. Each feature branch adds its field.
+
+Shrunk fills only online (from the portfolio files), so the offline pipeline leaves it absent.
+"""
+
+
+def test_pipeline_leaves_unbuilt_sections_absent() -> None:
     rep = _assemble()
     assert rep.schema_version == SCHEMA_VERSION
     for name in SECTION_FIELDS:
-        assert getattr(rep, name) is None
-    assert rep.label_text == LABEL_TEXT
+        if name in BUILT_SECTIONS:
+            assert getattr(rep, name) is not None, name
+        else:
+            assert getattr(rep, name) is None, name
+    assert rep.label_text == report_label_text(
+        {name: getattr(rep, name) for name in SECTION_FIELDS}
+    )
+    if not BUILT_SECTIONS:
+        assert rep.label_text == LABEL_TEXT
 
 
 def test_hooks_get_the_finished_core_report(monkeypatch: pytest.MonkeyPatch) -> None:

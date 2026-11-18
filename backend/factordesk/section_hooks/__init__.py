@@ -15,12 +15,22 @@ the section with ``status = "failed"`` and a reason.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from factordesk.section_hooks.context import SectionInputs
 from factordesk.section_hooks.shrunk import load_shrinkage_inputs
 
 
-def load_section_inputs(now: datetime, *, offline: bool) -> SectionInputs:
-    """Fetch the extra data of the sections that need some (``offline``: fetch nothing)."""
-    return SectionInputs(shrinkage_portfolios=load_shrinkage_inputs(now, offline=offline))
+def load_section_inputs(
+    now: datetime, *, offline: bool, factor_last_date: date | None = None
+) -> SectionInputs:
+    """Fetch the extra data of the sections that need some (``offline``: fetch nothing).
+
+    ``factor_last_date`` is the last date of the factor file: portfolio files that end before it
+    count as stale, so every entry point keeps them on the factor vintage (SB10.4 question 2).
+    """
+    return SectionInputs(
+        shrinkage_portfolios=load_shrinkage_inputs(
+            now, offline=offline, factor_last_date=factor_last_date
+        )
+    )

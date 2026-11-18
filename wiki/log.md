@@ -20,6 +20,9 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 ## 2026-11-18 (roadmap update 2)
 
 - Roadmap update 2: PR #1 open with CI green, the SPY hardening, rolling speed-up conditions and schema contract marked Done, three feature agents resumed, confidence re-scored, a nightly workflow proposed (not ranked). See [the roadmap](../docs/ROADMAP.md#changes-in-this-update-update-2).
+## 2026-11-18 (shrunk betas)
+
+- Added [Shrunk betas](decision-shrunk-betas.md): a second, labelled beta pulled toward a typical stock, with power statements; ordinary betas stay primary. Built on branch `feat/shrunk-betas` (as of commit `b1331d8`, not merged); status Decided-pending-implementation until the independent validation of `docs/validation/shrunk-betas-handoff-2026-11-18.md` passes. Owner decision of 2026-11-18 recorded: download the four portfolio files and keep them fresh with the factor data.
 
 ## 2026-11-18 (owner ranking)
 
