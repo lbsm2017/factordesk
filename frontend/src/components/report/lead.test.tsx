@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
 import { Colophon } from "./Colophon";
@@ -50,6 +50,16 @@ describe("Notice", () => {
     expect(items).toEqual((mockReport.warnings ?? []).map((w) => w.message));
     expect(details?.textContent).toContain("5-day estimate (111 blocks): alpha +0.73% a year");
     expect(details?.querySelector("a")?.getAttribute("href")).toBe("#regression-detail");
+  });
+
+  it("summarises audit errors in the static report's words (F4)", () => {
+    const r = cloneReport();
+    r.quality_gate.fired = false;
+    r.warnings = [{ code: "audit_errors", message: "The price audit reported 1 error finding(s)." }];
+    const { container } = render(<Notice report={r} />);
+    expect(container.querySelector(".notice-sum")?.textContent).toBe(
+      "Warning: The price audit found errors, so the headline numbers are not interpretable until they are explained; see Data and audit.",
+    );
   });
 
   it("adds the gate caveat when it fired without a residual_reversal warning", () => {
@@ -168,6 +178,30 @@ describe("KpiStrip", () => {
     const { container } = render(<KpiStrip report={r} />);
     expect(container.querySelector(".kpi .n")?.textContent).toBe("Distinguishable from zero at 5%");
     expect(container.querySelector(".kpi:nth-child(4) .n")?.textContent).toBe("Trading days; none excluded");
+  });
+
+  it("mutes the fitted tiles and says alpha is not interpretable when the price audit found errors (F4)", () => {
+    const r = cloneReport();
+    r.regression.alpha_tag = "reliable";
+    r.data.audit_status = "errors";
+    const { container } = render(<KpiStrip report={r} />);
+    const cells = Array.from(container.querySelectorAll(".kpi"));
+    expect(cells[0]?.querySelector(".n")?.textContent).toBe("Not interpretable: the price audit found errors");
+    expect(cells.map((c) => c.classList.contains("ns"))).toEqual([true, true, true, false, false]);
+    expect(cells[0]?.querySelector(".v")?.textContent).toBe("+0.81%");
+  });
+
+  it("leaves the fitted tiles alone for warnings and a clean audit (F4)", () => {
+    for (const status of ["clean", "warnings"] as const) {
+      const r = cloneReport();
+      r.regression.alpha_tag = "reliable";
+      r.data.audit_status = status;
+      const { container } = render(<KpiStrip report={r} />);
+      const cells = Array.from(container.querySelectorAll(".kpi"));
+      expect(cells[0]?.querySelector(".n")?.textContent).toBe("Distinguishable from zero at 5%");
+      expect(cells.map((c) => c.classList.contains("ns"))).toEqual([false, false, false, false, false]);
+      cleanup();
+    }
   });
 
   it("shows an empty state when the regression is not ok", () => {
