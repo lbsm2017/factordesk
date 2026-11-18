@@ -32,6 +32,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Drift alerts and regime betas](decision-drift-alerts-and-regime-betas.md) [Decided-pending-implementation]: alerts when two of three conditions agree, and betas by market regime.
 - [Shrunk betas](decision-shrunk-betas.md) [Decided-pending-implementation]: a second beta pulled toward a typical stock by how noisy it is, plus power statements; the ordinary betas stay primary.
 - [Kalman-filter betas](decision-kalman-betas.md) [Decided-pending-implementation]: an extra time-varying beta line with a band, from a filter that learns its own drift rate; the rolling betas stay.
+- [World beta](decision-world-beta.md) [Decided-pending-implementation]: a quick beta against the iShares MSCI ACWI ETF as a stand-in for the MSCI ACWI index, next to the US market beta on the same days; ACWI is cached and refreshed incrementally.
 
 ### Product and design
 
