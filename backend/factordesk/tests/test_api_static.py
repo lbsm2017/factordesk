@@ -118,6 +118,28 @@ def test_missing_asset_is_404_not_index(client: ApiClient) -> None:
     assert INDEX not in response.text
 
 
+@pytest.mark.parametrize("path", ["/assets/nope.js", "/assets/sub/dir/nope.css", "/assets/"])
+def test_missing_asset_body_is_an_api_error(client: ApiClient, path: str) -> None:
+    response = client.get(path)
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("application/json")
+    error = ApiError.model_validate(response.json())
+    assert error.code == "not_found"
+    assert error.message.endswith(".")
+    assert error.action.endswith(".")
+    assert "detail" not in response.json()
+    assert "content-security-policy" not in response.headers
+
+
+def test_missing_asset_message_names_the_path(client: ApiClient) -> None:
+    error = ApiError.model_validate(client.get("/assets/nope.js").json())
+    assert "/assets/nope.js" in error.message
+
+
+def test_head_on_missing_asset_is_404(client: ApiClient) -> None:
+    assert client.head("/assets/nope.js").status_code == 404
+
+
 @pytest.mark.parametrize(
     "path",
     [
@@ -174,4 +196,6 @@ def test_without_static_dir_nothing_is_mounted(tmp_path: Path) -> None:
 def test_index_removed_after_start_is_404(tmp_path: Path, dist: Path) -> None:
     with _client(_deps(tmp_path, dist)) as test_client:  # pyright: ignore[reportUnknownVariableType]
         (dist / "index.html").unlink()
-        assert cast(ApiClient, test_client).get("/").status_code == 404
+        response = cast(ApiClient, test_client).get("/")
+        assert response.status_code == 404
+        assert ApiError.model_validate(response.json()).code == "not_found"

@@ -60,7 +60,7 @@ class ApiException(Exception):
         return ApiError(code=self.code, message=self.message, action=self.action)
 
 
-def _one_line(text: str, limit: int = _MAX_ECHO) -> str:
+def one_line(text: str, limit: int = _MAX_ECHO) -> str:
     """First non-empty line of ``text``, trimmed, without a trailing full stop, capped."""
     for line in text.splitlines():
         stripped = line.strip().rstrip(".")
@@ -76,7 +76,7 @@ def check_ticker(raw: str) -> str:
     except PriceDataError as exc:
         raise ApiException(
             "invalid_ticker",
-            f"{_one_line(raw)} is not a valid ticker.",
+            f"{one_line(raw)} is not a valid ticker.",
             "Use 1 to 12 letters, digits or . ^ = - (for example SPY or BRK-B).",
         ) from exc
 
@@ -110,7 +110,7 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
     if isinstance(exc, DegenerateInputError):
         return ApiException(
             "degenerate_input",
-            f"Cannot analyse {who}: {_one_line(exc.reason)}.",
+            f"Cannot analyse {who}: {one_line(exc.reason)}.",
             "Choose another ticker or range.",
         )
     if isinstance(exc, PriceDataError):
@@ -139,7 +139,7 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
         )
     return ApiException(
         "internal",
-        f"The report for {who} could not be computed: {_one_line(str(exc))}.",
+        f"The report for {who} could not be computed: {one_line(str(exc))}.",
         "Try another range. If it happens again, report it with this page's address.",
     )
 
@@ -223,7 +223,7 @@ async def _http_exception_handler(request: Request, exc: Exception) -> Response:
     path = request.url.path
     if path != API_PREFIX and not path.startswith(API_PREFIX + "/"):
         return await http_exception_handler(request, exc)
-    shown = _one_line(path)
+    shown = one_line(path)
     if exc.status_code == 404:
         return _respond(
             ApiException(
