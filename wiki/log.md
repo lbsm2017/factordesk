@@ -7,6 +7,12 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (SPY hardening closed)
+
+- The roadmap item "Hardening of the SPY slice" is Done. Every validation finding has a row in [docs/validation/spy-hardening-closure-2026-11-18.md](../docs/validation/spy-hardening-closure-2026-11-18.md): 20 fixed before, 4 fixed on branch `fix/spy-hardening-closure` (audit errors mute the headline, `--start`/`--end` on the report command, min-max thinning of long series, a named cause when no return lines up), 5 deferred with reasons. One wording error found during the closure was fixed: the gate summary now says residual volatility is overstated, not understated.
+- Owner decisions still open from the closure: non-USD tickers (warn or refuse, M16 question 2), and adopting the variance-stability check and keeping the gate thresholds after the panel calibration.
+- Updated [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) to Decided, with facts as of commit `4c1cb7c`.
+
 ## 2026-11-18 (dashboard built)
 
 - The dashboard was built as tickets T1 to T10 of `docs/specs/dashboard.md`, all on branch `feat/report-ui-feedback` (25 commits ahead of `dev` as of commit `f36255e`; nothing merged to `dev` yet). T1 API skeleton `5ef6922`, T2 report endpoints `d958ebc`, T3 frontend scaffold `2df0bff`, T4 controls and URL state `380694f`, T5 to T8 panels (`b6d5472`, `534996b`, `b45d6de`, `10ed53c`), T9 serve command `afefd9a` with static serving `32c04f0`, T10 fake backend, browser smoke test and CI `9ae81a9` and `f36255e`. A batch price download (`deca962`) and the reduction of range presets to 3Y, 5Y and Full history (`96f0b2f`) landed on the same branch.

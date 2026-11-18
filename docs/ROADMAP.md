@@ -11,8 +11,9 @@ test written down first, logged, independently reviewed) before it ships.
   (`docs/validation/spy-slice-validation.md`, verdict "ship with changes").
 - **Built, in review:** the dashboard (local FastAPI server and React page, one-command start,
   fake-backend browser test and CI). Not yet run against live Yahoo data.
-- **In progress:** hardening from the validation findings (residual diagnostics, quality gate,
-  bad-input handling); a data-source comparison of Yahoo, Tiingo and Alpaca.
+- **In progress:** a data-source comparison of Yahoo, Tiingo and Alpaca. Hardening from the
+  validation findings (residual diagnostics, quality gate, bad-input handling) is done as of
+  2026-11-18: `docs/validation/spy-hardening-closure-2026-11-18.md`.
 - **Specified, not built:** report redesign (`docs/design/report-design.md`), residual alpha
   analysis (`docs/methodology-residual-analysis.md`), regional datasets
   (`docs/methodology-datasets.md`).
@@ -21,7 +22,7 @@ test written down first, logged, independently reviewed) before it ships.
 
 | Item | Why it matters | Status | Depends on |
 |---|---|---|---|
-| Hardening of the SPY slice | Numbers must never mislead: diagnostics, quality gate, clean errors | On Track | — |
+| Hardening of the SPY slice | Numbers must never mislead: diagnostics, quality gate, clean errors | Done 2026-11-18: every critical and major validation finding fixed; minor and calibration items deferred with reasons in `docs/validation/spy-hardening-closure-2026-11-18.md` | — |
 | First commit, `prod` and `dev` branches | Everything after this goes through pull requests | Not Started | Hardening; folder rename to `factordesk` |
 | Report redesign integration | The validated numbers in the approved look | Not Started | First commit; schema v3 contract |
 | Residual alpha analysis | Shows how much alpha holds up with point-in-time betas | Not Started | Schema v3 contract |
