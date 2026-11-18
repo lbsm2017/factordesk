@@ -6,26 +6,28 @@
 .shrunk-scope > .reading { margin-top: 0; }
 
 /* The shrunk beta: a hollow diamond in neutral grey, with a thin credible-interval line. Never a bar. */
-.bar-svg .shrm path { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.75; stroke-linejoin: round; }
-.shrm-sw { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.5; stroke-linejoin: round; }
-line.cred { stroke: var(--ink-3); stroke-width: 1; }
+.bar-svg .shrm path { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.75; stroke-linejoin: round; }
+.shrm-sw { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.5; stroke-linejoin: round; }
+line.cred { stroke: var(--ink-2); stroke-width: 1.25; }
 
 .sub.moved { color: var(--ink); font-weight: 560; margin-top: 1px; }
 
 /* Seven columns on desktop; the factor and plot columns share what the number columns leave. */
-.bars.shrunk thead th.num:nth-child(3), .bars.shrunk thead th.num:nth-child(5) { width: 76px; }
+.bars.shrunk thead th.num:nth-child(3) { width: 76px; }
+.bars.shrunk thead th.num:nth-child(5) { width: 92px; }
 .bars.shrunk thead th.num:nth-child(4) { width: 56px; }
-.bars.shrunk thead th.num:nth-child(6) { width: 112px; }
+.bars.shrunk thead th.num:nth-child(6) { width: 150px; }
 .bars.shrunk thead th.num:nth-child(7) { width: 56px; }
-.bars.shrunk thead th:first-child { width: 150px; }
-.bars.shrunk td.num.ci-text { white-space: normal; }
+.bars.shrunk thead th:first-child { width: 168px; }
+.bars.shrunk thead th.num { padding-left: var(--s-3); }
+.bars.shrunk td.num.ci-text { white-space: nowrap; }
 
 .power-h { margin: var(--s-4) 0 var(--s-1); font-size: var(--fs-1); font-weight: 560; color: var(--ink-2); }
 .power { max-width: 76ch; font-size: var(--fs-1); color: var(--ink-2); line-height: 1.45; }
 .power li { padding: 2px 0; }
 
 @media screen and (max-width: 719px) {
-  /* Row 1: factor, OLS, shrunk, pull. Row 2: the plot. Row 3: se and the interval. The header row is
+  /* Row 1: factor, OLS, shrunk, pull. Row 2: the plot. Row 3: se and the interval, each with its label above. The header row is
      kept for assistive technology and hidden; each number carries its own small label instead. */
   .bars.shrunk thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); }
   .bars.shrunk tbody tr { grid-template-columns: minmax(0, 1fr) 58px 58px 50px; row-gap: 2px; padding-top: 12px; }
@@ -37,7 +39,5 @@ line.cred { stroke: var(--ink-3); stroke-width: 1; }
   .bars.shrunk td.se { grid-column: 1; grid-row: 3; text-align: left; }
   .bars.shrunk td.ci-text { grid-column: 2 / -1; grid-row: 3; text-align: right; white-space: nowrap; }
   .bars.shrunk td.num::before { content: attr(data-label); display: block; font-size: 11px; line-height: 1.2; color: var(--ink-3); font-weight: 400; }
-  .bars.shrunk td.se::before, .bars.shrunk td.ci-text::before { display: inline; margin-right: 6px; }
-  .bars.shrunk td.se, .bars.shrunk td.ci-text { font-size: var(--fs-1); }
   .bars.shrunk tfoot tr { padding-top: 0; }
 }
