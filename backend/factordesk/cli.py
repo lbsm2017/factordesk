@@ -16,6 +16,7 @@ writable. Every failure prints exactly one line on stderr.
 from __future__ import annotations
 
 import argparse
+import importlib
 import ipaddress
 import logging
 import socket
@@ -55,6 +56,8 @@ DEFAULT_STATIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 """The built page, found from the package location (a source checkout, not the wheel)."""
 _BUILD_COMMAND = "npm --prefix frontend run build"
 _OPEN_WAIT_SECONDS = 15.0
+_PRELOAD_MODULES = ("factordesk.pipeline", "yfinance")
+"""Slow to import and needed only by the first report; loaded in the background by serve."""
 
 logger = logging.getLogger(__name__)
 
@@ -275,22 +278,49 @@ def _port_problem(host: str, port: int) -> str | None:
     return None
 
 
+def _wait_until_listening(probe_host: str, port: int) -> bool:
+    """Poll until ``probe_host:port`` accepts a connection; False after the wait limit."""
+    deadline = time.monotonic() + _OPEN_WAIT_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((probe_host, port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
 def _open_when_ready(host: str, port: int) -> None:
     """Open the browser once the server accepts connections (in a daemon thread)."""
     url = _browser_url(host, port)
     probe_host = _reachable_host(host)
 
     def wait_then_open() -> None:
-        deadline = time.monotonic() + _OPEN_WAIT_SECONDS
-        while time.monotonic() < deadline:
-            try:
-                with socket.create_connection((probe_host, port), timeout=0.5):
-                    break
-            except OSError:
-                time.sleep(0.2)
+        _wait_until_listening(probe_host, port)
         webbrowser.open(url)
 
     threading.Thread(target=wait_then_open, name="open-browser", daemon=True).start()
+
+
+def _preload_when_ready(host: str, port: int) -> None:
+    """Load the report code once the server is listening (in a daemon thread).
+
+    The statistics stack (statsmodels, scipy) and yfinance take seconds to import and are
+    needed only by the first report, so the server starts without them. Importing them in the
+    background means a first report does not wait for them. No network call is made.
+    """
+    probe_host = _reachable_host(host)
+
+    def preload() -> None:
+        if not _wait_until_listening(probe_host, port):
+            return
+        try:
+            for name in _PRELOAD_MODULES:
+                importlib.import_module(name)
+        except Exception:  # a failed import surfaces on the first report instead
+            logger.debug("background preload failed", exc_info=True)
+
+    threading.Thread(target=preload, name="preload-report-code", daemon=True).start()
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -325,6 +355,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     print(f"Dashboard: {_browser_url(host, port)}" + (" (API only, dev)" if args.dev else ""))
     if args.open:
         _open_when_ready(host, port)
+    if not args.dev:
+        _preload_when_ready(host, port)
     if args.dev:
         uvicorn.run(
             "factordesk.api.main:create_dev_app",

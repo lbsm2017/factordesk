@@ -31,11 +31,39 @@ from fastapi import Request
 from factordesk.api import ranges
 from factordesk.api.runtime import Runtime
 from factordesk.data.prices import PriceHistory
-from factordesk.pipeline import assemble_report
 from factordesk.report.render_html import render_report_html
 from factordesk.report.schema import FactorReport, RangeOptions, RangePreset
 
 logger = logging.getLogger(__name__)
+
+
+def assemble_report(
+    ticker: str,
+    history: PriceHistory,
+    factor_frame: pd.DataFrame,
+    *,
+    now: datetime,
+    factors_downloaded_at: datetime | None,
+    start: date | None = None,
+    end: date | None = None,
+) -> FactorReport:
+    """``factordesk.pipeline.assemble_report``, imported on first use.
+
+    The pipeline pulls in statsmodels and scipy, which take seconds to load; importing it at
+    module level would delay the start of the server.
+    """
+    from factordesk.pipeline import assemble_report as assemble
+
+    return assemble(
+        ticker,
+        history,
+        factor_frame,
+        now=now,
+        factors_downloaded_at=factors_downloaded_at,
+        start=start,
+        end=end,
+    )
+
 
 PRICE_CACHE_SIZE = 16
 """Price histories kept in memory (DB3 layer 2)."""

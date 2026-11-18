@@ -23,7 +23,6 @@ from factordesk.analytics.sample import (
 )
 from factordesk.api.errors import ApiException
 from factordesk.data.prices import PriceHistory
-from factordesk.pipeline import unique_dates
 from factordesk.report.schema import RANGE_PRESETS, RangeOption, RangeOptions, RangePreset
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -73,6 +72,17 @@ class Coverage:
 
 def _day(value: object) -> date:
     return pd.Timestamp(str(value)).date()
+
+
+def unique_dates(history: PriceHistory) -> PriceHistory:
+    """``factordesk.pipeline.unique_dates``, imported on first use.
+
+    The pipeline pulls in statsmodels and scipy, which take seconds to load; importing it here
+    would delay the start of the server. The first report request pays for it instead.
+    """
+    from factordesk.pipeline import unique_dates as collapse
+
+    return collapse(history)
 
 
 def coverage(history: PriceHistory, factor_frame: pd.DataFrame) -> Coverage:
