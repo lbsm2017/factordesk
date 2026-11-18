@@ -15,8 +15,8 @@ The independent validation (`docs/reviews/kalman-betas-validation-2026-11-18.md`
 
 Left for the owner (not changed here):
 
-- **F4.** Sign-off of the edits to contract files (`test_schema_contract.py`, `test_panel_registry.py`, `panelRegistry.test.tsx`, `panel_registry.py`) and the merge order with `feat/shrunk-betas` and `feat/residual-alpha`, which edit the same three test files.
-- **The L-KF window clause.** The spec's `L-KF` text has the clause "behaves like a {W_eq}-day window for this stock"; the implemented label drops it and the window appears only in the vintage table. Either amend the spec label or restore the clause.
+- **F4: accepted by the owner (2026-11-18).** The edits to contract files (`test_schema_contract.py` with the `BUILT_SECTIONS` tuple, `test_panel_registry.py`, `panelRegistry.test.tsx`, `panel_registry.py`) stay as they are. The merge order with `feat/shrunk-betas` and `feat/residual-alpha`, which edit the same three test files, is still to be agreed.
+- **The L-KF window clause: decided by the owner (2026-11-18), as a proposal only.** Proposal for the spec (KB8.3, `docs/specs/kalman-betas.md`, not edited here): remove the clause "behaves like a {W_eq}-day window for this stock" from the `L-KF` label, so the spec matches the implemented label; the window stays in the vintage table. The code is unchanged.
 - The five unfilled spec markers, the stale spec header and KB8.1 runtime (validation F8), the screen-reader strings that differ between the panels (F7), and the MSTR half of TKB24 as a test.
 - Proposed for `docs/methodology.md` at the fold-in: the corrected definition of the drift rate (weight of a new day roughly the square root of the rate).
 
