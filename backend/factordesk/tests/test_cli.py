@@ -58,6 +58,8 @@ def _isolated_data_dir(  # pyright: ignore[reportUnusedFunction]
         data_dir = tmp_path / "cache"
 
     monkeypatch.setattr(cli, "get_settings", lambda: StubSettings())
+    # A built page in the package folder (after "npm run build:package") must not leak in.
+    monkeypatch.setattr(cli, "PACKAGED_STATIC_DIR", tmp_path / "no-packaged-web")
 
 
 def test_report_writes_html_and_json(

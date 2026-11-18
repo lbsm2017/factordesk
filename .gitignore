@@ -27,3 +27,6 @@ frontend/shots/
 
 frontend/test-results/
 frontend/playwright-report/
+
+# The built page copied into the package by "npm run build:package"; the wheel carries it
+backend/factordesk/web/
