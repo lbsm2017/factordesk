@@ -74,6 +74,25 @@ class DrawdownEpisodeInfo(FrozenModel):
     )
 
 
+class DrawdownSeries(FrozenModel):
+    """The fall from the running peak on every day of the compounded return path, for a chart."""
+
+    dates: list[date] = Field(
+        description="The path origin (the price date before the first analysed return), then "
+        "each analysed date."
+    )
+    values: list[float] = Field(
+        description="Value / running peak - 1 on each date, rounded to 4 decimals; 0.0 at a new "
+        "high, never positive. Same length as dates."
+    )
+
+    @model_validator(mode="after")
+    def _same_length(self) -> DrawdownSeries:
+        if len(self.dates) != len(self.values):
+            raise ValueError("dates and values must have the same length")
+        return self
+
+
 class PerformanceDrawdown(FrozenModel):
     """Maximum drawdown and the deepest episodes."""
 
@@ -86,9 +105,10 @@ class PerformanceDrawdown(FrozenModel):
     days_peak_to_trough: int | None
     days_trough_to_recovery: int | None
     episodes: list[DrawdownEpisodeInfo] = Field(
-        description="Up to three distinct, non-overlapping episodes, deepest first; the first "
+        description="Up to five distinct, non-overlapping episodes, deepest first; the first "
         "equals the maximum drawdown. Empty when there was no drawdown."
     )
+    series: DrawdownSeries = Field(description="Daily drawdown over the analysed window.")
 
 
 class PerformanceSection(SectionModel):

@@ -7,7 +7,7 @@ from. Positions between the numbers of contract SC4 are free for later panels, a
 existing position.
 
 Contents, top to bottom: a four-cell strip in the style of the headline strip (Return a year,
-Volatility a year, Sharpe ratio, Worst fall), one sentence on the window, a small table of the three
+Volatility a year, Sharpe ratio, Worst fall), one sentence on the window, a small table of the five
 largest falls, one footnote, and a folded "How this is computed". Everything described is past
 data; the panel says nothing about the future. A section that is not ``ok`` shows its reason as the
 empty state and no numbers. Only existing classes and tokens are used (the panel's stylesheet
@@ -62,7 +62,7 @@ HOW = (
     "returns, so it ignores autocorrelation, fat tails and volatility clustering, and the "
     "interval is approximate. The ratio is not defined when the daily returns do not vary.",
     "Worst fall is the largest drop of the compounded return path (starting at 1) from a running "
-    "high. An episode runs from a high until the path first regains it; the table lists the three "
+    "high. An episode runs from a high until the path first regains it; the table lists the five "
     "deepest, which do not overlap. Days are trading days of the analysed sample.",
 )
 HEADINGS = ("Fall", "Peak", "Trough", "Recovered", "Peak to trough", "Trough to recovery")

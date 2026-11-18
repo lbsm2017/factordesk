@@ -1255,6 +1255,35 @@
         "title": "DrawdownEpisodeInfo",
         "description": "One fall of the compounded return path from a running peak, and its recovery."
       },
+      "DrawdownSeries": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates",
+            "description": "The path origin (the price date before the first analysed return), then each analysed date."
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "Value / running peak - 1 on each date, rounded to 4 decimals; 0.0 at a new high, never positive. Same length as dates."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dates",
+          "values"
+        ],
+        "title": "DrawdownSeries",
+        "description": "The fall from the running peak on every day of the compounded return path, for a chart."
+      },
       "ExcludedRow": {
         "properties": {
           "date": {
@@ -2567,7 +2596,11 @@
             },
             "type": "array",
             "title": "Episodes",
-            "description": "Up to three distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown."
+            "description": "Up to five distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown."
+          },
+          "series": {
+            "$ref": "#/components/schemas/DrawdownSeries",
+            "description": "Daily drawdown over the analysed window."
           }
         },
         "additionalProperties": false,
@@ -2579,7 +2612,8 @@
           "recovery_date",
           "days_peak_to_trough",
           "days_trough_to_recovery",
-          "episodes"
+          "episodes",
+          "series"
         ],
         "title": "PerformanceDrawdown",
         "description": "Maximum drawdown and the deepest episodes."

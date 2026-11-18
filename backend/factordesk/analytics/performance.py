@@ -28,8 +28,8 @@ Inputs and definitions (owner-approved wording of 2026-11-18; they are proposals
   *episode* runs from a running peak until the path first regains that peak (``W >= peak``,
   within ``PEAK_TOLERANCE``); it is open when the path never regains it. Episodes never
   overlap. Its depth is the lowest drawdown inside it, its trough the date of that low (first
-  date on a tie). The maximum drawdown is the deepest episode; ``episodes`` lists the three
-  deepest, deepest first.
+  date on a tie). The maximum drawdown is the deepest episode; ``episodes`` lists the five
+  deepest, deepest first. ``drawdown_series`` gives the drawdown at every path point.
   A path that never falls below a previous peak has no episode: depth ``0.0`` and no dates.
   Day counts are trading days of the path (positions in the sample, the origin counting as 0).
   Rows excluded from ``S`` (M2) are not in the path.
@@ -61,7 +61,8 @@ SD_FLOOR = 1e-8
 ``sample.MIN_RETURN_SD``): a constant series has an sd of rounding noise, never exactly 0."""
 Z95 = 1.959963984540054
 """Two-sided 95% normal quantile."""
-TOP_EPISODES = 3
+TOP_EPISODES = 5
+"""How many of the deepest, non-overlapping falls the result lists."""
 PEAK_TOLERANCE = 1e-9
 """A path value within this fraction of the running peak is back at the peak (validation F1).
 
@@ -115,6 +116,10 @@ class PerformanceResult:
     """Depth of the deepest episode; ``0.0`` when there is none."""
     episodes: tuple[DrawdownEpisode, ...]
     """The deepest ``TOP_EPISODES`` episodes, deepest first (ties: earlier peak first)."""
+    drawdown_dates: tuple[date, ...]
+    """Date of every path point: the origin, then each analysed date (``n + 1`` entries)."""
+    drawdown_values: tuple[float, ...]
+    """``W_j / max_{i<=j} W_i - 1`` at each path point, 0.0 or negative (``n + 1`` entries)."""
 
 
 def _as_date(value: object) -> date:
@@ -131,6 +136,11 @@ def _values(name: str, series: pd.Series) -> FloatArray:
 def compound_path(ret: FloatArray) -> FloatArray:
     """``[1, W_1, ..., W_n]``, the compounded path starting at 1.0 (length ``n + 1``)."""
     return np.concatenate([[1.0], np.cumprod(1.0 + ret)])
+
+
+def drawdown_series(path: FloatArray) -> FloatArray:
+    """The drawdown ``W_j / max_{i<=j} W_i - 1`` at every point of ``path`` (0.0 at a new high)."""
+    return np.asarray(path / np.maximum.accumulate(path) - 1.0, dtype=np.float64)
 
 
 def drawdown_episodes(path: FloatArray, dates: list[date]) -> list[DrawdownEpisode]:
@@ -218,6 +228,7 @@ def performance_stats(
         raise ValueError("origin is after the first date")
     dates = [_as_date(start_point), *(_as_date(d) for d in index)]
     top = top_episodes(drawdown_episodes(path, dates))
+    series = drawdown_series(path)
     result = PerformanceResult(
         n=n,
         start=_as_date(index[0]),
@@ -234,6 +245,8 @@ def performance_stats(
         sharpe_ci95=ci,
         max_drawdown=top[0].depth if top else 0.0,
         episodes=tuple(top),
+        drawdown_dates=tuple(dates),
+        drawdown_values=tuple(float(v) for v in series),
     )
     numbers = [
         result.cagr,

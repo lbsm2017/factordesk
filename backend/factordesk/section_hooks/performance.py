@@ -22,6 +22,7 @@ from factordesk.analytics.performance import (
 )
 from factordesk.report.sections.performance import (
     DrawdownEpisodeInfo,
+    DrawdownSeries,
     PerformanceDrawdown,
     PerformancePeriods,
     PerformanceReturns,
@@ -47,6 +48,17 @@ def _episode(e: DrawdownEpisode) -> DrawdownEpisodeInfo:
         recovery_date=e.recovery_date,
         days_peak_to_trough=e.days_peak_to_trough,
         days_trough_to_recovery=e.days_trough_to_recovery,
+    )
+
+
+SERIES_DECIMALS = 4
+
+
+def _series(result: PerformanceResult) -> DrawdownSeries:
+    """Dates and drawdown values (4 decimals; ``+ 0.0`` turns a rounded ``-0.0`` into ``0.0``)."""
+    return DrawdownSeries(
+        dates=list(result.drawdown_dates),
+        values=[round(v, SERIES_DECIMALS) + 0.0 for v in result.drawdown_values],
     )
 
 
@@ -83,6 +95,7 @@ def _section(result: PerformanceResult, ctx: SectionContext) -> PerformanceSecti
             days_peak_to_trough=None if worst is None else worst.days_peak_to_trough,
             days_trough_to_recovery=None if worst is None else worst.days_trough_to_recovery,
             episodes=[_episode(e) for e in result.episodes],
+            series=_series(result),
         ),
     )
 

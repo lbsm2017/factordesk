@@ -278,7 +278,7 @@ def test_tp38_first_episode_is_the_maximum_drawdown() -> None:
         dd.days_peak_to_trough,
         dd.days_trough_to_recovery,
     )
-    assert len(dd.episodes) <= 3
+    assert len(dd.episodes) <= 5
     assert [e.depth for e in dd.episodes] == sorted(e.depth for e in dd.episodes)
 
 
@@ -309,10 +309,6 @@ def test_tp40_hook_returns_the_failed_state_when_the_statistics_raise(
     assert sec is not None and sec.status == "failed" and sec.reason == hook.FAILED
 
 
-if __name__ == "__main__":
-    FIXTURE.write_text(synthetic_section().model_dump_json() + "\n", encoding="utf-8")
-
-
 def test_tp54_an_interval_that_ends_exactly_at_zero_includes_zero(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -327,3 +323,31 @@ def test_tp54_an_interval_that_ends_exactly_at_zero_includes_zero(
         sec = hook.build_performance(ctx)
         assert sec is not None and sec.sharpe is not None
         assert sec.sharpe.ci_includes_zero is True
+
+
+def test_tp58_the_drawdown_series_is_rounded_and_spans_the_path() -> None:
+    report, ctx = _spy_context()
+    dd = report.performance.drawdown if report.performance else None
+    assert dd is not None
+    series = dd.series
+    values = series.values  # noqa: PD011 (a pydantic field, not a pandas attribute)
+    n = len(ctx.sample.ret)
+    assert len(series.dates) == len(values) == n + 1
+    assert series.dates[0] < ctx.sample.ret.index[0].date()  # the price date before the window
+    assert series.dates[1:] == [d.date() for d in ctx.sample.ret.index]
+    assert series.dates == sorted(set(series.dates))
+    assert all(v <= 0.0 and round(v, 4) == v for v in values)
+    assert all(str(v) != "-0.0" for v in values)
+    assert min(values) == pytest.approx(dd.max_drawdown, abs=5e-5)
+    assert values[0] == 0.0
+
+
+def test_tp59_series_of_different_length_is_rejected() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["drawdown"]["series"]["values"].pop()
+    with pytest.raises(ValidationError):
+        _validate(payload)
+
+
+if __name__ == "__main__":
+    FIXTURE.write_text(synthetic_section().model_dump_json() + "\n", encoding="utf-8")

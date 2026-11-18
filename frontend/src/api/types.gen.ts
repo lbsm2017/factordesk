@@ -470,6 +470,22 @@ export interface components {
             days_trough_to_recovery: number | null;
         };
         /**
+         * DrawdownSeries
+         * @description The fall from the running peak on every day of the compounded return path, for a chart.
+         */
+        DrawdownSeries: {
+            /**
+             * Dates
+             * @description The path origin (the price date before the first analysed return), then each analysed date.
+             */
+            dates: string[];
+            /**
+             * Values
+             * @description Value / running peak - 1 on each date, rounded to 4 decimals; 0.0 at a new high, never positive. Same length as dates.
+             */
+            values: number[];
+        };
+        /**
          * ExcludedRow
          * @description One return row left out of the analysis sample, with the reason (M2).
          */
@@ -1002,9 +1018,11 @@ export interface components {
             days_trough_to_recovery: number | null;
             /**
              * Episodes
-             * @description Up to three distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown.
+             * @description Up to five distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown.
              */
             episodes: components["schemas"]["DrawdownEpisodeInfo"][];
+            /** @description Daily drawdown over the analysed window. */
+            series: components["schemas"]["DrawdownSeries"];
         };
         /**
          * PerformancePeriods

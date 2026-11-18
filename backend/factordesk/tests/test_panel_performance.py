@@ -13,6 +13,7 @@ from factordesk.report.panel_registry import registered_panels
 from factordesk.report.panels import performance as panel
 from factordesk.report.sections.performance import (
     DrawdownEpisodeInfo,
+    DrawdownSeries,
     PerformanceDrawdown,
     PerformanceSection,
     PerformanceSharpe,
@@ -127,6 +128,7 @@ def test_tp46_recovered_and_no_fall_states() -> None:
                 days_trough_to_recovery=65,
             )
         ],
+        series=DrawdownSeries(dates=[date(2025, 1, 2)], values=[0.0]),
     )
     text = _text(_html(_with(report, drawdown=dd)))
     assert "Peak 2 Jan 2025, trough 3 Mar 2025, recovered 2 Jun 2025" in text
@@ -139,6 +141,7 @@ def test_tp46_recovered_and_no_fall_states() -> None:
         days_peak_to_trough=None,
         days_trough_to_recovery=None,
         episodes=[],
+        series=DrawdownSeries(dates=[date(2025, 1, 2)], values=[0.0]),
     )
     html = _html(_with(report, drawdown=none))
     assert "No fall from an earlier high" in html and "Largest falls" not in html
@@ -149,7 +152,7 @@ def test_tp47_drawdown_table_lists_the_episodes_deepest_first() -> None:
     html = _html(_report())
     rows = re.findall(r"<tbody>(.*?)</tbody>", html, flags=re.S)[0]
     parts = re.findall(r"<tr>(.*?)</tr>", rows, flags=re.S)
-    assert len(parts) == 3
+    assert len(parts) == 5
     first = _text(parts[0])
     assert "−41.0%" in first and "not recovered" in first and "310" in first and "n/a" in first
     second = _text(parts[1])

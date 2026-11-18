@@ -19,6 +19,7 @@ from factordesk.analytics.performance import (
     InsufficientObservations,
     compound_path,
     drawdown_episodes,
+    drawdown_series,
     performance_stats,
     top_episodes,
 )
@@ -105,7 +106,7 @@ def test_tp02_top_episodes_are_deepest_first_and_capped() -> None:
     top = top_episodes(eps)
     assert [e.depth for e in top] == pytest.approx([-0.5, -0.2])
     many = [e for _ in range(5) for e in eps]
-    assert len(top_episodes(many)) == 3
+    assert len(top_episodes(many)) == 5
     assert top_episodes([]) == []
 
 
@@ -370,7 +371,7 @@ def test_tp21_drawdown_is_within_minus_one_and_zero_and_matches_pandas() -> None
         if res.episodes:
             assert res.episodes[0].depth == res.max_drawdown
             depths = [e.depth for e in res.episodes]
-            assert depths == sorted(depths) and len(res.episodes) <= 3
+            assert depths == sorted(depths) and len(res.episodes) <= 5
 
 
 def test_tp22_volatility_and_mean_against_numpy_on_random_series() -> None:
@@ -433,10 +434,38 @@ def test_tp53_a_price_back_exactly_at_its_old_high_counts_as_recovered() -> None
     assert deepest.recovery_date == ret.index[-1].date()
 
 
-def test_tp55_a_price_seven_thousandths_of_a_percent_under_its_old_high_is_not_recovered() -> None:
+def test_tp55_a_real_shortfall_from_the_old_high_is_not_recovered() -> None:
     # The tolerance covers float rounding only: a real shortfall of 0.007% (1.0999 against 1.1)
     # leaves the fall open.
     r = [0.0] * 57 + [0.10, -0.20, 0.2499]
     ret, rf = _series(r)
     res = performance_stats(ret, rf)
     assert res.episodes[0].recovery_date is None
+
+
+def test_tp56_drawdown_series_follows_the_path_and_the_episodes() -> None:
+    path = compound_path(np.array(R6))
+    values = drawdown_series(path)
+    # path 1, 1.1, 0.88, 1.144, 1.2584, 0.6292, 0.81796; running peak 1, 1.1, 1.1, 1.144, ...
+    expected = [0.0, 0.0, 0.88 / 1.1 - 1.0, 0.0, 0.0, 0.6292 / 1.2584 - 1.0, 0.81796 / 1.2584 - 1.0]
+    assert values.tolist() == pytest.approx(expected)
+    assert float(values.min()) == pytest.approx(-0.5) and bool((values <= 0.0).all())
+    ret, rf = _series([0.0] * 54 + R6)
+    res = performance_stats(ret, rf, origin=ret.index[0] - pd.Timedelta(days=1))
+    assert len(res.drawdown_dates) == len(res.drawdown_values) == len(ret) + 1
+    assert res.drawdown_dates[0] == (ret.index[0] - pd.Timedelta(days=1)).date()
+    assert res.drawdown_dates[1:] == tuple(d.date() for d in ret.index)
+    assert min(res.drawdown_values) == pytest.approx(res.max_drawdown)
+    assert res.drawdown_values[0] == 0.0
+
+
+def test_tp57_the_five_deepest_falls_do_not_overlap() -> None:
+    rng = np.random.default_rng(57)
+    r = rng.normal(0.0003, 0.012, size=1500)
+    ret, rf = _series(r.tolist())
+    res = performance_stats(ret, rf)
+    assert len(res.episodes) == 5
+    assert [e.depth for e in res.episodes] == sorted(e.depth for e in res.episodes)
+    spans = sorted((e.peak_date, e.recovery_date or ret.index[-1].date()) for e in res.episodes)
+    for (_, end_a), (start_b, _) in zip(spans, spans[1:], strict=False):
+        assert end_a <= start_b
