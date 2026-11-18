@@ -8,6 +8,7 @@ are translated here, in one place, so a route only has to let them propagate.
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Callable, Sequence
 from typing import Any, cast
 
@@ -18,6 +19,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.data.factors import FactorDataError, FactorDownloadError
@@ -60,7 +62,7 @@ class ApiException(Exception):
         return ApiError(code=self.code, message=self.message, action=self.action)
 
 
-def _one_line(text: str, limit: int = _MAX_ECHO) -> str:
+def one_line(text: str, limit: int = _MAX_ECHO) -> str:
     """First non-empty line of ``text``, trimmed, without a trailing full stop, capped."""
     for line in text.splitlines():
         stripped = line.strip().rstrip(".")
@@ -76,7 +78,7 @@ def check_ticker(raw: str) -> str:
     except PriceDataError as exc:
         raise ApiException(
             "invalid_ticker",
-            f"{_one_line(raw)} is not a valid ticker.",
+            f"{one_line(raw)} is not a valid ticker.",
             "Use 1 to 12 letters, digits or . ^ = - (for example SPY or BRK-B).",
         ) from exc
 
@@ -110,7 +112,7 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
     if isinstance(exc, DegenerateInputError):
         return ApiException(
             "degenerate_input",
-            f"Cannot analyse {who}: {_one_line(exc.reason)}.",
+            f"Cannot analyse {who}: {one_line(exc.reason)}.",
             "Choose another ticker or range.",
         )
     if isinstance(exc, PriceDataError):
@@ -139,15 +141,17 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
         )
     return ApiException(
         "internal",
-        f"The report for {who} could not be computed: {_one_line(str(exc))}.",
+        f"The report for {who} could not be computed: {one_line(str(exc))}.",
         "Try another range. If it happens again, report it with this page's address.",
     )
 
 
 def _is_yahoo_refusal(exc: BaseException) -> bool:
-    from yfinance.exceptions import YFException  # pyright: ignore[reportMissingTypeStubs]
-
-    return isinstance(exc, YFException)
+    """True for a yfinance error. yfinance is not imported here: it takes seconds to load, and
+    an exception of its own can only exist once something has imported it."""
+    module = sys.modules.get("yfinance.exceptions")
+    refusal: object = getattr(module, "YFException", None)
+    return isinstance(refusal, type) and isinstance(exc, refusal)
 
 
 def _respond(error: ApiException) -> JSONResponse:
@@ -223,7 +227,7 @@ async def _http_exception_handler(request: Request, exc: Exception) -> Response:
     path = request.url.path
     if path != API_PREFIX and not path.startswith(API_PREFIX + "/"):
         return await http_exception_handler(request, exc)
-    shown = _one_line(path)
+    shown = one_line(path)
     if exc.status_code == 404:
         return _respond(
             ApiException(
@@ -264,13 +268,44 @@ _DOMAIN_EXCEPTIONS: tuple[type[Exception], ...] = (
 )
 
 
+class _YahooRefusalMiddleware:
+    """Answers a yfinance error with its ``ApiError``, in place of a per-class handler.
+
+    A handler is registered by class, which would mean importing yfinance when the app is
+    built. This sits outside the exception handlers, so it sees only what they did not take.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = False
+
+        async def tracked_send(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, tracked_send)
+        except Exception as exc:
+            if started or not _is_yahoo_refusal(exc):
+                raise
+            translated = to_api_exception(exc)
+            logger.info("%s on %s: %s", translated.code, scope.get("path"), translated.message)
+            await _respond(translated)(scope, receive, send)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     """Register the handlers that make every error body an ``ApiError``."""
-    from yfinance.exceptions import YFException  # pyright: ignore[reportMissingTypeStubs]
-
     handler: Callable[[Request, Exception], Any] = _domain_exception_handler
     app.add_exception_handler(ApiException, _api_exception_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)
-    for cls in (*_DOMAIN_EXCEPTIONS, YFException):
+    for cls in _DOMAIN_EXCEPTIONS:
         app.add_exception_handler(cls, handler)
+    app.add_middleware(_YahooRefusalMiddleware)

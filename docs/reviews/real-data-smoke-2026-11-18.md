@@ -55,14 +55,15 @@ Status: open. No statistic or threshold was changed. The owner should decide whe
 What: on 3Y the chart is zoomed to about mid 2023 onward, but the side list says "First 29 Jan 1993 24.05". It matches the series and the "Show full history" button, so it may be intended.
 Status: open, no change made.
 
-### F5. Static-file 404 body is not an `ApiError` (open, left as is)
+### F5. Static-file 404 body is not an `ApiError` (fixed)
 
-What: `/assets/missing.js` answers `{"detail":"Not Found"}`. `test_missing_asset_is_404_not_index` pins the status; no browser shows the body. Left unchanged.
+What: `/assets/missing.js` answers `{"detail":"Not Found"}`. `test_missing_asset_is_404_not_index` pins the status; no browser shows the body.
+Status: fixed 2026-11-18. A missing file under `/assets` and a missing `index.html` now answer 404 with an `ApiError` body (`not_found`, a plain message and action). SPA routes still fall back to the page; unknown `/api/...` paths keep their JSON 404. Tests in `test_api_static.py`.
 
-### F6. Server start takes about 17 s here (open)
+### F6. Server start takes about 17 s here (fixed)
 
 What: importing `factordesk.api.main` takes about 17 s on this machine (statsmodels, scipy, pandas), mostly cold disk and a busy machine. `localhost` in curl also took 2.2 s the first time on Windows (IPv6 first); the server prints and the page uses `127.0.0.1`, so users following the printed URL are not affected.
-Status: open, informational.
+Status: fixed 2026-11-18 (the `localhost` note is unchanged). Python, not the OS, was the cost: a bare interpreter starts in 0.3 s. statsmodels and scipy (reached through `factordesk.pipeline`) took about 8 to 9 s and yfinance about 2 s when the app was built. The API now imports the pipeline and yfinance on first use, and `factordesk serve` loads them in a background thread once it is listening, with no network call. Time until `GET /api/health` answers, three runs each on this machine: 17 to 22 s before, 6 to 8 s after. The rest is pandas, FastAPI, pydantic and httpx.
 
 ## Gates
 

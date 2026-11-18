@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from starlette.responses import Response
 
-from factordesk.api.errors import API_PREFIX
+from factordesk.api.errors import API_PREFIX, ApiException, one_line
 
 ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
 PAGE_CACHE_CONTROL = "no-cache"
@@ -73,7 +73,12 @@ def install_static(app: FastAPI, static_dir: Path) -> None:
     def asset(asset_path: str) -> Response:  # pyright: ignore[reportUnusedFunction]
         found = _asset_file(assets_root, asset_path)
         if found is None:
-            raise HTTPException(status_code=404, detail=_NOT_FOUND)
+            raise ApiException(
+                "not_found",
+                f"There is no file at {one_line('/assets/' + asset_path)}.",
+                "Reload the page; if it still fails, rebuild the dashboard with "
+                "'npm --prefix frontend run build'.",
+            )
         return FileResponse(found, headers=_ASSET_HEADERS)
 
     @app.api_route("/{page_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
@@ -81,5 +86,9 @@ def install_static(app: FastAPI, static_dir: Path) -> None:
         if _is_api_path("/" + page_path):
             raise HTTPException(status_code=404, detail=_NOT_FOUND)
         if not index.is_file():
-            raise HTTPException(status_code=404, detail=_NOT_FOUND)
+            raise ApiException(
+                "not_found",
+                "The dashboard page is missing from the build folder.",
+                "Rebuild the dashboard with 'npm --prefix frontend run build', then reload.",
+            )
         return FileResponse(index, media_type="text/html", headers=_PAGE_HEADERS)

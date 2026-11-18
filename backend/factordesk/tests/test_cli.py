@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import socket
+import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from datetime import UTC, date, datetime
@@ -336,9 +338,13 @@ class UvicornCalls:
 
     def __init__(self) -> None:
         self.calls: list[tuple[object, dict[str, object]]] = []
+        self.preloads: list[tuple[str, int]] = []
 
     def run(self, app: object, **kwargs: object) -> None:
         self.calls.append((app, kwargs))
+
+    def preload(self, host: str, port: int) -> None:
+        self.preloads.append((host, port))
 
 
 class ApiClient(Protocol):
@@ -351,6 +357,7 @@ class ApiClient(Protocol):
 def uvicorn_calls(monkeypatch: pytest.MonkeyPatch) -> UvicornCalls:
     calls = UvicornCalls()
     monkeypatch.setattr(uvicorn, "run", calls.run)
+    monkeypatch.setattr(cli, "_preload_when_ready", calls.preload)
     return calls
 
 
@@ -418,6 +425,70 @@ def test_serve_runs_the_api_with_the_built_page(
         unknown = client.get("/api/nope")
         assert unknown.status_code == 404
         assert unknown.json()["code"] == "not_found"
+
+
+def test_serve_preloads_the_report_code_but_not_in_dev(
+    dist: Path, uvicorn_calls: UvicornCalls, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class StubSettings:
+        data_dir = tmp_path / "cache"
+
+    monkeypatch.setattr(deps_module, "get_settings", lambda: StubSettings())
+    port = _free_port()
+    assert cli.main(["serve", "--port", str(port)]) == cli.EXIT_OK
+    assert uvicorn_calls.preloads == [("127.0.0.1", port)]
+    assert cli.main(["serve", "--dev", "--port", str(port)]) == cli.EXIT_OK
+    assert uvicorn_calls.preloads == [("127.0.0.1", port)]
+
+
+def test_preload_imports_once_the_port_accepts_connections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported: list[str] = []
+    done = threading.Event()
+
+    def record(name: str) -> object:
+        imported.append(name)
+        if len(imported) == len(cli._PRELOAD_MODULES):  # pyright: ignore[reportPrivateUsage]
+            done.set()
+        return None
+
+    monkeypatch.setattr(cli.importlib, "import_module", record)
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        cli._preload_when_ready("127.0.0.1", int(server.getsockname()[1]))  # pyright: ignore[reportPrivateUsage]
+        assert done.wait(10)
+    assert imported == list(cli._PRELOAD_MODULES)  # pyright: ignore[reportPrivateUsage]
+
+
+def test_preload_survives_a_failing_import(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempted = threading.Event()
+
+    def broken(name: str) -> object:
+        attempted.set()
+        raise ImportError(name)
+
+    monkeypatch.setattr(cli.importlib, "import_module", broken)
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        cli._preload_when_ready("127.0.0.1", int(server.getsockname()[1]))  # pyright: ignore[reportPrivateUsage]
+        assert attempted.wait(10)
+
+
+def test_the_app_is_built_without_the_statistics_stack() -> None:
+    """Importing the API and building the app must not load statsmodels, scipy or yfinance."""
+    script = (
+        "import sys;"
+        "from factordesk.api.main import create_app;"
+        "from factordesk.api.deps import default_deps;"
+        "create_app(default_deps(None));"
+        "heavy = [m for m in ('statsmodels', 'scipy', 'yfinance') if m in sys.modules];"
+        "print(heavy); sys.exit(1 if heavy else 0)"
+    )
+    done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert done.returncode == 0, done.stdout + done.stderr
 
 
 def test_serve_open_waits_for_the_server(
