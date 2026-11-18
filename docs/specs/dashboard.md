@@ -82,7 +82,7 @@ One rule: `message` says what went wrong and `action` says what to do. Both are 
 | `validate_ticker` fails | `invalid_ticker` | 422 | "BRK B is not a valid ticker." / "Use 1 to 12 letters, digits or . ^ = - (for example SPY or BRK-B)." |
 | `PriceDataError` after validation | `unknown_ticker` | 404 | "No prices were returned for XYZ." / "Check the ticker symbol." |
 | Start after end, bad date, `range` plus dates | `bad_range` | 400 | "The start date 1 May 2026 is after the end date 1 Jan 2026." / "Choose a start date before the end date." |
-| `InsufficientHistoryError` (`n`, `required`) | `insufficient_history` | 422 | "SPY has 251 trading days in this range that line up with the factor data; at least 504 (about two years) are needed." / "Choose a longer range or Full history." |
+| `InsufficientHistoryError` (`n`, `required`, `detail`) | `insufficient_history` | 422 | "SPY has 251 trading days in this range that line up with the factor data; at least 504 (about two years) are needed." / "Choose a longer range or Full history." With zero rows and a single clear cause, the cause follows a colon before the full stop (validation F14), for example "...are needed: every price in the requested range is missing." |
 | `DegenerateInputError` (`reason`) | `degenerate_input` | 422 | "Cannot analyse XYZ: {reason}." / "Choose another ticker or range." |
 | `FactorDataError` | `factor_data_invalid` | 502 | "The downloaded factor file failed validation; the previous copy was kept." / "Try again later." |
 | `FactorDownloadError`, `httpx.HTTPError`, `OSError` | `network` | 503 | "factordesk could not reach the data source." / "Check your network connection, then try again." |
