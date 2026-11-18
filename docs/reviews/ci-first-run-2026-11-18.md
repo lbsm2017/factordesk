@@ -117,3 +117,83 @@ A second run is needed to see the warm-cache durations and the hit path of the P
 - The `actions/upload-artifact` step for screenshots (`frontend/shots/`).
 
 All of this needs one more CI run on the pushed `fix/ci-first-run` change.
+
+## Second run, 2026-11-18
+
+Run 44349295423 of `.github/workflows/ci.yml` on pull request #1, with the fix `7877202` pushed. Started 16:37:06Z, finished 16:40:36Z (3 min 30 s wall time). Conclusion: **success, all four jobs green**. No change to the code or the workflow was needed. This is the first time the real e2e job ran on GitHub.
+
+### Results per job
+
+Durations come from the job and step timestamps (whole seconds, each accurate to about one second).
+
+| Job | Result | Duration | First run |
+|---|---|---|---|
+| python (ubuntu-latest) | success | 1 min 12 s | failure, 1 min 1 s |
+| python (windows-latest) | success | 2 min 5 s | success, 1 min 40 s |
+| frontend | success | 1 min 44 s | success, 1 min 49 s |
+| e2e | success | 1 min 19 s | skipped |
+
+The jobs python and frontend ran in parallel, e2e started at 16:39:17Z when the slowest of them (Windows) ended, so the Windows job sets the wall time.
+
+Step durations that matter:
+
+| Job | Step | Duration |
+|---|---|---|
+| python (ubuntu) | `uv sync --locked` | 5 s |
+| python (ubuntu) | `uv run pyright` | 25 s |
+| python (ubuntu) | `uv run pytest -q` | 34 s (519 passed, 205 deselected, 33.27 s in pytest) |
+| python (windows) | `uv sync --locked` | 7 s |
+| python (windows) | `uv run pyright` | 46 s |
+| python (windows) | `uv run pytest -q` | 53 s (519 passed, 205 deselected, 48.51 s in pytest) |
+| frontend | `npm ci` | 39 s (60 s on the first run) |
+| frontend | `npm test` | 22 s (25 files, 361 tests passed) |
+| frontend | typecheck, lint, build | 5 s, 5 s, 5 s |
+| frontend | OpenAPI dump, `gen:types`, `git diff --exit-code frontend/src/api` | 3 s, 1 s, under 1 s (types still match the backend) |
+| e2e | `uv sync --locked` | 6 s |
+| e2e | `npm ci` | 19 s |
+| e2e | `npm run build` | 4 s |
+| e2e | Playwright cache step | under 1 s (miss) |
+| e2e | `npx playwright install --with-deps chromium` | 18 s |
+| e2e | `npm run e2e` | 9 s (1 test passed, 7.5 s in Playwright) |
+| e2e | upload screenshots (`e2e-shots`) | 1 s |
+
+The same 519 tests pass on Ubuntu and Windows, which matches a local collection on this branch (519 selected of 724); the 505 in the first-run local checks came from an earlier base commit. The 205 deselected tests are the 202 `slow` and 3 `live` tests (see the recommendation below).
+
+### Cache behaviour
+
+| Cache | Ubuntu python | Windows python | frontend | e2e |
+|---|---|---|---|---|
+| uv (`setup-uv`, key from `uv.lock`) | hit | hit | hit | hit |
+| npm (`setup-node`, key from `package-lock.json`) | not used | not used | hit, 68 MB | hit, 68 MB |
+| Playwright browsers (`actions/cache`, `~/.cache/ms-playwright`) | not used | not used | not used | **miss**, saved 307 MB (about 5 s upload in the post step) |
+
+- The first run saved the uv caches on Windows and Ubuntu (frontend) and the npm cache; this run restored them. `npm ci` went from 60 s to 39 s in the frontend job, with the npm cache restore at about 1 s.
+- The uv cache is tiny: the log shows "Cache Size: ~0 MB (100633 B)". The restore therefore saves almost no time, and `uv sync --locked` still takes 5 to 7 s. This is how `setup-uv` behaves by default (it prunes pre-built wheels from the saved cache). It costs nothing, so it was left alone.
+- The Playwright cache step ran for the first time and, as expected, missed (`Cache not found for input keys: playwright-Linux-<hash of package-lock.json>`). The miss branch ran `npx playwright install --with-deps chromium` (downloaded Chrome for Testing 159.0.8154.6, FFmpeg and the headless shell), the "Install system libraries only" step was skipped, and the post step saved the cache. The **hit branch has still not run on GitHub**: it needs a third run with an unchanged `frontend/package-lock.json`. The expected saving is the browser download (about 14 s of the 18 s install step); the apt part of `--with-deps` is then done by the `install-deps` step.
+
+### e2e job
+
+The job passed on its first real run: `npm run e2e` ran `playwright test --grep-invert @shots`, started the fake backend on `127.0.0.1:8848`, and the single test `e2e/smoke.spec.ts` (dashboard smoke on the fake backend) passed in 3.8 s. The screenshot upload step succeeded. The local container run in the first review (Debian bookworm) was therefore a good predictor of the Ubuntu runner.
+
+### Items from "Not verified locally" that are now closed
+
+- The e2e job on a real runner: verified.
+- Ubuntu failure fix and the Windows job after the fix (Python 3.12.10 on the runner): verified, both pass.
+- Warm-cache durations and keys for uv and npm: verified (above).
+- The `actions/upload-artifact` step for `frontend/shots/`: ran and succeeded.
+
+Still open: the Playwright cache hit path (needs a third run, see above).
+
+### Recommendation: nightly workflow for the deselected tests
+
+`pyproject.toml` deselects them by default with `addopts = "-m 'not live and not slow'"`; the markers are `slow` (Monte Carlo and seed sweeps) and `live` (network: French library, Yahoo).
+
+Measured locally on Windows (`uv run pytest -m slow -q --durations=5`): **202 passed in 94 s**. Two tests are 49 of those seconds (`test_regression.py::test_t40_hac_coverage` 30 s, `test_diagnostics.py::test_t120_robust_bg_size_under_garch` 19 s); the rest are under 0.4 s each. The fast suite is about 30 percent faster on the Ubuntu runner than on Windows (33 s against 49 s), so a runner estimate is **about 1 to 1.5 minutes** for the slow tests, plus about 40 s of setup (checkout, setup-uv, `uv sync`). The 3 `live` tests were only collected, not run (they need the network, and Yahoo can rate limit or change); they would take seconds when the services respond.
+
+Recommendation:
+
+1. **Yes, run the slow tests in a scheduled workflow.** They guard the statistical claims (HAC coverage, size under GARCH, structural-break detection) that a quick change can degrade without any fast test noticing, and the cost is about 2 minutes a day of runner time, far below the free allowance. Do not add them to the pull request workflow: they would double the Python job time for little gain. Suggested shape: a separate file `.github/workflows/nightly.yml`, triggers `schedule` (one run a day, off-peak) and `workflow_dispatch`, one job on ubuntu-latest only (the numbers are platform independent, the fixture float issue was a test-builder matter), steps `checkout`, `setup-uv`, `uv sync --locked`, `uv run pytest -m slow -q`, with the same pinned action hashes as `ci.yml`.
+2. **Run the live tests in the same scheduled workflow but as a separate job** (`uv run pytest -m live -q`) that is allowed to fail without hiding the slow-test result. They depend on Ken French's site and on Yahoo, so a red result can mean an outside outage. Their purpose is to detect upstream format changes early, which is what a nightly run is good for. Never run them on pull requests.
+3. Before enabling, run `pytest -m slow` once on a Linux container to confirm that all 202 pass on glibc (the first run showed that exact-float assumptions can differ by platform), and keep the schedule only on the default branch (GitHub runs schedules from the default branch).
+
+This is a recommendation only; no workflow was added.
