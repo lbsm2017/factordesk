@@ -40,7 +40,7 @@
 .res-key { stroke-width: 2; }
 .res-key.ins { stroke: var(--ink-3); stroke-dasharray: 5 3; }
 .res-key.pit, .res-key.full { stroke: var(--ink); }
-.res-zone { position: absolute; top: 4px; font-size: var(--fs-1); color: var(--ink-2); white-space: nowrap; }
+.res-zone { position: absolute; bottom: 4px; font-size: var(--fs-1); color: var(--ink-2); white-space: nowrap; }
 .res-zone.l { left: 6px; }
 .res-zone.r { right: 6px; }
 .res-legend { justify-content: flex-start; max-width: none; margin-top: var(--s-2); flex-direction: column; gap: var(--s-1); }
@@ -48,8 +48,8 @@
 .res-legend .sw { margin-top: 4px; flex: none; }
 
 .res-scroll { margin-top: var(--s-3); }
-.res-mini { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
-.res-mini.wide { min-width: 600px; }
+.res-mini { width: 100%; max-width: 720px; border-collapse: collapse; font-size: var(--fs-1); }
+.res-mini.wide { min-width: 600px; max-width: 860px; }
 .res-mini thead th { font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 0 6px var(--s-3); border-bottom: 1px solid var(--border); vertical-align: bottom; }
 .res-mini thead th:first-child { padding-left: 0; }
 .res-mini thead th.num { text-align: right; }
