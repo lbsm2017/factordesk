@@ -33,7 +33,7 @@ All decisions below were given by the owner on 2026-11-18, after testing the das
   never "no alpha"; they never imply cause or forecast; and they add a caution when the price audit
   found errors or the quality gate fired.
 - **Company name.** The header shows the company name, exchange and currency from one Yahoo metadata
-  read per ticker (a new optional report field, `data.security`, report format version 5). The same
+  read per ticker (a new optional report field, `data.security`, report format unchanged at version 4). The same
   read lets factordesk refuse a ticker quoted in a currency other than US dollars (roadmap ticket N1).
 - **Historical performance and a quick world beta**, added by the owner later the same day, as two
   new optional report sections: return a year (compound), volatility, Sharpe ratio and largest fall;

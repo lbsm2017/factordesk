@@ -105,13 +105,13 @@ class DataInfo(FrozenModel):
   Cached beside the price cache with the same refresh rule (same-day cache). Never blocking: if
   the read fails, is throttled or times out, the report builds with `security = None` (or with
   null members) and one log line; no warning is added to the report.
-- **Version.** `SCHEMA_VERSION = "5"`, `SUPPORTED_SCHEMA_VERSIONS = ("3", "4", "5")`. A version 3
-  or 4 file loads with `security = None`. This bump is deliberate even though the change is
-  additive (SC5 says a bump is needed only for changes an old reader cannot absorb): the plan of
-  2026-11-18 asks for it, and it lets a reader tell "written before names existed" from "name not
-  found". Recorded as a departure from SC5 and listed in DV11 for the owner. Regenerate
+- **Version.** No bump (decided 2026-11-19, following SC5): `SCHEMA_VERSION` stays `"4"` and
+  `SUPPORTED_SCHEMA_VERSIONS` stays `("3", "4")`. The new fields `data.security`, `performance` and
+  `world_beta` are additive and optional, and feature branches do not bump (SC5). A version 3 or 4
+  file loads with the new fields `None`. A reader cannot tell "written before names existed" from
+  "name not found"; both show the ticker only. Regenerate
   `frontend/src/api/openapi.json` and `types.gen.ts` once, in V6.
-- **Colophon.** "factordesk report, schema v5. ..." follows from the field, no wording change.
+- **Colophon.** "factordesk report, schema v4. ..." stays as it is, no wording change.
 
 ### DV2.2 Exchange labels
 
@@ -171,10 +171,19 @@ same overlap against the US market (`Mkt-RF`) and a plain comparison.
 | `us_beta`, `us_se`, `us_ci_low`, `us_ci_high` | `Mkt-RF` fit over the same overlap |
 | `comparison` | `"about_the_same"` when the two 95% intervals overlap, else `"higher"` or `"lower"` (world against US) |
 
-Statuses: `ok`; `insufficient_data` when the overlap is under 252 days; `unavailable` when the
-fund's prices cannot be fetched (the report still builds). `unavailable` is not one of the M0.7
-status values (`ok`, `insufficient_data`, `not_applicable`, `failed`); DV11 asks whether to extend
-the literal or map it to `failed` with the reason. The frontend treats both the same way.
+Statuses (decided 2026-11-19, DV11 question 3): only the existing M0.7 values are used, with no
+new literal.
+
+- `ok`.
+- `insufficient_data` when the overlap is under 252 days.
+- `failed`, with the reason "The world fund's prices could not be fetched.", when the ACWI fetch
+  fails and there is no cached copy. The report still builds.
+- A stale cache (the refresh failed but cached prices exist) gives `ok`, with a note "ACWI data
+  ends {date}" (the last cached date) in the section note.
+
+Refresh rule (owner instruction, 2026-11-19): ACWI is refreshed incrementally on every ticker load,
+that is, only the days after the last cached date are fetched, through the existing price provider
+and cache.
 
 ---
 
@@ -414,9 +423,9 @@ the same stock returns); the panel's "How this is computed" says so.
 
 | Status | Tile value | Tile note | Panel |
 |---|---|---|---|
-| `ok` | `times(beta)` | "Against world stocks, with the ACWI fund standing in for the index; {phrase} its US market beta of {times(us_beta)}" | outcome line below |
+| `ok` | `times(beta)` | "Against world stocks, with the ACWI fund standing in for the index; {phrase} its US market beta of {times(us_beta)}"; with a stale cache the note gains ". ACWI data ends {date}" | outcome line below |
 | `insufficient_data` | "n/a" | "Too few days overlap with the world fund: {n}, at least 252 needed" | empty state, reason as given, action "Choose a longer range." |
-| `unavailable` (or `failed`) | "n/a" | "The world fund's prices could not be fetched; nothing else in the report is affected" | empty state, action "Try again later." |
+| `failed` | "n/a" | "The world fund's prices could not be fetched; nothing else in the report is affected" | empty state, action "Try again later." |
 | section null | tile hidden | | panel hidden |
 
 Show statistics line (tile): "standard error {num(se, 3)}, R² {num(r2, 2)}". Gate fired: the note
@@ -597,7 +606,7 @@ Size hint: haiku mechanical, sonnet standard, opus hard.
 | V3 | B tokens | `styles/tokens.css`, `styles/fonts.css`, `styles/report.css` and every panel CSS file (type-size and token pass only), `assets/fonts/*` (add IBM Plex Sans, remove STIX and Instrument Sans), `test/tokens.test.ts`, `styles/busyContrast.test.ts` | Design M.1 and M.2 in both themes; nothing under 14 px (test scans CSS); rows at least 48 px; prefers-color-scheme block removed; every required pair of M.3 passes in the test; font bytes before and after recorded in the PR | Stage 1 approval | sonnet |
 | V4 | C verdict | new `text/verdict.ts`, `text/verdict.test.ts`; `text/plain.ts` (reuse only, no wording change) | DV4 in full; appendix A reproduced word for word; banned-words check; thresholds as constants with a comment citing DV4.10 | none (can start at once) | opus |
 | V5 | C verdict | new `components/report/{VerdictBand,OutcomeTiles,FactorCards,PerformanceTiles,WorldBetaTile}.tsx` (the last two as stubs returning null for V14 and V16 to fill), `Header.tsx`, `panelRegistry.ts`, delete `Equation.tsx` and `KpiStrip.tsx`, `lead.test.tsx`, `kpiGap.test.tsx`, `busy.test.tsx`, `panelRegistry.test.tsx` | Design L.1 to L.3 and D.1; registry of DV1; card links focus the exposures row; empty and hedged states; `aria-busy` placeholders; density rule 1 (four per row) at every width | V4, V3 | sonnet |
-| V6 | F backend | `data/prices.py`, `report/schema.py` (`SecurityInfo`, version 5, `TickerSuggestion.name`), `pipeline.py`, `api/routes_factors.py`, `api/errors.py` (`unsupported_currency`), `report/render_html.py` (name line only), `cli.py` (refusal line), `tests/test_security_metadata.py`, regenerated `openapi.json` and `types.gen.ts`, the N1 D-entry in `docs/methodology.md` | DV2.1 to DV2.4; never blocks on metadata; non-USD refused with the DV2.3 copy; unknown currency warns; old fixtures load; static header shows the name; pytest, ruff, pyright green. Merged first | none (starts at once) | sonnet |
+| V6 | F backend | `data/prices.py`, `report/schema.py` (`SecurityInfo`, no version bump, `TickerSuggestion.name`), `pipeline.py`, `api/routes_factors.py`, `api/errors.py` (`unsupported_currency`), `report/render_html.py` (name line only), `cli.py` (refusal line), `tests/test_security_metadata.py`, regenerated `openapi.json` and `types.gen.ts`, the N1 D-entry in `docs/methodology.md` | DV2.1 to DV2.4; never blocks on metadata; non-USD refused with the DV2.3 copy; unknown currency warns; old fixtures load; static header shows the name; pytest, ruff, pyright green. Merged first | none (starts at once) | sonnet |
 | V7 | D switches | new `ui/Switch.tsx`, `ui/Segmented.tsx`, their tests, `state/url.ts`, `state/useUrlState.ts`, `state/url.test.ts`, theme bootstrap in `main.tsx`, `components/controls/{RangeChips,CustomRange}.tsx` (segmented style), `controlsStyle.test.ts` | DV6 and design K; keyboard and `aria-checked` tests; `stats` and `theme` round trip; no theme flash on reload with `theme=dark` | V3 | sonnet |
 | V8 | E panels | `PricePanel`, `ExposuresPanel`, `ReturnPanel`, `RiskPanel`, `RollingPanel`, `DataAuditPanel`, `RegressionDetail`, `Panel.tsx` (outcome line slot) and their tests | Outcome line from `verdict.ts` on each (DV4.9); DV5 columns for these panels; at most six columns with statistics off; empty states unchanged | V4, V5 (`stats` prop), V7 | sonnet |
 | V9 | E panels | `sections/{ResidualAlphaPanel,ResidualAlphaBody,KalmanPanel,ShrunkBetasPanel}.tsx` and tests; lazy loading of Kalman and Shrunk in the registry entries | Outcome lines and DV5 columns for these three; Kalman and Shrunk in lazy chunks; copy fixes of DV4.9; size measured before and after | V8 | sonnet |
@@ -634,20 +643,34 @@ merged in that order.
 1. **Light sign pair under deuteranopia.** `#0A7A55` and `#C23345` separate by 6.6 OKLab units,
    under the rev 2 floor of 8 (design M.3). Meaning is also carried by position, sign and words.
    Recommended: darken the green slightly at the Stage 1 gate.
+   **Decided 2026-11-19:** the owner has no preference, so the recommendation is applied. The
+   light `--pos` is now `#007862` (was `#0A7A55`): 27.2 normal, 8.9 protanopia, 8.5
+   deuteranopia, 31.3 tritanopia (floor 8), and every text pair stays at least 4.5:1 (on white
+   5.44, on the page 5.02, on its tint 4.88). Design M.3 holds the numbers and the method.
 2. **Schema version 5 for an additive field** (DV2.1) departs from SC5's own rule. Recommended:
    accept, because it marks files that could carry a name.
+   **Decided 2026-11-19:** no bump. `SCHEMA_VERSION` stays `"4"`; `data.security`, `performance`
+   and `world_beta` are additive and optional (SC5); the colophon keeps "schema v4".
 3. **`unavailable` status for `world_beta`** is not an M0.7 value. Recommended: use `failed` with
    the reason "The world fund's prices could not be fetched.", keeping the status set closed.
+   **Decided 2026-11-19:** `world_beta` uses the existing M0.7 statuses only. A fetch failure
+   with no cache gives `failed` with that reason; a stale cache gives `ok` with the note "ACWI
+   data ends {date}"; and ACWI is refreshed incrementally on every ticker load (owner
+   instruction). See DV2.6.
 4. **Verdict headline at 28 px under 600 px** instead of 36 to 40 (design L.1). Recommended:
    accept; 36 px fills the first phone screen.
+   **Decided 2026-11-19:** the owner has no preference; accepted as written (28 px under 600 px).
 5. **Market card on its own row** to keep at most four cards per row (design L.3). Recommended:
    accept.
+   **Decided 2026-11-19:** the owner has no preference; accepted as written.
 6. **Dark theme ignores the OS setting** (plan default). Confirm at Stage 1.
 7. **Company name fallback:** when Yahoo throttles the metadata read, the header shows the ticker
    only, with no error. Recommended: accept (plan default).
 8. **Residual verdict copy G2** in R4.8 says "check the Exposures tab"; the page has no tabs. The
    dashboard shows its own outcome line (DV4.9) but the body still shows the R4.8 copy. Recommended:
    the methodology owner changes "tab" to "section" in R4.8.
+   **Decided 2026-11-19:** yes. The G2 copy now says "check the Exposures section" in R4.8, the
+   test oracle, the verdict message in `analytics/residual.py` and its test.
 
 ## Owner decisions
 

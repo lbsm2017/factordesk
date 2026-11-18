@@ -415,7 +415,7 @@ only with Show statistics on (K.1).
 Rev 2: the header was two rows of badges plus a paragraph. It is now three short pieces.
 
 **Rev 3: company name line.** Under the ticker sits one line with the company name, then the
-exchange and the currency, from the optional `data.security` field (schema version 5,
+exchange and the currency, from the optional `data.security` field (schema version unchanged at 4,
 `docs/specs/dashboard-v2.md` section DV2): for example "Zoom Communications Inc." on the name line
 and "NASDAQ, USD" in `--ink-2` beside it at caption size. In the dashboard the ticker is 32 px / 640
 and the name 19 px / 500 in ink. Rules: the name is plain text, never a link; a name longer than
@@ -699,10 +699,11 @@ linked to its detail row.
   regression detail table already holds every coefficient.
 - **Rejected: Tailwind and shadcn/ui.** Owner decision 4 of `docs/specs/dashboard.md` stands; the
   switch, segmented control and drawer are small native-element components.
-- Known weak point: the light sign pair (green `#0A7A55`, red `#C23345`, owner values of
-  2026-11-18) separates by only 6.6 OKLab units under deuteranopia, under the rev 2 floor of 8
-  (M.3). Position, the sign glyph and the direction word carry the meaning as well; the owner
-  decides at the Stage 1 gate whether to darken the green.
+- Light sign pair (owner values of 2026-11-18: green `#0A7A55`, red `#C23345`): the green
+  separated from the red by only 6.6 OKLab units under deuteranopia, under the rev 2 floor of 8
+  (M.3). Decided 2026-11-19: the green is now `#007862`, which passes the floor (8.5 under
+  deuteranopia, 8.9 under protanopia); position, the sign glyph and the direction word still
+  carry the meaning as well.
 - **Sidebar references (owner, 2026-11-18):** a dark navy icon-and-label rail, after Altoo and an
   investment analytics tearsheet tool the owner pointed to. Taken: the dark rail with a bright
   accent for the current place, labels next to icons, a light content area with white cards.
@@ -743,7 +744,7 @@ linked to its detail row.
 6. **Final caption wording.** Fixture captions are placeholders. Compose each footnote as caption
    + `label_text[labels]` + numbers (`hac_lags`, `bh_family_size`).
 7. **Optional security name** for the header. Rev 3: resolved by the additive field
-   `data.security` (`name`, `currency`, `exchange`), schema version 5, ticket V6 in
+   `data.security` (`name`, `currency`, `exchange`), no version bump, ticket V6 in
    `docs/specs/dashboard-v2.md`.
 8. **t vs z.** The schema says `z` (HAC, normal reference) but the UI says "t"; keep them
    consistent.
@@ -1092,7 +1093,7 @@ navy dark surface.
 | `--accent-50` | `#EAF6F8` (owner, teal tint) | `#123247` | selected row, link hover wash |
 | `--highlight` | `#3A3F9E` (owner, indigo) | `#A9AEF5` | verdict band rule, R² gauge |
 | `--highlight-50` | `#EEEFFB` (owner) | `#22275A` | verdict band fill |
-| `--pos` | `#0A7A55` (owner) | `#5ED6AC` | positive sign: bars, pills, top rules |
+| `--pos` | `#007862` (owner `#0A7A55`, adjusted 2026-11-19, see M.3) | `#5ED6AC` | positive sign: bars, pills, top rules |
 | `--pos-50` | `#E8F6EF` (owner) | `#0F2E2A` | positive pill fill |
 | `--neg` | `#C23345` (owner) | `#EC6876` | negative sign; drawdown line |
 | `--neg-50` | `#FCECEE` (owner) | `#3A1A26` | negative pill fill, drawdown area, audit error badge |
@@ -1163,9 +1164,9 @@ requirement. **No required pair fails.** The owner's own figures (for example in
 | text | `--on-accent` on `--accent` | 5.59 | 8.67 |
 | text | `--highlight` on `--highlight-50` | 7.71 | 6.68 |
 | text | `--highlight` on `--surface` | 8.81 | 8.21 |
-| text | `--pos` on `--surface` | 5.35 | 9.54 |
-| text | `--pos` on `--page` | 4.94 | 10.50 |
-| text | `--pos` on `--pos-50` | 4.80 | 8.09 |
+| text | `--pos` on `--surface` | 5.44 | 9.54 |
+| text | `--pos` on `--page` | 5.02 | 10.50 |
+| text | `--pos` on `--pos-50` | 4.88 | 8.09 |
 | text | `--neg` on `--surface` | 5.45 | 5.56 |
 | text | `--neg` on `--page` | 5.04 | 6.11 |
 | text | `--neg` on `--neg-50` | 4.77 | 5.02 |
@@ -1187,7 +1188,7 @@ requirement. **No required pair fails.** The owner's own figures (for example in
 | UI | `--accent` on `--page` | 5.16 | 9.53 |
 | UI | `--axis` on `--surface` | 3.44 | 3.83 |
 | UI | `--axis` on `--page` | 3.18 | 4.21 |
-| UI | `--pos` on `--surface` | 5.35 | 9.54 |
+| UI | `--pos` on `--surface` | 5.44 | 9.54 |
 | UI | `--neg` on `--surface` | 5.45 | 5.56 |
 | UI | `--neutral` on `--surface` | 7.52 | 8.21 |
 | UI | `--rail-accent` on `--rail` | 8.67 | 9.84 |
@@ -1207,14 +1208,20 @@ Sign pair separation (OKLab x 100; rev 2 floor: 8 under any simulation, 15 norma
 
 | Theme | Normal | Protanopia | Deuteranopia | Tritanopia | OKLab L (pos, neg) |
 |---|---|---|---|---|---|
-| Light (`#0A7A55` / `#C23345`) | 27.6 | 9.2 | **6.6 (below 8)** | 31.3 | 0.514, 0.545 |
+| Light (`#007862` / `#C23345`) | 27.2 | 8.9 | 8.5 | 31.3 | 0.511, 0.545 |
 | Dark (`#5ED6AC` / `#EC6876`) | 30.2 | 23.0 | 10.9 | 35.5 | 0.796, 0.682 |
 
-- The light pair has almost the same lightness, so a deuteranope sees two similar browns. The
-  owner set these two values, so they are kept and the miss is recorded: sign is also carried by
-  position (left or right of zero), the `+` or `−` on every number, the pill word and its arrow
-  glyph, so no reading depends on the hue. Owner question at the Stage 1 gate: darken the green
-  (a lightness gap of about 0.1 in OKLab L passes, as the dark pair shows) or accept.
+- The owner's first light pair (`#0A7A55` / `#C23345`) had almost the same lightness, so a
+  deuteranope saw two similar browns: 27.6 normal, 9.2 protanopia, 6.6 deuteranopia, 31.3
+  tritanopia. Decided 2026-11-19 (owner had no preference, so the recommendation was applied): the
+  green moves to `#007862`. Darkening alone does not work: every step that lifts deuteranopia
+  over 8 drops protanopia under 8 (`#097350` gives 8.2 and 7.0), because the two simulations pull
+  the pair in opposite directions. A small hue shift toward teal (OKLCH hue 163 to 174,
+  lightness 0.514 to 0.511, chroma 0.108 to 0.097) clears both. Found by a grid search
+  over OKLCH around the old green with the script below, requiring deuteranopia and protanopia
+  at least 8.2, normal at least 15, and every text pair at least 4.5:1; `#007862` is the
+  balanced pick. Sign is still also carried by position (left or right of zero), the `+` or `−`
+  on every number, the pill word and its arrow glyph.
 - Dark `--neg` was first `#F07A88` (deuteranopia 7.4) and was stepped to `#EC6876`.
 - `tokens.test.ts` (ticket V3) asserts every required pair of this table with the same thresholds,
   and `busyContrast.test.ts` re-checks the loading placeholder on the new surfaces.
@@ -1227,7 +1234,7 @@ import math, sys
 LIGHT = {"page": "#F4F6FA", "surface": "#FFFFFF", "sunk": "#F4F6FA", "hairline": "#DDE2EC",
          "ink": "#0E1430", "ink-2": "#4A5470", "ink-3": "#5A6482", "axis": "#808AA5",
          "accent": "#0B7285", "on-accent": "#FFFFFF", "accent-50": "#EAF6F8",
-         "highlight": "#3A3F9E", "highlight-50": "#EEEFFB", "pos": "#0A7A55", "pos-50": "#E8F6EF",
+         "highlight": "#3A3F9E", "highlight-50": "#EEEFFB", "pos": "#007862", "pos-50": "#E8F6EF",
          "neg": "#C23345", "neg-50": "#FCECEE", "caution": "#8A5A00", "caution-50": "#FFF5E0",
          "neutral": "#4A5470", "neutral-50": "#EEF0F5", "rail": "#141A33", "rail-ink": "#FFFFFF",
          "rail-ink-2": "#A9B3D1", "rail-accent": "#3CC8E8", "rail-on-accent": "#141A33",
