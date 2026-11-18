@@ -1,0 +1,21 @@
+# Secrets and local data
+.env
+/data/
+*.parquet
+/logs/
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+
+# Frontend
+node_modules/
+dist/
+
+# Real-data sample reports stay local (data licences). Only the synthetic mock report is committed.
+/docs/samples/spy_report.*
+# Screenshots of real-data reports stay local too; a README screenshot is added deliberately.
+/docs/samples/shot_*.png
