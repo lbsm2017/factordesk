@@ -11,10 +11,11 @@ test written down first, logged, independently reviewed) before it ships.
   (`docs/validation/spy-slice-validation.md`, verdict "ship with changes").
 - **Built, in review:** the dashboard (local FastAPI server and React page, one-command start,
   fake-backend browser test and CI). Not yet run against live Yahoo data.
-- **In progress:** hardening from the validation findings (residual diagnostics, quality gate,
-  bad-input handling); a data-source comparison of Yahoo, Tiingo and Alpaca; the rolling-regression
-  speed-up conditions (owner rank 2); the schema v3 contract (owner rank 4); the one-shot install
-  and run command (owner rank 7, no publishing).
+- **In progress:** a data-source comparison of Yahoo, Tiingo and Alpaca; the schema v3
+  contract (owner rank 4). Built and waiting for review: the rolling-regression speed-up
+  conditions (owner rank 2) and the one-shot install and run command (owner rank 7, no
+  publishing). Hardening from the validation findings is done as of 2026-11-18:
+  `docs/validation/spy-hardening-closure-2026-11-18.md`.
 - **Specified, not built:** report redesign (`docs/design/report-design.md`), residual alpha
   analysis (`docs/methodology-residual-analysis.md`), regional datasets
   (`docs/methodology-datasets.md`).
@@ -55,8 +56,8 @@ Items 1 to 4 of the priority ranking.
 | Item | Why it matters | Status | Depends on |
 |---|---|---|---|
 | Dashboard (FastAPI + React) (rank 1) | Search bar, range chips (3Y, 5Y, Full history) and custom dates, factor refresh; the report as an app. Runbook: `docs/dashboard.md`; spec: `docs/specs/dashboard.md` | Built, in review: tickets T1 to T10 done as of commit f36255e on `feat/report-ui-feedback`, not merged to `dev`. Left: a smoke test on live Yahoo data, fixes from the T11 design and accessibility review, peer comparison using the batch price fetch | Review; merge of `feat/report-ui-feedback` into `dev` |
-| Rolling regression speed-up conditions (rank 2) | Conditions the rolling-regression speed-up must meet before it ships | In progress | — |
-| Hardening of the SPY slice (rank 3) | Numbers must never mislead: diagnostics, quality gate, clean errors | On Track | — |
+| Rolling regression speed-up conditions (rank 2) | Conditions the rolling-regression speed-up must meet before it ships | Built: all three conditions met on 2026-11-18 (`docs/reviews/rolling-speedup-validation-2026-11-18.md`) | — |
+| Hardening of the SPY slice (rank 3) | Numbers must never mislead: diagnostics, quality gate, clean errors | Done 2026-11-18: every critical and major validation finding fixed; minor and calibration items deferred with reasons in `docs/validation/spy-hardening-closure-2026-11-18.md` | — |
 | Schema v3 contract (rank 4) | One shared report schema, so parallel branches do not collide (see Risks) | In progress | — |
 
 ## Next

@@ -152,6 +152,39 @@ def test_too_short_history(capsys: pytest.CaptureFixture[str], tmp_path: Path) -
     assert code == cli.EXIT_DATA
     err = capsys.readouterr().err
     assert "300" in err and "504" in err and err.count("\n") == 1
+    assert "missing" not in err and "overlap" not in err  # a short history has no single cause
+
+
+def test_zero_aligned_rows_name_their_cause(
+    synthetic: tuple[StaticProvider, pd.DataFrame],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Validation F14: all prices missing and no date overlap give different reasons."""
+    provider, factors = synthetic
+    history = provider.fetch("SPY")
+    frame = history.frame.copy()
+    frame[["close", "adj_close"]] = np.nan
+    blank = StaticProvider(PriceHistory("SPY", frame, history.fetched_at, history.source))
+    code = cli.main(
+        ["report", "SPY", "--out", str(tmp_path)], price_provider=blank, factors=factors, now=NOW
+    )
+    assert code == cli.EXIT_DATA
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and "has 0 daily returns" in err
+    assert "every price in the requested range is missing" in err
+
+    after_factors = str(history.frame.index[790].date())  # factors cover the first 780 rows
+    code = cli.main(
+        ["report", "SPY", "--out", str(tmp_path), "--start", after_factors],
+        price_provider=provider,
+        factors=factors,
+        now=NOW,
+    )
+    assert code == cli.EXIT_DATA
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and "has 0 daily returns" in err
+    assert "no price date falls in both the requested range" in err
 
 
 def test_refuses_cache_folder(
@@ -260,6 +293,9 @@ def test_t126_degenerate_inputs_end_cleanly(
         assert len(dup) == 1 and dup[0].severity == "error"
         assert dup[0].dates == [history.frame.index[399].date()]
         assert rep.data.n_obs == 800
+        # Validation F4: the audit warning says the headline is not interpretable.
+        audit_warning = next(w for w in rep.warnings if w.code == "audit_errors")
+        assert "not interpretable" in audit_warning.message
 
 
 def test_unexpected_numerical_error_is_one_line(
@@ -280,6 +316,46 @@ def test_unexpected_numerical_error_is_one_line(
     err = capsys.readouterr().err
     assert code == cli.EXIT_DATA
     assert err.count("\n") == 1 and "could not compute" in err
+
+
+def test_report_start_and_end_reach_the_report(
+    synthetic: tuple[StaticProvider, pd.DataFrame], tmp_path: Path
+) -> None:
+    """Validation F10: the CLI passes a requested range; the report keeps requested vs actual."""
+    provider, factors = synthetic
+    dates = [d.date() for d in factors.index]
+    start, end = dates[100], dates[700]
+    out = tmp_path / "out"
+    code = cli.main(
+        ["report", "SPY", "--out", str(out), "--json", "--start", str(start), "--end", str(end)],
+        price_provider=provider,
+        factors=factors,
+        now=NOW,
+    )
+    assert code == cli.EXIT_OK
+    data = load_report(out / "SPY_report.json").data
+    assert (data.requested_start, data.requested_end) == (start, end)
+    assert (data.actual_start, data.actual_end) == (start, end)
+    assert data.n_obs == 601
+
+
+def test_report_range_usage_errors(
+    synthetic: tuple[StaticProvider, pd.DataFrame],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    provider, factors = synthetic
+
+    def run(*extra: str) -> int:
+        argv = ["report", "SPY", "--out", str(tmp_path), *extra]
+        return cli.main(argv, price_provider=provider, factors=factors, now=NOW)
+
+    assert run("--start", "2020-13-01") == cli.EXIT_USAGE
+    assert "YYYY-MM-DD" in capsys.readouterr().err
+    assert run("--start", "2021-06-01", "--end", "2021-01-01") == cli.EXIT_USAGE
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and "after --end" in err
+    assert not list(tmp_path.glob("*.html"))
 
 
 def test_usage_errors() -> None:

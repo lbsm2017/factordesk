@@ -48,13 +48,16 @@ ExclusionReason = Literal["multi_day_return", "no_factor_row", "price_missing", 
 class InsufficientHistoryError(ValueError):
     """Fewer aligned rows than the minimum sample: the report is refused (M0.7)."""
 
-    def __init__(self, n: int, required: int) -> None:
-        super().__init__(
+    def __init__(self, n: int, required: int, detail: str | None = None) -> None:
+        message = (
             f"insufficient_history: {n} aligned daily observations, at least {required} required"
         )
+        super().__init__(f"{message} ({detail})" if detail else message)
         self.code = "insufficient_history"
         self.n = n
         self.required = required
+        self.detail = detail
+        # Why no row lines up, when that has a single clear cause (validation F14); else None.
 
 
 class DegenerateInputError(ValueError):
@@ -157,6 +160,25 @@ def factor_frame_to_codes(factors: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _no_rows_detail(
+    in_range: NDArray[np.bool_],
+    price_nan: NDArray[np.bool_],
+    req_start: date,
+    req_end: date,
+    fac_first: date,
+    fac_last: date,
+) -> str | None:
+    """Single clear cause when no row aligns (validation F14), or None when causes are mixed."""
+    if not bool(in_range.any()):
+        return (
+            f"no price date falls in both the requested range ({req_start} to {req_end}) "
+            f"and the factor data ({fac_first} to {fac_last})"
+        )
+    if bool(price_nan[in_range].all()):
+        return "every price in the requested range is missing"
+    return None
+
+
 def build_sample(
     history: PriceHistory,
     factors: pd.DataFrame,
@@ -175,7 +197,7 @@ def build_sample(
     price_index = validate_date_index(history.frame.index, f"{history.ticker} prices")
     fac = factor_frame_to_codes(factors)
     if len(price_index) < 2:
-        raise InsufficientHistoryError(0, min_obs)
+        raise InsufficientHistoryError(0, min_obs, "fewer than two price dates")
 
     ret = history.total_returns  # index = price dates[1:]; NaN where a price is missing
     ret_dates = pd.DatetimeIndex(ret.index)
@@ -243,7 +265,12 @@ def build_sample(
     s_dates = ret_dates[aligned]
     n = len(s_dates)
     if n < min_obs:
-        raise InsufficientHistoryError(n, min_obs)
+        detail = (
+            _no_rows_detail(in_range, price_nan, req_start, req_end, fac_first, fac_last)
+            if n == 0
+            else None
+        )
+        raise InsufficientHistoryError(n, min_obs, detail)
 
     s_ret = ret[aligned].astype("float64")
     ret_sd = float(np.std(s_ret.to_numpy(dtype=np.float64), ddof=1))

@@ -51,12 +51,15 @@ TILT = {
 }
 WARN_PLAIN = {
     "residual_reversal": (
-        "Prices look out of step with the factor data, so R² and residual volatility are "
-        "probably understated."
+        "Prices look out of step with the factor data, so R² is probably understated and "
+        "residual volatility overstated."
     ),
     "short_history": "The history is short, so the betas rest on a small sample.",
     "collinearity": "Some factors move together in this sample, so single betas are less precise.",
-    "audit_errors": "The price audit found errors; the analysis still uses prices as published.",
+    "audit_errors": (
+        "The price audit found errors, so the headline numbers are not interpretable until "
+        "they are explained; see Data and audit."
+    ),
     "audit_warnings": "The price audit flagged some unusual price moves; see Data and audit.",
     "factor_data_lag": (
         "The factor data stops before the latest prices, so the newest days are charted but "
@@ -242,15 +245,29 @@ def _decimals(values: Sequence[float]) -> int:
     return 4
 
 
-def _decimate[T](items: list[T], max_n: int) -> list[T]:
-    """Deterministic stride decimation that always keeps the last element."""
-    if len(items) <= max_n or max_n < 2:
+def _decimate[T](items: list[T], max_n: int, value: Callable[[T], float]) -> list[T]:
+    """Deterministic min-max decimation to about ``max_n`` points (validation F11).
+
+    The series is cut into ``max_n // 2`` consecutive buckets; each bucket keeps its lowest and
+    highest point by ``value``, in their original order, so a one-day spike is never thinned
+    away the way a fixed stride would. The first and last points are always kept (at most
+    ``max_n + 2`` points in all).
+    """
+    n = len(items)
+    if n <= max_n or max_n < 4:
         return items
-    stride = math.ceil(len(items) / max_n)
-    out = items[::stride]
-    if out[-1] is not items[-1]:
-        out.append(items[-1])
-    return out
+    size = math.ceil(n / (max_n // 2))
+    keep = {0, n - 1}
+    for lo in range(0, n, size):
+        idx = range(lo, min(lo + size, n))
+        keep.add(min(idx, key=lambda i: value(items[i])))
+        keep.add(max(idx, key=lambda i: value(items[i])))
+    return [items[i] for i in sorted(keep)]
+
+
+def _second(point: tuple[float, ...]) -> float:
+    """The plotted value of a ``(x, value, ...)`` point, the key for ``_decimate``."""
+    return point[1]
 
 
 def _quantile(xs: list[float], q: float) -> float:
@@ -588,7 +605,13 @@ def _kpis(report: FactorReport) -> str:
             "Widen the date range and run the report again.",
         )
         return f'<section class="kpis" aria-label="Headline statistics">{body}</section>'
-    if g.alpha_tag == "reliable":
+    # Validation F4: with audit errors one bad row can dominate every fitted number, so the
+    # fitted tiles are muted and alpha carries no significance claim (the values stay shown).
+    audit_errors = d.audit_status == "errors"
+    fit_cls = "ns" if audit_errors else ""
+    if audit_errors:
+        alpha_note, alpha_cls = "Not interpretable: the price audit found errors", "ns"
+    elif g.alpha_tag == "reliable":
         alpha_note, alpha_cls = "Distinguishable from zero at 5%", ""
     elif g.alpha_tag == "noise":
         alpha_note, alpha_cls = "Not distinguishable from zero", "ns"
@@ -599,12 +622,12 @@ def _kpis(report: FactorReport) -> str:
     )
     cells = [
         ("Alpha, a year", esc(_pct(g.alpha_annual)), alpha_note, alpha_cls),
-        ("R&#178;", esc(_num(g.r2, 4)), "Share of daily variance the factors explain", ""),
+        ("R&#178;", esc(_num(g.r2, 4)), "Share of daily variance the factors explain", fit_cls),
         (
             "Residual volatility",
             esc(_pct(g.sigma_e_annual, 1, False)),
             "A year, left unexplained by the factors",
-            "",
+            fit_cls,
         ),
         ("Observations", f"{d.n_obs:,}", excl, ""),
         (
@@ -690,9 +713,9 @@ def _price_panel(report: FactorReport) -> str:
     tail = [(x_of(dt), y_of(v)) for dt, v in pts[max(cut, 0) :]]
     paths = ""
     if len(main) > 1:
-        paths += f'<path class="price-line" d="{_path_xy(_decimate(main, 700))}"/>'
+        paths += f'<path class="price-line" d="{_path_xy(_decimate(main, 700, _second))}"/>'
     if len(tail) > 1:
-        paths += f'<path class="price-tail" d="{_path_xy(_decimate(tail, 300))}"/>'
+        paths += f'<path class="price-tail" d="{_path_xy(_decimate(tail, 300, _second))}"/>'
     label = f"{report.ticker} adjusted close price over time"
     svg = (
         f'<svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" '
@@ -1119,7 +1142,7 @@ def _rolling_block(
         def y_of(v: float, lo: float = lo, hi: float = hi) -> float:
             return 100 - (v - lo) / (hi - lo) * 100
 
-        sp = _decimate(pts, 400)
+        sp = _decimate(pts, 400, _second)
         upper = [(x_of(i), y_of(v + z * s)) for i, v, s in sp]
         lower = [(x_of(i), y_of(v - z * s)) for i, v, s in sp][::-1]
         band = _path_xy(upper + lower) + "Z"

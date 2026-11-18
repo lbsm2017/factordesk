@@ -760,12 +760,48 @@ def test_render_five_kpi_cells() -> None:
     assert "Data audit" not in kpis and "Adjusted R" not in kpis
 
 
+def _kpi_cells(page: str) -> dict[str, tuple[str, str, str]]:
+    """KPI label -> (class attribute, value, note) from a rendered page."""
+    kpis = page.split('aria-label="Headline statistics"')[1].split("</section>")[0]
+    cells = re.findall(
+        r'<div class="(kpi[^"]*)"><dt>(.*?)</dt><dd class="v">(.*?)</dd><dd class="n">(.*?)</dd>',
+        kpis,
+    )
+    return {label: (cls, value, note) for cls, label, value, note in cells}
+
+
+def test_render_audit_errors_mute_the_headline() -> None:
+    """Validation F4: audit errors mute the fitted tiles and drop alpha's significance claim."""
+    rep = build_mock_report()
+    clean = _kpi_cells(render_report_html(rep))
+    assert "Not interpretable" not in clean["Alpha, a year"][2]
+    assert clean["R&#178;"][0] == "kpi " and clean["Residual volatility"][0] == "kpi "
+    bad = rep.model_copy(
+        update={
+            "data": rep.data.model_copy(update={"audit_status": "errors"}),
+            "warnings": [ReportWarning(code="audit_errors", message="MOCK audit.")],
+        }
+    )
+    page = render_report_html(bad)
+    summary = page.split('class="notice-sum"')[1].split("</p>")[0]
+    assert "headline numbers are not interpretable" in summary
+    cells = _kpi_cells(page)
+    alpha_cls, alpha_value, alpha_note = cells["Alpha, a year"]
+    assert (alpha_cls, alpha_note) == ("kpi ns", "Not interpretable: the price audit found errors")
+    assert alpha_value == clean["Alpha, a year"][1]  # the number itself stays shown
+    assert cells["R&#178;"][0] == "kpi ns" and cells["Residual volatility"][0] == "kpi ns"
+    assert cells["Observations"][0] == "kpi "  # counts and dates are not fitted numbers
+
+
 def test_render_header_chips_and_notice_details() -> None:
     page = render_report_html(build_mock_report())
     assert page.count('class="chip') == 2  # factor data end, warnings
     assert 'href="#notice"' in page and "2 warnings" in page
     notice = page.split('id="notice"')[1].split("</aside>")[0]
     assert "Prices look out of step with the factor data" in notice  # plain, by warning code
+    # M3.6: the transient noise inflates the residual variance, so R² is too low and residual
+    # volatility too high; the summary must not say both are understated.
+    assert "R² is probably understated and residual volatility overstated." in notice
     assert '<details class="how"><summary>Details</summary>' in notice
     assert "MOCK: short history." in notice  # the raw message sits behind Details
     rep = build_mock_report()
@@ -844,3 +880,20 @@ def test_render_price_shades_both_non_analysed_ends() -> None:
     only_right = render_report_html(rep)
     assert only_right.count('class="tailzone"') == 1 and "Not analysed: before" not in only_right
     assert "How has the price moved over the window? Shaded days are not in the analysis." in both
+
+
+def test_decimation_keeps_one_day_spikes() -> None:
+    """Validation F11: thinning a long series for the page must not hide its extremes."""
+    from factordesk.report import render_html
+
+    n, spike_at = 8000, 4321  # a fixed stride of 20 would skip index 4321
+    pts = [(float(i), 1.0, 0.1) for i in range(n)]
+    pts[spike_at] = (float(spike_at), 5.0, 0.1)
+    pts[6007] = (6007.0, -3.0, 0.1)
+    out = render_html._decimate(pts, 400, render_html._second)  # pyright: ignore[reportPrivateUsage]
+    assert len(out) <= 402 and out[0] == pts[0] and out[-1] == pts[-1]
+    assert pts[spike_at] in out and pts[6007] in out
+    assert [p[0] for p in out] == sorted(p[0] for p in out)  # original order
+    assert out == render_html._decimate(pts, 400, render_html._second)  # pyright: ignore[reportPrivateUsage]
+    short = pts[:300]
+    assert render_html._decimate(short, 400, render_html._second) == short  # pyright: ignore[reportPrivateUsage]

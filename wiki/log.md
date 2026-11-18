@@ -18,6 +18,11 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 ## 2026-11-18 (one-shot install)
 
 - Added the one-shot install path on branch `feat/one-shot-install` (as of commit `ce931c7`, not merged, not published): the wheel now ships the built dashboard, two bootstrap scripts (`scripts/install.sh`, `scripts/install.ps1`) pinned to a version argument, an "Install without cloning" section in `docs/dashboard.md` and an owner-run `docs/release-checklist.md`. Details and what was and was not verified are in `decision-python-and-uv-for-every-platform.md`.
+## 2026-11-18 (SPY hardening closed)
+
+- The roadmap item "Hardening of the SPY slice" is Done. Every validation finding has a row in [docs/validation/spy-hardening-closure-2026-11-18.md](../docs/validation/spy-hardening-closure-2026-11-18.md): 20 fixed before, 4 fixed on branch `fix/spy-hardening-closure` (audit errors mute the headline, `--start`/`--end` on the report command, min-max thinning of long series, a named cause when no return lines up), 5 deferred with reasons. One wording error found during the closure was fixed: the gate summary now says residual volatility is overstated, not understated.
+- Owner decisions still open from the closure: non-USD tickers (warn or refuse, M16 question 2), and adopting the variance-stability check and keeping the gate thresholds after the panel calibration.
+- Updated [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) to Decided, with facts as of commit `4c1cb7c`.
 
 ## 2026-11-18 (dashboard built)
 

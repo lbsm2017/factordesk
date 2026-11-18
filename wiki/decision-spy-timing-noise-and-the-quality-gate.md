@@ -1,7 +1,7 @@
 # Decision: SPY timing noise, and a pre-set quality gate
 
 Date: 2026-11-18
-Status: Decided-pending-implementation
+Status: Decided (implemented as of commit `4c1cb7c`; the variance-stability check is deferred)
 
 ## In one sentence
 
@@ -14,7 +14,7 @@ SPY fits the factors worse than expected (R-squared 0.967, not about 0.995) beca
 - Add a gate, written down before use: if residual lag-1 autocorrelation is below -0.2 with a robust z below -4, add a caveat and a 5-day (non-overlapping) estimate. Alpha is called significant only if daily and 5-day estimates both reject at 5%.
 - A second check (variance stability across years) reports a break date and each side's alpha, as information only.
 
-As of 2026-11-18 the gate is not in `docs/methodology.md`, so this is pending implementation. Thresholds are untested outside five S&P 500 products.
+As of commit `4c1cb7c` (2026-11-18): the gate is written into `docs/methodology.md` M3.6 (decisions D21 to D23) and built in `backend/factordesk/analytics/diagnostics.py`, with the caveat listed first among the report warnings and the 5-day estimate shown when it fires. The alpha tile says "Distinguishable from zero at 5%" instead of "reliable". The variance-stability check (G2) is not built: it waits for the panel calibration, as do the gate thresholds, which are still untested outside five S&P 500 products. Closure record: `docs/validation/spy-hardening-closure-2026-11-18.md`.
 
 ## Why
 
@@ -42,7 +42,8 @@ Calibration showing the gate fires often on clean tickers, a confirmed mechanism
 ## Sources
 
 - [docs/validation/spy-slice-validation.md](../docs/validation/spy-slice-validation.md), sections 3 and 3.6, findings F1 and F2.
-- [docs/methodology.md](../docs/methodology.md), M3.5 (diagnostics; gate absent as of 2026-11-18).
+- [docs/methodology.md](../docs/methodology.md), M3.5 (diagnostics) and M3.6 (the gate), decisions D21 to D23.
+- [docs/validation/spy-hardening-closure-2026-11-18.md](../docs/validation/spy-hardening-closure-2026-11-18.md): what was fixed and what is deferred.
 - [docs/test-oracle.md](../docs/test-oracle.md), T47.
 
 ## Related decisions

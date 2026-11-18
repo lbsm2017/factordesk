@@ -106,7 +106,8 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
         return ApiException(
             "insufficient_history",
             f"{who} has {exc.n} trading days in this range that line up with the factor "
-            f"data; at least {exc.required} (about two years) are needed.",
+            f"data; at least {exc.required} (about two years) are needed"
+            + (f": {exc.detail}." if exc.detail else "."),
             "Choose a longer range or Full history.",
         )
     if isinstance(exc, DegenerateInputError):

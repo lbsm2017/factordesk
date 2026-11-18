@@ -406,6 +406,15 @@ WORDING: list[tuple[BaseException, int, str, str, str]] = [
         "at least 504 (about two years) are needed.",
         "Choose a longer range or Full history.",
     ),
+    (  # validation F14: a single clear cause for zero rows is named
+        InsufficientHistoryError(0, 504, "every price in the requested range is missing"),
+        422,
+        "insufficient_history",
+        "SPY has 0 trading days in this range that line up with the factor data; "
+        "at least 504 (about two years) are needed: every price in the requested range is "
+        "missing.",
+        "Choose a longer range or Full history.",
+    ),
     (
         DegenerateInputError("the price does not move"),
         422,

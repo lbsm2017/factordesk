@@ -270,7 +270,7 @@ Rev 2: the header was two rows of badges plus a paragraph. It is now three short
   but not analysed." One sentence pair, 76ch maximum.
 - Notice (only when `warnings[]` is non-empty): a framed strip with a 3 px ink left rule, the
   warning glyph, and a **two-line plain summary**, for example "Prices look out of step with the
-  factor data, so R² and residual volatility are probably understated." A "Details" disclosure
+  factor data, so R² is probably understated and residual volatility overstated." A "Details" disclosure
   holds the raw messages (and, in the dashboard, the 5-day estimate line). The hidden prefix
   "Warning:" stays for screen readers.
 - The generated time moves to the colophon. Dates in prose read like "8 Aug 2024".
