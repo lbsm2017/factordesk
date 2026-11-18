@@ -52,14 +52,39 @@ PROG = "factordesk"
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
-DEFAULT_STATIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-"""The built page, found from the package location (a source checkout, not the wheel)."""
+_PACKAGE_DIR = Path(__file__).resolve().parent
+DEFAULT_STATIC_DIR = _PACKAGE_DIR.parents[1] / "frontend" / "dist"
+"""The built page in a source checkout, found from the package location."""
+PACKAGED_STATIC_DIR = _PACKAGE_DIR / "web"
+"""The built page copied into the package; this is where a wheel carries it."""
+_IN_CHECKOUT = (
+    _PACKAGE_DIR.parent.name == "backend" and (_PACKAGE_DIR.parents[1] / "pyproject.toml").is_file()
+)
+"""True when running from the repository (``backend/factordesk`` beside ``pyproject.toml``)."""
 _BUILD_COMMAND = "npm --prefix frontend run build"
 _OPEN_WAIT_SECONDS = 15.0
 _PRELOAD_MODULES = ("factordesk.pipeline", "yfinance")
 """Slow to import and needed only by the first report; loaded in the background by serve."""
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_static_dir(checkout_dist: Path, packaged: Path) -> Path:
+    """The folder ``serve`` uses when ``--static`` is not given.
+
+    A built ``frontend/dist`` in a checkout wins (a developer's latest build). Otherwise the
+    copy inside the package is used, which is the only one in a wheel. When neither holds an
+    ``index.html`` the checkout path is returned, so the error names the folder to build.
+    """
+    for candidate in (checkout_dist, packaged):
+        if (candidate / "index.html").is_file():
+            return candidate
+    return checkout_dist
+
+
+def default_static_dir() -> Path:
+    """``resolve_static_dir`` applied to this install's own folders."""
+    return resolve_static_dir(DEFAULT_STATIC_DIR, PACKAGED_STATIC_DIR)
 
 
 def _err(message: str) -> None:
@@ -102,7 +127,8 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         metavar="DIR",
-        help="folder with the built page (default: frontend/dist in the repository)",
+        help="folder with the built page (default: frontend/dist in a checkout, else the page "
+        "shipped in the package)",
     )
     srv.add_argument(
         "--dev",
@@ -332,9 +358,11 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     if not 1 <= port <= 65535:
         _err(f"invalid port {port}: use a number from 1 to 65535")
         return EXIT_USAGE
-    static_dir: Path = args.static if args.static is not None else DEFAULT_STATIC_DIR
+    static_dir: Path = args.static if args.static is not None else default_static_dir()
     if not args.dev and not (static_dir / "index.html").is_file():
-        if args.static is None:
+        if args.static is None and not _IN_CHECKOUT:
+            _err("this install has no dashboard files; reinstall factordesk, or use --static DIR")
+        elif args.static is None:
             _err(
                 f"the dashboard is not built; run '{_BUILD_COMMAND}' first, or use --dev (API only)"
             )
