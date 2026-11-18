@@ -27,7 +27,7 @@ Every test below is automatable with `pytest`. Each states its **target module**
 | Kind | Tolerance | Why |
 | --- | --- | --- |
 | Algebraic identity on values of order 0.01-1 | `1e-10` absolute | Float error in these sums is around `1e-15`; `1e-10` leaves room for summation order, not for a wrong formula. |
-| Same computation two ways (ours vs statsmodels reference call) | `1e-10` relative (`1e-8` for our vectorised rolling HAC) | Same maths, different summation order. |
+| Same computation two ways (ours vs statsmodels reference call) | `1e-10` relative (`1e-8` for our vectorised rolling HAC) | Same maths, different summation order. The rolling fast path (cumulative-sum Gram matrices) measures `1e-12` absolute on real data and at most `1e-11` on adversarial designs its guard admits, so `1e-8` leaves three orders of margin; the earlier thresholds reached `2e-8` on betas. |
 | Recovery of a true parameter from a DGP | `4 * SE` (HAC SE from the fit, or the theoretical SE when stated) | See 0.2. |
 | Labels, counts, dates, statuses | exact | - |
 
@@ -151,7 +151,7 @@ Fixture construction (CRSP method): build a split-adjusted `Close` path (geometr
 
 - **T48 Exact window length (pyfolio off-by-one).** On DGP-A with `W = 252`: number of stamps `n - W + 1 = 2269`; first stamp at row 252 (1-based); each stamp's window has exactly 252 rows, first row `t - 251`. The estimate at stamp `t` equals `sm.OLS` on rows `t-251..t` (`1e-10`) and differs from OLS on rows `t-252..t` (253 rows) by more than `1e-6`. Same for `W = 126`. Also compare with `RollingOLS(window=W)` params (`1e-10`).
 - **T49 Structural break recovery.** DGP-A with `beta_mkt = 0.5` on rows 1-1260 and `1.5` after. Stamp 1260 equals OLS on rows 1009-1260 exactly (`1e-10`) and `|beta_hat - 0.5| <= 4 se`; stamp 1512 has `|beta_hat - 1.5| <= 4 se`.
-- **T50 Vectorised rolling HAC.** Five stamps drawn with the test rng, for `W = 126` and `252`: our se equals the reference statsmodels call on that window (`maxlags = L(W) = 4`) to `1e-8` relative.
+- **T50 Vectorised rolling HAC.** Five stamps drawn with the test rng, for `W = 126` and `252`: our se equals the reference statsmodels call on that window (`maxlags = L(W) = 4`) to `1e-8` relative (measured `5e-12` on DGP-A and `1e-11` on SPY; T129 bounds the guard-edge designs).
 - **T51 Ex-ante beta.** `beta_tilde_t` equals `beta_hat_{t-1}` bitwise; multiplying `f_t` and `y_t` on one row `t` by 10 leaves `beta_tilde_t` unchanged.
 - **T52 Average beta statistics.** Mean, sd (`ddof=1`), p10, p90, min, max, share positive equal numpy on the rolling series (`1e-12`); stamp count equals `n - W_p + 1`.
 
