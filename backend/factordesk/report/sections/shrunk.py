@@ -101,7 +101,10 @@ class ShrunkBeta(FrozenModel):
     cred95_low: float | None
     cred95_high: float | None
     pull: float | None = Field(
-        description="Share of the way pulled toward the prior centre (S_w[j, j]), unclipped."
+        description=(
+            "Weight the prior gets on this beta by itself (S_w[j, j]), unclipped. With correlated "
+            "factors the actual move can be smaller, larger or away from the prior centre."
+        )
     )
     moved_away: bool | None = Field(
         description="True when the shrunk beta moved away from its centre (L-CORR-MOVE)."

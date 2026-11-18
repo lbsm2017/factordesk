@@ -224,3 +224,19 @@ Also to check without reading the code: (a) rows dated after 2026-09-30 never en
 ## 8. Gate results at hand-off
 
 Python: 649 passed (default selection; 209 `slow` and `live` tests deselected), plus the 4 shrunk `slow` and `live` tests run separately and passed. ruff and pyright: no findings. Frontend: typecheck and lint clean, 399 vitest tests passed (28 files), build and size budget (383.8 kB raw, 117.7 kB gzip against 400 / 125) pass, browser smoke test passed.
+
+## 9. Conditions of the independent validation (review of 2026-11-18, section 7)
+
+The review (`docs/reviews/shrunk-betas-validation-2026-11-18.md`) accepted the section with three conditions, none of which changes a number. Texts that belong to the spec are changed in the code and listed here as proposed spec edits; `docs/specs/shrunk-betas.md` is not edited.
+
+### 9.1 C1: what "pull" means
+
+`pull_j = S_w[j, j]` is the weight the prior gets on beta `j` by itself. With correlated factors the actual share of the way, `(b_post - b) / (m0 - b)`, also contains the moves of the other coefficients (RDDT CMA: pull 0.81, actual 0.22), so "share of the way" was wrong. Changed in the model field description, both panels and the React marker tooltip. A row that moved away is no longer described as "pulled toward typical" in the tooltip. The legend now reads "Pull of 5% or more". Tests on both sides pin the new words.
+
+| Where | Old text | New text | Spec section |
+| --- | --- | --- | --- |
+| Pull note under each table (both panels) | Pull is the share of the way from the OLS beta to its typical value: 0% means no move, 100% means all the way. | Pull is the weight the prior gets on this beta by itself: 0% means none, 100% means all. Because the factors are estimated together, the beta can move less, more, or away from its typical value. | New text; belongs to SB6 (display rules) |
+| Notation row `pull_j` | `S_w[j, j]`, the share of the way factor `j` is pulled toward its prior centre (display "pulled {pull_j:.0%} toward typical") | `S_w[j, j]`, the weight the prior gets on factor `j` by itself; the actual move can be smaller, larger or away from the centre with correlated factors (display "pull {pull_j:.0%}") | SB0.2 |
+| Legend (both panels) | Pulled 5% or more toward typical | Pull of 5% or more | SB6 rule 2 and 3 |
+| Marker tooltip, rows that moved away (React) | ...pulled toward typical to {b_post}... ; moved away from its typical value | ...moved away from its typical value to {b_post}... | SB6 rule 3 |
+| Schema field `ShrunkBeta.pull` description | Share of the way pulled toward the prior centre (S_w[j, j]), unclipped. | Weight the prior gets on this beta by itself (S_w[j, j]), unclipped. With correlated factors the actual move can be smaller, larger or away from the prior centre. | SB7.2 |

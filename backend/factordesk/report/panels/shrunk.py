@@ -41,7 +41,7 @@ NO_VISIBLE_PULL = "Shrinkage moves no beta by a visible amount: this sample is l
 NEXT_STEP = "Widen the date range and run the report again."
 NEXT_STEP_FAILED = "Run the report again; if it repeats, check the factor data in Data and audit."
 POWER_HEADING = "What the test behind the reliable tags could detect"
-LEGEND_TEXT = "Pulled 5% or more toward typical"
+LEGEND_TEXT = "Pull of 5% or more"
 MOVED_WORD = "Moved away from typical"
 CAPTION = (
     "OLS and shrunk betas with standard errors, 95% credible intervals and pull; a marker is "
@@ -50,8 +50,9 @@ CAPTION = (
 CROSS_SECTION_WORDS = {"industry49": "industry", "size_char75": "size"}
 DEFAULT_DESC = "Descriptive, in-sample, not predictive."
 PULL_NOTE = (
-    "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, "
-    "100% means all the way."
+    "Pull is the weight the prior gets on this beta by itself: 0% means none, 100% means all. "
+    "Because the factors are estimated together, the beta can move less, more, or away from its "
+    "typical value."
 )
 SCOPE_ID = {"full_sample": "shrunk-full", "latest_window": "shrunk-latest"}
 

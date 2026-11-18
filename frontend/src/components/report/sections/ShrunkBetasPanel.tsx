@@ -21,9 +21,9 @@ const NO_PULL_LINE = "Shrinkage moves no beta by a visible amount: this sample i
 const NOTHING = "n/a";
 /* The words below are the words of the static panel (backend/factordesk/report/panels/shrunk.py); a
    test on each side pins them, so a change here needs the same change there. */
-const LEGEND_TEXT = "Pulled 5% or more toward typical";
+const LEGEND_TEXT = "Pull of 5% or more";
 const PULL_NOTE =
-  "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, 100% means all the way.";
+  "Pull is the weight the prior gets on this beta by itself: 0% means none, 100% means all. Because the factors are estimated together, the beta can move less, more, or away from its typical value.";
 const POWER_HEADING = "What the test behind the reliable tags could detect";
 const CAPTION =
   "OLS and shrunk betas with standard errors, 95% credible intervals and pull; a marker is drawn only where the pull is at least 5%";
@@ -89,11 +89,13 @@ function pullText(r: Row): string {
 /** The spoken form of the shrunk marker, used for the tooltip and for screen readers. */
 function markerText(r: Row): string {
   const { beta } = r;
-  const base =
-    `${beta.factor}: OLS beta ${signed(beta.beta_ols)}; pulled toward typical to ${sgn(finite(beta.beta_shrunk))}, ` +
+  // A row that moved away is never described as pulled toward typical.
+  const move = r.movedAway ? "moved away from its typical value to" : "pulled toward typical to";
+  return (
+    `${beta.factor}: OLS beta ${signed(beta.beta_ols)}; ${move} ${sgn(finite(beta.beta_shrunk))}, ` +
     `95% credible interval ${r.cred ? `${signed(r.cred.low)} to ${signed(r.cred.high)}` : NOTHING}, ` +
-    `pull ${pullText(r)}`;
-  return r.movedAway ? `${base}; moved away from its typical value` : base;
+    `pull ${pullText(r)}`
+  );
 }
 
 function plainTitle(r: Row): string {

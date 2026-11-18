@@ -1381,7 +1381,7 @@ export interface components {
             cred95_high: number | null;
             /**
              * Pull
-             * @description Share of the way pulled toward the prior centre (S_w[j, j]), unclipped.
+             * @description Weight the prior gets on this beta by itself (S_w[j, j]), unclipped. With correlated factors the actual move can be smaller, larger or away from the prior centre.
              */
             pull: number | null;
             /**

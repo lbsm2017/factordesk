@@ -75,7 +75,8 @@ describe("ShrunkBetasPanel", () => {
     expect(moved[0]?.closest("tr")?.id).toBe("shrunk-latest_window-SMB");
     expect(moved[0]?.textContent).toMatch(/Moved away from typical/);
     expect(moved[0]?.querySelector('[aria-hidden="true"]')?.textContent).toBe("↗");
-    expect(win.querySelector("#shrunk-latest_window-SMB .vh")?.textContent).toContain("moved away from its typical value");
+    expect(win.querySelector("#shrunk-latest_window-SMB .vh")?.textContent).toContain("moved away from its typical value to");
+    expect(win.querySelector("#shrunk-latest_window-SMB .vh")?.textContent).not.toContain("pulled toward typical");
   });
 
   it("draws a marker only for a pull of at least 0.05", () => {
@@ -220,9 +221,9 @@ describe("ShrunkBetasPanel", () => {
       "What the test behind the reliable tags could detect",
     ]);
     // legend, pull note, interval format, no-pull line
-    expect(container.querySelector(".legend")?.textContent).toContain("Pulled 5% or more toward typical");
+    expect(container.querySelector(".legend")?.textContent).toContain("Pull of 5% or more");
     expect(text).toContain(
-      "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, 100% means all the way.",
+      "Pull is the weight the prior gets on this beta by itself: 0% means none, 100% means all. Because the factors are estimated together, the beta can move less, more, or away from its typical value.",
     );
     expect(text).toContain("[+0.996, +1.022]");
     expect(text).toContain("Shrinkage moves no beta by a visible amount: this sample is long enough.");

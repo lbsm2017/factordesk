@@ -296,7 +296,7 @@ def test_prior_sentence_reads_as_in_the_react_panel() -> None:
 def test_shared_wording_is_fixed() -> None:
     """The words the React panel repeats (pinned there too): change both or neither."""
     html = _panel(_report())
-    assert LEGEND_TEXT == "Pulled 5% or more toward typical"
+    assert LEGEND_TEXT == "Pull of 5% or more"
     assert (
         NO_VISIBLE_PULL
         == "Shrinkage moves no beta by a visible amount: this sample is long enough."
@@ -308,8 +308,9 @@ def test_shared_wording_is_fixed() -> None:
         "a marker is drawn only where the pull is at least 5%"
     )
     assert (
-        "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, "
-        "100% means all the way."
+        "Pull is the weight the prior gets on this beta by itself: 0% means none, 100% means all. "
+        "Because the factors are estimated together, the beta can move less, more, or away from "
+        "its typical value."
     ) in html
 
 
@@ -331,4 +332,4 @@ def test_marker_never_relies_on_colour_alone() -> None:
     assert "color:#" not in CSS and "rgb(" not in CSS  # tokens only
     legend = re.search(r'<ul class="legend".*?</ul>', html, re.S)
     assert legend is not None
-    assert "Pulled 5% or more toward typical" in _text(legend.group(0))
+    assert "Pull of 5% or more" in _text(legend.group(0))
