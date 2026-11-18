@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (owner ranking)
+
+- The owner ranked 16 epics on 2026-11-18. The [priority ranking](../docs/ROADMAP.md#priority-ranking-owner-2026-11-18) is in the roadmap, and Now, Next, Later and Very later follow that order.
+
 ## 2026-11-18 (dashboard built)
 
 - The dashboard was built as tickets T1 to T10 of `docs/specs/dashboard.md`, all on branch `feat/report-ui-feedback` (25 commits ahead of `dev` as of commit `f36255e`; nothing merged to `dev` yet). T1 API skeleton `5ef6922`, T2 report endpoints `d958ebc`, T3 frontend scaffold `2df0bff`, T4 controls and URL state `380694f`, T5 to T8 panels (`b6d5472`, `534996b`, `b45d6de`, `10ed53c`), T9 serve command `afefd9a` with static serving `32c04f0`, T10 fake backend, browser smoke test and CI `9ae81a9` and `f36255e`. A batch price download (`deca962`) and the reduction of range presets to 3Y, 5Y and Full history (`96f0b2f`) landed on the same branch.
