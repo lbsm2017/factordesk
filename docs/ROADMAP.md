@@ -41,7 +41,7 @@ test written down first, logged, independently reviewed) before it ships.
 | Data triangulation build | Consensus returns from Yahoo, Tiingo and Alpaca; flagged disagreement days | Data-quality plan |
 | European mode | Regional French factors, USD conversion, currency regressor | Dataset docs; owner decisions D16 (RF source, ECB FX, regressor default, Canada) |
 | Peer comparison | Where a stock's betas sit within its sector | — |
-| Dashboard (FastAPI + React) | Search bar, "Factor it", refresh; the report as an app | Report redesign |
+| Dashboard (FastAPI + React) | Search bar, "Factor it", range chips and custom dates, refresh; the report as an app (controls specified in `docs/design/report-design.md` section I) | Report redesign (specified; renderer port pending) |
 | Alpaca adapter | Optional cross-check and fallback from 2016, returns rebuilt from raw closes and dividends (`sip` feed); check Alpaca's "user application" notice before shipping | Data-quality plan |
 | One-shot install-and-run command | A single line per OS that installs uv if missing and opens a report (`uvx factordesk report SPY --open`); a short bootstrap script pinned to a release tag, readable, with a published checksum | Publish to PyPI; first tagged release |
 

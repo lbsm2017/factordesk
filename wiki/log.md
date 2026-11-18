@@ -7,6 +7,11 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (report review)
+
+- Added [report density, width cap and range controls](decision-report-density-and-range-controls.md) after the owner's review of the live SPY report. The design spec and prototype were revised to match.
+- Linked it from the [colour decision](decision-report-design-colour-is-evidence.md) and the [application stack](decision-application-stack.md).
+
 ## 2026-11-18 (follow-up)
 
 - Filled the "Why" sections of [MIT license](decision-open-source-mit-license.md), [project name](decision-project-name-factordesk.md), [Python and uv](decision-python-and-uv-for-every-platform.md) and [branches and pull requests](decision-branches-and-pull-requests.md) with the owner's reasoning.

@@ -47,5 +47,6 @@ Finding that ECharts cannot draw the shaded-region price chart cleanly, a decisi
 ## Related decisions
 
 - [Report design: colour is evidence](decision-report-design-colour-is-evidence.md)
+- [Report density, width cap and range controls](decision-report-density-and-range-controls.md)
 - [Thin slice on SPY first](decision-thin-slice-on-spy-first.md)
 - [Python and uv for every platform](decision-python-and-uv-for-every-platform.md)
