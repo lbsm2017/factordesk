@@ -26,7 +26,8 @@ V-rules elsewhere). Open questions: DV11.
 3. Bigger, easier type: nothing under 14 px; body 16 px; panel outcome sentences 19 px.
 4. Colour and highlighted areas in the owner's fintech-tool palette, with evidence colours that
    keep their meaning (design rev 3, M).
-5. Toggle switches: "Show statistics" and "Dark theme", both in the URL.
+5. Toggle switches: "Show statistics", in the URL. (The "Dark theme" switch was dropped by the
+   owner on 2026-11-19; light only, see DV11 item 6.)
 6. The company name, exchange and currency in the header (owner request).
 7. Historical performance (return, volatility, Sharpe ratio, largest fall) and a quick world beta,
    each as an optional report section (owner additions, 2026-11-18).
@@ -664,8 +665,12 @@ merged in that order.
    accept.
    **Decided 2026-11-19:** the owner has no preference; accepted as written.
 6. **Dark theme ignores the OS setting** (plan default). Confirm at Stage 1.
+   Decided 2026-11-19: the owner said "skip dark theme". Dashboard v2 ships light only: no
+   "Dark theme" switch, no `theme` URL parameter, no dark token set, and the OS setting is ignored.
+   This supersedes every dark-theme item elsewhere in this spec and in design rev 3.
 7. **Company name fallback:** when Yahoo throttles the metadata read, the header shows the ticker
    only, with no error. Recommended: accept (plan default).
+   Decided 2026-11-19: accepted by the owner.
 8. **Residual verdict copy G2** in R4.8 says "check the Exposures tab"; the page has no tabs. The
    dashboard shows its own outcome line (DV4.9) but the body still shows the R4.8 copy. Recommended:
    the methodology owner changes "tab" to "section" in R4.8.
