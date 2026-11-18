@@ -2,7 +2,7 @@
 
 ``create`` is a uvicorn app factory::
 
-    uv run uvicorn factordesk.tests.fixtures.fake_app:create --factory --port 8765  # or any free port; Playwright picks one per checkout
+    uv run uvicorn factordesk.tests.fixtures.fake_app:create --factory --port 8765
 
 It builds the real application (``create_app``) with fake collaborators: a price provider that
 serves one synthetic history (``dgp_a``) for any ticker except ``XYZ``, a factor frame cut 30
