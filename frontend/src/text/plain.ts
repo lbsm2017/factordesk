@@ -16,6 +16,11 @@ export const WARN_PLAIN: Record<string, string> = {
   residual_reversal:
     "Prices look out of step with the factor data, so R² and residual volatility are probably understated.",
   short_history: "The history is short, so the betas rest on a small sample.",
+  collinearity: "Some factors move together in this sample, so single betas are less precise.",
+  audit_errors: "The price audit found errors; the analysis still uses prices as published.",
+  audit_warnings: "The price audit flagged some unusual price moves; see Data and audit.",
+  factor_data_lag:
+    "The factor data stops before the latest prices, so the newest days are charted but not analysed.",
 };
 
 /** [positive beta, negative beta] tilt phrases (H.2). The market factor has its own wording. */

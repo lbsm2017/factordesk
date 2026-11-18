@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mockReport } from "../test/fixture";
-import { exposureReading, plainName, warningSummary } from "./plain";
+import { exposureReading, plainName, WARN_PLAIN, warningSummary } from "./plain";
 
 describe("plain text", () => {
   it("names factors in plain words", () => {
@@ -16,6 +16,17 @@ describe("plain text", () => {
     expect(warningSummary([known, unknown, unknown])).toBe(
       "The history is short, so the betas rest on a small sample. Raw message.",
     );
+  });
+
+  it("has plain text for every warning code the backend emits", () => {
+    const codes = ["residual_reversal", "short_history", "collinearity", "audit_errors", "audit_warnings", "factor_data_lag"];
+    for (const code of codes) {
+      const text = warningSummary([{ code, message: "Raw message." }]);
+      expect(text, code).toBe(WARN_PLAIN[code]);
+      expect(text, code).not.toBe("Raw message.");
+      expect(text.endsWith("."), code).toBe(true);
+    }
+    expect(Object.keys(WARN_PLAIN).sort()).toEqual([...codes].sort());
   });
 
   it("reads the exposures from the tags", () => {
