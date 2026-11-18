@@ -28,6 +28,14 @@ export type PriceSeries = Schemas["PriceSeries"];
 export type DataInfo = Schemas["DataInfo"];
 export type ReportWarning = Schemas["ReportWarning"];
 export type AuditFinding = Schemas["AuditFinding"];
+export type SampleInfo = Schemas["SampleInfo"];
+
+/** Optional sections of the schema v3 contract (docs/specs/schema-v3-contract.md); null when not computed. */
+export type LeadLagSection = Schemas["LeadLagSection"];
+export type ShrunkBetas = Schemas["ShrunkBetas"];
+export type FragilitySection = Schemas["FragilitySection"];
+export type ResidualAnalysis = Schemas["ResidualAnalysis"];
+export type KalmanBetaSeries = Schemas["KalmanBetaSeries"];
 
 /** Canonical factor names and order (backend FACTOR_NAMES). */
 export const FACTOR_NAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA"] as const;
