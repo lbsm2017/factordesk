@@ -7,6 +7,11 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (dashboard)
+
+- Added [dashboard server and interface](decision-dashboard-server-and-interface.md) after the owner approved building it. Spec: `docs/specs/dashboard.md`. Dropped Tailwind and shadcn/ui, dropped the YTD and 1Y chips (the pipeline needs 504 days).
+- Static report ported to design revision 2 (commits `fabd702`, `d0cacbb`); API skeleton added (`5ef6922`).
+
 ## 2026-11-18 (report review)
 
 - Added [report density, width cap and range controls](decision-report-density-and-range-controls.md) after the owner's review of the live SPY report. The design spec and prototype were revised to match.

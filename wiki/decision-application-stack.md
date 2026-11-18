@@ -9,6 +9,8 @@ The analysis runs on a Python backend (FastAPI) with a React dashboard on top an
 
 ## What we decided
 
+Superseded in part on 2026-11-18: the owner approved plain CSS tokens instead of Tailwind and shadcn/ui, and ECharts only for the price and rolling charts. See [dashboard server and interface](decision-dashboard-server-and-interface.md). The text below is the original decision.
+
 - Backend: FastAPI in Python. Python is required because the statsmodels library provides Newey-West errors, Engle-Granger and Johansen tests.
 - Dashboard: Vite, React and TypeScript, with Tailwind and shadcn/ui, and Apache ECharts for every chart.
 - First slice: a single HTML file with inline SVG charts, written by a command-line tool.
