@@ -1,32 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { mockReport } from "../../test/fixture";
 import { EmptyState } from "./EmptyState";
 import { Panel } from "./Panel";
 import { ReportView } from "./ReportView";
-import { ReturnPanel } from "./ReturnPanel";
-import { RiskPanel } from "./RiskPanel";
-import { RollingPanel } from "./RollingPanel";
 
 const report = mockReport;
-
-const stubs: [string, string, () => ReactElement][] = [
-  ["ReturnPanel", "Where the return came from", () => <ReturnPanel report={report} />],
-  ["RiskPanel", "Where the risk comes from", () => <RiskPanel report={report} />],
-  ["RollingPanel", "Exposure over time", () => <RollingPanel report={report} win={252} onWinChange={vi.fn()} />],
-];
-
-describe("stubs", () => {
-  it.each(stubs)("%s renders a titled, empty Panel", (_name, title, make) => {
-    const { container } = render(make());
-    expect(screen.getByRole("heading", { level: 2, name: title })).toBeTruthy();
-    const section = container.querySelector("section.panel");
-    expect(section).not.toBeNull();
-    expect(section?.querySelector(".foot")).toBeNull();
-    expect(section?.querySelector("table")).toBeNull();
-  });
-});
 
 describe("ReportView", () => {
   it("places every report panel in order inside one region", () => {
