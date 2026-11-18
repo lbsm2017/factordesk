@@ -9,18 +9,8 @@ import { CustomRange } from "../controls/CustomRange";
 import { FactorDataLine } from "../controls/FactorDataLine";
 import { RangeChips } from "../controls/RangeChips";
 import { TickerSearch } from "../controls/TickerSearch";
-import { Colophon } from "./Colophon";
-import { DataAuditPanel } from "./DataAuditPanel";
 import { EmptyState } from "./EmptyState";
-import { Equation } from "./Equation";
-import { ExposuresPanel } from "./ExposuresPanel";
-import { GateCallout } from "./GateCallout";
-import { Header } from "./Header";
-import { KpiStrip } from "./KpiStrip";
-import { Notice } from "./Notice";
 import { Panel } from "./Panel";
-import { PricePanel } from "./PricePanel";
-import { RegressionDetail } from "./RegressionDetail";
 import { ReportView } from "./ReportView";
 import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
@@ -29,19 +19,9 @@ import { RollingPanel } from "./RollingPanel";
 const report = mockReport;
 
 const stubs: [string, string, () => ReactElement][] = [
-  ["Header", "SPY", () => <Header report={report} downloadHref="#" />],
-  ["Notice", "Data-quality notice", () => <Notice report={report} />],
-  ["Equation", "Fitted model", () => <Equation report={report} />],
-  ["KpiStrip", "Key figures", () => <KpiStrip report={report} />],
-  ["GateCallout", "Residual quality gate", () => <GateCallout report={report} />],
-  ["PricePanel", "Price", () => <PricePanel report={report} />],
-  ["ExposuresPanel", "Factor exposures", () => <ExposuresPanel report={report} />],
   ["ReturnPanel", "Where the return came from", () => <ReturnPanel report={report} />],
   ["RiskPanel", "Where the risk comes from", () => <RiskPanel report={report} />],
   ["RollingPanel", "Exposure over time", () => <RollingPanel report={report} win={252} onWinChange={vi.fn()} />],
-  ["DataAuditPanel", "Data and audit", () => <DataAuditPanel report={report} />],
-  ["RegressionDetail", "Regression detail", () => <RegressionDetail report={report} />],
-  ["Colophon", "About this report", () => <Colophon report={report} />],
   [
     "ControlsStrip",
     "Controls",
@@ -91,7 +71,7 @@ describe("stubs", () => {
 describe("ReportView", () => {
   it("places every report panel in order inside one region", () => {
     const { container } = render(<ReportView report={report} downloadHref="#" win={null} onWinChange={vi.fn()} />);
-    const ids = Array.from(container.querySelectorAll("section.panel")).map((el) => el.id);
+    const ids = Array.from(container.querySelectorAll("main > [id]")).map((el) => el.id);
     expect(ids).toEqual([
       "header",
       "notice",
