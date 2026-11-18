@@ -45,6 +45,13 @@ from factordesk.report.schema import (
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mock_report.json"
+
+
+def _body(page: str) -> str:
+    """The page without its stylesheet (which embeds base64 fonts)."""
+    return re.sub(r"<style>.*?</style>", "", page, flags=re.S)
+
+
 SOURCE_URL = "https://example.invalid/factors.zip"
 Z = 1.959963984540054
 
@@ -468,22 +475,31 @@ def test_render_is_deterministic_and_self_contained() -> None:
     assert "<script" not in a
     assert "<link" not in a
     assert "@import" not in a
-    assert "url(" not in a.replace("url(#", "")
+    # the only url() values are the embedded fonts (data URIs) and fragment references
+    assert "url(" not in re.sub(r"url\((#|data:font/woff2;base64,)", "", a)
     # the only URL in the document is the user-supplied factor source, shown as text
     assert a.count(SOURCE_URL) == 1
     assert not re.search(r"https?://", a.replace(SOURCE_URL, ""))
     assert 'role="img"' in a and "<title" in a and "aria-label" in a
-    assert 'id="betas-data"' in a
+    assert 'id="beta-SMB"' in a  # the bar tables carry the numbers
 
 
 def test_render_contains_key_content() -> None:
     page = render_report_html(build_mock_report())
-    for needle in ("SPY", "MOCK DATA", "Data lag", "Factor betas", "Return contribution"):
+    for needle in (
+        "SPY",
+        "MOCK DATA",
+        "Factor exposures",
+        "Where the return came from",
+        "Where the risk comes from",
+        "Exposure over time",
+        "Not in the sum",
+    ):
         assert needle in page
     assert LABEL_TEXT["L-DESC"] in page
     assert LABEL_TEXT["L-ARITH"] in page and LABEL_TEXT["L-BAND"] in page
-    assert "Memo (not part of any sum)" in page and "Average 252-day beta" in page
-    assert "Data lag 49d" in page
+    assert "Factor data ends 30 Sep 2026 (49 days ago)" in page
+    assert "Generated" not in page.split("<footer")[0]  # the generated time is in the colophon
 
 
 def test_render_escapes_injected_html() -> None:
@@ -579,7 +595,7 @@ def test_render_handles_nan_none_and_zero_range() -> None:
             "price_series": flat,
         }
     )
-    page = render_report_html(bad)
+    page = _body(render_report_html(bad))
     assert "nan" not in page.lower().replace("financ", "")
     assert "inf" not in re.sub(r"info|infl|inferred", "", page.lower())
     assert "n/a" in page
@@ -589,7 +605,9 @@ def test_render_handles_nan_none_and_zero_range() -> None:
 def test_render_all_prices_beyond_factor_coverage_and_single_point() -> None:
     rep = build_mock_report()
     ps = rep.price_series.model_copy(update={"factor_coverage_end": date(2000, 1, 1)})
-    assert "no factor data" not in render_report_html(rep.model_copy(update={"price_series": ps}))
+    page = render_report_html(rep.model_copy(update={"price_series": ps}))
+    assert "Not analysed: factor data ends 1 Jan 2000" in page
+    assert page.count('class="tailzone"') == 1  # the whole window is shaded
     one = PriceSeries(
         dates=[date(2026, 1, 2)], adj_close=[1.0], factor_coverage_end=date(2026, 1, 2)
     )
@@ -634,8 +652,10 @@ def test_dump_is_compact_and_round_trips(tmp_path: Path) -> None:
 
 def test_render_shows_gate_callout_and_diagnostics() -> None:
     page = render_report_html(build_mock_report())
-    assert 'class="callout' in page
-    assert "MOCK: Daily price changes partly reverse the next day" in page
+    notice = page.split('id="notice"')[1].split("</aside>")[0]
+    assert "<details" in notice and "Details" in notice
+    assert "MOCK: Daily price changes partly reverse the next day" in notice
+    assert "5-day estimate (111 blocks)" in notice
     assert "Residual diagnostics" in page and "Robust Breusch-Godfrey" in page
     assert "5-day estimate" in page and "blocks of 5 trading days" in page
     assert "MOCK: HAC standard errors are used whatever these tests show." in page
@@ -677,7 +697,8 @@ def test_render_without_gate_has_no_callout() -> None:
         }
     )
     page = render_report_html(quiet)
-    assert 'class="callout' not in page
+    assert "5-day estimate" not in page.split("Regression detail")[0]
+    assert "MOCK: Daily price changes partly reverse the next day" not in page
     assert "Residual diagnostics" in page
     assert "5-day estimate" not in page
 
@@ -704,6 +725,122 @@ def test_render_failed_rolling_window_shows_reason() -> None:
 
 
 def test_signs_use_glyphs() -> None:
+    body = _body(render_report_html(build_mock_report()))
+    assert re.search(r'class="num strong">[+−][0-9]', body)  # + or a true minus
+    assert 'class="num strong">-' not in body  # no ASCII hyphen as a minus
+    assert not re.search(r"[+−]0\.0+(?![0-9])", body)  # zero prints unsigned
+    assert 'class="num pos"' not in body and 'class="num neg"' not in body  # text has no colour
+
+
+# ---------------------------------------------------------------------------------------------
+# Report design, revision 2 (docs/design/report-design.md)
+# ---------------------------------------------------------------------------------------------
+def _beta_row(page: str, name: str) -> str:
+    m = re.search(rf'<tr[^>]*id="beta-{name}".*?</tr>', page, flags=re.S)
+    assert m is not None
+    return m.group(0)
+
+
+def test_render_width_cap_fonts_and_no_monospace() -> None:
     page = render_report_html(build_mock_report())
-    assert re.search(r'class="num (pos|neg)">[+-]', page)
-    assert 'num pos">0' not in page and 'num neg">0' not in page
+    assert "max-width: 1216px" in page
+    assert "1680" not in page
+    assert "monospace" not in page.lower() and "--mono" not in page
+    assert page.count("font/woff2;base64,") == 4  # Instrument Sans plus three STIX subsets
+    assert "font-variant-numeric: tabular-nums" in page
+    assert "details.how::details-content" in page  # print unfolds the method text
+
+
+def test_render_five_kpi_cells() -> None:
+    page = render_report_html(build_mock_report())
+    kpis = page.split('aria-label="Headline statistics"')[1].split("</section>")[0]
+    assert len(re.findall(r'<div class="kpi[ "]', kpis)) == 5
+    for label in ("Alpha, a year", "Residual volatility", "Observations", "Analysed range"):
+        assert label in kpis
+    assert "Data audit" not in kpis and "Adjusted R" not in kpis
+
+
+def test_render_header_chips_and_notice_details() -> None:
+    page = render_report_html(build_mock_report())
+    assert page.count('class="chip') == 2  # factor data end, warnings
+    assert 'href="#notice"' in page and "2 warnings" in page
+    notice = page.split('id="notice"')[1].split("</aside>")[0]
+    assert "Prices look out of step with the factor data" in notice  # plain, by warning code
+    assert '<details class="how"><summary>Details</summary>' in notice
+    assert "MOCK: short history." in notice  # the raw message sits behind Details
+    rep = build_mock_report()
+    odd = rep.model_copy(update={"warnings": [ReportWarning(code="new_code", message="MOCK raw.")]})
+    summary = render_report_html(odd).split('class="notice-sum"')[1].split("</p>")[0]
+    assert "MOCK raw." in summary  # unknown codes fall back to the message
+    quiet = rep.model_copy(
+        update={
+            "warnings": [],
+            "quality_gate": rep.quality_gate.model_copy(update={"fired": False}),
+        }
+    )
+    assert 'id="notice"' not in render_report_html(quiet)
+
+
+def test_render_rolling_five_rows_three_number_columns() -> None:
+    page = render_report_html(build_mock_report())
+    assert "sm-grid" not in page and "Average 252-day beta" not in page
+    for k in (126, 252):
+        block = page.split(f'<div class="win w-{k}">')[1].split("</table>")[0]
+        assert block.count('class="plot mini"') == 5
+        assert block.count('<th role="columnheader" scope="col" class="num">') == 3
+        assert block.count('<td role="cell" class="num') == 15
+        for head in ("Latest", "Average", "Middle 80%"):
+            assert head in block
+    tip = re.search(r'class="num range" title="([^"]+)"', page)
+    assert tip is not None and "lowest" in tip.group(1) and "above zero" in tip.group(1)
+    assert 'id="win-126"' in page and 'id="win-252" value="252" checked' in page
+
+
+def test_render_interval_caps_are_short_and_omitted_when_narrow() -> None:
+    rep = build_mock_report()
+    row = _beta_row(render_report_html(rep), "SMB")
+    caps = re.findall(r'y1="46\.5%" y2="53\.5%"', row)
+    assert len(caps) == 2
+    assert (53.5 - 46.5) / 100 * 44 <= 3.5  # 3 px on a 44 px row
+    tight = [
+        s.model_copy(update={"ci_low": (s.beta or 0) - 0.0005, "ci_high": (s.beta or 0) + 0.0005})
+        if s.name == "SMB"
+        else s
+        for s in rep.regression.factors
+    ]
+    page = render_report_html(
+        rep.model_copy(update={"regression": rep.regression.model_copy(update={"factors": tight})})
+    )
+    assert 'y1="46.5%"' not in _beta_row(page, "SMB")
+    assert 'y1="46.5%"' in _beta_row(page, "HML")
+
+
+def test_render_average_beta_diamond_sits_on_the_bar_row() -> None:
+    page = render_report_html(build_mock_report())
+    for name in FACTOR_NAMES:
+        row = _beta_row(page, name)
+        m = re.search(r'<svg class="avgm" x="[^"]+%" y="50%"', row)
+        assert m is not None  # centred on the row, not below the bar
+        assert row.index('<rect class="') < m.start() < row.index("</svg></td>")
+    assert "M0 -3.6 3.6 0 0 3.6-3.6 0z" in page  # a 7 px diamond
+    assert "Average 252d beta" in page
+    assert page.count("noise means") == 1  # reliable and noise are defined once
+
+
+def test_render_price_shades_both_non_analysed_ends() -> None:
+    rep = build_mock_report()
+    ps = rep.price_series
+    early = _bdays(ps.dates[0] - timedelta(days=1), 30)
+    longer = PriceSeries(
+        dates=[*early, *ps.dates],
+        adj_close=[*[400.0] * 30, *ps.adj_close],
+        factor_coverage_end=ps.factor_coverage_end,
+    )
+    both = render_report_html(rep.model_copy(update={"price_series": longer}))
+    assert both.count('class="tailzone"') == 2 and both.count('class="cutline"') == 2
+    assert "Not analysed: before 8 Aug 2024" in both
+    assert "Not analysed: factor data ends 30 Sep 2026" in both
+    assert 'class="tailzone" x="0"' in both  # the left band starts at the plot edge
+    only_right = render_report_html(rep)
+    assert only_right.count('class="tailzone"') == 1 and "Not analysed: before" not in only_right
+    assert "How has the price moved over the window? Shaded days are not in the analysis." in both

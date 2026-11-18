@@ -65,7 +65,7 @@ def test_build_report_end_to_end() -> None:
     assert "factor_data_lag" in codes and "short_history" not in codes
     assert any("survivor" in n.lower() for n in rep.notes)
     page = render_report_html(rep)
-    assert "SYN" in page and "Memo (not part of any sum)" in page
+    assert "SYN" in page and "Not in the sum" in page
 
 
 def test_t35_refusal_and_short_history_warning() -> None:
