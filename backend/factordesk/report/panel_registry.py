@@ -54,9 +54,7 @@ class PanelRegistry:
             raise ValueError(f"panel name {name!r} is already registered")
         for other in self._specs.values():
             if other.name != name and other.position == position:
-                raise ValueError(
-                    f"panel position {position} is already taken by {other.name!r}"
-                )
+                raise ValueError(f"panel position {position} is already taken by {other.name!r}")
         spec = PanelSpec(name=name, position=position, render=render, css=css)
         self._specs[name] = spec
         return spec
