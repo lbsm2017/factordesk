@@ -68,8 +68,13 @@ def _bdays(end: date, n: int) -> list[date]:
 
 
 def _p_from_z(z: float) -> float:
-    """Two-sided normal p-value."""
-    return math.erfc(abs(z) / math.sqrt(2))
+    """Two-sided normal p-value, rounded to 12 significant digits.
+
+    ``math.erfc`` comes from the platform C library and differs in the last bit between glibc
+    and the Windows runtime, so the unrounded value would make the committed fixture
+    platform-dependent. Twelve digits are far above any displayed precision.
+    """
+    return float(f"{math.erfc(abs(z) / math.sqrt(2)):.12g}")
 
 
 def _bh(ps: list[float]) -> list[float]:
