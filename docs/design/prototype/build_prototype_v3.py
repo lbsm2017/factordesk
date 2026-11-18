@@ -10,8 +10,8 @@ which stays unchanged. Nothing outside docs/design/prototype/ is written.
 
     python docs/design/prototype/build_prototype_v3.py                 # report-v3.html
     python docs/design/prototype/build_prototype_v3.py --empty         # report-v3-empty.html
-    python docs/design/prototype/build_prototype_v3.py --on dark,stats --out PATH
-        (--on pre-checks inputs for screenshots: dark, stats, menu, win126)
+    python docs/design/prototype/build_prototype_v3.py --on stats --out PATH
+        (--on pre-checks inputs for screenshots: stats, menu, win126; --empty also shows the short-history state)
 """
 
 from __future__ import annotations
@@ -63,6 +63,11 @@ SECURITY = {
     "ZM": {"name": "Zoom Communications Inc.", "exchange": "Nasdaq", "currency": "USD"},
 }
 CURRENCY_PLAIN = {"USD": "US dollars"}
+
+# Years of daily price history available per ticker (demo values). A preset longer than the
+# history is disabled, with the reason as visible text. The --empty page shows the short case.
+HISTORY_YEARS = {"SPY": 33.8, "ZM": 7.6}
+SHORT_HISTORY_DEMO = 7.6
 
 # Historical performance over the analysed range (owner addition). Keyed, not computed.
 PERFORMANCE = {
@@ -121,7 +126,7 @@ ICON = {
     "kalman": '<path d="M2.5 10h3.5l2-5 4 10 2-5h3.5"/>',
     "shrunk": '<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3"/>',
     "data": '<ellipse cx="10" cy="5" rx="6" ry="2.5"/><path d="M4 5v10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5M4 10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5"/>',
-    "detail": '<rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14M8.5 8v8"/>',
+    "detail": '<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 8h14M8.5 8v8"/>',
 }
 
 
@@ -131,9 +136,9 @@ def icon(name: str, label: str = "") -> str:
 
 
 MARK = (
-    '<svg viewBox="0 0 28 28" aria-hidden="true"><rect class="m-bg" width="28" height="28" rx="7"/>'
-    '<rect class="m-bar" x="7" y="13" width="3" height="8" rx="1.5"/><rect class="m-bar" x="12.5" y="7" width="3" height="14" rx="1.5"/>'
-    '<rect class="m-bar" x="18" y="10.5" width="3" height="10.5" rx="1.5"/></svg>'
+    '<svg viewBox="0 0 28 28" aria-hidden="true"><rect class="m-bg" width="28" height="28" rx="6"/>'
+    '<rect class="m-bar" x="7" y="13" width="3" height="8"/><rect class="m-bar" x="12.5" y="7" width="3" height="14"/>'
+    '<rect class="m-bar" x="18" y="10.5" width="3" height="10.5"/></svg>'
 )
 
 
@@ -219,7 +224,7 @@ def grid_lines(ticks: list[float], lo: float, hi: float) -> str:
 
 def bar(v: float, lo: float, hi: float, cls: str) -> str:
     a, b = sorted((pos(0.0, lo, hi), pos(v, lo, hi)))
-    return f'<rect class="{cls}" x="{a}%" y="31%" width="{max(b - a, 0.0)}%" height="38%" rx="3"/>'
+    return f'<rect class="{cls}" x="{a}%" y="31%" width="{max(b - a, 0.0)}%" height="38%" rx="2"/>'
 
 
 def axis_row(ticks: list[float], lo: float, hi: float, fmt, ncols: int = 0) -> str:
@@ -249,7 +254,7 @@ def sure_word(tag: str | None) -> str:
 
 
 def word_cell(reliable: bool) -> str:
-    return f'<td class="word {"yes" if reliable else "no"}">{"Clear" if reliable else "Could be noise"}</td>'
+    return f'<td class="word {"yes" if reliable else "no"}">{"Clear evidence" if reliable else "Could be noise"}</td>'
 
 
 # ----------------------------------------------------------------------------- plain-language rules
@@ -308,18 +313,23 @@ def card_text(f: dict) -> tuple[str, str, str]:
 
 
 # ----------------------------------------------------------------------------- sidebar and top bar
-def sidebar(r: dict, nav: list[tuple[str, str, str]]) -> str:
+def sidebar(r: dict, nav: list[tuple[str, str, str]], history: float) -> str:
     d = r["data"]
-    ranges = [("3Y", False), ("5Y", False), ("Full history", True)]
+    ranges = [("3Y", 3), ("5Y", 5), ("10Y", 10), ("Full history", 0)]
+    off = [k for k, y in ranges if y and y > history]
     seg = "".join(
-        f'<label><input type="radio" name="range" value="{k}"{" checked" if c else ""}><span>{k}</span></label>' for k, c in ranges
+        f'<label><input type="radio" name="range" value="{k}"{" checked" if k == "Full history" else ""}'
+        f'{" disabled aria-describedby=" + chr(34) + "range-why" + chr(34) if k in off else ""}><span>{k}</span></label>'
+        for k, _ in ranges
     )
+    why = (f'<p class="side-note" id="range-why">{and_list(off)} {"is" if len(off) == 1 else "are"} unavailable: '
+           f'{e(r["ticker"])} has {history:.1f} years of prices.</p>') if off else ""
     items = []
     for sid, label, badge in nav:
         if sid == "residual":
             items.append('<li class="nav-sub" aria-hidden="true">Deeper checks</li>')
         cur = ' aria-current="true"' if sid == "summary" else ""
-        b = f'<span class="count"><span aria-hidden="true">{e(badge.split()[0])}</span><span class="vh">, {e(badge)}</span></span>' if badge else ""
+        b = f'<span class="count"><span aria-hidden="true">{e(badge.split()[0])}</span><span class="vh">, {e(badge)}</span></span>' if badge else ""  # plain text, no capsule
         items.append(f'<li><a href="#{sid}"{cur}>{icon(sid)}<span class="lab">{e(label)}</span>{b}</a></li>')
     excl = d["n_excluded"]
     return f"""
@@ -335,6 +345,7 @@ def sidebar(r: dict, nav: list[tuple[str, str, str]]) -> str:
     <fieldset class="side-group">
       <legend class="side-label">Date range</legend>
       <div class="seg fill" role="radiogroup" aria-label="Date range preset">{seg}</div>
+      {why}
       <div class="dates">
         <label>From<input class="field" name="from" type="date" value="{d['actual_start']}" max="{d['factors_last_date']}"></label>
         <label>To<input class="field" name="to" type="date" value="{d['actual_end']}" max="{d['factors_last_date']}"></label>
@@ -349,8 +360,6 @@ def sidebar(r: dict, nav: list[tuple[str, str, str]]) -> str:
     <div class="side-group">
       <label class="switch"><input type="checkbox" role="switch" id="sw-stats"><span class="track"><span class="thumb"></span></span>
         <span class="switch-text">Show statistics<span class="sw-hint">Tests, p-values, intervals</span></span></label>
-      <label class="switch"><input type="checkbox" role="switch" id="sw-dark"><span class="track"><span class="thumb"></span></span>
-        <span class="switch-text">Dark theme</span></label>
     </div>
     <nav class="side-group nav" aria-label="Sections">
       <p class="side-label">Sections</p>
@@ -377,17 +386,17 @@ def header(r: dict) -> str:
     d, ws = r["data"], r["warnings"]
     s = SECURITY.get(r["ticker"], {})
     name = f'<span class="name" translate="no">{e(s["name"])}</span>' if s.get("name") else ""
-    listing = ""
+    parts = []
     if s.get("exchange"):
         cur = CURRENCY_PLAIN.get(s.get("currency", ""), s.get("currency", ""))
-        listing = f'<p class="listing">Listed on {e(s["exchange"])}, priced in {e(cur)}</p>'
-    chips = f'<span class="chip"><span class="dot" aria-hidden="true"></span>Factor data to {d_long(d["factors_last_date"])}</span>'
+        parts.append(f"Listed on {e(s['exchange'])}, priced in {e(cur)}.")
+    parts.append(f"Factor data to {d_long(d['factors_last_date'])}.")
     if ws:
-        chips += f'<a class="chip warn" href="#notice">{icon("warn")}{plural(len(ws), "warning")}</a>'
+        parts.append(f'<a href="#notice">{plural(len(ws), "warning")}</a>')
     return f"""
 <div class="head">
-  <div><h1><span class="ticker" translate="no">{e(r['ticker'])}</span>{name}</h1>{listing}</div>
-  <div class="chips">{chips}</div>
+  <h1><span class="ticker" translate="no">{e(r['ticker'])}</span>{name}</h1>
+  <p class="listing">{" ".join(parts)}</p>
 </div>"""
 
 
@@ -420,7 +429,7 @@ def verdict(r: dict) -> str:
         a, ns = g["alpha_annual"], g["alpha_tag"] != "reliable"
         errors = d["audit_status"] == "errors"
         a_word = ("Not interpretable" if errors else "Could be noise" if ns else "Clear evidence")
-        a_pill = "neu" if (ns or errors) else ("pos" if a > 0 else "neg")
+        a_cls = "neu" if (ns or errors) else ("pos" if a > 0 else "neg")
         a_text = (
             "The price audit found errors, so this cannot be judged yet." if errors else
             "Not distinguishable from zero: the likely range includes zero." if ns else
@@ -434,16 +443,16 @@ def verdict(r: dict) -> str:
             "A year, left unexplained by the factors."
         )
         tiles = f"""
-  <div class="tiles">
-    <section class="tile" aria-labelledby="t-alpha">
+  <div class="figs">
+    <section class="fig" aria-labelledby="t-alpha">
       <h3 id="t-alpha">Beyond its risks</h3>
       <p class="v{' quiet' if ns else ''}">{pct(a)}<small>a year</small></p>
-      <span class="pill {a_pill}">{a_word}</span>
+      <p class="state {a_cls}">{a_word}</p>
       <div class="instrument">{alpha_range_svg(g)}</div>
       <p>{a_text}</p>
       {stat(f"t {tstat(g['alpha_z'])}, p {pval(g['alpha_p'])}, 95% interval {pct(g['alpha_ci_low_annual'])} to {pct(g['alpha_ci_high_annual'])}", "p")}
     </section>
-    <section class="tile" aria-labelledby="t-r2">
+    <section class="fig" aria-labelledby="t-r2">
       <h3 id="t-r2">How much the model explains</h3>
       <p class="v">{share(r2)}<small>of daily moves</small></p>
       <div class="instrument"><div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{r2 * 100:.1f}" aria-label="Share of daily moves explained"><span style="width:{r2 * 100:.2f}%"></span></div>
@@ -451,7 +460,7 @@ def verdict(r: dict) -> str:
       <p><b>{share(r2)}</b> of daily moves; <b>{share(1 - r2)}</b> is specific to the stock.</p>
       {stat(f"R&#178; {r2:.4f}, adjusted {g['adj_r2']:.4f}", "p")}
     </section>
-    <section class="tile" aria-labelledby="t-risk">
+    <section class="fig" aria-labelledby="t-risk">
       <h3 id="t-risk">Stock-specific risk</h3>
       <p class="v">{p1(g['sigma_e_annual'])}<small>a year</small></p>
       <div class="instrument"><div class="meter idio" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{(idio or 0) * 100:.1f}" aria-label="Stock-specific share of variance"><span style="width:{max((idio or 0) * 100, 1.2):.2f}%"></span></div>
@@ -465,6 +474,7 @@ def verdict(r: dict) -> str:
   <h2 class="vh" id="verdict-t">Verdict</h2>
   <p class="verdict-line">{e(line)}</p>
   <p class="verdict-basis">{e(basis)}</p>
+  {notice(r)}
   {tiles}
 </section>"""
 
@@ -477,10 +487,10 @@ def notice(r: dict) -> str:
     rest = " ".join(NOTICE_PLAIN.get(w["code"], WARN_PLAIN.get(w["code"], w["message"])) for w in ws[1:2])
     more = "".join(f"<li>{e(w['message'])}</li>" for w in ws)
     return f"""
-<aside class="notice" id="notice" aria-label="Data quality">{icon("warn")}
-  <div><p class="notice-sum"><b>Read with care.</b> {e(first)}<br>{e(rest)}</p>
-  <details class="more"><summary>Details</summary><ul>{more}</ul></details></div>
-</aside>"""
+<div class="note" id="notice" role="note" aria-label="Data quality">
+  <p><span class="vh">Warning: </span>{e(first)}<br>{e(rest)}</p>
+  <details class="more"><summary>Details</summary><ul>{more}</ul></details>
+</div>"""
 
 
 def sharpe_interval(sr: float, years: float) -> tuple[float, float]:
@@ -501,7 +511,7 @@ def performance_strip(r: dict) -> str:
         ("perf-ret", pct(p["ret"], 1), "Return a year (compound)", "Dividends reinvested, before costs and taxes.", ""),
         ("perf-vol", p1(p["vol"]), "Volatility a year", "How widely the daily price swings, scaled to a year.", ""),
         ("perf-sr", num(p["sharpe"], 2), "Sharpe ratio: return per unit of risk, above the risk-free rate",
-         "", stat(f"95% interval {num(lo, 2)} to {num(hi, 2)}: <b>{sure.lower()}</b>", "p")),
+         "", stat(f"95% interval {num(lo, 2)} to {num(hi, 2)}: <span class=\"state\">{sure}</span>", "p")),
         ("perf-dd", pct(p["mdd"], 1), "Worst fall from a peak",
          f"{d_long(p['peak'])} to {d_long(p['trough'])}, {rec}.", ""),
     ]
@@ -538,12 +548,12 @@ def factor_card(f: dict, lead: bool = False) -> str:
     ok = f["tag"] == "reliable"
     pill, pcls, text = card_text(f)
     fill = ("pos" if f["beta"] >= 0 else "neg") if ok else "ns"
-    cls = f"card {pcls if ok else 'ns'}" + (" lead" if lead else "")
+    cls = "card" + ("" if ok else " ns") + (" lead" if lead else "")
     head = f'<h3>{PLAIN[f["name"]]}<span class="code stat">{e(f["name"])}</span></h3>'
     beta = f'<p class="beta">{sgn(f["beta"], 2)}<small>beta</small></p>'
     bar_ = f'<div class="strength-wrap">{strength_svg(f["beta"], fill)}</div>'
-    txt = f'<div class="card-text"><span class="pill {pcls}">{e(pill)}</span><p>{e(text)}</p></div>'
-    sure = f'<p class="sure">How sure: <b>{sure_word(f["tag"])}</b>{stat(f", t {tstat(f["z"])}")}</p>'
+    txt = f'<div class="card-text"><p class="state {pcls}">{e(pill)}</p><p>{e(text)}</p></div>'
+    sure = f'<p class="sure"><span class="state {"" if ok else "quiet"}">{sure_word(f["tag"])}</span>{stat(f", t {tstat(f["z"])}")}</p>'
     if lead:
         return (f'<a class="{cls}" href="#beta-{f["name"]}"><div class="lead-a">{head}{beta}{bar_}</div>'
                 f'<div class="lead-b">{txt}{sure}</div></a>')
@@ -557,7 +567,7 @@ def drivers(r: dict) -> str:
     if w:
         b, lo, hi = w["acwi"]
         world = (
-            f'<a class="world-tile" href="#world"><span class="wt-l">Beta against the world</span>'
+            f'<a class="world-cell" href="#world"><span class="wt-l">Beta against the world</span>'
             f'<span class="wt-v">{num(b, 2)}</span><span class="wt-r">Likely range {num(lo, 2)} to {num(hi, 2)}, '
             f'against the ACWI fund</span><span class="wt-more">Compare with the US market</span></a>'
         )
@@ -565,8 +575,8 @@ def drivers(r: dict) -> str:
         body = empty_state(g["reason"], "Widen the date range in the sidebar and run the report again.")
     else:
         fs = {f["name"]: f for f in g["factors"]}
-        body = (f'<div class="drivers-top">{factor_card(fs["Mkt-RF"], lead=True)}{world}</div>'
-                f'<div class="cards">{"".join(factor_card(fs[n]) for n in ("SMB", "HML", "RMW", "CMA"))}</div>')
+        body = (f'<div class="drivers-grid"><div class="drivers-top">{factor_card(fs["Mkt-RF"], lead=True)}{world}</div>'
+                f'<div class="cards">{"".join(factor_card(fs[n]) for n in ("SMB", "HML", "RMW", "CMA"))}</div></div>')
     return f"""
 <section class="sec drivers" id="drivers" aria-labelledby="drivers-t">
   <div class="drivers-head"><div><h2 id="drivers-t" class="ph">What drives it</h2>
@@ -810,7 +820,7 @@ def exposures_panel(r: dict) -> str:
     outcome = (f"The market dominates: {e(r['ticker'])} {market_phrase(mk['beta'])}." if mk["tag"] == "reliable"
                else "There is no clear link to the market.")
     if clear:
-        outcome += f" The {and_list(clear)} tilt{'s are' if len(clear) > 1 else ' is'} clear{' but small' if small else ''}"
+        outcome += f" The {and_list(clear)} tilt{'s show' if len(clear) > 1 else ' shows'} clear evidence{' but {} small'.format('are' if len(clear) > 1 else 'is') if small else ''}"
         outcome += f"; {and_list(noise)} could be noise." if noise else "."
     legend = (
         '<ul class="legend" aria-label="Legend">'
@@ -881,7 +891,7 @@ def return_panel(r: dict) -> str:
   </table>"""
     side = (
         '<p class="reading">Each bar is the part of the average yearly return that one exposure explains. The bars add up to the total.</p>'
-        + f'<div class="callout"><h3>Not in the sum</h3><ul>{memo}</ul></div>'
+        + f'<div class="aside-list"><h3>Not in the sum</h3><ul>{memo}</ul></div>'
         + how("In-sample, descriptive, not predictive. The rows add up exactly to the total.",
               "Each factor's share is its full-sample beta times the factor's average return, times 252. Arithmetic, not compounded.")
     )
@@ -1054,7 +1064,7 @@ def residual_panel(r: dict) -> str:
     line = path_xy([X(k) for k in range(len(a))], [Y(v) for v in a])
     grid = "".join(f'<line class="{"zero" if abs(t) < 1e-12 else "grid"}" x1="0" x2="1000" y1="{Y(t):.2f}" y2="{Y(t):.2f}"/>' for t in ticks)
     svg = (f'<svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">{grid}'
-           f'<path class="band hi" d="{band}"/><path class="rline hi" d="{line}"/></svg>')
+           f'<path class="band ink" d="{band}"/><path class="rline ink" d="{line}"/></svg>')
     ylab = "".join(f'<span class="yl" style="top:{Y(t):.2f}%">{pct(t, 0) if t else "0%"}</span>' for t in ticks)
     xt = [(i - i0, lab, major) for i, lab, major in date_ticks(dates) if i >= i0]
     xlab = time_labels(xt, lambda k: X(k) / 10)
@@ -1117,7 +1127,7 @@ def kalman_panel(r: dict) -> str:
                  f'<circle class="dot-new" cx="{pos(kb, lo, hi)}%" cy="50%" r="5"/>')
         cells = (f'<td class="num strong">{sgn(kb)}</td><td class="num">{sgn(o)}</td>'
                  f'<td class="num stat">{sgn(l, 2)} to {sgn(h, 2)}</td><td class="num stat">{lam[n]:.4f}</td>'
-                 f'<td class="word {"no" if inside else "yes"}">{"No clear change" if inside else "Moved"}</td>')
+                 f'<td class="word {"no" if inside else "yes"}">{"Could be noise" if inside else "Clear evidence"}</td>')
         rows.append(dot_row(PLAIN[n], n, lo, hi, ticks, parts, cells))
     outcome = ("None of the exposures has moved clearly away from its full-sample value."
                if not moved else f"The {and_list(moved)} exposure{'s have' if len(moved) > 1 else ' has'} moved away from the full-sample value.")
@@ -1125,7 +1135,7 @@ def kalman_panel(r: dict) -> str:
   <table class="bars kalman">
     <caption class="vh">Latest day-by-day beta with its band, against the full-sample beta</caption>
     <thead><tr><th scope="col">Factor</th><th scope="col" class="plot-h"><span class="vh">Chart</span></th>
-      <th scope="col" class="num">Latest</th><th scope="col" class="num">Full sample</th><th scope="col" class="num stat w-wide">Band</th><th scope="col" class="num stat">Drift</th><th scope="col" class="num w-word">Changed?</th></tr></thead>
+      <th scope="col" class="num">Latest</th><th scope="col" class="num">Full sample</th><th scope="col" class="num stat w-wide">Band</th><th scope="col" class="num stat">Drift</th><th scope="col" class="num w-word">Moved away</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
     <tfoot>{axis_row(ticks, lo, hi, tick)}</tfoot>
   </table>"""
@@ -1199,10 +1209,9 @@ def data_panel(r: dict) -> str:
         ("Factors", d["factors_source_url"]),
     ]
     dl = "".join(f"<div><dt>{e(a)}</dt><dd>{e(b)}</dd></div>" for a, b in rows)
-    sev = {"info": ("neu", "Info"), "warning": ("acc", "Warning"), "error": ("neg", "Error")}
-    sev["warning"] = ("warn", "Warning")
+    sev = {"info": ("neu", "Info"), "warning": ("warn", "Warning"), "error": ("neg", "Error")}
     finds = "".join(
-        f'<li><span class="pill {sev[f["severity"]][0]}">{sev[f["severity"]][1]}</span><span>{e(f["message"])}'
+        f'<li><span class="state {sev[f["severity"]][0]}">{sev[f["severity"]][1]}</span><span>{e(f["message"])}'
         + (f' <span class="when">({", ".join(d_long(x) for x in f["dates"])})</span>' if f["dates"] else "") + "</span></li>"
         for f in d["audit_findings"]
     ) or "<li><span>No findings. Prices passed every check.</span></li>"
@@ -1242,7 +1251,7 @@ def detail_panel(r: dict) -> str:
     clear = [PLAIN[f["name"]] if k == 0 else PLAIN[f["name"]].lower()
              for k, f in enumerate(x for x in g["factors"] if x["tag"] == "reliable")]
     noise = [PLAIN[f["name"]].lower() for f in g["factors"] if f["tag"] != "reliable"]
-    outcome = (f"{and_list(clear)} {'are' if len(clear) > 1 else 'is'} statistically clear; "
+    outcome = (f"{and_list(clear)} {'show' if len(clear) > 1 else 'shows'} clear evidence; "
                f"{and_list(noise + (['the return beyond the factors'] if g['alpha_tag'] != 'reliable' else []))} could be noise.")
     five = r.get("five_day_regression") or {}
     five_line = ""
@@ -1287,7 +1296,8 @@ def gen_stamp(r: dict) -> str:
     return f"{g.day} {g.strftime('%b %Y, %H:%M')} UTC"
 
 
-def page(r: dict, on: set[str]) -> str:
+def page(r: dict, on: set[str], history: float | None = None) -> str:
+    history = HISTORY_YEARS.get(r["ticker"], 50.0) if history is None else history
     nwarn = len(r["data"]["audit_findings"])
     nav = [
         ("summary", "Summary", ""), ("drivers", "What drives it", ""), ("world", "World beta", ""),
@@ -1301,7 +1311,7 @@ def page(r: dict, on: set[str]) -> str:
              '<pattern id="hatch" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">'
              '<rect class="hatch-bg" width="5" height="5"/><rect class="hatch-ink" width="1.6" height="5"/></pattern></defs></svg>')
     main = "\n".join([
-        f'<section id="summary" aria-label="Summary">{header(r)}{verdict(r)}{notice(r)}{performance_strip(r)}</section>',
+        f'<section id="summary" aria-label="Summary">{header(r)}{verdict(r)}{performance_strip(r)}</section>',
         drivers(r), world_panel(r), price_panel(r), performance_panel(r), exposures_panel(r), return_panel(r),
         risk_panel(r), rolling_panel(r, "win126" in on), residual_panel(r), kalman_panel(r), shrunk_panel(r),
         data_panel(r), detail_panel(r),
@@ -1312,9 +1322,9 @@ def page(r: dict, on: set[str]) -> str:
 {hatch}
 <input class="vh" type="checkbox" id="nav-open" aria-controls="sidebar" aria-label="Menu">
 {topbar(r)}
-{sidebar(r, nav)}
+{sidebar(r, nav, history)}
 <div class="canvas"><main id="main">{main}</main></div>""")
-    for key, el in (("dark", "sw-dark"), ("stats", "sw-stats"), ("menu", "nav-open")):
+    for key, el in (("stats", "sw-stats"), ("menu", "nav-open")):
         if key in on:
             body = body.replace(f'id="{el}"', f'id="{el}" checked', 1)
     sec_name = SECURITY.get(r["ticker"], {}).get("name", "")
@@ -1346,7 +1356,7 @@ def main() -> None:
     if empty:
         r = make_empty(r)
     out = Path(args[args.index("--out") + 1]) if "--out" in args else HERE / ("report-v3-empty.html" if empty else "report-v3.html")
-    out.write_text(page(r, on), encoding="utf-8", newline="\n")
+    out.write_text(page(r, on, SHORT_HISTORY_DEMO if empty else None), encoding="utf-8", newline="\n")
     print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
 
 
