@@ -856,3 +856,35 @@ def test_tr37_arch_size_with_fat_tails() -> None:
         assert d.arch_lm_p is not None
         hits += d.arch_lm_p < 0.05
     assert hits / reps <= 0.05 + 3.5 * math.sqrt(0.0475 / reps)
+
+
+# ----------------------------------------------------------------------------- validator additions
+# Added by the independent validation (docs/reviews/residual-alpha-validation-2026-11-18.md):
+# each test kills a mutant that every other test let through.
+def test_tr17_both_p_values_exactly_at_the_level() -> None:
+    """``p_is = p_pit = 0.05``: neither is below 0.05, so G1 applies.
+
+    Without this case a G1 written with ``>`` instead of ``>=`` passes every other test.
+    """
+    v = decide_verdict(0.125, 0.05, 0.125, 0.0625, 0.05)
+    assert (v.code, v.severity) == ("no_reliable_alpha", "info")
+
+
+def test_tr18_message_rounds_half_points_away_from_zero() -> None:
+    """R4.8: ratios to the nearest 5 points, halves away from zero, in the verdict copy too.
+
+    Dyadic ratios are exact in binary, so 12.5% and 37.5% are true half points.
+    """
+    kw: dict[str, Any] = {
+        "window": 252,
+        "warmup_start": date(2010, 1, 4),
+        "warmup_end": date(2010, 12, 21),
+    }
+    g5 = verdict_message("mostly_disappears", a_c=0.04, a_pit=0.005, survival_ratio=0.125, **kw)
+    assert "point-in-time betas keep 15% of it" in g5
+    g5 = verdict_message("mostly_disappears", a_c=0.04, a_pit=0.015, survival_ratio=0.375, **kw)
+    assert "point-in-time betas keep 40% of it" in g5
+    g6 = verdict_message(
+        "survives_not_significant", a_c=0.04, a_pit=0.045, survival_ratio=1.125, **kw
+    )
+    assert "(115% kept with point-in-time betas)" in g6
