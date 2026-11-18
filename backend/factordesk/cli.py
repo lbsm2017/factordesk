@@ -25,7 +25,7 @@ import threading
 import time
 import webbrowser
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import httpx
@@ -66,6 +66,14 @@ def _err(message: str) -> None:
     print(f"{PROG}: error: {message}", file=sys.stderr)
 
 
+def _iso_date(text: str) -> date:
+    """argparse type for ``--start`` and ``--end``: a calendar date written YYYY-MM-DD."""
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a date in the form YYYY-MM-DD") from None
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=PROG,
@@ -84,6 +92,20 @@ def _parser() -> argparse.ArgumentParser:
     )
     rep.add_argument("--open", action="store_true", help="open the HTML report in a browser")
     rep.add_argument("--json", action="store_true", help="also write the report as JSON")
+    rep.add_argument(
+        "--start",
+        type=_iso_date,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="first requested date (default: the start of the price history)",
+    )
+    rep.add_argument(
+        "--end",
+        type=_iso_date,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="last requested date (default: the end of the price history)",
+    )
 
     fac = sub.add_parser("factors", help="manage the cached Fama-French factor file")
     fac_sub = fac.add_subparsers(dest="factors_command", required=True, metavar="ACTION")
@@ -173,6 +195,11 @@ def _cmd_report(
             "(for example SPY or BRK-B)"
         )
         return EXIT_DATA
+    start: date | None = args.start
+    end: date | None = args.end
+    if start is not None and end is not None and start > end:
+        _err(f"--start {start} is after --end {end}")
+        return EXIT_USAGE
 
     out_dir: Path = args.out if args.out is not None else Path.cwd()
     data_dir = Path(get_settings().data_dir)
@@ -181,7 +208,9 @@ def _cmd_report(
         return EXIT_OUTPUT
 
     try:
-        report = build_report(symbol, price_provider=price_provider, factors=factors, now=now)
+        report = build_report(
+            symbol, price_provider=price_provider, factors=factors, now=now, start=start, end=end
+        )
     except InsufficientHistoryError as exc:
         _err(
             f"{symbol} has {exc.n} daily returns that line up with the factor data; at least "
