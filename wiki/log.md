@@ -7,6 +7,60 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (bibliography)
+
+- References verified: 63 bibliography entries, each checked against Crossref or arXiv (58, by the new script) or by hand against the page or file (5). Of 11 items first listed as unverified, 4 are resolved with a source, 2 partly, and 5 have no source (listed with file and line in the references page). See [references](../docs/references.md), [references.bib](../docs/references.bib) and the rule in [no citation without verification](decision-citations-and-verification.md).
+- Findings: Chung (2024) is now published (Critical Finance Review 15(2), 133-155); the Ken French site states a copyright notice and no terms of use or citation request, although three wiki lines say the library asks for both (not changed here); Yahoo's own help page does describe its adjusted close as following CRSP standards; the Newey-West lag rule's attribution to the 1994 paper could not be confirmed.
+- Added `scripts/check_references.py` and `CITATION.cff`.
+
+## 2026-11-18 (owner re-rank)
+
+- Rank 7 (one-shot install and run) moved to very later. The work is built and stays in PR #1; only the release is deferred. See [the roadmap](../docs/ROADMAP.md#changes-in-this-update-update-2).
+
+## 2026-11-18 (roadmap update 2)
+
+- Roadmap update 2: PR #1 open with CI green, the SPY hardening, rolling speed-up conditions and schema contract marked Done, three feature agents resumed, confidence re-scored, a nightly workflow proposed (not ranked). See [the roadmap](../docs/ROADMAP.md#changes-in-this-update-update-2).
+
+## 2026-11-18 (owner ranking)
+
+- The owner ranked 16 epics on 2026-11-18. The [priority ranking](../docs/ROADMAP.md#priority-ranking-owner-2026-11-18) is in the roadmap, and Now, Next, Later and Very later follow that order.
+
+## 2026-11-18 (rolling precision)
+
+- Added `decision-rolling-fast-path-precision.md` after the independent validation of the rolling speed-up: precision wording corrected, fast-path check tightened, start-date effect recorded.
+
+## 2026-11-18 (one-shot install)
+
+- Added the one-shot install path on branch `feat/one-shot-install` (as of commit `ce931c7`, not merged, not published): the wheel now ships the built dashboard, two bootstrap scripts (`scripts/install.sh`, `scripts/install.ps1`) pinned to a version argument, an "Install without cloning" section in `docs/dashboard.md` and an owner-run `docs/release-checklist.md`. Details and what was and was not verified are in `decision-python-and-uv-for-every-platform.md`.
+## 2026-11-18 (SPY hardening closed)
+
+- The roadmap item "Hardening of the SPY slice" is Done. Every validation finding has a row in [docs/validation/spy-hardening-closure-2026-11-18.md](../docs/validation/spy-hardening-closure-2026-11-18.md): 20 fixed before, 4 fixed on branch `fix/spy-hardening-closure` (audit errors mute the headline, `--start`/`--end` on the report command, min-max thinning of long series, a named cause when no return lines up), 5 deferred with reasons. One wording error found during the closure was fixed: the gate summary now says residual volatility is overstated, not understated.
+- Owner decisions still open from the closure: non-USD tickers (warn or refuse, M16 question 2), and adopting the variance-stability check and keeping the gate thresholds after the panel calibration.
+- Updated [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) to Decided, with facts as of commit `4c1cb7c`.
+## 2026-11-18 (schema v3 contract)
+
+- Added [One contract for the five new report sections](decision-schema-v3-contract.md): where fragility, lead-lag, Kalman, shrunk betas and residual alpha plug into the report, so the four statistical features can be built in parallel. Full contract: `docs/specs/schema-v3-contract.md`.
+
+## 2026-11-18 (dashboard built)
+
+- The dashboard was built as tickets T1 to T10 of `docs/specs/dashboard.md`, all on branch `feat/report-ui-feedback` (25 commits ahead of `dev` as of commit `f36255e`; nothing merged to `dev` yet). T1 API skeleton `5ef6922`, T2 report endpoints `d958ebc`, T3 frontend scaffold `2df0bff`, T4 controls and URL state `380694f`, T5 to T8 panels (`b6d5472`, `534996b`, `b45d6de`, `10ed53c`), T9 serve command `afefd9a` with static serving `32c04f0`, T10 fake backend, browser smoke test and CI `9ae81a9` and `f36255e`. A batch price download (`deca962`) and the reduction of range presets to 3Y, 5Y and Full history (`96f0b2f`) landed on the same branch.
+- Pending as of `f36255e`: the T11 design and accessibility review, a smoke test on live Yahoo data, and peer comparison using the batch price fetch. Three follow-up branches (CI action pinning, frontend bundle split, real-data smoke) were started from `f36255e`; none had commits of its own yet.
+- Added the runbook [docs/dashboard.md](../docs/dashboard.md) and updated [dashboard server and interface](decision-dashboard-server-and-interface.md) with facts as of `f36255e`. The roadmap moved the dashboard from Next to Now.
+
+## 2026-11-18 (parallel price downloads)
+
+- Added [parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) after the owner asked for chunked, parallel Yahoo downloads with care over throttling. Status Decided-pending-implementation until merged. No Yahoo limit is claimed: the repo records none as published.
+
+## 2026-11-18 (dashboard)
+
+- Added [dashboard server and interface](decision-dashboard-server-and-interface.md) after the owner approved building it. Spec: `docs/specs/dashboard.md`. Dropped Tailwind and shadcn/ui, dropped the YTD and 1Y chips (the pipeline needs 504 days).
+- Static report ported to design revision 2 (commits `fabd702`, `d0cacbb`); API skeleton added (`5ef6922`).
+
+## 2026-11-18 (report review)
+
+- Added [report density, width cap and range controls](decision-report-density-and-range-controls.md) after the owner's review of the live SPY report. The design spec and prototype were revised to match.
+- Linked it from the [colour decision](decision-report-design-colour-is-evidence.md) and the [application stack](decision-application-stack.md).
+
 ## 2026-11-18 (follow-up)
 
 - Filled the "Why" sections of [MIT license](decision-open-source-mit-license.md), [project name](decision-project-name-factordesk.md), [Python and uv](decision-python-and-uv-for-every-platform.md) and [branches and pull requests](decision-branches-and-pull-requests.md) with the owner's reasoning.

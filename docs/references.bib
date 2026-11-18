@@ -1,0 +1,876 @@
+% factordesk bibliography. One entry per verified reference in docs/references.md.
+%
+% Rules
+% - An entry is added only after its bibliographic data were checked against Crossref
+%   (https://api.crossref.org/works/<doi>) or, where there is no DOI, against the publisher,
+%   a repository record or the page itself. The date is in the `verified` field.
+% - `verifiedvia` names the sources used. Page ranges that Crossref gives only as a start page
+%   were completed from the RePEc record named in docs/references.md.
+% - Run `uv run python scripts/check_references.py` to re-check every DOI against Crossref.
+% - Software packages are listed in docs/references.md (section "Software"), not here.
+% - `verified` and `verifiedvia` are not standard BibTeX fields; bibliography styles ignore them.
+
+% ---------------------------------------------------------------------------
+% Factor model and factor data
+% ---------------------------------------------------------------------------
+
+@article{fama1993,
+  author = {Fama, Eugene F. and French, Kenneth R.},
+  title = {Common risk factors in the returns on stocks and bonds},
+  journal = {Journal of Financial Economics},
+  year = {1993},
+  volume = {33},
+  number = {1},
+  pages = {3--56},
+  doi = {10.1016/0304-405X(93)90023-5},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{fama2015,
+  author = {Fama, Eugene F. and French, Kenneth R.},
+  title = {A five-factor asset pricing model},
+  journal = {Journal of Financial Economics},
+  year = {2015},
+  volume = {116},
+  number = {1},
+  pages = {1--22},
+  doi = {10.1016/j.jfineco.2014.10.010},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref, OpenAlex}
+}
+
+@article{carhart1997,
+  author = {Carhart, Mark M.},
+  title = {On persistence in mutual fund performance},
+  journal = {The Journal of Finance},
+  year = {1997},
+  volume = {52},
+  number = {1},
+  pages = {57--82},
+  doi = {10.1111/j.1540-6261.1997.tb03808.x},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{fama2012,
+  author = {Fama, Eugene F. and French, Kenneth R.},
+  title = {Size, value, and momentum in international stock returns},
+  journal = {Journal of Financial Economics},
+  year = {2012},
+  volume = {105},
+  number = {3},
+  pages = {457--472},
+  doi = {10.1016/j.jfineco.2012.05.011},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{fama2017,
+  author = {Fama, Eugene F. and French, Kenneth R.},
+  title = {International tests of a five-factor asset pricing model},
+  journal = {Journal of Financial Economics},
+  year = {2017},
+  volume = {123},
+  number = {3},
+  pages = {441--463},
+  doi = {10.1016/j.jfineco.2016.11.004},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{griffin2002,
+  author = {Griffin, John M.},
+  title = {Are the {Fama} and {French} factors global or country specific?},
+  journal = {The Review of Financial Studies},
+  year = {2002},
+  volume = {15},
+  number = {3},
+  pages = {783--803},
+  doi = {10.1093/rfs/15.3.783},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@misc{frenchlibrary,
+  author = {French, Kenneth R.},
+  title = {Kenneth R. French Data Library},
+  howpublished = {Tuck School of Business, Dartmouth College},
+  url = {https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html},
+  note = {Notice on the page: Copyright Eugene F. Fama and Kenneth R. French. Daily 5-factor file: https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip},
+  urldate = {2026-11-18},
+  verified = {2026-11-18},
+  verifiedvia = {page fetched, HTTP 200}
+}
+
+% ---------------------------------------------------------------------------
+% Regression and HAC inference
+% ---------------------------------------------------------------------------
+
+@article{newey1987,
+  author = {Newey, Whitney K. and West, Kenneth D.},
+  title = {A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix},
+  journal = {Econometrica},
+  year = {1987},
+  volume = {55},
+  number = {3},
+  pages = {703--708},
+  doi = {10.2307/1913610},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{newey1994,
+  author = {Newey, Whitney K. and West, Kenneth D.},
+  title = {Automatic lag selection in covariance matrix estimation},
+  journal = {The Review of Economic Studies},
+  year = {1994},
+  volume = {61},
+  number = {4},
+  pages = {631--653},
+  doi = {10.2307/2297912},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref, OpenAlex, RePEc}
+}
+
+@article{white1980,
+  author = {White, Halbert},
+  title = {A heteroskedasticity-consistent covariance matrix estimator and a direct test for heteroskedasticity},
+  journal = {Econometrica},
+  year = {1980},
+  volume = {48},
+  number = {4},
+  pages = {817--838},
+  doi = {10.2307/1912934},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{hodrick1992,
+  author = {Hodrick, Robert J.},
+  title = {Dividend yields and expected stock returns: alternative procedures for inference and measurement},
+  journal = {The Review of Financial Studies},
+  year = {1992},
+  volume = {5},
+  number = {3},
+  pages = {357--386},
+  doi = {10.1093/rfs/5.3.351},
+  note = {The DOI suffix is as registered with Crossref; the page range is as printed and as listed by RePEc.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref, RePEc}
+}
+
+@article{brittenjones2011,
+  author = {Britten-Jones, Mark and Neuberger, Anthony and Nolte, Ingmar},
+  title = {Improved inference in regression with overlapping observations},
+  journal = {Journal of Business Finance \& Accounting},
+  year = {2011},
+  volume = {38},
+  number = {5--6},
+  pages = {657--683},
+  doi = {10.1111/j.1468-5957.2011.02244.x},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+% ---------------------------------------------------------------------------
+% Multiple testing
+% ---------------------------------------------------------------------------
+
+@article{benjamini1995,
+  author = {Benjamini, Yoav and Hochberg, Yosef},
+  title = {Controlling the false discovery rate: a practical and powerful approach to multiple testing},
+  journal = {Journal of the Royal Statistical Society: Series B (Methodological)},
+  year = {1995},
+  volume = {57},
+  number = {1},
+  pages = {289--300},
+  doi = {10.1111/j.2517-6161.1995.tb02031.x},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+% ---------------------------------------------------------------------------
+% Rolling and time-varying betas, Kalman filter
+% ---------------------------------------------------------------------------
+
+@article{kalman1960,
+  author = {Kalman, R. E.},
+  title = {A new approach to linear filtering and prediction problems},
+  journal = {Journal of Basic Engineering},
+  year = {1960},
+  volume = {82},
+  number = {1},
+  pages = {35--45},
+  doi = {10.1115/1.3662552},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{rauch1965,
+  author = {Rauch, H. E. and Tung, F. and Striebel, C. T.},
+  title = {Maximum likelihood estimates of linear dynamic systems},
+  journal = {AIAA Journal},
+  year = {1965},
+  volume = {3},
+  number = {8},
+  pages = {1445--1450},
+  doi = {10.2514/3.3166},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@book{durbin2012,
+  author = {Durbin, James and Koopman, Siem Jan},
+  title = {Time Series Analysis by State Space Methods},
+  edition = {2},
+  publisher = {Oxford University Press},
+  year = {2012},
+  doi = {10.1093/acprof:oso/9780199641178.001.0001},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{masreliez1977,
+  author = {Masreliez, C. and Martin, R.},
+  title = {Robust {Bayesian} estimation for the linear model and robustifying the {Kalman} filter},
+  journal = {IEEE Transactions on Automatic Control},
+  year = {1977},
+  volume = {22},
+  number = {3},
+  pages = {361--371},
+  doi = {10.1109/TAC.1977.1101538},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{diebold1995,
+  author = {Diebold, Francis X. and Mariano, Roberto S.},
+  title = {Comparing predictive accuracy},
+  journal = {Journal of Business \& Economic Statistics},
+  year = {1995},
+  volume = {13},
+  number = {3},
+  pages = {253--263},
+  doi = {10.1080/07350015.1995.10524599},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+% ---------------------------------------------------------------------------
+% Non-synchronous trading: Dimson and Scholes-Williams
+% ---------------------------------------------------------------------------
+
+@article{scholes1977,
+  author = {Scholes, Myron and Williams, Joseph},
+  title = {Estimating betas from nonsynchronous data},
+  journal = {Journal of Financial Economics},
+  year = {1977},
+  volume = {5},
+  number = {3},
+  pages = {309--327},
+  doi = {10.1016/0304-405X(77)90041-1},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{dimson1979,
+  author = {Dimson, Elroy},
+  title = {Risk measurement when shares are subject to infrequent trading},
+  journal = {Journal of Financial Economics},
+  year = {1979},
+  volume = {7},
+  number = {2},
+  pages = {197--226},
+  doi = {10.1016/0304-405X(79)90013-8},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{fowler1983,
+  author = {Fowler, David J. and Rorke, C. Harvey},
+  title = {Risk measurement when shares are subject to infrequent trading: comment},
+  journal = {Journal of Financial Economics},
+  year = {1983},
+  volume = {12},
+  number = {2},
+  pages = {279--283},
+  doi = {10.1016/0304-405X(83)90039-9},
+  note = {Crossref registers the title without the word Comment; RePEc gives it with ``: Comment'' (RePEc page title read 2026-11-18).},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref, RePEc}
+}
+
+@article{cohen1983,
+  author = {Cohen, Kalman J. and Hawawini, Gabriel A. and Maier, Steven F. and Schwartz, Robert A. and Whitcomb, David K.},
+  title = {Friction in the trading process and the estimation of systematic risk},
+  journal = {Journal of Financial Economics},
+  year = {1983},
+  volume = {12},
+  number = {2},
+  pages = {263--278},
+  doi = {10.1016/0304-405X(83)90038-7},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{chung2026,
+  author = {Chung, Ling Tak Douglas},
+  title = {Simply better market betas around the globe},
+  journal = {Critical Finance Review},
+  year = {2026},
+  volume = {15},
+  number = {2},
+  pages = {133--155},
+  doi = {10.1108/CFR-06-2023-2498},
+  note = {The repo quotes the manuscript dated 12 March 2024 (SSRN 10.2139/ssrn.4755442); page numbers quoted in docs/specs/lead-lag-betas.md refer to that manuscript, not to this published version.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+% ---------------------------------------------------------------------------
+% Shrinkage and empirical Bayes
+% ---------------------------------------------------------------------------
+
+@article{vasicek1973,
+  author = {Vasicek, Oldrich A.},
+  title = {A note on using cross-sectional information in {Bayesian} estimation of security betas},
+  journal = {The Journal of Finance},
+  year = {1973},
+  volume = {28},
+  number = {5},
+  pages = {1233--1239},
+  doi = {10.2307/2978759},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{mueller2013,
+  author = {M{\"u}ller, Ulrich K.},
+  title = {Risk of {Bayesian} inference in misspecified models, and the sandwich covariance matrix},
+  journal = {Econometrica},
+  year = {2013},
+  volume = {81},
+  number = {5},
+  pages = {1805--1849},
+  doi = {10.3982/ECTA9097},
+  note = {Crossref returns no author list for this record; the author is taken from OpenAlex.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref, OpenAlex, RePEc}
+}
+
+% ---------------------------------------------------------------------------
+% Residual alpha, summary statistics, stability
+% ---------------------------------------------------------------------------
+
+@article{lo2002,
+  author = {Lo, Andrew W.},
+  title = {The statistics of {Sharpe} ratios},
+  journal = {Financial Analysts Journal},
+  year = {2002},
+  volume = {58},
+  number = {4},
+  pages = {36--52},
+  doi = {10.2469/faj.v58.n4.2453},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{magdonismail2004,
+  author = {Magdon-Ismail, Malik and Atiya, Amir F. and Pratap, Amrit and Abu-Mostafa, Yaser S.},
+  title = {On the maximum drawdown of a {Brownian} motion},
+  journal = {Journal of Applied Probability},
+  year = {2004},
+  volume = {41},
+  number = {1},
+  pages = {147--161},
+  doi = {10.1239/jap/1077134674},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{ploberger1992,
+  author = {Ploberger, Werner and Kr{\"a}mer, Walter},
+  title = {The {CUSUM} test with {OLS} residuals},
+  journal = {Econometrica},
+  year = {1992},
+  volume = {60},
+  number = {2},
+  pages = {271--285},
+  doi = {10.2307/2951597},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{kramer1988,
+  author = {Kr{\"a}mer, Walter and Ploberger, Werner and Alt, Raimund},
+  title = {Testing for structural change in dynamic models},
+  journal = {Econometrica},
+  year = {1988},
+  volume = {56},
+  number = {6},
+  pages = {1355--1369},
+  doi = {10.2307/1913102},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+% ---------------------------------------------------------------------------
+% Influence and fragility
+% ---------------------------------------------------------------------------
+
+@article{cook1977,
+  author = {Cook, R. Dennis},
+  title = {Detection of influential observation in linear regression},
+  journal = {Technometrics},
+  year = {1977},
+  volume = {19},
+  number = {1},
+  pages = {15--18},
+  doi = {10.1080/00401706.1977.10489493},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@misc{broderick2020,
+  author = {Broderick, Tamara and Giordano, Ryan and Meager, Rachael},
+  title = {An automatic finite-sample robustness metric: when can dropping a little data make a big difference?},
+  year = {2020},
+  eprint = {2011.14999},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2011.14999},
+  verified = {2026-11-18},
+  verifiedvia = {arXiv API, OpenAlex}
+}
+
+@article{giordano2026a,
+  author = {Giordano, Ryan and Meager, Rachael and Broderick, Tamara},
+  title = {An automatic finite-sample robustness metric: when can dropping a little data change conclusions? {Part I}: definitions and experiments},
+  journal = {Philosophical Transactions of the Royal Society A: Mathematical, Physical and Engineering Sciences},
+  year = {2026},
+  volume = {384},
+  number = {2321},
+  pages = {20250001},
+  doi = {10.1098/rsta.2025.0001},
+  note = {Article number 20250001.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{giordano2026b,
+  author = {Giordano, Ryan and Meager, Rachael and Broderick, Tamara},
+  title = {An automatic finite-sample robustness metric: when can dropping a little data change conclusions? {Part II}: theory and intuition},
+  journal = {Philosophical Transactions of the Royal Society A: Mathematical, Physical and Engineering Sciences},
+  year = {2026},
+  volume = {384},
+  number = {2321},
+  pages = {20240614},
+  doi = {10.1098/rsta.2024.0614},
+  note = {Article number 20240614.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{sherman1950,
+  author = {Sherman, Jack and Morrison, Winifred J.},
+  title = {Adjustment of an inverse matrix corresponding to a change in one element of a given matrix},
+  journal = {The Annals of Mathematical Statistics},
+  year = {1950},
+  volume = {21},
+  number = {1},
+  pages = {124--127},
+  doi = {10.1214/aoms/1177729893},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+% ---------------------------------------------------------------------------
+% Residual diagnostics
+% ---------------------------------------------------------------------------
+
+@article{ljung1978,
+  author = {Ljung, G. M. and Box, G. E. P.},
+  title = {On a measure of lack of fit in time series models},
+  journal = {Biometrika},
+  year = {1978},
+  volume = {65},
+  number = {2},
+  pages = {297--303},
+  doi = {10.1093/biomet/65.2.297},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{jarque1980,
+  author = {Jarque, Carlos M. and Bera, Anil K.},
+  title = {Efficient tests for normality, homoscedasticity and serial independence of regression residuals},
+  journal = {Economics Letters},
+  year = {1980},
+  volume = {6},
+  number = {3},
+  pages = {255--259},
+  doi = {10.1016/0165-1765(80)90024-5},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{durbin1950,
+  author = {Durbin, J. and Watson, G. S.},
+  title = {Testing for serial correlation in least squares regression. {I}},
+  journal = {Biometrika},
+  year = {1950},
+  volume = {37},
+  number = {3--4},
+  pages = {409--428},
+  doi = {10.1093/biomet/37.3-4.409},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{breusch1978,
+  author = {Breusch, T. S.},
+  title = {Testing for autocorrelation in dynamic linear models},
+  journal = {Australian Economic Papers},
+  year = {1978},
+  volume = {17},
+  number = {31},
+  pages = {334--355},
+  doi = {10.1111/j.1467-8454.1978.tb00635.x},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{godfrey1978,
+  author = {Godfrey, L. G.},
+  title = {Testing against general autoregressive and moving average error models when the regressors include lagged dependent variables},
+  journal = {Econometrica},
+  year = {1978},
+  volume = {46},
+  number = {6},
+  pages = {1293--1301},
+  doi = {10.2307/1913829},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{engle1982,
+  author = {Engle, Robert F.},
+  title = {Autoregressive conditional heteroscedasticity with estimates of the variance of {United Kingdom} inflation},
+  journal = {Econometrica},
+  year = {1982},
+  volume = {50},
+  number = {4},
+  pages = {987--1007},
+  doi = {10.2307/1912773},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{lobato2001,
+  author = {Lobato, Ignacio and Nankervis, John C. and Savin, N. E.},
+  title = {Testing for autocorrelation using a modified {Box-Pierce} {Q} test},
+  journal = {International Economic Review},
+  year = {2001},
+  volume = {42},
+  number = {1},
+  pages = {187--205},
+  doi = {10.1111/1468-2354.00106},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{romano1996,
+  author = {Romano, Joseph P. and Thombs, Lori A.},
+  title = {Inference for autocorrelations under weak assumptions},
+  journal = {Journal of the American Statistical Association},
+  year = {1996},
+  volume = {91},
+  number = {434},
+  pages = {590--600},
+  doi = {10.1080/01621459.1996.10476928},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+% ---------------------------------------------------------------------------
+% Cointegration and unit roots
+% ---------------------------------------------------------------------------
+
+@article{engle1987,
+  author = {Engle, Robert F. and Granger, C. W. J.},
+  title = {Co-integration and error correction: representation, estimation, and testing},
+  journal = {Econometrica},
+  year = {1987},
+  volume = {55},
+  number = {2},
+  pages = {251--276},
+  doi = {10.2307/1913236},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{mackinnon1994,
+  author = {MacKinnon, James G.},
+  title = {Approximate asymptotic distribution functions for unit-root and cointegration tests},
+  journal = {Journal of Business \& Economic Statistics},
+  year = {1994},
+  volume = {12},
+  number = {2},
+  pages = {167--176},
+  doi = {10.1080/07350015.1994.10510005},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@techreport{mackinnon2010,
+  author = {MacKinnon, James G.},
+  title = {Critical values for cointegration tests},
+  institution = {Queen's University, Department of Economics},
+  type = {Queen's Economics Department Working Paper},
+  number = {1227},
+  year = {2010},
+  month = {jan},
+  url = {https://www.econ.queensu.ca/sites/econ.queensu.ca/files/qed_wp_1227.pdf},
+  urldate = {2026-11-18},
+  verified = {2026-11-18},
+  verifiedvia = {PDF URL fetched (HTTP 200), RePEc record, OpenAlex}
+}
+
+@article{johansen1991,
+  author = {Johansen, S{\o}ren},
+  title = {Estimation and hypothesis testing of cointegration vectors in {Gaussian} vector autoregressive models},
+  journal = {Econometrica},
+  year = {1991},
+  volume = {59},
+  number = {6},
+  pages = {1551--1580},
+  doi = {10.2307/2938278},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page), RePEc (page range)}
+}
+
+@article{shin1994,
+  author = {Shin, Yongcheol},
+  title = {A residual-based test of the null of cointegration against the alternative of no cointegration},
+  journal = {Econometric Theory},
+  year = {1994},
+  volume = {10},
+  number = {1},
+  pages = {91--115},
+  doi = {10.1017/S0266466600008240},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{dickey1979,
+  author = {Dickey, David A. and Fuller, Wayne A.},
+  title = {Distribution of the estimators for autoregressive time series with a unit root},
+  journal = {Journal of the American Statistical Association},
+  year = {1979},
+  volume = {74},
+  number = {366a},
+  pages = {427--431},
+  doi = {10.1080/01621459.1979.10482531},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{said1984,
+  author = {Said, Said E. and Dickey, David A.},
+  title = {Testing for unit roots in autoregressive-moving average models of unknown order},
+  journal = {Biometrika},
+  year = {1984},
+  volume = {71},
+  number = {3},
+  pages = {599--607},
+  doi = {10.1093/biomet/71.3.599},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+% ---------------------------------------------------------------------------
+% Report design (colour and accessibility)
+% ---------------------------------------------------------------------------
+
+@article{machado2009,
+  author = {Machado, Gustavo M. and Oliveira, Manuel M. and Fernandes, Leandro A. F.},
+  title = {A physiologically-based model for simulation of color vision deficiency},
+  journal = {IEEE Transactions on Visualization and Computer Graphics},
+  year = {2009},
+  volume = {15},
+  number = {6},
+  pages = {1291--1298},
+  doi = {10.1109/TVCG.2009.113},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@misc{ottosson2020,
+  author = {Ottosson, Bj{\"o}rn},
+  title = {A perceptual color space for image processing},
+  howpublished = {Blog post introducing Oklab},
+  year = {2020},
+  url = {https://bottosson.github.io/posts/oklab/},
+  urldate = {2026-11-18},
+  note = {The year is taken from the page text, which says Oklab was introduced in 2020; the page shows no publication date.},
+  verified = {2026-11-18},
+  verifiedvia = {page fetched, HTTP 200}
+}
+
+@misc{wcag22,
+  author = {{World Wide Web Consortium}},
+  title = {Web Content Accessibility Guidelines ({WCAG}) 2.2},
+  howpublished = {W3C Recommendation, 12 December 2024},
+  year = {2024},
+  url = {https://www.w3.org/TR/WCAG22/},
+  urldate = {2026-11-18},
+  verified = {2026-11-18},
+  verifiedvia = {page fetched, HTTP 200}
+}
+
+% ---------------------------------------------------------------------------
+% Added after the first pass, to resolve items that were listed as unverified
+% ---------------------------------------------------------------------------
+
+@article{efron1973,
+  author = {Efron, Bradley and Morris, Carl},
+  title = {Stein's estimation rule and its competitors---an empirical {Bayes} approach},
+  journal = {Journal of the American Statistical Association},
+  year = {1973},
+  volume = {68},
+  number = {341},
+  pages = {117--130},
+  doi = {10.1080/01621459.1973.10481350},
+  note = {Candidate source for the phrase ``Efron-Morris type'' in docs/specs/shrunk-betas.md; the spec does not say which paper it means.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{efron1975,
+  author = {Efron, Bradley and Morris, Carl},
+  title = {Data analysis using {Stein's} estimator and its generalizations},
+  journal = {Journal of the American Statistical Association},
+  year = {1975},
+  volume = {70},
+  number = {350},
+  pages = {311--319},
+  doi = {10.1080/01621459.1975.10479864},
+  note = {Second candidate source for ``Efron-Morris type'' (see efron1973).},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{wilcoxon1945,
+  author = {Wilcoxon, Frank},
+  title = {Individual comparisons by ranking methods},
+  journal = {Biometrics Bulletin},
+  year = {1945},
+  volume = {1},
+  number = {6},
+  pages = {80},
+  doi = {10.2307/3001968},
+  note = {Start page only: the end page could not be confirmed in a second source.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref (start page)}
+}
+
+@article{hollstein2019,
+  author = {Hollstein, Fabian and Prokopczuk, Marcel and Wese Simen, Chardin},
+  title = {Estimating beta: forecast adjustments and the impact of stock characteristics for a broad cross-section},
+  journal = {Journal of Financial Markets},
+  year = {2019},
+  volume = {44},
+  pages = {91--118},
+  doi = {10.1016/j.finmar.2019.03.001},
+  note = {Secondary source for the form of the Scholes-Williams estimator (accepted manuscript, equation 4).},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref; accepted manuscript read at centaur.reading.ac.uk/81659}
+}
+
+@misc{tasche2008,
+  author = {Tasche, Dirk},
+  title = {Capital allocation to business units and sub-portfolios: the {Euler} principle},
+  year = {2007},
+  eprint = {0708.2542},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/0708.2542},
+  note = {First posted 2007-08-19 (arXiv version v3 returned by the API). The key says 2008 because the paper is usually cited by that year; no published version was checked.},
+  verified = {2026-11-18},
+  verifiedvia = {arXiv API (abstract read)}
+}
+
+@article{litterman1996,
+  author = {Litterman, Robert},
+  title = {Hot {Spots}{\texttrademark} and hedges},
+  journal = {The Journal of Portfolio Management},
+  year = {1996},
+  volume = {23},
+  number = {5},
+  pages = {52--75},
+  doi = {10.3905/jpm.1996.052},
+  note = {Relevance to risk contribution judged from the title; the abstract and text were not read.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@misc{qian2005,
+  author = {Qian, Edward E.},
+  title = {On the financial interpretation of risk contribution: risk budgets do add up},
+  year = {2005},
+  howpublished = {SSRN working paper},
+  doi = {10.2139/ssrn.684221},
+  note = {Relevance judged from the title; the abstract and text were not read.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{kunsch1989,
+  author = {K{\"u}nsch, Hans R.},
+  title = {The jackknife and the bootstrap for general stationary observations},
+  journal = {The Annals of Statistics},
+  year = {1989},
+  volume = {17},
+  number = {3},
+  pages = {1217--1241},
+  doi = {10.1214/aos/1176347265},
+  note = {Candidate source for the planned block bootstrap (docs/ROADMAP.md); not implemented.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{politis1994,
+  author = {Politis, Dimitris N. and Romano, Joseph P.},
+  title = {The stationary bootstrap},
+  journal = {Journal of the American Statistical Association},
+  year = {1994},
+  volume = {89},
+  number = {428},
+  pages = {1303--1313},
+  doi = {10.1080/01621459.1994.10476870},
+  note = {Candidate source for the planned block bootstrap (docs/ROADMAP.md); not implemented.},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref}
+}
+
+@article{roll1984,
+  author = {Roll, Richard},
+  title = {A simple implicit measure of the effective bid-ask spread in an efficient market},
+  journal = {The Journal of Finance},
+  year = {1984},
+  volume = {39},
+  number = {4},
+  pages = {1127--1139},
+  doi = {10.1111/j.1540-6261.1984.tb03897.x},
+  verified = {2026-11-18},
+  verifiedvia = {Crossref; abstract via OpenAlex}
+}
+
+@misc{yahoohelp_adjclose,
+  author = {{Yahoo}},
+  title = {What is the adjusted close?},
+  howpublished = {Yahoo Help},
+  url = {https://help.yahoo.com/kb/SLN28256.html},
+  urldate = {2026-11-18},
+  verified = {2026-11-18},
+  verifiedvia = {page fetched, HTTP 200, text read}
+}

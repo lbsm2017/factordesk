@@ -1,0 +1,32 @@
+/* Fonts ship in the bundle (src/assets/fonts); nothing loads from a network host.
+   Licences: InstrumentSans-OFL.txt and STIXTwo-OFL.txt beside the files. */
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/instrument-sans.woff2") format("woff2");
+}
+@font-face {
+  font-family: "STIX Two Text";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/stix-r.woff2") format("woff2");
+}
+@font-face {
+  font-family: "STIX Two Text";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0041-005A, U+0061-007A;
+  src: url("../assets/fonts/stix-il.woff2") format("woff2");
+}
+@font-face {
+  font-family: "STIX Two Text";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+03B1, U+03B2, U+03B5, U+03C1, U+03C3;
+  src: url("../assets/fonts/stix-ig.woff2") format("woff2");
+}

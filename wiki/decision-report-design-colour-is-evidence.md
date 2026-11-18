@@ -50,3 +50,4 @@ User testing showing the table-plus-bar layout slows reading, a failed accessibi
 - [Thin slice on SPY first](decision-thin-slice-on-spy-first.md)
 - [Which betas count as reliable](decision-which-betas-count-as-reliable.md)
 - [Return and risk attribution](decision-return-and-risk-attribution.md)
+- [Report density, width cap and range controls](decision-report-density-and-range-controls.md)

@@ -3,11 +3,16 @@
 Design spec for the one-page HTML report. The prototype is `docs/design/prototype/report.html`,
 built from the mock fixture by `docs/design/prototype/build_prototype.py` (stdlib only) with the
 stylesheet source `docs/design/prototype/report.css`. Screenshots sit next to it
-(`shot_{1440,390}_{light,dark}.png`, `*_empty.png` for the insufficient-data states,
-`report-print.pdf` for print).
+(`shot_{1440,390}_{light,dark}.png`, `shot_1920_light.png` to check the width cap,
+`*_empty.png` for the insufficient-data states, `report-print.pdf` for print). The dashboard
+controls mock is `report-controls.html` (`build_prototype.py --controls`,
+`shot_1440_light_controls.png`).
 
 Contents: A. palette and tokens. B. type. C. layout. D. panels. E. motion. F. accessibility.
-G. self-critique. H. integration notes and schema gaps.
+G. self-critique. H. integration notes and schema gaps. I. dashboard controls.
+
+Revision 2 (owner review of the live report, 2026-11-18): density, price cut-off wording, marker
+sizes, and range controls. Changes are marked "Rev 2" below.
 
 ## Principles
 
@@ -168,6 +173,12 @@ renderer.
 
 - Single column, max 1216 px wide (1152 px content). Text is left-aligned; numbers are
   right-aligned.
+- **Rev 2: the cap is a hard rule.** The live renderer used 1680 px and stretched every table to
+  about 1650 px, which is what read as "too wide and spread apart". Check at 1920 px
+  (`shot_1920_light.png`): the content stays 1216 px wide and centred.
+- **Rev 2: no stretched columns.** Number columns have a fixed measure (72 to 92 px); no column
+  is wider than its content plus 24 px of gap. A table that looks sparse is fixed by dropping a
+  column, not by widening the others.
 - Two-up panels were rejected because they starve the plot column.
 - Spacing scale (dense): 4, 8, 12, 16, 24, 32, 48.
 - Bar row height 44 px (30 px plot strip on mobile).
@@ -188,15 +199,15 @@ Alignment rules:
 
 ```text
 +-- page (Chalk) ---------------------------------------------------------------+
-| SPY  Fama-French five-factor profile               Generated 18 Nov 2026 UTC  |
-| Daily returns from 8 Aug 2024 to 30 Sep 2026, 559 days. Factor data ends ...  |
-| /!\ Short history.                                                            |
+| SPY  Fama-French five-factor profile     [Factor data ends 30 Sep ...] [2 warn] |
+| Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days. Last 32 not analysed.   |
+| /!\ Two-line plain summary of the warnings.                  + Details         |
 | r - r_f =  0.81%  + 0.998 Mkt-RF  - 0.141 SMB  + 0.012 HML  + 0.027 RMW ... +e |
 |           |____|  |___________|   |_________|  |_________|  |_________|       |
 |           alpha   market          size         value        profitability     |
 |           n.s.    signif, t 475   signif ...   not signif.  signif, t 2.2     |
 | +---------------------------------------------------------------------------+ |
-| | Alpha, a year | R2 | Adj. R2 | Observations | Sample | Data audit          | |
+| | Alpha, a year | R2 | Residual vol | Observations | Analysed range        | |
 | +---------------------------------------------------------------------------+ |
 | +- Price -------------------------------------------------------------------+ |
 | |  line chart, shaded tail ##            | First / End of data / Latest     | |
@@ -216,12 +227,12 @@ Alignment rules:
 ### 390 wide
 
 ```text
-| SPY / subtitle / generated / coverage sentence   |
+| SPY / subtitle / chips / range line / notice     |
 | r - r_f =                                        |
 | 0.81%            + 0.998 Mkt-RF   (2 terms/line, |
 | alpha, a year    market            each keeps    |
 | - 0.141 SMB      + 0.012 HML       its bracket)  |
-| KPI strip as 2 x 3 grid                          |
+| KPI strip as 2 columns, last cell spans both     |
 | Factor    Beta    t   Sig.  Avg                  |
 | Mkt-RF   +0.998  475  Yes  +0.998   <- line 1    |
 | |=========================|         <- line 2    |
@@ -238,21 +249,32 @@ Alignment rules:
 on the right, optional reading line, the chart-table, and one footnote (12.5 px, `--ink-3`,
 hairline above).
 
+**Rev 2: footnotes show one or two sentences.** Method detail (test names, lags, formulas) folds
+into a native `<details class="how">` labelled "How this is computed". No JavaScript. Print
+expands it (`details::details-content` forced visible, summary hidden); checked in Chrome 157.
+
 **Empty state** (any statistic with `status != "ok"`):
 
 - The title and question stay.
 - The chart becomes a `--sunk` box showing `reason` in ink and one next step in `--ink-2`.
 - The footnote is dropped.
 
-### 1. Header and coverage line
+### 1. Header, range line and data-quality notice
 
-- Ticker at 44.8/640, plus "Fama-French five-factor profile", plus the UTC generated time on the
-  right.
-- Coverage sentence: "Daily returns from {actual_start} to {actual_end}, {n_obs} trading days.
-  Factor data ends {factors_last_date}, {days_behind} days before this report; the last
-  {uncovered.n} price days are shown but not analysed."
-- `warnings[]`: one line each, with a glyph and a hidden "Warning:" prefix.
-- Dates in prose read like "8 Aug 2024".
+Rev 2: the header was two rows of badges plus a paragraph. It is now three short pieces.
+
+- Row 1: ticker at 44.8/640, "Fama-French five-factor profile", and on the right two chips: "Factor
+  data ends 30 Sep 2026 (49 days ago)" (plain) and "2 warnings" (a link to the notice, ink,
+  weight 560). No outlined badges, no middle dots.
+- Range line: "Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days. The last 32 price days are charted
+  but not analysed." One sentence pair, 76ch maximum.
+- Notice (only when `warnings[]` is non-empty): a framed strip with a 3 px ink left rule, the
+  warning glyph, and a **two-line plain summary**, for example "Prices look out of step with the
+  factor data, so R² is probably understated and residual volatility overstated." A "Details" disclosure
+  holds the raw messages (and, in the dashboard, the 5-day estimate line). The hidden prefix
+  "Warning:" stays for screen readers.
+- The generated time moves to the colophon. Dates in prose read like "8 Aug 2024".
+- In the dashboard the range line is replaced by the controls (section I).
 
 ### 2. Equation (the memorable element)
 
@@ -270,23 +292,33 @@ hairline above).
 
 ### 3. KPI strip
 
-- One framed strip with six cells split by hairlines (not cards):
-  - Alpha a year, with the note "t 0.8, p 0.401. Not distinguishable from zero." The value is in
-    `--ink-2` when not significant.
-  - R².
-  - Adjusted R².
-  - Observations, with the excluded count.
-  - Sample, as a month range at 18 px with the requested range below.
-  - Data audit: Clean / Warnings / Errors, with severity counts.
+- One framed strip with **five** cells split by hairlines (not cards). Rev 2: six became five;
+  Adjusted R² and the Data audit cell moved out (adjusted R² sits in the regression footnote;
+  audit status is the warnings chip and the Data and audit panel).
+  - Alpha, a year: value, then one plain line, "Not distinguishable from zero" or
+    "Distinguishable from zero at 5%". The value is in `--ink-2` when not significant. t and p
+    live in the equation and the regression table, not here.
+  - R²: "Share of daily variance the factors explain".
+  - Residual volatility: "A year, left unexplained by the factors".
+  - Observations: "Trading days; 1 excluded".
+  - Analysed range: month range at 18 px, with the requested range below.
+- Every cell is a label, a value and at most one line of 12.5 px text.
+- Narrow screens: 2 columns, the last cell spans both.
 - Empty: one box with `regression.reason` and "Widen the date range ... and run the report
   again."
 
 ### 4. Price
 
-- Question: "How has the price moved over the window?"
+- Question: "How has the price moved over the window? Shaded days are not in the analysis."
 - 1.5 px ink line, 3 to 4 y ticks, quarterly x ticks.
-- The tail after `factor_coverage_end` is drawn in `--ink-3` over a `--sunk` band, labelled
-  "Shaded: no factor data".
+- **Rev 2: both ends of the non-analysed region are marked.** Days after `factor_coverage_end`
+  and days before the analysed start sit on a `--grid` band (darker than the old `--sunk`, which
+  was nearly invisible), with a 1 px dashed `--ink-3` rule at the cut. The analysed window is the
+  unshaded part. The band keeps its true width: it is a time axis, so it is never widened to look
+  bigger; the dashed rule and the label carry a thin tail.
+- **Rev 2: the label says what it means.** "Not analysed: factor data ends 30 Sep 2026" (right
+  end) and "Not analysed: before 8 Aug 2024" (left end, when present). The old label, "no factor
+  data", was internal jargon and said nothing about the consequence.
 - Right-hand table: First, End of factor data, Latest, and a muted "After factor data: 32 days,
   raw, not analysed +1.23%".
 - Footnote: "for context only; no statistic uses the price line."
@@ -295,17 +327,25 @@ hairline above).
 ### 5. Factor exposures
 
 - Question: "What is this stock exposed to, and how sure are we?"
-- Legend: Positive, Negative, Faded: not significant, 95% interval.
+- Legend: Positive, Negative, Faded: not significant, 95% interval, Average 252d beta (a small
+  diamond).
 - Reading line built from the tags (template in H).
 - Rows in canonical order, each with its code and plain name.
 - Bar from zero (36% of row height), sign colour.
-- CI whisker: 1.5 px ink with caps.
+- CI whisker: 1.5 px ink. **Rev 2:** caps are 3 px tall (they were 8 px on a 16 px bar and read
+  as an "H" on narrow intervals), and are omitted when the interval is narrower than 1.2% of the
+  plot width, about 6 px.
+- **Rev 2: average rolling beta marker.** A 7 px diamond centred on the row's centre line (never
+  below the bar), ink fill with a 0.75 px surface outline. It is the only marker besides the
+  whisker; the bar (16 px at 44 px row height) stays the strongest mark. The Avg 252d column
+  keeps the number.
 - Domain: a nice range over the CI ends and 0. Solid hairline gridlines; zero line in `--axis`.
 - Columns: Beta (bold unless not significant), t, Significant (Yes/No), Avg 252d.
 - Native `<title>` gives beta, interval, t and adjusted p.
-- Footnote: "In-sample, descriptive, not predictive. OLS on daily excess returns with Newey-West
-  standard errors ({hac_lags} lags). Significant means the Benjamini-Hochberg adjusted p is below
-  0.05 across the {bh_family_size} betas. Average 252d is the mean of the overlapping rolling
+- Footnote: "In-sample, descriptive, not predictive. Significant means the adjusted p is below
+  0.05." Folded: "OLS on daily excess returns with Newey-West standard errors ({hac_lags} lags).
+  Significant means the Benjamini-Hochberg adjusted p is below 0.05 across the {bh_family_size}
+  betas. The diamond and the Avg 252d column are the mean of the overlapping rolling
   estimates."
 
 ### 6. Where the return came from
@@ -347,7 +387,9 @@ hairline above).
 - **Common vertical span, own centre:** every row spans the same beta range, so wiggles compare
   across factors while Mkt-RF sits near 1. Top and bottom (and 0 when there is room) are labelled.
 - X starts at the first full window; the caption gives that date.
-- Columns: Latest, Average, Middle 80% (p10 to p90).
+- Columns: Latest, Average, Middle 80% (p10 to p90). Rev 2: the Middle 80% cell carries a
+  `title` with the spread, lowest, highest and the share of windows above zero, so the live
+  renderer's eight-column "Average 252-day beta" table is not needed.
 - Footnote: pointwise band, overlapping windows, common span.
 
 **Toggle without JavaScript:**
@@ -408,7 +450,7 @@ Measured contrast (WCAG ratio):
 - **Print (A4):**
   - Light tokens are forced even from a dark OS.
   - `print-color-adjust: exact`.
-  - KPI strip as 3 x 2.
+  - KPI strip in three columns (3 cells, then 2).
   - Price, exposure, return and risk panels are kept whole.
   - Both rolling windows are shown and the toggle is hidden.
   - The mock prints on 8 pages.
@@ -431,6 +473,17 @@ Defaults caught and removed:
   layout, chrome or wording. Rolling exposure is small multiples with bands, not a heatmap.
 - **Broadsheet look.** Hairlines were kept, but with rounded frames, 44 px rows and a single wide
   column, not newspaper columns.
+
+**Revision 2 (owner review of the live report):**
+
+- The live renderer had drifted from this spec: 1680 px width, monospace everywhere, tiles and
+  tables stretched. The spec was right; the checklist in H.12 lists what to port.
+- Where the spec was not enough: the header and KPI strip were still dense (five panels' worth of
+  numbers above the first chart), the data-quality notice was a 120-word paragraph, the price
+  cut-off wording was jargon, and the interval caps were too large. Those are changed above.
+- Rejected: widening the post-factor band so it is "visible". It would misstate the time axis.
+- Kept: the owner's words "reliable" and "noise" are not in this spec; the legend text "Faded: not
+  significant" already defines the faded mark, so no extra definition is added.
 
 **One memorable element:** the fitted regression typeset as mathematics. Each coefficient is
 bracketed and labelled with its plain name and evidence, faded where the evidence is weak, and
@@ -473,7 +526,20 @@ linked to its detail row.
 7. **Optional security name** for the header.
 8. **t vs z.** The schema says `z` (HAC, normal reference) but the UI says "t"; keep them
    consistent.
-9. **Renderer-derivable:** first and last in-sample price, first full rolling window, audit
+9. **Plain warning summaries.** The notice shows a plain two-line summary; the prototype maps
+   `warnings[].code` to text (`WARN_PLAIN`). Suggest `ReportWarning.summary` (plain, one
+   sentence) next to `message` (technical), owned by analytics. Unknown codes fall back to
+   `message`.
+10. **Range and ticker parameters** for the dashboard (section I): the report endpoint in
+    `backend/factordesk/api/` (currently empty) takes `ticker`, `start`, `end` and returns the
+    same schema.
+11. **Minimum sample per range chip** comes from the pipeline's existing threshold (the mock uses
+    252 days for 1Y and so on); confirm the exact numbers when the API is written.
+12. **Port checklist (live renderer to this spec):** width cap 1216; Instrument Sans and
+    tabular figures instead of `--mono`; five-cell KPI strip; collapsed notice; price labels and
+    band; 3 px caps and 7 px diamond; rolling panel as five rows with three number columns;
+    footnotes with folded method detail.
+13. **Renderer-derivable:** first and last in-sample price, first full rolling window, audit
    counts, ticks.
 
 **Renderer notes:**
@@ -484,6 +550,49 @@ linked to its detail row.
   `vector-effect: non-scaling-stroke`. Labels as HTML overlays.
 - One shared `<pattern id="hatch">`.
 - Rolling series with more than 400 stamps are decimated to every second point.
-- Page weight: 226 KB with fonts.
+- Page weight: 233 KB with fonts (Rev 2).
 - `add_roles()` in the generator shows the ARIA roles to emit.
-- `report.css` is final.
+- `report.css` is final for the static report; the controls styles (`.controls`, `.chip-opt`) are
+  specified for the dashboard and only mocked here.
+
+## I. Dashboard controls (design only)
+
+The static report cannot recompute a regression, so it only states its range (the range line in
+panel 1). The date range and ticker controls belong to the dashboard (FastAPI + React, roadmap
+"Next"). The mock is `report-controls.html`; it uses real form controls but no behaviour.
+
+**Anatomy**, one framed strip above the header (surface, 6 px radius, 16 px by 24 px padding):
+
+```text
++-----------------------------------------------------------------------------------+
+| [ SPY        ] [Factor it]   [YTD|1Y|3Y|5Y|Full history]   From [date]  To [date]  |
+| Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days. The last 32 ... not analysed. |
+| Factor data ends 30 Sep 2026, so later dates cannot be chosen.                      |
+| 3Y and 5Y need more trading days than SPY has in this sample (559). Choose shorter. |
++-----------------------------------------------------------------------------------+
+```
+
+- **Ticker search:** a text field (uppercase, 148 px) plus a filled "Factor it" button. Enter
+  submits. Recent tickers appear in a list under the field when it has focus.
+- **Range chips:** YTD, 1Y, 3Y, 5Y, Full history, one connected segmented radio group in the same
+  style as the rolling-window toggle. The selected chip is ink on surface. "Factor lens
+  history" from the reference screenshot is deliberately not included.
+- **Custom range:** two date fields, From and To. They fill with the analysed dates when a chip is
+  chosen, and choosing a date clears the chip. `max` is the last factor date.
+- **Analysed range label:** always visible, dates and trading-day count, plus the factor cut-off
+  sentence. It reads the same as the static report's range line.
+- **Unavailable chips:** disabled (`--sunk` fill, `--ink-3` text, not-allowed cursor) with the
+  reason as visible text under the strip, never only in a tooltip. The reason names the minimum
+  and what the sample has.
+- **Loading:** the strip stays interactive; the KPI values and equation show a `--grid`
+  placeholder while `aria-busy="true"`, and the previous page is not blanked. No spinner and no
+  motion beyond the placeholder.
+- **Errors:** an unknown ticker or a range with too few days puts a sentence in the notice
+  style: what went wrong, then what to do ("No prices were returned for XYZ. Check the ticker
+  symbol.").
+- **Narrow screens:** the search row is full width, chips fill the width in one row, every target
+  is at least 44 px tall.
+- **Accessibility:** a `form` with a labelled `fieldset` and hidden `legend` "Date range"; chips
+  are native radios, so arrow keys work; focus ring as elsewhere; the analysed-range label is
+  announced when it changes (`aria-live="polite"`).
+- **Print:** hidden. The range line prints.

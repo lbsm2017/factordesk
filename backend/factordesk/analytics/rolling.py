@@ -34,7 +34,7 @@ WINDOWS: tuple[int, ...] = (126, 252)
 """Windows always computed and overlaid (M4)."""
 PRIMARY_WINDOW = 252
 """Default ``beta_window`` W_p (M15)."""
-_CHUNK = 512
+_CHUNK = 256
 """Stamps per batch; bounds memory at about chunk x W x 6 floats per array."""
 
 
@@ -66,6 +66,108 @@ class RollingBetas:
         return pd.DatetimeIndex(self.betas.index[mask])
 
 
+def _window_r2(yc: FloatArray, resid: FloatArray, window: int) -> FloatArray:
+    """``1 - SSR/TSS`` per window row; NaN where ``y`` is constant within the window."""
+    centred = yc - yc.mean(axis=1, keepdims=True)
+    tss = np.einsum("cw,cw->c", centred, centred)
+    ssr = np.einsum("cw,cw->c", resid, resid)
+    varies = tss > window * (ZERO_SD_RELATIVE * np.max(np.abs(yc), axis=1)) ** 2
+    ratio = np.full(len(tss), np.nan)
+    np.divide(ssr, tss, out=ratio, where=varies)
+    return np.where(varies, 1.0 - ratio, np.nan)
+
+
+def _exact_windows(
+    x_win: FloatArray, y_win: FloatArray, window: int, lags: int
+) -> tuple[NDArray[np.bool_], FloatArray, FloatArray, FloatArray]:
+    """Per-window QR fit with the full M3.1 design guard: the unconditionally exact path.
+
+    ``x_win`` is ``(c, W, k)``, ``y_win`` is ``(c, W)`` (views are fine). Returns ``(ok, theta,
+    se, r2)`` where ``ok`` marks the windows that pass the guard and the other three describe
+    only those windows (in order).
+    """
+    k = x_win.shape[2]
+    constant, share = unexplained_shares(x_win)
+    ok = ~(constant.any(axis=1) | (share < MIN_UNEXPLAINED_SHARE).any(axis=1))
+    if not ok.any():
+        return ok, np.empty((0, k)), np.empty((0, k)), np.empty(0)
+    xc = np.ascontiguousarray(x_win[ok])
+    yc = np.ascontiguousarray(y_win[ok])
+    q, r = np.linalg.qr(xc)
+    r_inv = np.linalg.solve(r, np.broadcast_to(np.eye(k), r.shape))
+    theta = np.einsum("cij,cj->ci", r_inv, np.einsum("cwi,cw->ci", q, yc))
+    resid = yc - np.einsum("cwi,ci->cw", xc, theta)
+    meat = _hac_meat_batch(xc * resid[:, :, None], lags)
+    bread = r_inv @ r_inv.transpose(0, 2, 1)
+    cov = bread @ meat @ bread.transpose(0, 2, 1)
+    se = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
+    return ok, theta, se, _window_r2(yc, resid, window)
+
+
+def _hac_meat_batch(scores: FloatArray, lags: int) -> FloatArray:
+    """Newey-West meat of stacked windows, ``scores`` of shape ``(c, W, k)``.
+
+    ``S = sum_t u_t u_t' + sum_l w_l (Gamma_l + Gamma_l')`` with ``Gamma_l = sum_t u_t u_{t-l}'``,
+    written as ``Z'Z + Z'T + T'Z`` where ``T_t = sum_{l=1..L, l<=t} w_l u_{t-l}`` (the kernel-
+    weighted lagged scores), so that three batched matrix products replace ``L + 1``.
+    """
+    c, w, k = scores.shape
+    zt = scores.transpose(0, 2, 1)
+    if lags == 0:
+        return zt @ scores
+    padded = np.zeros((c, w + lags, k))
+    padded[:, lags:] = scores
+    # Window t spans padded rows t..t+L-1 = scores rows t-L..t-1 (zeros before the window).
+    lagged = sliding_window_view(padded, lags, axis=1)[:, :w] @ bartlett_weights(lags)[:0:-1]
+    cross = zt @ lagged
+    return zt @ scores + cross + cross.transpose(0, 2, 1)
+
+
+_FAST_MIN_SHARE = 1e-2
+"""A window is estimated on the fast path only when every factor keeps at least this share of
+its variance after the constant and earlier factors (10,000 times the M3.1 limit; two factors
+with correlation above about 0.995 fall back to QR)."""
+_FAST_MIN_CENTRED = 1e-2
+"""... only when every factor's within-window variance is at least this fraction of its
+within-window mean square (a factor far from zero-mean with little spread would lose digits
+in the Gram solve; the M3.1 constant test fires at 1e-24) ..."""
+_FAST_MIN_WINDOW_SHARE = 1e-3
+"""... and only when each window's centred sum of squares (factors) and sum of squares (``y``)
+is at least this fraction of the running sum of squares up to the window end, which bounds
+the digits lost to the cumulative-sum difference. Every other window takes the per-window QR
+path.
+
+Measured error of the fast path against the per-window QR path (which is itself about 1e-13
+relative from exact rational arithmetic): about 1e-12 absolute on betas and standard errors on
+real SPY data (about 1e-10 relative from exact at the worst SPY windows); at most 1e-11 on
+adversarial designs that these thresholds admit (volatility regimes up to 1,000-fold, factor
+means up to 30 standard deviations). With the earlier thresholds (1e-3 and 1e-4, and the
+uncentred sum of squares) such designs reached 2e-8 on betas and 1e-9 on standard errors
+(independent validation, 2026-11-18). All SPY and synthetic long-series windows still take the
+fast path, so tightening cost no speed there."""
+
+
+def _pivots(gram: FloatArray) -> FloatArray:
+    """Squared diagonal of the Cholesky factor of stacked Gram matrices ``(c, k, k)``.
+
+    Equals ``R_jj^2`` of the QR of the design. Non-positive pivots propagate as NaN or
+    non-positive values, which the caller treats as "not certified".
+    """
+    c, k, _ = gram.shape
+    lower = np.zeros_like(gram)
+    pivots = np.empty((c, k))
+    with np.errstate(all="ignore"):
+        for j in range(k):
+            pivot = gram[:, j, j] - np.einsum("ci,ci->c", lower[:, j, :j], lower[:, j, :j])
+            pivots[:, j] = pivot
+            root = np.sqrt(pivot)
+            lower[:, j, j] = root
+            for i in range(j + 1, k):
+                dot = np.einsum("ci,ci->c", lower[:, i, :j], lower[:, j, :j])
+                lower[:, i, j] = (gram[:, i, j] - dot) / root
+    return pivots
+
+
 def rolling_ols_hac(
     y: FloatArray, factors: FloatArray, window: int
 ) -> tuple[FloatArray, FloatArray, FloatArray]:
@@ -76,6 +178,23 @@ def rolling_ols_hac(
     factor matrix fails the design guard of M3.1 (a factor constant within the window, or a
     linear combination of the others) gets NaN instead of an estimate; the caller reports it.
     ``r2`` is NaN for a window whose ``y`` is constant.
+
+    Windows whose design is clearly healthy are solved from window Gram matrices (cumulative
+    sums of cross-products, each window standardised by its own factor spreads, with the same
+    QR-equivalent guard quantities); every other window, and every window near a guard limit,
+    goes through the per-window QR path that decides the guard exactly. No quantity of a window
+    uses a row after it.
+
+    Precision: the QR path is exact to about 1e-13 relative. The fast path carries the rounding
+    of the cumulative sums, so it is not bit-identical to QR: about 1e-12 absolute (about 1e-10
+    relative from exact rational arithmetic, worst windows) on real factor data, and at most
+    about 1e-11 on the adversarial designs the thresholds above admit (see ``_FAST_MIN_*``).
+    For the same reason a window's value depends, in the last bits, on rows before the
+    window: the cumulative sums start at the first row passed in, so a different first row
+    moves a window's value by up to about 1e-12 (measured 7.9e-13 on SPY; the previous per-
+    window implementation gave exactly 0; 1e-13 on synthetic data, up to 3e-11 on the volatility
+    regime design of ``test_rolling_equivalence``). A window never depends on a later row (no
+    look-ahead), and the dependence is far below the 6 significant digits the report keeps.
     """
     yv = np.asarray(y, dtype=np.float64)
     x = with_intercept(factors)
@@ -91,41 +210,67 @@ def rolling_ols_hac(
         raise ValueError("inputs must be finite; excluded rows are removed upstream")
 
     lags = hac_lags(window)
-    weights = bartlett_weights(lags)
-    eye = np.eye(k)
-    # Views of shape (n - W + 1, W, k) and (n - W + 1, W): window j holds rows j..j+W-1.
+    n_stamps = n - window + 1
+    # Window Gram matrices X'X and X'y from cumulative sums (row j of a cumulative array is the
+    # sum of the first j rows, so a window is a difference of two rows); each cumulative sum
+    # at row j holds only rows before j, so a window never sees a later row.
+    zero = np.zeros((1, k * k))
+    cum_gram = np.concatenate(
+        [zero, np.cumsum((x[:, :, None] * x[:, None, :]).reshape(n, -1), axis=0)]
+    )
+    cum_xy = np.concatenate([zero[:, :k], np.cumsum(x * yv[:, None], axis=0)])
+    cum_yy = np.concatenate([[0.0], np.cumsum(yv * yv)])
+    diag_at: list[int] = list(range(0, k * k, k + 1))  # diagonal of a flattened Gram
+
     x_win = sliding_window_view(x, window, axis=0).transpose(0, 2, 1)
     y_win = sliding_window_view(yv, window)
-    n_stamps = n - window + 1
+
     for c0 in range(0, n_stamps, _CHUNK):
         c1 = min(c0 + _CHUNK, n_stamps)
-        constant, share = unexplained_shares(x_win[c0:c1])
-        ok = ~(constant.any(axis=1) | (share < MIN_UNEXPLAINED_SHARE).any(axis=1))
-        if not ok.any():
-            continue
-        xc = np.ascontiguousarray(x_win[c0:c1][ok])
-        yc = np.ascontiguousarray(y_win[c0:c1][ok])
-        q, r = np.linalg.qr(xc)
-        r_inv = np.linalg.solve(r, np.broadcast_to(eye, r.shape))
-        theta = np.einsum("cij,cj->ci", r_inv, np.einsum("cwi,cw->ci", q, yc))
-        resid = yc - np.einsum("cwi,ci->cw", xc, theta)
-        scores = xc * resid[:, :, None]
-        meat = np.einsum("cwi,cwj->cij", scores, scores)
-        for lag in range(1, lags + 1):
-            gamma = np.einsum("cwi,cwj->cij", scores[:, lag:], scores[:, :-lag])
-            meat += weights[lag] * (gamma + gamma.transpose(0, 2, 1))
-        bread = r_inv @ r_inv.transpose(0, 2, 1)
-        cov = bread @ meat @ bread.transpose(0, 2, 1)
-        rows = np.arange(c0 + window - 1, c1 + window - 1)[ok]
-        params[rows] = theta
-        bse[rows] = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
-        centred = yc - yc.mean(axis=1, keepdims=True)
-        tss = np.einsum("cw,cw->c", centred, centred)
-        ssr = np.einsum("cw,cw->c", resid, resid)
-        varies = tss > window * (ZERO_SD_RELATIVE * np.max(np.abs(yc), axis=1)) ** 2
-        r2_chunk = np.full(len(tss), np.nan)
-        np.divide(ssr, tss, out=r2_chunk, where=varies)
-        r2[rows] = np.where(varies, 1.0 - r2_chunk, np.nan)
+        end = cum_gram[c0 + window : c1 + window]
+        flat = end - cum_gram[c0:c1]
+        gram = flat.reshape(-1, k, k)
+        sq = flat[:, diag_at][:, 1:]  # window sum of squares of each factor
+        css = sq - gram[:, 0, 1:] ** 2 / window  # centred sum of squares of each factor
+        yy = cum_yy[c0 + window : c1 + window] - cum_yy[c0:c1]
+        with np.errstate(all="ignore"):
+            sd = np.sqrt(css / window)
+            d = np.concatenate([np.ones((len(sd), 1)), 1.0 / sd], axis=1)  # (c, k) column scale
+            gram_s = gram * d[:, :, None] * d[:, None, :]
+            pivots = _pivots(gram_s)[:, 1:]
+            healthy = (
+                (
+                    (css > _FAST_MIN_CENTRED * sq)
+                    & (pivots > _FAST_MIN_SHARE * window)  # centred sum of squares is W when scaled
+                    & (css > _FAST_MIN_WINDOW_SHARE * end[:, diag_at][:, 1:])
+                ).all(axis=1)
+                & (yy > _FAST_MIN_WINDOW_SHARE * cum_yy[c0 + window : c1 + window])
+            )
+        fast = healthy
+        if fast.any():
+            idx = np.flatnonzero(fast)
+            dc = d[idx]
+            xc = np.ascontiguousarray(x_win[c0:c1][idx])
+            yc = np.ascontiguousarray(y_win[c0:c1][idx])
+            g_inv = np.linalg.inv(gram_s[idx])
+            xy_s = (cum_xy[c0 + window : c1 + window] - cum_xy[c0:c1])[idx] * dc
+            theta_s = np.einsum("cij,cj->ci", g_inv, xy_s)
+            theta = theta_s * dc
+            resid = yc - (xc @ theta[:, :, None])[:, :, 0]
+            meat = _hac_meat_batch(xc * resid[:, :, None], lags) * dc[:, :, None] * dc[:, None, :]
+            cov = g_inv @ meat @ g_inv
+            rows = idx + (c0 + window - 1)
+            params[rows] = theta
+            bse[rows] = np.sqrt(np.diagonal(cov, axis1=1, axis2=2)) * dc
+            r2[rows] = _window_r2(yc, resid, window)
+        rest = np.flatnonzero(~fast)
+        for s0 in range(0, len(rest), _CHUNK):
+            sel = c0 + rest[s0 : s0 + _CHUNK]
+            ok, theta, se, r2_sel = _exact_windows(x_win[sel], y_win[sel], window, lags)
+            rows = (sel + (window - 1))[ok]
+            params[rows] = theta
+            bse[rows] = se
+            r2[rows] = r2_sel
     return params, bse, r2
 
 

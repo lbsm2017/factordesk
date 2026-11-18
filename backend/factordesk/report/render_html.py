@@ -1,177 +1,150 @@
 """Render a ``FactorReport`` as one self-contained HTML file.
 
-No scripts, no external fonts, stylesheets or images: inline CSS plus inline SVG built here.
-Output is deterministic for a given report (nothing reads the clock or the environment).
-Every dynamic string goes through ``html.escape``.
+The design is specified in ``docs/design/report-design.md`` (revision 2). No scripts and no
+external requests: the stylesheet (``report.css``) and the fonts (``fonts/*.woff2``, base64) are
+inlined, charts are inline SVG or positioned HTML. Output is deterministic for a given report
+(nothing reads the clock or the environment). Every dynamic string goes through ``html.escape``.
+
+Panels are drawn from the ordered registry of ``panel_registry.py`` (schema v3 contract, SC3.3):
+the core panels register at the end of this module, the optional sections' panels in their own
+modules under ``report/panels/``. The helpers those modules may use are public names here
+(``panel_head``, ``panel_section``, ``empty_state``, ...).
 """
 
 from __future__ import annotations
 
+import base64
 import html
 import math
+import re
 from collections.abc import Callable, Sequence
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 
+from factordesk.report.panel_registry import register_panel, registered_panels
 from factordesk.report.schema import (
     FACTOR_NAMES,
-    LABEL_TEXT,
     FactorReport,
     FactorStat,
-    PriceSeries,
     RollingWindow,
 )
 
-FOOT = LABEL_TEXT["L-DESC"]
+HERE = Path(__file__).resolve().parent
+FONTS_DIR = HERE / "fonts"
+CSS_PATH = HERE / "report.css"
+
+MINUS = "−"
 IDIO = "Idiosyncratic"
+PLAIN = {
+    "Mkt-RF": "Market",
+    "SMB": "Size",
+    "HML": "Value",
+    "RMW": "Profitability",
+    "CMA": "Investment",
+}
 EXCLUSION_TEXT = {
     "multi_day_return": "return spans several factor days",
     "no_factor_row": "date not in the factor file",
     "price_missing": "price missing",
     "factor_missing": "factor value missing",
 }
-WIDE = "wide"
-NARROW = "narrow"
+TILT = {
+    "SMB": ("small companies", "large companies"),
+    "HML": ("value stocks", "growth stocks"),
+    "RMW": ("highly profitable firms", "weakly profitable firms"),
+    "CMA": ("firms that invest conservatively", "firms that invest aggressively"),
+}
+WARN_PLAIN = {
+    "residual_reversal": (
+        "Prices look out of step with the factor data, so R² is probably understated and "
+        "residual volatility overstated."
+    ),
+    "short_history": "The history is short, so the betas rest on a small sample.",
+    "collinearity": "Some factors move together in this sample, so single betas are less precise.",
+    "audit_errors": (
+        "The price audit found errors, so the headline numbers are not interpretable until "
+        "they are explained; see Data and audit."
+    ),
+    "audit_warnings": "The price audit flagged some unusual price moves; see Data and audit.",
+    "factor_data_lag": (
+        "The factor data stops before the latest prices, so the newest days are charted but "
+        "not analysed."
+    ),
+}
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+HAC_DEFAULT_Z = 1.959963984540054
 
-# --------------------------------------------------------------------------------------------
-# Styles. Tokens live on :root; the light theme is selected by prefers-color-scheme.
-# Factor colours: Okabe-Ito hues (blue, orange, reddish purple, yellow) plus a neutral grey, kept
-# away from the red/green pair that is reserved for sign. Light-theme values are darkened to keep
-# >= 3:1 against the white surface.
-# --------------------------------------------------------------------------------------------
-CSS = """
-:root{
-  color-scheme:dark;
-  --bg:#0e1115;--surface:#14181e;--surface-2:#191e25;--border:#2a313b;--grid:#222932;
-  --ink:#dde2e9;--ink-2:#a3adba;--ink-3:#8791a0;
-  --accent:#8fa8c8;--pos:#4cc38a;--neg:#f0705f;--warn:#e3ad3a;
-  --f0:#56b4e9;--f1:#e69f00;--f2:#cc79a7;--f3:#e8df4a;--f4:#aab3bf;
-  --tail:rgba(160,172,188,.10);
-  --mono:ui-monospace,"Cascadia Mono","SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
-  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+GLYPH_WARN = (
+    '<svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 1.5 15 14.5H1z"/>'
+    '<path class="cut" d="M8 6v4M8 11.6v1"/></svg>'
+)
+GLYPHS = {
+    "info": (
+        '<svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/>'
+        '<path class="cut" d="M8 7v4.5M8 4.6v.9"/></svg>'
+    ),
+    "warning": GLYPH_WARN,
+    "error": (
+        '<svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><rect x="2" y="2" width="12" '
+        'height="12" rx="1"/><path class="cut" d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>'
+    ),
 }
-@media (prefers-color-scheme:light){
-  :root{
-    color-scheme:light;
-    --bg:#f2f4f6;--surface:#ffffff;--surface-2:#f7f8fa;--border:#d3d8df;--grid:#e6e9ed;
-    --ink:#1a2027;--ink-2:#46515f;--ink-3:#5b6676;
-    --accent:#3f5f86;--pos:#14764a;--neg:#b3362a;--warn:#855600;
-    --f0:#0072b2;--f1:#b86800;--f2:#a8508a;--f3:#8d8300;--f4:#5b6572;
-    --tail:rgba(60,72,88,.07);
-  }
-}
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 var(--sans)}
-.num,td.n,th.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
-  clip:rect(0 0 0 0);white-space:nowrap;border:0}
-.wrap{max-width:1680px;margin:0 auto;padding:12px 16px 32px}
-.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;padding:4px 0 12px;
-  border-bottom:1px solid var(--border);margin-bottom:12px}
-.brand{font-size:12px;color:var(--ink-3);letter-spacing:.04em}
-.brand i{display:inline-block;width:8px;height:8px;background:var(--accent);margin-right:6px}
-h1{margin:0;font:600 22px/1.1 var(--mono);letter-spacing:.02em}
-.top .meta{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--ink-2);font-size:12px;
-  margin-left:auto}
-.top .meta b{font-weight:500;color:var(--ink)}
-.badge{display:inline-block;border:1px solid var(--border);padding:0 6px;font:11px/18px var(--mono);
-  color:var(--ink-2);background:var(--surface-2)}
-.badge.warn{color:var(--warn);border-color:var(--warn)}
-a.badge{text-decoration:none}
-a.badge:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-ul.list.cap{margin-top:6px}
-.badge.ok{color:var(--ink-2)}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
-  background:var(--border);border:1px solid var(--border);margin-bottom:12px}
-.kpi{background:var(--surface);padding:8px 10px;min-width:0}
-.kpi .l{font-size:11px;color:var(--ink-3);letter-spacing:.03em}
-.kpi .v{font:500 19px/1.3 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
-.kpi .v.sm{font-size:14px;line-height:1.75}
-.kpi .s{font:11px/1.3 var(--mono);color:var(--ink-2);font-variant-numeric:tabular-nums}
-.pos{color:var(--pos)}.neg{color:var(--neg)}.zero{color:var(--ink-2)}.warn{color:var(--warn)}
-.callout{background:var(--surface);border:1px solid var(--warn);border-left-width:3px;
-  padding:8px 10px;margin-bottom:12px;font-size:12.5px}
-.callout p{margin:0}.callout p+p{margin-top:4px;color:var(--ink-2);font-size:11.5px}
-.callout b{color:var(--warn);font-weight:600}
-.callout a{color:var(--accent)}
-.callout a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.grid{display:grid;gap:12px;margin-bottom:12px}
-.g-main{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr)}
-.g-two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.g-data{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.panel{background:var(--surface);border:1px solid var(--border);min-width:0;display:flex;
-  flex-direction:column}
-.panel>header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
-  padding:8px 10px;border-bottom:1px solid var(--border)}
-.panel h2{margin:0;font:600 12.5px/1.3 var(--sans);letter-spacing:.03em}
-.panel .sub{font-size:11px;color:var(--ink-3)}
-.panel .body{padding:8px 10px;flex:1;min-width:0}
-.panel .cap{margin:6px 0 0;font-size:11.5px;color:var(--ink-2)}
-.panel .foot{margin:0;padding:5px 10px;border-top:1px solid var(--border);font-size:11px;
-  color:var(--ink-3)}
-.chart{display:block;width:100%;height:auto}
-.v-narrow{display:none}
-.g-two .chart{max-width:640px}
-.p-betas .chart{max-width:560px}
-@media (max-width:640px){.v-wide{display:none}.v-narrow{display:block}}
-.t{font:11px var(--mono);fill:var(--ink-2)}
-.tv{font:11px var(--mono);fill:var(--ink)}
-.tm{font:10.5px var(--mono);fill:var(--ink-3)}
-.tp{fill:var(--pos)}.tn{fill:var(--neg)}
-.axis{stroke:var(--grid);stroke-width:1;fill:none}
-.zero-line{stroke:var(--ink-3);stroke-width:1}
-.fc0{fill:var(--f0)}.fc1{fill:var(--f1)}.fc2{fill:var(--f2)}.fc3{fill:var(--f3)}.fc4{fill:var(--f4)}
-.sk0{stroke:var(--f0)}.sk1{stroke:var(--f1)}.sk2{stroke:var(--f2)}.sk3{stroke:var(--f3)}
-.sk4{stroke:var(--f4)}
-.empty{border:1px dashed var(--border);color:var(--ink-3);padding:18px 10px;text-align:center;
-  font-size:12px}
-.sm-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
-.card{border:1px solid var(--border);background:var(--surface-2);min-width:0}
-.card header{display:flex;justify-content:space-between;align-items:baseline;gap:6px;
-  padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px}
-.card header b{font-weight:600}
-.card header span.r{font:10.5px var(--mono);color:var(--ink-2);text-align:right}
-.sw{display:inline-block;width:9px;height:9px;margin-right:6px;vertical-align:baseline}
-.sw0{background:var(--f0)}.sw1{background:var(--f1)}.sw2{background:var(--f2)}
-.sw3{background:var(--f3)}.sw4{background:var(--f4)}
-.card .cb{padding:4px 4px 2px}
-dl.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;margin:0}
-dl.kv dt{color:var(--ink-3)}
-dl.kv dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;
-  overflow-wrap:anywhere}
-h3{margin:12px 0 4px;font:600 11.5px var(--sans);color:var(--ink-2);letter-spacing:.03em}
-h3:first-child{margin-top:0}
-ul.list{margin:0;padding:0;list-style:none}
-ul.list li{padding:4px 0;border-top:1px solid var(--grid)}
-ul.list li:first-child{border-top:0}
-.sev{display:inline-block;min-width:54px;margin-right:6px;font:11px var(--mono);color:var(--ink-3)}
-.sev.warning,.sev.error{color:var(--warn)}
-.tablewrap{overflow-x:auto}
-table.dt{border-collapse:collapse;width:100%;font-size:12px}
-table.dt th,table.dt td{padding:4px 8px;border-bottom:1px solid var(--grid);text-align:right;
-  white-space:nowrap}
-table.dt th:first-child,table.dt td:first-child{text-align:left}
-table.dt th{color:var(--ink-3);font-weight:500}
-table.dt td.rd,table.dt th.rd{text-align:left}
-table.dt td.rd{white-space:normal;min-width:260px;color:var(--ink-2)}
-.legend{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:11.5px;color:var(--ink-2);
-  margin:6px 0 0}
-.legend .hatch{display:inline-block;width:12px;height:9px;margin-right:5px;
-  border:1px solid var(--ink-3);
-  background:repeating-linear-gradient(45deg,var(--ink-3) 0 1px,transparent 1px 4px)}
-@media (max-width:1000px){.g-main,.g-two,.g-data{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:640px){
-  .wrap{padding:8px 16px 24px}
-  .top .meta{margin-left:0}
-  h1{font-size:20px}
-}
-@media print{body{background:#fff}}
-""".strip()
+HATCH_DEFS = (
+    '<svg class="defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>'
+    '<pattern id="hatch" patternUnits="userSpaceOnUse" width="5" height="5" '
+    'patternTransform="rotate(45)"><rect class="hatch-bg" width="5" height="5"/>'
+    '<rect class="hatch-ink" width="1.6" height="5"/></pattern></defs></svg>'
+)
 
 
 # --------------------------------------------------------------------------------------------
-# Small formatting helpers
+# Assets: stylesheet and fonts, read once from the package directory
+# --------------------------------------------------------------------------------------------
+def _font_url(name: str) -> str:
+    raw = (FONTS_DIR / name).read_bytes()
+    return f"url(data:font/woff2;base64,{base64.b64encode(raw).decode('ascii')}) format('woff2')"
+
+
+@lru_cache(maxsize=1)
+def font_faces() -> str:
+    """``@font-face`` rules with the WOFF2 files inlined as base64."""
+    return (
+        "@font-face{font-family:'Instrument Sans';font-style:normal;font-weight:400 700;"
+        f"font-display:block;src:{_font_url('instrument-sans.woff2')}}}\n"
+        "@font-face{font-family:'STIX Two Text';font-style:normal;font-weight:400;"
+        f"font-display:block;src:{_font_url('stix-r.woff2')}}}\n"
+        "@font-face{font-family:'STIX Two Text';font-style:italic;font-weight:400;"
+        "font-display:block;unicode-range:U+0041-005A,U+0061-007A;"
+        f"src:{_font_url('stix-il.woff2')}}}\n"
+        "@font-face{font-family:'STIX Two Text';font-style:italic;font-weight:400;"
+        "font-display:block;unicode-range:U+03B1,U+03B2,U+03B5,U+03C1,U+03C3;"
+        f"src:{_font_url('stix-ig.woff2')}}}\n"
+    )
+
+
+@lru_cache(maxsize=1)
+def base_css() -> str:
+    """The shared stylesheet text."""
+    return CSS_PATH.read_text(encoding="utf-8")
+
+
+def _window_css(windows: Sequence[int]) -> str:
+    """Radio-driven show/hide rules for the rolling windows (no JavaScript)."""
+    show = ", ".join(f"#win-{k}:checked ~ #rolling .w-{k}" for k in windows)
+    lab = ", ".join(f'#win-{k}:checked ~ #rolling label[for="win-{k}"]' for k in windows)
+    foc = ", ".join(f'#win-{k}:focus-visible ~ #rolling label[for="win-{k}"]' for k in windows)
+    if not windows:
+        return ""
+    return (
+        f"#rolling .win{{display:none}}\n{show}{{display:block}}\n"
+        f"{lab}{{background:var(--ink);color:var(--surface);border-color:var(--ink)}}\n"
+        f"{foc}{{outline:2px solid var(--focus);outline-offset:2px;position:relative;z-index:1}}\n"
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Formatting
 # --------------------------------------------------------------------------------------------
 def esc(value: object) -> str:
     """HTML-escape any value (quotes included)."""
@@ -185,34 +158,37 @@ def _fin(x: float | None) -> float | None:
     return float(x)
 
 
-def _sign_fmt(
-    x: float | None, digits: int, scale: float = 1.0, suffix: str = ""
-) -> tuple[str, str]:
-    """Format with an explicit +/- glyph. Returns (text, css class: pos|neg|zero)."""
-    v = _fin(x)
-    if v is None:
-        return "n/a", "zero"
-    s = f"{v * scale:.{digits}f}"
-    body = s.lstrip("-")
-    if not body.strip("0."):
-        return f"{body}{suffix}", "zero"
-    if s.startswith("-"):
-        return f"-{body}{suffix}", "neg"
-    return f"+{body}{suffix}", "pos"
-
-
-def _signed_html(x: float | None, digits: int, scale: float = 1.0, suffix: str = "") -> str:
-    """Sign-coloured number as an HTML span."""
-    text, cls = _sign_fmt(x, digits, scale, suffix)
-    return f'<span class="num {cls}">{esc(text)}</span>'
-
-
-def _plain(x: float | None, digits: int, scale: float = 1.0, suffix: str = "") -> str:
-    """Unsigned-colour number, ``n/a`` when not finite."""
+def _sgn(x: float | None, digits: int = 3, scale: float = 1.0, suffix: str = "") -> str:
+    """Signed number: ``+`` or a true minus on every value, zero unsigned, ``n/a`` if missing."""
     v = _fin(x)
     if v is None:
         return "n/a"
-    return f"{v * scale:.{digits}f}{suffix}"
+    s = f"{abs(v * scale):,.{digits}f}"
+    if float(s.replace(",", "")) == 0:
+        return s + suffix
+    return ("+" if v > 0 else MINUS) + s + suffix
+
+
+def _num(x: float | None, digits: int = 3, scale: float = 1.0, suffix: str = "") -> str:
+    """Unsigned-style number (true minus when negative), ``n/a`` if missing."""
+    v = _fin(x)
+    if v is None:
+        return "n/a"
+    s = f"{abs(v * scale):,.{digits}f}"
+    neg = v < 0 and float(s.replace(",", "")) != 0
+    return (MINUS if neg else "") + s + suffix
+
+
+def _pct(x: float | None, digits: int = 2, signed: bool = True) -> str:
+    """Decimal as a percentage."""
+    return (_sgn if signed else _num)(x, digits, 100.0, "%")
+
+
+def _tstat(z: float | None) -> str:
+    v = _fin(z)
+    if v is None:
+        return "n/a"
+    return _num(v, 0) if abs(v) >= 100 else _num(v, 1)
 
 
 def _pval(x: float | None) -> str:
@@ -223,1036 +199,1278 @@ def _pval(x: float | None) -> str:
     return "<0.001" if v < 0.001 else f"{v:.3f}"
 
 
-def _n(x: float) -> str:
-    """Compact coordinate formatting for SVG."""
-    s = f"{x:.1f}"
-    return s[:-2] if s.endswith(".0") else s
+def _d_long(d: date) -> str:
+    return f"{d.day} {MONTHS[d.month - 1]} {d.year}"
 
 
-def _empty(message: str) -> str:
-    """Explicit 'insufficient data' state."""
-    return f'<div class="empty" role="status">Insufficient data: {esc(message)}</div>'
+def _d_short(d: date) -> str:
+    return f"{MONTHS[d.month - 1]} {d.year}"
 
 
-def _decimals_for(step: float) -> int:
-    """Smallest number of decimals that represents ``step`` exactly."""
-    for d in range(0, 7):
-        if abs(round(step, d) - step) < 1e-9 * max(1.0, abs(step)):
+def _plural(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
+# --------------------------------------------------------------------------------------------
+# Scales and ticks
+# --------------------------------------------------------------------------------------------
+def _nice_step(span: float, target: int = 4) -> float:
+    raw = span / max(target, 1)
+    mag = 10 ** math.floor(math.log10(raw))
+    for m in (1, 2, 2.5, 5, 10):
+        if raw <= m * mag:
+            return m * mag
+    return 10 * mag
+
+
+def _nice_domain(lo: float, hi: float, target: int = 4) -> tuple[float, float, list[float]]:
+    """A round-number domain covering [lo, hi], with its tick values."""
+    if hi - lo < 1e-12:
+        hi, lo = hi + 0.5, lo - 0.5
+    step = _nice_step(hi - lo, target)
+    nlo = math.floor(lo / step - 1e-9) * step
+    nhi = math.ceil(hi / step + 1e-9) * step
+    ticks: list[float] = []
+    t = nlo
+    while t <= nhi + step / 2:
+        ticks.append(round(t, 10))
+        t += step
+    return nlo, nhi, ticks
+
+
+def _pos(v: float, lo: float, hi: float) -> float:
+    """Position of ``v`` in [lo, hi] as a percentage."""
+    return round((v - lo) / (hi - lo) * 100, 3)
+
+
+def _decimals(values: Sequence[float]) -> int:
+    """Fewest decimals (0-4) that print every value exactly enough for an axis label."""
+    for d in range(0, 5):
+        if all(abs(round(v, d) - v) < 1e-9 * max(1.0, abs(v)) for v in values):
             return d
-    return 6
+    return 4
 
 
-def _nice_ticks(lo: float, hi: float, n: int = 4) -> tuple[list[float], float]:
-    """Round-number ticks inside [lo, hi]. Returns (ticks, step); empty if not finite."""
-    if not (math.isfinite(lo) and math.isfinite(hi)) or hi < lo:
-        return [], 1.0
-    if hi == lo:
-        pad = abs(lo) * 0.05 or 1.0
-        lo, hi = lo - pad, hi + pad
-    span = hi - lo
-    base = 10.0 ** (math.floor(math.log10(span / max(n, 1))) - 1)
-    step = base * 100.0
-    for m in (1.0, 2.0, 2.5, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0):
-        if span / (m * base) <= n + 0.5:
-            step = m * base
-            break
-    first = math.ceil(lo / step - 1e-9)
-    last = math.floor(hi / step + 1e-9)
-    return [k * step for k in range(first, last + 1)], step
+def _decimate[T](items: list[T], max_n: int, value: Callable[[T], float]) -> list[T]:
+    """Deterministic min-max decimation to about ``max_n`` points (validation F11).
 
-
-def _scale(d0: float, d1: float, r0: float, r1: float) -> Callable[[float], float]:
-    """Linear scale; a degenerate domain maps to the middle of the range."""
-    if d1 == d0:
-        mid = (r0 + r1) / 2
-        return lambda _v: mid
-    k = (r1 - r0) / (d1 - d0)
-    return lambda v: r0 + (v - d0) * k
-
-
-def _path(points: Sequence[tuple[float, float] | None]) -> str:
-    """SVG path data; ``None`` entries break the line (warm-up gaps)."""
-    parts: list[str] = []
-    pen = False
-    for p in points:
-        if p is None:
-            pen = False
-            continue
-        parts.append(f"{'L' if pen else 'M'}{_n(p[0])} {_n(p[1])}")
-        pen = True
-    return " ".join(parts)
-
-
-def _decimate[T](items: list[T], max_n: int) -> list[T]:
-    """Deterministic stride decimation that always keeps the last element."""
-    if len(items) <= max_n or max_n < 2:
+    The series is cut into ``max_n // 2`` consecutive buckets; each bucket keeps its lowest and
+    highest point by ``value``, in their original order, so a one-day spike is never thinned
+    away the way a fixed stride would. The first and last points are always kept (at most
+    ``max_n + 2`` points in all).
+    """
+    n = len(items)
+    if n <= max_n or max_n < 4:
         return items
-    stride = math.ceil(len(items) / max_n)
-    out = items[::stride]
-    if out[-1] is not items[-1]:
-        out.append(items[-1])
-    return out
+    size = math.ceil(n / (max_n // 2))
+    keep = {0, n - 1}
+    for lo in range(0, n, size):
+        idx = range(lo, min(lo + size, n))
+        keep.add(min(idx, key=lambda i: value(items[i])))
+        keep.add(max(idx, key=lambda i: value(items[i])))
+    return [items[i] for i in sorted(keep)]
 
 
-def _date_ticks(d0: date, d1: date, max_ticks: int) -> list[tuple[date, str]]:
-    """Calendar ticks (years for long spans, months for short ones)."""
-    days = (d1 - d0).days
-    if days <= 0:
-        return [(d0, d0.isoformat())]
-    ticks: list[tuple[date, str]] = []
-    years = days / 365.25
-    if years >= 3:
-        step = max(1, math.ceil(years / max_ticks))
-        y = d0.year + (0 if d0 == date(d0.year, 1, 1) else 1)
-        while y <= d1.year:
-            ticks.append((date(y, 1, 1), str(y)))
-            y += step
-    else:
-        months = days / 30.4
-        step = next((k for k in (1, 2, 3, 6, 12) if months / k <= max_ticks), 12)
-        y, m = d0.year, d0.month + (0 if d0.day == 1 else 1)
-        m += (-(m - 1)) % step  # align to month 1, 1+step, ...
-        while True:
-            y, m = y + (m - 1) // 12, (m - 1) % 12 + 1
-            cur = date(y, m, 1)
-            if cur > d1:
-                break
-            ticks.append((cur, f"{y}-{m:02d}"))
-            m += step
+def _second(point: tuple[float, ...]) -> float:
+    """The plotted value of a ``(x, value, ...)`` point, the key for ``_decimate``."""
+    return point[1]
+
+
+def _quantile(xs: list[float], q: float) -> float:
+    s = sorted(xs)
+    k = (len(s) - 1) * q
+    f = math.floor(k)
+    c = min(f + 1, len(s) - 1)
+    return s[f] + (s[c] - s[f]) * (k - f)
+
+
+def _date_ticks(d0: date, d1: date) -> list[tuple[date, str, bool]]:
+    """Calendar ticks as (date, label, major). Quarterly for short spans, yearly for long ones."""
+    months = max((d1 - d0).days, 1) / 30.44
+    step = next((k for k in (3, 6, 12, 24, 60, 120) if months / k <= 14), 120)
+    out: list[date] = []
+    y, m = d0.year, d0.month
+    while True:
+        aligned = (m - 1) % step == 0 if step < 12 else (m == 1 and y % (step // 12) == 0)
+        cur = date(y, m, 1)
+        if cur > d1:
+            break
+        if aligned and cur >= d0:
+            out.append(cur)
+        m += 1
+        if m > 12:
+            y, m = y + 1, 1
+    ticks: list[tuple[date, str, bool]] = []
+    for i, cur in enumerate(out):
+        if step < 12:
+            ticks.append((cur, _d_short(cur), cur.month == 1))
+        else:
+            ticks.append((cur, str(cur.year), i % 2 == 0 or len(out) <= 6))
     return ticks
 
 
-def _fidx(name: str, order: Sequence[str]) -> int:
-    """Colour slot (0-4) for a factor: canonical position, else order of appearance."""
-    if name in FACTOR_NAMES:
-        return FACTOR_NAMES.index(name)
-    return order.index(name) % 5 if name in order else 0
+def _edge(x: float) -> str:
+    """Tick labels at the plot edges are anchored inward so they never overflow."""
+    return "edge-l" if x < 3 else ("edge-r" if x > 97 else "")
 
 
+def _path_xy(points: Sequence[tuple[float, float]]) -> str:
+    return "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in points)
+
+
+# --------------------------------------------------------------------------------------------
+# Factor helpers
+# --------------------------------------------------------------------------------------------
 def _factor_order(report: FactorReport) -> list[str]:
     """Factor names in display order."""
     names = [f.name for f in report.regression.factors]
     return names or list(report.return_contribution.factors)
 
 
-def _foot(report: FactorReport, caption: str, labels: Sequence[str]) -> str:
-    """Panel footnote: the section caption followed by its standard labels (M0.9)."""
-    texts = [report.label_text.get(k, LABEL_TEXT.get(k, "")) for k in labels]
-    return " ".join(t for t in [caption, *texts] if t)
+def _slot(name: str, order: Sequence[str]) -> int:
+    """Colour slot 1-5: canonical position, else order of appearance."""
+    if name in FACTOR_NAMES:
+        return FACTOR_NAMES.index(name) + 1
+    return order.index(name) % 5 + 1 if name in order else 1
 
 
-def _reliable(s: FactorStat) -> bool:
+def _plain_name(name: str) -> str:
+    return PLAIN.get(name, "")
+
+
+def _sub(text: str, cls: str = "") -> str:
+    return f'<span class="sub{" " + cls if cls else ""}">{esc(text)}</span>' if text else ""
+
+
+def _is_reliable(s: FactorStat) -> bool:
     return s.tag == "reliable"
 
 
-def _ci_excludes_zero(s: FactorStat) -> bool:
-    lo, hi = _fin(s.ci_low), _fin(s.ci_high)
-    return lo is not None and hi is not None and (lo > 0 or hi < 0)
+def _label_texts(report: FactorReport, keys: Sequence[str], skip: str = "L-DESC") -> list[str]:
+    """Standard footnote texts for ``keys`` (M0.9), without the one shown in the open."""
+    return [report.label_text[k] for k in keys if k != skip and k in report.label_text]
 
 
-def _svg_open(w: float, h: float, uid: str, title: str) -> str:
-    """Opening tag + accessible title. The title doubles as the aria-label."""
+def _desc(report: FactorReport) -> str:
+    """The standard 'descriptive, in-sample' sentence that opens most footnotes."""
+    return report.label_text.get("L-DESC", "Descriptive, in-sample, not predictive.")
+
+
+# --------------------------------------------------------------------------------------------
+# Small pieces
+# --------------------------------------------------------------------------------------------
+def _footnote(text: str, more: Sequence[str] = ()) -> str:
+    """One or two visible sentences; method detail folds into a native ``<details>``."""
+    paras = "".join(f"<p>{esc(m)}</p>" for m in more if m)
+    if not paras:
+        return f'<p class="foot">{esc(text)}</p>'
     return (
-        f'<svg class="chart" viewBox="0 0 {_n(w)} {_n(h)}" role="img" aria-label="{esc(title)}" '
-        f'aria-labelledby="{uid}-t"><title id="{uid}-t">{esc(title)}</title>'
+        f'<div class="foot"><p>{esc(text)}</p><details class="how"><summary>How this is '
+        f"computed</summary>{paras}</details></div>"
     )
 
 
-def _variants(builder: Callable[[int, str], str], wide: int, narrow: int, uid: str) -> str:
-    """Emit a wide and a narrow rendering; CSS shows the one that suits the viewport."""
-    w = builder(wide, f"{uid}-w")
-    n = builder(narrow, f"{uid}-n")
-    if w.startswith('<div class="empty"'):
-        return w
-    return f'<div class="v-wide">{w}</div><div class="v-narrow">{n}</div>'
+def _panel_head(pid: str, title: str, question: str, extra: str = "") -> str:
+    return (
+        f'<header class="panel-head"><div><h2 id="{pid}-t">{esc(title)}</h2>'
+        f'<p class="q">{esc(question)}</p></div>{extra}</header>'
+    )
 
 
-def _panel(
-    title: str, sub: str, body: str, foot: str | None = FOOT, cls: str = "", pid: str = ""
+def _empty(what: str, action: str = "") -> str:
+    """Empty state: the reason in ink, one next step in a quieter colour."""
+    do = f'<p class="empty-do">{esc(action)}</p>' if action else ""
+    return f'<div class="empty" role="note"><p class="empty-what">{esc(what)}</p>{do}</div>'
+
+
+def _nodata(what: str, action: str = "") -> str:
+    """Empty state for a gap the renderer itself found."""
+    return _empty(f"Insufficient data: {what}", action)
+
+
+def _section(pid: str, head: str, body: str) -> str:
+    return f'<section class="panel" id="{pid}" aria-labelledby="{pid}-t">{head}{body}</section>'
+
+
+def _legend(items: Sequence[str]) -> str:
+    inner = "".join(f"<li>{i}</li>" for i in items)
+    return f'<ul class="legend" aria-label="Legend">{inner}</ul>'
+
+
+def _sw_rect(cls: str, faded: bool = False) -> str:
+    if faded:
+        return (
+            f'<svg class="sw" aria-hidden="true"><rect class="{cls} faded" x="0.5" y="0.5" '
+            'width="13" height="9" rx="2"/></svg>'
+        )
+    return (
+        f'<svg class="sw" aria-hidden="true"><rect class="{cls}" width="14" height="10" '
+        'rx="2"/></svg>'
+    )
+
+
+def _axis_row(
+    ticks: list[float], lo: float, hi: float, fmt: Callable[[float], str], ncols: int
 ) -> str:
-    """Standard bordered panel with optional footnote."""
-    ident = f' id="{pid}"' if pid else ""
-    sub_html = f'<span class="sub">{esc(sub)}</span>' if sub else ""
-    foot_html = f'<p class="foot">{esc(foot)}</p>' if foot else ""
+    k0 = next((k for k, t in enumerate(ticks) if abs(t) < 1e-12), 0)  # the zero label survives
+    labels = "".join(
+        f'<span class="{_edge(_pos(t, lo, hi))}'
+        f'{" alt" if ((k - k0) % 2 and len(ticks) > 5) else ""}" '
+        f'style="left:{_pos(t, lo, hi)}%">{esc(fmt(t))}</span>'
+        for k, t in enumerate(ticks)
+    )
     return (
-        f'<section class="panel {cls}"{ident}><header><h2>{esc(title)}</h2>{sub_html}</header>'
-        f'<div class="body">{body}</div>{foot_html}</section>'
+        f'<tr class="axis-row" aria-hidden="true"><td></td><td class="axis">{labels}</td>'
+        f'<td colspan="{ncols}"></td></tr>'
     )
 
 
-# --------------------------------------------------------------------------------------------
-# Charts
-# --------------------------------------------------------------------------------------------
-def _price_svg(ps: PriceSeries, ticker: str, w: int, uid: str) -> str:
-    """Adjusted-close line; points after factor coverage are muted and labelled."""
-    pts = [
-        (d, v)
-        for d, v in zip(ps.dates, ps.adj_close, strict=True)
-        if _fin(v) is not None and v is not None
-    ]
-    if len(pts) < 2:
-        return _empty("fewer than two price points")
-    narrow = w < 500
-    h = 190 if narrow else 270
-    ml, mr, mt, mb = (40 if narrow else 48), 10, 10, 22
-    d0, d1 = pts[0][0], pts[-1][0]
-    xs = _scale(d0.toordinal(), d1.toordinal(), ml, w - mr)
-    vals = [v for _, v in pts]
-    ticks, _step = _nice_ticks(min(vals), max(vals), 4 if not narrow else 3)
-    lo = min(min(vals), ticks[0] if ticks else min(vals))
-    hi = max(max(vals), ticks[-1] if ticks else max(vals))
-    if hi == lo:
-        lo, hi = lo - 1, hi + 1
-    ys = _scale(lo, hi, h - mb, mt)
-    dec = _decimals_for(_step) if ticks else 0
-    out = [_svg_open(w, h, uid, f"{ticker} adjusted close price over time")]
-    for tv in ticks:
-        y = ys(tv)
-        out.append(f'<line class="axis" x1="{ml}" x2="{w - mr}" y1="{_n(y)}" y2="{_n(y)}"/>')
-        out.append(
-            f'<text class="tm" x="{ml - 6}" y="{_n(y + 3.5)}" text-anchor="end">{tv:.{dec}f}</text>'
-        )
-    for dt, label in _date_ticks(d0, d1, 4 if narrow else 7):
-        x = xs(dt.toordinal())
-        anchor = "end" if x > w - 24 else "middle"
-        out.append(
-            f'<line class="axis" x1="{_n(x)}" x2="{_n(x)}" y1="{h - mb}" y2="{h - mb + 4}"/>'
-        )
-        out.append(
-            f'<text class="tm" x="{_n(x)}" y="{h - 6}" text-anchor="{anchor}">{esc(label)}</text>'
-        )
-    cov = ps.factor_coverage_end
-    main = [(xs(d.toordinal()), ys(v)) for d, v in pts if d <= cov]
-    tail = [(xs(d.toordinal()), ys(v)) for d, v in pts if d >= cov]
-    if main and len(pts) > len(main):
-        # tail starts from the last covered point so the line is continuous
-        tail = [main[-1]] + [(xs(d.toordinal()), ys(v)) for d, v in pts if d > cov]
-    if len(tail) > 1 and main:
-        x_cov = main[-1][0]
-        tail_mid = sum(y for _, y in tail) / len(tail)
-        # keep the label clear of the line: bottom if the tail runs high, top otherwise
-        label_y = h - mb - 6 if tail_mid < (mt + h - mb) / 2 else mt + 12
-        out.append(
-            f'<rect x="{_n(x_cov)}" y="{mt}" width="{_n(w - mr - x_cov)}" height="{h - mb - mt}" '
-            'fill="var(--tail)"/>'
-        )
-        out.append(
-            f'<line x1="{_n(x_cov)}" x2="{_n(x_cov)}" y1="{mt}" y2="{h - mb}" '
-            'stroke="var(--ink-3)" stroke-dasharray="2 3"/>'
-        )
-        out.append(
-            f'<text class="tm" x="{w - mr - 4}" y="{label_y}" text-anchor="end">'
-            "no factor data</text>"
-        )
-    elif not main:
-        out.append(
-            f'<rect x="{ml}" y="{mt}" width="{w - mr - ml}" height="{h - mb - mt}" '
-            'fill="var(--tail)"/>'
-        )
-        tail = [(xs(d.toordinal()), ys(v)) for d, v in pts]
-    if len(main) > 1:
-        out.append(
-            f'<path d="{_path(_decimate(main, 700))}" fill="none" stroke="var(--ink)" '
-            'stroke-width="1.5" stroke-linejoin="round"/>'
-        )
-    if len(tail) > 1:
-        out.append(
-            f'<path d="{_path(_decimate(tail, 300))}" fill="none" stroke="var(--ink-3)" '
-            'stroke-width="1.5" stroke-dasharray="4 3" stroke-linejoin="round"/>'
-        )
-    out.append("</svg>")
+def _grid_lines(ticks: list[float], lo: float, hi: float) -> str:
+    out: list[str] = []
+    for t in ticks:
+        cls = "zero" if abs(t) < 1e-12 else "grid"
+        p = _pos(t, lo, hi)
+        out.append(f'<line class="{cls}" x1="{p}%" x2="{p}%" y1="0" y2="100%"/>')
     return "".join(out)
 
 
-def _stat_points(stat: FactorStat, avg: float | None) -> list[float]:
-    """Finite x-values a beta row needs on the axis."""
-    cands = [stat.beta, stat.ci_low, stat.ci_high, avg, 0.0]
-    return [v for v in (_fin(c) for c in cands) if v is not None]
+def _bar(v: float, lo: float, hi: float, cls: str) -> str:
+    a, b = sorted((_pos(0.0, lo, hi), _pos(v, lo, hi)))
+    return f'<rect class="{cls}" x="{a}%" y="32%" width="{max(b - a, 0.0)}%" height="36%" rx="2"/>'
 
 
-def _betas_svg(report: FactorReport, w: int, uid: str) -> str:
-    """Diverging beta bars, 95% CI whiskers, hatched when not BH-significant, avg marker."""
-    stats = report.regression.factors
-    if not stats or all(_fin(s.beta) is None for s in stats):
-        return _empty("no factor betas available")
-    order = _factor_order(report)
-    avg_map = {a.name: _fin(a.mean) for a in report.average_beta.factors}
-    allv = [v for s in stats for v in _stat_points(s, avg_map.get(s.name))]
-    m = max(abs(v) for v in allv) * 1.08 or 1.0
-    narrow = w < 400
-    lc, rc = 50, (112 if narrow else 124)  # room for "z +151.8 reliable" right of the plot
-    rowh, top, bot = 40, 6, 22
-    h = top + rowh * len(stats) + bot
-    xs = _scale(-m, m, lc, w - rc)
-    out = [_svg_open(w, h, uid, "Factor betas with 95% confidence intervals")]
-    out.append("<defs>")
-    for i in range(5):
-        out.append(
-            f'<pattern id="{uid}-h{i}" width="5" height="5" patternUnits="userSpaceOnUse" '
-            f'patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" class="sk{i}" '
-            'stroke-width="1.8"/></pattern>'
-        )
-    out.append("</defs>")
-    ticks, step = _nice_ticks(-m, m, 4)
-    dec = _decimals_for(step) if ticks else 1
-    for tv in ticks:
-        x = xs(tv)
-        out.append(f'<line class="axis" x1="{_n(x)}" x2="{_n(x)}" y1="{top}" y2="{h - bot}"/>')
-        label = f"{tv:.{dec}f}" if abs(tv) > 1e-12 else "0"
-        out.append(f'<text class="tm" x="{_n(x)}" y="{h - 7}" text-anchor="middle">{label}</text>')
-    out.append(
-        f'<line class="zero-line" x1="{_n(xs(0))}" x2="{_n(xs(0))}" y1="{top}" y2="{h - bot}"/>'
-    )
-    for r, s in enumerate(stats):
-        i = _fidx(s.name, order)
-        cy = top + rowh * r + 17
-        out.append(f'<text class="tv" x="2" y="{_n(cy + 4)}">{esc(s.name)}</text>')
-        beta = _fin(s.beta)
-        if beta is None:
-            out.append(
-                f'<text class="tm" x="{w - 2}" y="{_n(cy + 4)}" text-anchor="end">n/a</text>'
-            )
-            continue
-        x0, x1 = sorted((xs(0), xs(beta)))
-        bw = max(x1 - x0, 1.0)
-        tip = (
-            f"{s.name}: beta {_plain(s.beta, 4)}, 95% CI {_plain(s.ci_low, 4)} to "
-            f"{_plain(s.ci_high, 4)}, p {_pval(s.p)}, BH-adjusted p {_pval(s.p_adj_bh)}"
-        )
-        if not _reliable(s) and _ci_excludes_zero(s):
-            tip += "; not significant after correcting for testing 5 betas"
-        if _reliable(s):
-            out.append(
-                f'<rect class="fc{i}" x="{_n(x0)}" y="{_n(cy - 8)}" width="{_n(bw)}" height="16">'
-                f"<title>{esc(tip)}</title></rect>"
-            )
-        else:
-            out.append(
-                f'<rect class="sk{i}" x="{_n(x0)}" y="{_n(cy - 8)}" width="{_n(bw)}" height="16" '
-                f'fill="url(#{uid}-h{i})" stroke-width="1" stroke-opacity=".85">'
-                f"<title>{esc(tip)}</title></rect>"
-            )
-        lo, hi = _fin(s.ci_low), _fin(s.ci_high)
-        if lo is not None and hi is not None:
-            xl, xh = xs(lo), xs(hi)
-            for stroke, sw in (("var(--surface)", 3.6), ("var(--ink)", 1.3)):
-                out.append(
-                    f'<path d="M{_n(xl)} {_n(cy)}H{_n(xh)}M{_n(xl)} {_n(cy - 4)}V{_n(cy + 4)}'
-                    f'M{_n(xh)} {_n(cy - 4)}V{_n(cy + 4)}" stroke="{stroke}" '
-                    f'stroke-width="{sw}" fill="none"/>'
-                )
-        avg = avg_map.get(s.name)
-        if avg is not None:
-            ax = xs(avg)
-            out.append(
-                f'<path d="M{_n(ax)} {_n(cy + 9)}l4 4.5l-4 4.5l-4 -4.5z" fill="var(--surface)" '
-                'stroke="var(--ink)" stroke-width="1.3"/>'
-            )
-        text, cls = _sign_fmt(beta, 3)
-        out.append(
-            f'<text class="t {"tp" if cls == "pos" else "tn" if cls == "neg" else ""}" '
-            f'x="{w - 2}" y="{_n(cy - 2)}" text-anchor="end">{esc(text)}</text>'
-        )
-        z_text, _ = _sign_fmt(s.z, 1)
-        tag = "reliable" if _reliable(s) else "noise"
-        out.append(
-            f'<text class="tm" x="{w - 2}" y="{_n(cy + 11)}" text-anchor="end">'
-            f"z {esc(z_text)} {tag}</text>"
-        )
-    out.append("</svg>")
-    return "".join(out)
-
-
-def _betas_table(report: FactorReport) -> str:
-    """Visually hidden data table: the accessible equivalent of the betas chart."""
-    avg_map = {a.name: a for a in report.average_beta.factors}
-    rows: list[str] = []
-    for s in report.regression.factors:
-        a = avg_map.get(s.name)
-        rows.append(
-            "<tr>"
-            f"<th scope='row'>{esc(s.name)}</th><td>{_plain(s.beta, 4)}</td>"
-            f"<td>{_plain(s.ci_low, 4)} to {_plain(s.ci_high, 4)}</td>"
-            f"<td>{_pval(s.p)}</td><td>{_pval(s.p_adj_bh)}</td>"
-            f"<td>{'reliable' if _reliable(s) else 'noise'}</td>"
-            f"<td>{_plain(a.mean if a else None, 4)}</td></tr>"
-        )
+def _bar_cell(title: str, ticks: list[float], lo: float, hi: float, marks: str = "") -> str:
     return (
-        '<div class="sr-only"><table id="betas-data"><caption>Full-sample factor betas</caption>'
-        "<thead><tr><th>Factor</th><th>Beta</th><th>95% CI</th><th>p</th><th>BH-adjusted p</th>"
-        f"<th>Result</th><th>Mean rolling {report.average_beta.window}d beta</th></tr></thead>"
-        f"<tbody>{''.join(rows)}</tbody></table></div>"
+        f'<td class="plot-cell"><svg class="bar-svg" aria-hidden="true"><title>{esc(title)}</title>'
+        f"{_grid_lines(ticks, lo, hi)}{marks}</svg></td>"
     )
 
 
-def _extent_axis(
-    lo: float, hi: float, a0: float, a1: float, n: int
-) -> tuple[Callable[[float], float], list[float], int]:
-    """Scale for [lo, hi] (ticks included) with its tick values and decimals."""
-    ticks, step = _nice_ticks(lo, hi, n)
-    if ticks:
-        lo, hi = min(lo, ticks[0]), max(hi, ticks[-1])
-    return _scale(lo, hi, a0, a1), ticks, _decimals_for(step) if ticks else 1
-
-
-def _waterfall_svg(report: FactorReport, w: int, uid: str) -> str:
-    """Horizontal waterfall: each factor, then alpha, summing to the annualised mean excess."""
-    rc = report.return_contribution
-    order = _factor_order(report)
-    rows: list[tuple[str, float | None, int | None, str]] = [
-        (n, _fin(rc.factors.get(n)), _fidx(n, order), "factor") for n in order
-    ]
-    rows.append(("Alpha", _fin(rc.alpha), None, "alpha"))
-    total = _fin(rc.total_annualised_mean_excess_return)
-    if all(v is None for _, v, _, _ in rows) and total is None:
-        return _empty("no return attribution available")
-    # cumulative bounds
-    bounds: list[tuple[float, float] | None] = []
-    cum = 0.0
-    for _, v, _, _ in rows:
-        if v is None:
-            bounds.append(None)
-            continue
-        bounds.append((cum, cum + v))
-        cum += v
-    extent = [0.0, cum] + ([total] if total is not None else [])
-    extent += [b for pair in bounds if pair for b in pair]
-    lo, hi = min(extent) * 100, max(extent) * 100
-    if hi - lo < 1e-9:
-        lo, hi = lo - 1, hi + 1
-    lo, hi = lo - (hi - lo) * 0.03, hi + (hi - lo) * 0.03
-    narrow = w < 400
-    lc, rcw = 52, 64
-    rowh, top, bot = 28, 4, 22
-    n_rows = len(rows) + 1
-    h = top + rowh * n_rows + bot
-    xs, ticks, dec = _extent_axis(lo, hi, lc, w - rcw, 3 if narrow else 5)
-    out = [_svg_open(w, h, uid, "Annualised return contribution by factor, alpha and total")]
-    for tv in ticks:
-        x = xs(tv)
-        out.append(f'<line class="axis" x1="{_n(x)}" x2="{_n(x)}" y1="{top}" y2="{h - bot}"/>')
-        out.append(
-            f'<text class="tm" x="{_n(x)}" y="{h - 7}" text-anchor="middle">{tv:.{dec}f}%</text>'
-        )
-    out.append(
-        f'<line class="zero-line" x1="{_n(xs(0))}" x2="{_n(xs(0))}" y1="{top}" y2="{h - bot}"/>'
-    )
-    prev_end: tuple[float, float] | None = None
-    for r, (name, v, idx, kind) in enumerate(rows):
-        cy = top + rowh * r + rowh / 2
-        out.append(f'<text class="tv" x="2" y="{_n(cy + 4)}">{esc(name)}</text>')
-        pair = bounds[r]
-        if v is None or pair is None:
-            out.append(
-                f'<text class="tm" x="{w - 2}" y="{_n(cy + 4)}" text-anchor="end">n/a</text>'
-            )
-            continue
-        xa, xb = xs(pair[0] * 100), xs(pair[1] * 100)
-        x0, x1 = sorted((xa, xb))
-        fill = f"fc{idx}" if idx is not None else ""
-        style = ' fill="var(--accent)"' if kind == "alpha" else ""
-        out.append(
-            f'<rect class="{fill}" x="{_n(x0)}" y="{_n(cy - 8)}" width="{_n(max(x1 - x0, 1))}" '
-            f'height="16"{style}/>'
-        )
-        if prev_end is not None:
-            out.append(
-                f'<line x1="{_n(prev_end[0])}" x2="{_n(xa)}" y1="{_n(prev_end[1])}" '
-                f'y2="{_n(cy - 8)}" stroke="var(--ink-3)" stroke-width="1" '
-                'stroke-dasharray="2 2"/>'
-            )
-        prev_end = (xb, cy + 8)
-        text, cls = _sign_fmt(v, 2, 100, "%")
-        out.append(
-            f'<text class="t {"tp" if cls == "pos" else "tn" if cls == "neg" else ""}" '
-            f'x="{w - 2}" y="{_n(cy + 4)}" text-anchor="end">{esc(text)}</text>'
-        )
-    # total row
-    cy = top + rowh * len(rows) + rowh / 2
-    out.append(
-        f'<line x1="2" x2="{w - 2}" y1="{_n(cy - rowh / 2)}" y2="{_n(cy - rowh / 2)}" '
-        'stroke="var(--border)"/>'
-    )
-    out.append(f'<text class="tv" x="2" y="{_n(cy + 4)}" font-weight="600">Total</text>')
-    if total is None:
-        out.append(f'<text class="tm" x="{w - 2}" y="{_n(cy + 4)}" text-anchor="end">n/a</text>')
-    else:
-        x0, x1 = sorted((xs(0), xs(total * 100)))
-        out.append(
-            f'<rect x="{_n(x0)}" y="{_n(cy - 8)}" width="{_n(max(x1 - x0, 1))}" height="16" '
-            'fill="var(--ink-2)"/>'
-        )
-        text, cls = _sign_fmt(total, 2, 100, "%")
-        out.append(
-            f'<text class="tv {"tp" if cls == "pos" else "tn" if cls == "neg" else ""}" '
-            f'x="{w - 2}" y="{_n(cy + 4)}" text-anchor="end" font-weight="600">{esc(text)}</text>'
-        )
-    out.append("</svg>")
-    return "".join(out)
-
-
-def _risk_svg(report: FactorReport, w: int, uid: str) -> str:
-    """Horizontal bars of variance share, sorted, with an idiosyncratic row."""
-    rk = report.risk_contribution
-    order = _factor_order(report)
-    items: list[tuple[str, float | None, int | None]] = [
-        (n, _fin(rk.factors.get(n)), _fidx(n, order)) for n in order
-    ]
-    if all(v is None for _, v, _ in items) and _fin(rk.idiosyncratic) is None:
-        return _empty("no risk attribution available")
-    # Factors by share descending (ties: canonical order), idiosyncratic always last (M7).
-    rank = {name: i for i, name in enumerate(rk.order)}
-    items.sort(key=lambda it: (it[1] is None, rank.get(it[0], len(rank)), -(it[1] or 0.0)))
-    items.append((IDIO, _fin(rk.idiosyncratic), None))
-    detail = {d.name: d for d in rk.details}
-    vals = [v * 100 for _, v, _ in items if v is not None]
-    lo, hi = min(0.0, min(vals)), max(0.0, max(vals))
-    if hi - lo < 1e-9:
-        hi = lo + 1
-    hi = hi + (hi - lo) * 0.03
-    lo = lo - (hi - lo) * 0.03 if lo < 0 else lo
-    lc, rcw = 86, 52
-    rowh, top, bot = 28, 4, 22
-    h = top + rowh * len(items) + bot
-    xs, ticks, dec = _extent_axis(lo, hi, lc, w - rcw, 3 if w < 400 else 5)
-    out = [_svg_open(w, h, uid, "Share of total variance by factor and idiosyncratic")]
-    for tv in ticks:
-        x = xs(tv)
-        out.append(f'<line class="axis" x1="{_n(x)}" x2="{_n(x)}" y1="{top}" y2="{h - bot}"/>')
-        out.append(
-            f'<text class="tm" x="{_n(x)}" y="{h - 7}" text-anchor="middle">{tv:.{dec}f}%</text>'
-        )
-    out.append(
-        f'<line class="zero-line" x1="{_n(xs(0))}" x2="{_n(xs(0))}" y1="{top}" y2="{h - bot}"/>'
-    )
-    for r, (name, v, idx) in enumerate(items):
-        cy = top + rowh * r + rowh / 2
-        out.append(f'<text class="tv" x="2" y="{_n(cy + 4)}">{esc(name)}</text>')
-        if v is None:
-            out.append(
-                f'<text class="tm" x="{w - 2}" y="{_n(cy + 4)}" text-anchor="end">n/a</text>'
-            )
-            continue
-        x0, x1 = sorted((xs(0), xs(v * 100)))
-        bw = max(x1 - x0, 1.0)
-        d = detail.get(name)
-        tip = f"{name}: {v * 100:.2f}% of variance"
-        if d is not None:
-            tip += (
-                f"; beta {_plain(d.beta, 3)}, factor volatility {_plain(d.sigma_annual, 1, 100)}%"
-                f" a year, correlation with the systematic return {_plain(d.rho_sys, 2)}"
-            )
-        if idx is None:
-            out.append(
-                f'<rect x="{_n(x0)}" y="{_n(cy - 8)}" width="{_n(bw)}" height="16" fill="none" '
-                f'stroke="var(--ink-2)" stroke-dasharray="3 2"><title>{esc(tip)}</title></rect>'
-            )
-        else:
-            out.append(
-                f'<rect class="fc{idx}" x="{_n(x0)}" y="{_n(cy - 8)}" width="{_n(bw)}" '
-                f'height="16"><title>{esc(tip)}</title></rect>'
-            )
-        label = f"{v * 100:.2f}"
-        if label == "-0.00":
-            label = "0.00"
-        cls = ' class="t tn"' if label.startswith("-") else ' class="t"'
-        out.append(f'<text{cls} x="{w - 2}" y="{_n(cy + 4)}" text-anchor="end">{label}%</text>')
-    out.append("</svg>")
-    return "".join(out)
-
-
-def _rolling_svg(
-    name: str, idx: int, wins: list[RollingWindow], full_beta: float | None, uid: str
-) -> str:
-    """One small multiple: all windows overlaid for a single factor (thicker = longer window)."""
-    w, h = 320, 132
-    ml, mr, mt, mb = 36, 8, 8, 20
-    series: list[tuple[int, list[tuple[date, float | None]]]] = []
-    band: list[tuple[date, float, float]] = []
-    for win in sorted(wins, key=lambda x: -x.window):
-        beta = win.betas.get(name)
-        if beta is None:
-            continue
-        series.append((win.window, [(d, _fin(v)) for d, v in zip(win.dates, beta, strict=True)]))
-        se = win.se.get(name)
-        z = win.ci_z
-        if not band and se is not None and z is not None:  # band for the longest window only
-            for d, b, s in zip(win.dates, beta, se, strict=True):
-                bv, sv = _fin(b), _fin(s)
-                if bv is not None and sv is not None:
-                    band.append((d, bv - z * sv, bv + z * sv))
-    finite = [(d, v) for _, s in series for d, v in s if v is not None]
-    if len(finite) < 2:
-        return f'<div class="empty" role="status">Insufficient data: {esc(name)} warm-up</div>'
-    dates = [d for d, _ in finite]
-    d0, d1 = min(dates), max(dates)
-    vals = [v for _, v in finite] + [x for _, lo, hi in band for x in (lo, hi)]
-    if full_beta is not None:
-        vals.append(full_beta)
-    ys, ticks, dec = _extent_axis(min(vals), max(vals), h - mb, mt, 3)
-    xs = _scale(d0.toordinal(), d1.toordinal(), ml, w - mr)
-    out = [
-        _svg_open(
-            w,
-            h,
-            uid,
-            f"Rolling beta to {name}, windows of "
-            + " and ".join(str(s[0]) for s in series)
-            + " trading days",
-        )
-    ]
-    for tv in ticks:
-        y = ys(tv)
-        out.append(f'<line class="axis" x1="{ml}" x2="{w - mr}" y1="{_n(y)}" y2="{_n(y)}"/>')
-        out.append(
-            f'<text class="tm" x="{ml - 5}" y="{_n(y + 3.5)}" text-anchor="end">{tv:.{dec}f}</text>'
-        )
-    for dt, label in _date_ticks(d0, d1, 4):
-        x = xs(dt.toordinal())
-        out.append(
-            f'<text class="tm" x="{_n(x)}" y="{h - 6}" '
-            f'text-anchor="{"end" if x > w - 24 else "middle"}">{esc(label)}</text>'
-        )
-    if len(band) > 1:
-        thin = _decimate(band, 400)
-        upper = [(xs(d.toordinal()), ys(hi)) for d, _, hi in thin]
-        lower = [(xs(d.toordinal()), ys(lo)) for d, lo, _ in reversed(thin)]
-        out.append(
-            f'<path d="{_path([*upper, *lower])} Z" class="fc{idx}" fill-opacity=".16" '
-            'stroke="none"/>'
-        )
-    if full_beta is not None:
-        y = ys(full_beta)
-        out.append(
-            f'<line x1="{ml}" x2="{w - mr}" y1="{_n(y)}" y2="{_n(y)}" stroke="var(--ink-3)" '
-            'stroke-dasharray="2 3"/>'
-        )
-    for rank, (_, s) in enumerate(series):
-        pts = [None if v is None else (xs(d.toordinal()), ys(v)) for d, v in s]
-        width, op = ("1.8", "1") if rank == 0 else ("1", ".55")
-        out.append(
-            f'<path d="{_path(_decimate(pts, 500))}" fill="none" class="sk{idx}" '
-            f'stroke-width="{width}" stroke-opacity="{op}" stroke-linejoin="round"/>'
-        )
-    out.append("</svg>")
-    return "".join(out)
-
-
-# --------------------------------------------------------------------------------------------
-# Sections
-# --------------------------------------------------------------------------------------------
-def _audit_counts(report: FactorReport) -> tuple[int, int, int]:
-    """(errors, warnings, infos)."""
-    f = report.data.audit_findings
+def _name_cell(name: str, plain: str, key: str = "", mob: str = "") -> str:
     return (
-        sum(1 for x in f if x.severity == "error"),
-        sum(1 for x in f if x.severity == "warning"),
-        sum(1 for x in f if x.severity == "info"),
+        f'<th scope="row"><span class="fname">{key}{esc(name)}</span>{_sub(plain)}'
+        f"{_sub(mob, 'mob')}</th>"
+    )
+
+
+def _key_swatch(cls: str) -> str:
+    return (
+        f'<svg class="key" aria-hidden="true"><rect class="{cls}" width="8" height="8" '
+        'rx="1"/></svg>'
+    )
+
+
+def _sig_head() -> str:
+    return (
+        '<th scope="col" class="num"><span class="long">Significant</span>'
+        '<span class="short" aria-hidden="true">Sig.</span></th>'
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Header, notice, equation, KPI strip
+# --------------------------------------------------------------------------------------------
+def _range_line(report: FactorReport) -> str:
+    d = report.data
+    s = (
+        f"Analysed {_d_long(d.actual_start)} to {_d_long(d.actual_end)}, "
+        f"{_plural(d.n_obs, 'trading day', 'trading days')}."
+    )
+    tail_n = d.uncovered.n
+    if tail_n == 1:
+        s += " The last price day is charted but not analysed."
+    elif tail_n:
+        s += f" The last {tail_n} price days are charted but not analysed."
+    # The price day just before the first return is that return's base price, not a gap.
+    head_n = max(sum(1 for x in report.price_series.dates if x < d.actual_start) - 1, 0)
+    if head_n == 1:
+        s += " The first price day is also not analysed."
+    elif head_n:
+        s += f" The first {head_n} price days are also not analysed."
+    return s
+
+
+def _notice_items(report: FactorReport) -> list[tuple[str, str]]:
+    """(code, message) for every warning, including the quality-gate caveat when it fired."""
+    items = [(w.code, w.message) for w in report.warnings]
+    gate = report.quality_gate
+    if gate.fired and gate.message and not any(c == "residual_reversal" for c, _ in items):
+        items.insert(0, ("residual_reversal", gate.message))
+    return items
+
+
+def _gate_detail(report: FactorReport) -> str:
+    """The 5-day estimate line shown under the notice's Details (methodology M3.6)."""
+    gate, five = report.quality_gate, report.five_day_regression
+    if not gate.fired:
+        return ""
+    if five.status == "ok":
+        return (
+            f"<p>5-day estimate ({five.n_blocks:,} blocks): alpha {esc(_pct(five.alpha_annual))} "
+            f"a year, t {esc(_tstat(five.alpha_z))}, p {_pval(five.alpha_p)}, "
+            f"{esc(five.alpha_tag or 'n/a')}; R² {_num(five.r2, 4)}. "
+            'The full table is under <a href="#detail">Regression detail</a>.</p>'
+        )
+    if five.reason:
+        return f"<p>5-day estimate: {esc(five.reason)}.</p>"
+    return ""
+
+
+def _notice(report: FactorReport, items: list[tuple[str, str]]) -> str:
+    if not items:
+        return ""
+    plain: list[str] = []
+    for code, message in items:
+        text = WARN_PLAIN.get(code, message)
+        if text not in plain:
+            plain.append(text)
+    summary = " ".join(plain[:2])
+    if len(plain) > 2:
+        summary += f" {len(plain) - 2} more are listed under Details."
+    more = "".join(f"<li>{esc(m)}</li>" for _, m in items)
+    return (
+        f'<aside class="notice" id="notice" aria-label="Data quality">{GLYPH_WARN}'
+        f'<div><p class="notice-sum"><span class="vh">Warning: </span>{esc(summary)}</p>'
+        f'<details class="how"><summary>Details</summary><ul>{more}</ul>'
+        f"{_gate_detail(report)}</details></div></aside>"
     )
 
 
 def _header(report: FactorReport) -> str:
-    """Ticker, as-of, factor data end and data-lag badge."""
     d = report.data
-    as_of = report.generated_at.date()
-    lag = (as_of - d.factors_last_date).days
-    tone = "ok" if lag <= 40 else "warn"
-    word = "current" if lag <= 40 else "lagging"
-    n_warn = len(report.warnings)
-    warn_badge = (
-        f'<a class="badge warn" href="#warnings">{n_warn} warning{"s" if n_warn != 1 else ""}</a>'
-        if n_warn
-        else ""
+    items = _notice_items(report)
+    ago = _plural(d.factors_days_behind, "day", "days")
+    chips = f'<span class="chip">Factor data ends {_d_long(d.factors_last_date)} ({ago} ago)</span>'
+    if items:
+        chips += (
+            f'<a class="chip warn" href="#notice">{_plural(len(items), "warning", "warnings")}</a>'
+        )
+    return (
+        '<header class="masthead"><div class="mast-top"><h1>'
+        f'<span class="ticker">{esc(report.ticker)}</span>'
+        '<span class="what">Fama&#8211;French five-factor profile</span></h1>'
+        f'<p class="mast-meta">{chips}</p></div>'
+        f'<p class="coverage">{esc(_range_line(report))}</p>{_notice(report, items)}</header>'
+    )
+
+
+def _equation(report: FactorReport) -> str:
+    g = report.regression
+    alpha = _fin(g.alpha_annual)
+    betas = [(s, _fin(s.beta)) for s in g.factors]
+    if g.status != "ok" or alpha is None or not betas or any(b is None for _, b in betas):
+        return ""
+    sigma = _fin(g.sigma_e_annual)
+    alpha_ns = g.alpha_tag != "reliable"
+    terms = [
+        f'<a class="term{" ns" if alpha_ns else ""}" href="#ret-alpha">'
+        f'<span class="m">{"" if alpha >= 0 else MINUS}{_num(abs(alpha), 2, 100.0, "%")}</span>'
+        f'<span class="ann"><span>alpha, a year</span>'
+        f"<span>{'not significant' if alpha_ns else 'significant'}, t {_tstat(g.alpha_z)}"
+        "</span></span></a>"
+    ]
+    for s, b in betas:
+        assert b is not None
+        ns = not _is_reliable(s)
+        plain = _plain_name(s.name).lower() or s.name
+        terms.append(
+            f'<a class="term{" ns" if ns else ""}" href="#beta-{esc(s.name)}">'
+            f'<span class="m"><span class="op">{"+" if b >= 0 else MINUS}</span>'
+            f'{_num(abs(b), 3)}<span class="fn">{esc(s.name)}</span></span>'
+            f'<span class="ann"><span>{esc(plain)}</span>'
+            f"<span>{'not significant' if ns else 'significant'}, t {_tstat(s.z)}</span>"
+            "</span></a>"
+        )
+    resid = f"{_pct(sigma, 1, False)} a year" if sigma is not None else "n/a"
+    terms.append(
+        '<span class="term eps"><span class="m"><span class="op">+</span><var>&#949;</var></span>'
+        f'<span class="ann"><span>residual</span><span>{esc(resid)}</span></span></span>'
+    )
+    label = (
+        "Fitted model: daily excess return equals "
+        + ", ".join(
+            [f"alpha {_pct(alpha)} a year"] + [f"{_sgn(b)} times {s.name}" for s, b in betas]
+        )
+        + ", plus a residual."
     )
     return (
-        '<header class="top"><span class="brand"><i></i>factordesk</span>'
-        f"<h1>{esc(report.ticker)}</h1>"
-        '<span class="brand">Fama-French 5-factor report</span>'
-        '<div class="meta">'
-        f'<span>As of <b class="num">{esc(as_of.isoformat())}</b></span>'
-        f'<span>Factors through <b class="num">{esc(d.factors_last_date.isoformat())}</b></span>'
-        f'<span class="badge {tone}" title="Days between report date and last factor date">'
-        f"Data lag {lag}d &middot; {word}</span>{warn_badge}</div></header>"
+        f'<figure class="model" aria-label="{esc(label)}"><div class="eq">'
+        '<span class="lhs" aria-hidden="true"><var>r</var><span class="op">&#8722;</span>'
+        '<var>r</var><sub>f</sub><span class="op eqs">=</span></span>'
+        f'<span class="terms">{"".join(terms)}</span></div>'
+        "<figcaption>The fitted daily model, in-sample. Faded terms are not statistically "
+        "significant. Select a term to see its detail.</figcaption></figure>"
     )
 
 
 def _kpis(report: FactorReport) -> str:
-    """KPI strip."""
-    rg, d = report.regression, report.data
-    errs, warns, infos = _audit_counts(report)
-    if errs:
-        audit, tone, sub = f"{errs} error{'s' if errs != 1 else ''}", "warn", f"{warns} warn"
-    elif warns:
-        audit, tone, sub = f"{warns} warning{'s' if warns != 1 else ''}", "warn", f"{infos} info"
+    g, d = report.regression, report.data
+    if g.status != "ok":
+        body = _empty(
+            g.reason or "The regression could not be computed.",
+            "Widen the date range and run the report again.",
+        )
+        return f'<section class="kpis" aria-label="Headline statistics">{body}</section>'
+    # Validation F4: with audit errors one bad row can dominate every fitted number, so the
+    # fitted tiles are muted and alpha carries no significance claim (the values stay shown).
+    audit_errors = d.audit_status == "errors"
+    fit_cls = "ns" if audit_errors else ""
+    if audit_errors:
+        alpha_note, alpha_cls = "Not interpretable: the price audit found errors", "ns"
+    elif g.alpha_tag == "reliable":
+        alpha_note, alpha_cls = "Distinguishable from zero at 5%", ""
+    elif g.alpha_tag == "noise":
+        alpha_note, alpha_cls = "Not distinguishable from zero", "ns"
     else:
-        audit, tone, sub = "Clean", "zero", f"{infos} info"
-    z_text, _ = _sign_fmt(rg.alpha_z, 2)
-    alpha_tag = rg.alpha_tag or "n/a"
-
-    def tile(label: str, value: str, sub_html: str, small: bool = False) -> str:
-        cls = "v sm" if small else "v"
-        return (
-            f'<div class="kpi"><div class="l">{esc(label)}</div><div class="{cls}">{value}</div>'
-            f'<div class="s">{sub_html}</div></div>'
-        )
-
-    return (
-        '<div class="kpis">'
-        + tile(
-            "Alpha, annualised",
-            _signed_html(rg.alpha_annual, 2, 100, "%"),
-            f"z {esc(z_text)} &middot; p {_pval(rg.alpha_p)} &middot; {esc(alpha_tag)}",
-        )
-        + tile("R²", f'<span class="num">{_plain(rg.r2, 4)}</span>', "explained variance")
-        + tile(
-            "Residual vol",
-            f'<span class="num">{_plain(rg.sigma_e_annual, 2, 100, "%")}</span>',
-            f"adj. R² {_plain(rg.adj_r2, 4)}",
-        )
-        + tile(
-            "Observations",
-            f'<span class="num">{d.n_obs:,}</span>',
-            f"HAC lags {rg.hac_lags}",
-        )
-        + tile(
-            "Window",
-            f'<span class="num">{esc(d.actual_start.isoformat())}</span>',
-            f"to {esc(d.actual_end.isoformat())}",
-            small=True,
-        )
-        + tile("Data audit", f'<span class="num {tone}">{esc(audit)}</span>', esc(sub), small=True)
-        + "</div>"
+        alpha_note, alpha_cls = "Significance not available", "ns"
+    excl = (
+        f"Trading days; {d.n_excluded} excluded" if d.n_excluded else "Trading days; none excluded"
     )
-
-
-def _gate_callout(report: FactorReport) -> str:
-    """Visible caveat when the residual quality gate fired (methodology M3.6)."""
-    gate, five = report.quality_gate, report.five_day_regression
-    if not gate.fired or not gate.message:
-        return ""
-    detail = ""
-    if five.status == "ok":
-        z_text, _ = _sign_fmt(five.alpha_z, 2)
-        detail = (
-            f"<p>5-day estimate ({five.n_blocks:,} blocks): alpha "
-            f"{esc(_sign_fmt(five.alpha_annual, 2, 100, '%')[0])} a year, z {esc(z_text)}, "
-            f"p {_pval(five.alpha_p)}, {esc(five.alpha_tag or 'n/a')}; R² {_plain(five.r2, 4)}. "
-            'Full table under <a href="#detail">Regression detail</a>.</p>'
-        )
-    elif five.reason:
-        detail = f"<p>5-day estimate: {esc(five.reason)}.</p>"
-    return (
-        '<div class="callout" role="note" id="quality">'
-        f"<p><b>Data quality.</b> {esc(gate.message)}</p>{detail}</div>"
+    cells = [
+        ("Alpha, a year", esc(_pct(g.alpha_annual)), alpha_note, alpha_cls),
+        ("R&#178;", esc(_num(g.r2, 4)), "Share of daily variance the factors explain", fit_cls),
+        (
+            "Residual volatility",
+            esc(_pct(g.sigma_e_annual, 1, False)),
+            "A year, left unexplained by the factors",
+            fit_cls,
+        ),
+        ("Observations", f"{d.n_obs:,}", excl, ""),
+        (
+            "Analysed range",
+            f"{_d_short(d.actual_start)} to {_d_short(d.actual_end)}",
+            f"Requested {_d_long(d.requested_start)} to {_d_long(d.requested_end)}",
+            "dates",
+        ),
+    ]
+    body = "".join(
+        f'<div class="kpi {cls}"><dt>{lab}</dt><dd class="v">{val}</dd>'
+        f'<dd class="n">{esc(note)}</dd></div>'
+        for lab, val, note, cls in cells
     )
+    return f'<section class="kpis" aria-label="Headline statistics"><dl>{body}</dl></section>'
 
 
+# --------------------------------------------------------------------------------------------
+# Panel 4: price
+# --------------------------------------------------------------------------------------------
 def _price_panel(report: FactorReport) -> str:
-    """Price chart with the post-coverage tail muted."""
-    ps = report.price_series
-    body = _variants(lambda w, u: _price_svg(ps, report.ticker, w, u), 760, 340, "px")
-    tail_n = sum(1 for d in ps.dates if d > ps.factor_coverage_end)
-    cap = (
-        f"Muted dashed tail: {tail_n} price days after factor coverage "
-        f"({esc(ps.factor_coverage_end.isoformat())}); not used in any statistic."
-        if tail_n
-        else "Price history is fully covered by factor data."
+    ps, d = report.price_series, report.data
+    head = _panel_head(
+        "price",
+        "Price",
+        "How has the price moved over the window? Shaded days are not in the analysis.",
     )
-    return _panel(
-        f"{report.ticker} adjusted close",
-        "price units",
-        body + f'<p class="cap">{cap}</p>',
-        foot="Adjusted for splits and dividends. Charted for context only.",
-        pid="price",
+    pts: list[tuple[date, float]] = []
+    for dt, raw in zip(ps.dates, ps.adj_close, strict=True):
+        v = _fin(raw)
+        if v is not None:
+            pts.append((dt, v))
+    if len(pts) < 2:
+        body = _nodata(
+            "fewer than two price points were returned for this ticker and window.",
+            "Check the ticker symbol or choose a later start date.",
+        )
+        return _section("price", head, body)
+
+    cov = ps.factor_coverage_end
+    cut = max((k for k, (dt, _) in enumerate(pts) if dt <= cov), default=-1)
+    start_k = next((k for k, (dt, _) in enumerate(pts) if dt >= d.actual_start), 0)
+    lo, hi, ticks = _nice_domain(min(v for _, v in pts), max(v for _, v in pts), 4)
+    o0 = pts[0][0].toordinal()
+    span = max(pts[-1][0].toordinal() - o0, 1)
+
+    def x_of(dt: date) -> float:
+        return (dt.toordinal() - o0) / span * 1000
+
+    def y_of(v: float) -> float:
+        return 100 - (v - lo) / (hi - lo) * 100
+
+    grid = "".join(
+        f'<line class="grid" x1="0" x2="1000" y1="{y_of(t):.2f}" y2="{y_of(t):.2f}"/>'
+        for t in ticks
     )
-
-
-def _betas_panel(report: FactorReport) -> str:
-    """Betas panel with legend, interpretation of reliable betas, and hidden table."""
-    rg = report.regression
-    body = _variants(lambda w, u: _betas_svg(report, w, u), 440, 340, "bt")
-    legend = (
-        '<div class="legend"><span>Bar: full-sample beta</span><span>Line: 95% HAC CI</span>'
-        f"<span>&#9671; mean rolling {report.average_beta.window}d beta</span>"
-        '<span><i class="hatch"></i>noise (not significant after BH)</span></div>'
+    shade = ""
+    labels = ""
+    if cut == -1:  # nothing is covered: the whole window is not analysed
+        shade += '<rect class="tailzone" x="0" y="0" width="1000" height="100"/>'
+        labels += f'<span class="zone-label">Not analysed: factor data ends {_d_long(cov)}</span>'
+    else:
+        if cut < len(pts) - 1:
+            xc = x_of(pts[cut][0])
+            shade += (
+                f'<rect class="tailzone" x="{xc:.1f}" y="0" width="{1000 - xc:.1f}" height="100"/>'
+                f'<line class="cutline" x1="{xc:.1f}" x2="{xc:.1f}" y1="0" y2="100"/>'
+            )
+            labels += (
+                f'<span class="zone-label">Not analysed: factor data ends {_d_long(cov)}</span>'
+            )
+        if 2 <= start_k <= cut:  # one earlier day is only the base price of the first return
+            xs0 = x_of(pts[start_k][0])
+            shade += (
+                f'<rect class="tailzone" x="0" y="0" width="{xs0:.1f}" height="100"/>'
+                f'<line class="cutline" x1="{xs0:.1f}" x2="{xs0:.1f}" y1="0" y2="100"/>'
+            )
+            labels += (
+                f'<span class="zone-label l">Not analysed: before {_d_long(pts[start_k][0])}</span>'
+            )
+    two = labels.count("zone-label") == 2
+    main = [(x_of(dt), y_of(v)) for dt, v in pts[: cut + 1]]
+    tail = [(x_of(dt), y_of(v)) for dt, v in pts[max(cut, 0) :]]
+    paths = ""
+    if len(main) > 1:
+        paths += f'<path class="price-line" d="{_path_xy(_decimate(main, 700, _second))}"/>'
+    if len(tail) > 1:
+        paths += f'<path class="price-tail" d="{_path_xy(_decimate(tail, 300, _second))}"/>'
+    label = f"{report.ticker} adjusted close price over time"
+    svg = (
+        f'<svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" '
+        f'aria-label="{esc(label)}">{shade}{grid}{paths}</svg>'
     )
-    flagged = [s.name for s in rg.factors if not _reliable(s) and _ci_excludes_zero(s)]
-    extra = (
-        f'<p class="cap">{esc(", ".join(flagged))}: the interval excludes zero, but the beta is '
-        "not significant after correcting for testing 5 betas.</p>"
-        if flagged
-        else ""
+    dec = _decimals(ticks)
+    ylab = "".join(
+        f'<span class="yl" style="top:{y_of(t):.2f}%">{t:,.{dec}f}</span>' for t in ticks
     )
-    return _panel(
-        "Factor betas",
-        "full sample, decimal sensitivity",
-        body + legend + extra + _betas_table(report),
-        foot=_foot(report, rg.caption, rg.labels),
-        cls="p-betas",
-        pid="betas",
+    xlab = "".join(
+        f'<span class="xl{"" if major else " minor"} {_edge(x_of(dt) / 10)}" '
+        f'style="left:{x_of(dt) / 10:.2f}%">{esc(lab)}</span>'
+        for dt, lab, major in _date_ticks(pts[0][0], pts[-1][0])
     )
-
-
-def _return_panel(report: FactorReport) -> str:
-    """Return contribution waterfall, the identity check and the memo rows."""
-    rc = report.return_contribution
-    res = _fin(rc.identity_residual)
-    resid = _fin(rc.residual)
-    cap = "Factors + alpha + residual = total."
-    if resid is not None:
-        cap += f" Residual {resid:.1e} (0 by construction)."
-    if res is not None:
-        cap += f" Identity check {res:.1e}."
-    memo = "".join(f"<li>{esc(m)}</li>" for m in rc.memo)
-    body = _variants(lambda w, u: _waterfall_svg(report, w, u), 560, 340, "wf")
-    return _panel(
-        "Return contribution",
-        "% per year of mean excess return",
-        body
-        + f'<p class="cap">{esc(cap)}</p>'
-        + (f'<h3>Memo (not part of any sum)</h3><ul class="list cap">{memo}</ul>' if memo else ""),
-        foot=_foot(report, rc.caption, rc.labels),
-        pid="return",
+    rows = [("First", pts[0][0], pts[0][1])]
+    if cut >= 0:
+        rows.append(("End of factor data", pts[cut][0], pts[cut][1]))
+    rows.append(("Latest", pts[-1][0], pts[-1][1]))
+    side = "".join(
+        f'<tr><th scope="row">{a}<span class="sub">{_d_long(b)}</span></th>'
+        f'<td class="num">{c:,.2f}</td></tr>'
+        for a, b, c in rows
     )
-
-
-def _risk_panel(report: FactorReport) -> str:
-    """Risk contribution bars plus the M7 sentences."""
-    rk = report.risk_contribution
-    res = _fin(rk.sums_to_one_residual)
-    cap = "Euler shares of variance; idiosyncratic shown last."
-    if res is not None:
-        cap += f" Sum check {res:.1e}."
-    vol = _fin(rk.total_vol_annual)
-    if vol is not None:
-        cap += f" Total volatility {vol * 100:.2f}% a year."
-    sentences = "".join(f"<li>{esc(t)}</li>" for t in rk.sentences)
-    body = _variants(lambda w, u: _risk_svg(report, w, u), 560, 340, "rk")
-    return _panel(
-        "Risk contribution",
-        "share of total variance",
-        body
-        + f'<p class="cap">{esc(cap)}</p>'
-        + (f'<ul class="list cap">{sentences}</ul>' if sentences else ""),
-        foot=_foot(report, rk.caption, rk.labels),
-        pid="risk",
-    )
-
-
-def _average_table(report: FactorReport) -> str:
-    """Average-beta table (M5): distribution of the primary window's rolling betas."""
-    ab = report.average_beta
-    if ab.status != "ok" or not ab.factors:
-        return _empty(ab.reason or "no average beta")
-    rows = "".join(
-        f"<tr><td>{esc(a.name)}</td><td class='n'>{_signed_html(a.full_sample_beta, 3)}</td>"
-        f"<td class='n'>{_signed_html(a.mean, 3)}</td><td class='n'>{_plain(a.sd, 3)}</td>"
-        f"<td class='n'>{_plain(a.p10, 3)}</td><td class='n'>{_plain(a.p90, 3)}</td>"
-        f"<td class='n'>{_plain(a.min, 3)}</td><td class='n'>{_plain(a.max, 3)}</td>"
-        f"<td class='n'>{_plain(a.share_positive, 0, 100, '%')}</td></tr>"
-        for a in ab.factors
+    u = d.uncovered
+    if u.n and _fin(u.compounded_return) is not None:
+        side += (
+            '<tr class="muted-row"><th scope="row">After factor data'
+            f'<span class="sub">{u.n} days, raw, not analysed</span></th>'
+            f'<td class="num">{esc(_pct(u.compounded_return))}</td></tr>'
+        )
+    foot = _footnote(
+        f"Adjusted close from {d.price_source}, for context only; no statistic uses the price line."
     )
     return (
-        f"<h3>Average {ab.window}-day beta ({ab.n_stamps:,} windows)</h3>"
-        '<div class="tablewrap"><table class="dt"><thead><tr><th>Factor</th><th>Full sample</th>'
-        "<th>Mean</th><th>SD</th><th>P10</th><th>P90</th><th>Min</th><th>Max</th>"
-        f"<th>Share &gt; 0</th></tr></thead><tbody>{rows}</tbody></table></div>"
-        f'<p class="cap">{esc(ab.caption)}</p>'
+        f'<section class="panel" id="price" aria-labelledby="price-t">{head}'
+        '<div class="price-wrap">'
+        f'<div class="plot price-plot{" two" if two else ""}">{svg}'
+        f'<div class="ylabels" aria-hidden="true">{ylab}</div>{labels}'
+        f'<div class="xlabels" aria-hidden="true">{xlab}</div></div>'
+        '<table class="side"><caption class="vh">Price points</caption>'
+        '<thead class="vh"><tr><th scope="col">Point</th><th scope="col">Adjusted close</th>'
+        f"</tr></thead><tbody>{side}</tbody></table></div>{foot}</section>"
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Panel 5: factor exposures
+# --------------------------------------------------------------------------------------------
+def _exposure_reading(stats: Sequence[FactorStat]) -> str:
+    parts: list[str] = []
+    quiet: list[str] = []
+    for s in stats:
+        b = _fin(s.beta)
+        if b is None:
+            continue
+        if not _is_reliable(s):
+            quiet.append(f"{_plain_name(s.name).lower() or s.name} ({s.name})")
+            continue
+        if s.name == "Mkt-RF":
+            if abs(b - 1) < 0.1:
+                parts.append(f"moves roughly one-for-one with the market (beta {_num(b)})")
+            elif b > 1:
+                parts.append(f"amplifies market moves (beta {_num(b)})")
+            else:
+                parts.append(f"moves less than the market (beta {_num(b)})")
+        elif s.name in TILT:
+            parts.append(f"leans toward {TILT[s.name][0 if b > 0 else 1]} ({s.name} {_sgn(b)})")
+        else:
+            parts.append(f"has a reliable exposure to {s.name} ({_sgn(b)})")
+    text = ""
+    if parts:
+        joined = ", ".join(parts[:-1]) + " and " + parts[-1] if len(parts) > 1 else parts[0]
+        text = f"Over this window the stock {joined}."
+    if quiet:
+        q = ", ".join(quiet[:-1]) + " or " + quiet[-1] if len(quiet) > 1 else quiet[0]
+        text += f" There is no clear tilt to {q}."
+    return text.strip()
+
+
+def _exposures_panel(report: FactorReport) -> str:
+    g, ab = report.regression, report.average_beta
+    q = "What is this stock exposed to, and how sure are we?"
+    head = _panel_head("beta", "Factor exposures", q)
+    stats = g.factors
+    if g.status != "ok" or not stats or all(_fin(s.beta) is None for s in stats):
+        body = (
+            _empty(g.reason, "Widen the date range and run the report again.")
+            if g.reason
+            else _nodata("no factor betas available.")
+        )
+        return _section("exposures", head, body)
+    win = ab.window
+    avg = {a.name: _fin(a.mean) for a in ab.factors} if ab.status == "ok" else {}
+    vals = [0.0]
+    for s in stats:
+        cands = (_fin(s.beta), _fin(s.ci_low), _fin(s.ci_high), avg.get(s.name))
+        vals += [v for v in cands if v is not None]
+    lo, hi, ticks = _nice_domain(min(vals), max(vals), 5)
+    rows: list[str] = []
+    for s in stats:
+        ns = not _is_reliable(s)
+        b = _fin(s.beta)
+        marks = ""
+        tip = f"{s.name}: no estimate"
+        if b is not None:
+            cls = ("pos" if b >= 0 else "neg") + (" faded" if ns else "")
+            marks = _bar(b, lo, hi, cls)
+            ci_lo, ci_hi = _fin(s.ci_low), _fin(s.ci_high)
+            tip = (
+                f"{s.name}: beta {_sgn(b)}, 95% interval {_sgn(ci_lo)} to {_sgn(ci_hi)}, "
+                f"t {_tstat(s.z)}, adjusted p {_pval(s.p_adj_bh)}"
+            )
+            if ci_lo is not None and ci_hi is not None:
+                pl, ph = _pos(ci_lo, lo, hi), _pos(ci_hi, lo, hi)
+                marks += f'<line class="ci" x1="{pl}%" x2="{ph}%" y1="50%" y2="50%"/>'
+                if ph - pl >= 1.2:  # caps only when the interval is wide enough to read
+                    for p in (pl, ph):
+                        marks += f'<line class="ci" x1="{p}%" x2="{p}%" y1="46.5%" y2="53.5%"/>'
+            a = avg.get(s.name)
+            if a is not None:
+                marks += (
+                    f'<svg class="avgm" x="{_pos(a, lo, hi)}%" y="50%" overflow="visible" '
+                    'aria-hidden="true"><path d="M0 -3.6 3.6 0 0 3.6-3.6 0z"/></svg>'
+                )
+        a = avg.get(s.name)
+        rows.append(
+            f'<tr id="beta-{esc(s.name)}" class="{"ns" if ns else ""}" tabindex="-1">'
+            f"{_name_cell(s.name, _plain_name(s.name))}{_bar_cell(tip, ticks, lo, hi, marks)}"
+            f'<td class="num strong">{esc(_sgn(b))}</td><td class="num">{esc(_tstat(s.z))}</td>'
+            f'<td class="num sig">{"No" if ns else "Yes"}</td>'
+            f'<td class="num">{esc(_sgn(a)) if a is not None else "&#8211;"}</td></tr>'
+        )
+    legend = _legend(
+        [
+            _sw_rect("pos") + "Positive",
+            _sw_rect("neg") + "Negative",
+            _sw_rect("pos", True) + "Faded: not significant",
+            '<svg class="sw" aria-hidden="true"><line class="ci" x1="1" x2="15" y1="5" y2="5"/>'
+            '<line class="ci" x1="1" x2="1" y1="3.5" y2="6.5"/>'
+            '<line class="ci" x1="15" x2="15" y1="3.5" y2="6.5"/></svg>95% interval',
+            '<svg class="sw" aria-hidden="true"><path class="avgm-sw" d="M8 1.4 11.6 5 8 8.6 '
+            f'4.4 5z"/></svg>Average {win}d beta',
+        ]
+    )
+    reading = _exposure_reading(stats)
+    reading_html = f'<p class="reading">{esc(reading)}</p>' if reading else ""
+    fold = [
+        "Reliable means the Benjamini-Hochberg adjusted p is below 0.05 (Yes in the Significant "
+        "column); noise means it is not (No, shown faded).",
+        g.caption,
+        f"The diamond and the Avg {win}d column are the mean of the overlapping rolling estimates.",
+        *_label_texts(report, g.labels),
+    ]
+    return (
+        f'<section class="panel" id="exposures" aria-labelledby="beta-t">'
+        f"{_panel_head('beta', 'Factor exposures', q, legend)}{reading_html}"
+        '<table class="bars cols-4"><caption class="vh">Full-sample factor betas with 95% '
+        "intervals, t-statistics, significance and average rolling beta</caption>"
+        '<thead><tr><th scope="col">Factor</th><th scope="col" class="plot-h">'
+        '<span class="vh">Chart</span></th><th scope="col" class="num">Beta</th>'
+        f'<th scope="col" class="num">t</th>{_sig_head()}'
+        f'<th scope="col" class="num">Avg {win}d</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody>"
+        f"<tfoot>{_axis_row(ticks, lo, hi, lambda t: _sgn(t, 2) if t else '0', 4)}</tfoot></table>"
+        f"{_footnote(_desc(report) + ' Significant means the adjusted p is below 0.05.', fold)}"
+        "</section>"
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Panel 6: where the return came from
+# --------------------------------------------------------------------------------------------
+def _return_panel(report: FactorReport) -> str:
+    rc, g = report.return_contribution, report.regression
+    q = "How much of the average yearly return does each factor explain?"
+    head = _panel_head("ret", "Where the return came from", q)
+    order = _factor_order(report)
+    tags = {f.name: f.tag for f in g.factors}
+    items: list[tuple[str, str, float | None, bool, str]] = [
+        (n, _plain_name(n), _fin(rc.factors.get(n)), tags.get(n) != "reliable", "factor")
+        for n in order
+    ]
+    alpha_ns = g.alpha_tag != "reliable"
+    items.append(("Alpha", "Unexplained average", _fin(rc.alpha), alpha_ns, "alpha"))
+    items.append(("Residual", "Zero by construction", _fin(rc.residual), False, "resid"))
+    total = _fin(rc.total_annualised_mean_excess_return)
+    finite = [v for _, _, v, _, _ in items if v is not None]
+    if rc.status != "ok" or (not finite and total is None):
+        body = (
+            _empty(rc.reason, "Widen the date range and run the report again.")
+            if rc.reason
+            else _nodata("no return attribution available.")
+        )
+        return _section("returns", head, body)
+    extent = [*finite, 0.0, total or 0.0]
+    lo, hi, ticks = _nice_domain(min(extent), max(extent), 5)
+    rows: list[str] = []
+    for n, plain, v, ns, kind in items:
+        marks = ""
+        if v is not None:
+            cls = ("pos" if v >= 0 else "neg") + (" faded" if ns else "")
+            if kind == "resid":
+                cls = "hatch"
+            marks = _bar(v, lo, hi, cls)
+        rid = "ret-alpha" if kind == "alpha" else f"ret-{esc(n)}"
+        sig = "&#8211;" if kind == "resid" else ("No" if ns else "Yes")
+        rows.append(
+            f'<tr id="{rid}" class="{"ns" if ns else ""} {kind}" tabindex="-1">'
+            f"{_name_cell(n, plain)}"
+            f"{_bar_cell(f'{n}: {_pct(v)} a year', ticks, lo, hi, marks)}"
+            f'<td class="num strong">{esc(_pct(v))}</td><td class="num sig">{sig}</td></tr>'
+        )
+    tmarks = ""
+    if total is not None:
+        z0, tx = _pos(0.0, lo, hi), _pos(total, lo, hi)
+        tmarks = (
+            f'<line class="total-line" x1="{min(z0, tx)}%" x2="{max(z0, tx)}%" y1="50%" y2="50%"/>'
+            f'<line class="total-cap" x1="{tx}%" x2="{tx}%" y1="22%" y2="78%"/>'
+        )
+    rows.append(
+        '<tr class="total"><th scope="row"><span class="fname">Total</span>'
+        '<span class="sub">Mean excess return</span></th>'
+        f"{_bar_cell(f'Total: {_pct(total)} a year', ticks, lo, hi, tmarks)}"
+        f'<td class="num strong">{esc(_pct(total))}</td><td class="num"></td></tr>'
+    )
+    mkt = _fin(rc.factors.get("Mkt-RF"))
+    reading = ""
+    if total is not None and mkt is not None:
+        alpha_ns = ", but it is not significant" if g.alpha_tag != "reliable" else ""
+        reading = (
+            f"Of the {_pct(total, 2, False)} average excess return a year, market exposure "
+            f"accounts for {_pct(mkt, 2, False)}. Alpha adds {_pct(rc.alpha)}{alpha_ns}."
+        )
+    legend = _legend(
+        [
+            _sw_rect("pos") + "Adds",
+            _sw_rect("neg") + "Subtracts",
+            _sw_rect("pos", True) + "Faded: not significant",
+            '<svg class="sw" aria-hidden="true"><rect class="hatch" width="14" height="10" '
+            'rx="2"/></svg>Residual',
+            '<svg class="sw" aria-hidden="true"><line class="total-line" x1="0" x2="13" y1="5" '
+            'y2="5"/><line class="total-cap" x1="13" x2="13" y1="0" y2="10"/></svg>Total',
+        ]
+    )
+    memo = "".join(f"<li>{esc(m)}</li>" for m in rc.memo)
+    checks: list[str] = []
+    resid = _fin(rc.residual)
+    if resid is not None:
+        checks.append(f"Residual {resid:.1e} (zero by construction).")
+    ident = _fin(rc.identity_residual)
+    if ident is not None:
+        checks.append(f"Identity check {ident:.1e}.")
+    fold = [
+        rc.caption,
+        "Each factor's share is its full-sample beta times the factor's average return, "
+        "times 252. Arithmetic, not compounded.",
+        *_label_texts(report, rc.labels),
+        " ".join(checks),
+    ]
+    return (
+        f'<section class="panel" id="returns" aria-labelledby="ret-t">'
+        f"{_panel_head('ret', 'Where the return came from', q, legend)}"
+        + (f'<p class="reading">{esc(reading)}</p>' if reading else "")
+        + '<table class="bars cols-2"><caption class="vh">Return contribution per factor, alpha '
+        "and residual, percent a year, with the total</caption>"
+        '<thead><tr><th scope="col">Component</th><th scope="col" class="plot-h">'
+        '<span class="vh">Chart</span></th><th scope="col" class="num">% a year</th>'
+        f"{_sig_head()}</tr></thead><tbody>{''.join(rows)}</tbody>"
+        f"<tfoot>{_axis_row(ticks, lo, hi, _return_tick, 2)}</tfoot></table>"
+        + (f'<div class="memo"><h3>Not in the sum</h3><ul>{memo}</ul></div>' if memo else "")
+        + _footnote(f"{_desc(report)} The rows add up exactly to the total.", fold)
+        + "</section>"
+    )
+
+
+def _return_tick(t: float) -> str:
+    if not t:
+        return "0%"
+    return _pct(t, 0 if abs(t * 100 - round(t * 100)) < 1e-9 else 1)
+
+
+# --------------------------------------------------------------------------------------------
+# Panel 7: where the risk comes from
+# --------------------------------------------------------------------------------------------
+def _risk_panel(report: FactorReport) -> str:
+    rk = report.risk_contribution
+    q = "What share of the day-to-day variance does each factor drive?"
+    head = _panel_head("risk", "Where the risk comes from", q)
+    order = _factor_order(report)
+    shares: dict[str, float | None] = {n: _fin(v) for n, v in rk.factors.items()}
+    shares[IDIO] = _fin(rk.idiosyncratic)
+    names = [n for n in rk.order if n in shares]
+    names += [n for n in shares if n not in names and n != IDIO]
+    if IDIO not in names:
+        names.append(IDIO)
+    finite = [v for v in shares.values() if v is not None]
+    if rk.status != "ok" or not finite:
+        body = (
+            _empty(rk.reason, "Widen the date range and run the report again.")
+            if rk.reason
+            else _nodata("no risk attribution available.")
+        )
+        return _section("risk", head, body)
+    det = {d.name: d for d in rk.details}
+    lo, hi, ticks = _nice_domain(min(0.0, min(finite)), max(1.0, max(finite)), 4)
+    rows: list[str] = []
+    for n in names:
+        v = shares.get(n)
+        dd = det.get(n)
+        if n == IDIO:
+            cls, plain, key = "hatch", "Stock-specific", _key_swatch("hatch")
+            cells = '<td class="num">&#8211;</td>' * 3
+            tip = f"Idiosyncratic: {_pct(v, 2, False)} of variance"
+            mob = "Not explained by the factors"
+        else:
+            cls = f"cat c{_slot(n, order)}"
+            plain, key = _plain_name(n), _key_swatch(cls)
+            if dd is None:
+                cells = '<td class="num">n/a</td>' * 3
+                tip, mob = f"{n}: {_pct(v, 2, False)} of variance", ""
+            else:
+                cells = (
+                    f'<td class="num">{esc(_sgn(dd.beta))}</td>'
+                    f'<td class="num">{esc(_pct(dd.sigma_annual, 1, False))}</td>'
+                    f'<td class="num">{esc(_sgn(dd.rho_sys, 2))}</td>'
+                )
+                tip = (
+                    f"{n}: {_pct(v, 2, False)} of variance = exposure {_sgn(dd.beta)} x "
+                    f"volatility {_pct(dd.sigma_annual, 1, False)} x correlation "
+                    f"{_sgn(dd.rho_sys, 2)} with the factor-driven return"
+                )
+                mob = (
+                    f"Beta {_sgn(dd.beta)}, vol {_pct(dd.sigma_annual, 1, False)}, "
+                    f"corr {_sgn(dd.rho_sys, 2)}"
+                )
+        marks = _bar(v, lo, hi, cls) if v is not None else ""
+        neg = v is not None and v < 0
+        rows.append(
+            f'<tr class="{"idio" if n == IDIO else ""}">{_name_cell(n, plain, key, mob)}'
+            f"{_bar_cell(tip, ticks, lo, hi, marks)}"
+            f'<td class="num strong">{esc(_pct(v, 2, neg))}</td>{cells}</tr>'
+        )
+    top = next((n for n in names if n != IDIO and shares.get(n) is not None), None)
+    vol = _fin(rk.total_vol_annual)
+    reading = ""
+    if top is not None:
+        reading = f"{top} drives {_pct(shares[top], 1, False)} of the variance; "
+        reading += f"stock-specific risk is {_pct(shares[IDIO], 1, False)}."
+        if vol is not None:
+            reading += f" Total volatility is {_pct(vol, 1, False)} a year."
+        reading += "".join(f" {s}" for s in rk.sentences)
+    sum_res = _fin(rk.sums_to_one_residual)
+    checks = f"Sum check {sum_res:.1e}." if sum_res is not None else ""
+    fold = [
+        rk.caption,
+        "Euler decomposition of variance: share = beta x factor volatility x correlation with "
+        "the factor-driven return, divided by total volatility.",
+        *_label_texts(report, rk.labels),
+        checks,
+    ]
+    return (
+        f'<section class="panel" id="risk" aria-labelledby="risk-t">{head}'
+        + (f'<p class="reading">{esc(reading)}</p>' if reading else "")
+        + '<table class="bars cols-4 risk"><caption class="vh">Share of variance per factor and '
+        "stock-specific, with exposure, factor volatility and correlation</caption>"
+        '<thead><tr><th scope="col">Source</th><th scope="col" class="plot-h">'
+        '<span class="vh">Chart</span></th><th scope="col" class="num">Share</th>'
+        '<th scope="col" class="num">Beta</th><th scope="col" class="num">Factor vol</th>'
+        '<th scope="col" class="num">Corr.</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody>"
+        f"<tfoot>{_axis_row(ticks, lo, hi, lambda t: _pct(t, 0, t < 0), 4)}</tfoot></table>"
+        + _footnote(
+            f"{_desc(report)} Shares add to 100% and can be negative when a factor offsets "
+            "the others.",
+            fold,
+        )
+        + "</section>"
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Panel 8: exposure over time
+# --------------------------------------------------------------------------------------------
+def _rolling_block(
+    w: RollingWindow,
+    order: list[str],
+    avg: dict[str, tuple[float, float, float, float, float, float]],
+) -> str:
+    """One window: five rows (line and band, then Latest, Average, Middle 80%)."""
+    dates = w.dates
+    z = _fin(w.ci_z) or HAC_DEFAULT_Z
+    series: dict[str, list[tuple[int, float, float]]] = {}
+    for name in order:
+        pts: list[tuple[int, float, float]] = []
+        for i, (b, s) in enumerate(zip(w.betas.get(name, []), w.se.get(name, []), strict=False)):
+            bv, sv = _fin(b), _fin(s)
+            if bv is not None and sv is not None:
+                pts.append((i, bv, sv))
+        if pts:
+            series[name] = pts
+    if not series:
+        return _nodata(f"every {w.window}-day estimate is still in warm-up (no full window).")
+    spans = [
+        max(v + z * s for _, v, s in p) - min(v - z * s for _, v, s in p) for p in series.values()
+    ]
+    span = max(max(spans) * 1.08, 1e-9)
+    i0 = min(p[0][0] for p in series.values())
+    o0 = dates[i0].toordinal()
+    o1 = max(dates[-1].toordinal(), o0 + 1)
+
+    def x_of(i: int) -> float:
+        return (dates[i].toordinal() - o0) / (o1 - o0) * 1000
+
+    ticks = _date_ticks(dates[i0], dates[-1])
+
+    def x_of_date(d: date) -> float:
+        return (d.toordinal() - o0) / (o1 - o0) * 100  # percent of the plot width
+
+    rows: list[str] = []
+    for name, pts in series.items():
+        mid = (max(v + z * s for _, v, s in pts) + min(v - z * s for _, v, s in pts)) / 2
+        lo, hi = mid - span / 2, mid + span / 2
+
+        def y_of(v: float, lo: float = lo, hi: float = hi) -> float:
+            return 100 - (v - lo) / (hi - lo) * 100
+
+        sp = _decimate(pts, 400, _second)
+        upper = [(x_of(i), y_of(v + z * s)) for i, v, s in sp]
+        lower = [(x_of(i), y_of(v - z * s)) for i, v, s in sp][::-1]
+        band = _path_xy(upper + lower) + "Z"
+        line = _path_xy([(x_of(i), y_of(v)) for i, v, _ in sp])
+        zero = (
+            f'<line class="zero" x1="0" x2="1000" y1="{y_of(0):.2f}" y2="{y_of(0):.2f}"/>'
+            if lo < 0 < hi
+            else ""
+        )
+        vgrid = "".join(
+            f'<line class="grid" x1="{x_of_date(d) * 10:.1f}" x2="{x_of_date(d) * 10:.1f}" '
+            'y1="0" y2="100"/>'
+            for d, _, major in ticks
+            if major and d.month == 1
+        )
+        c = _slot(name, order)
+        svg = (
+            '<svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" '
+            f'aria-label="{esc(f"Rolling {w.window}-day beta to {name}, with a 95 percent band")}">'
+            f'{vgrid}{zero}<path class="band c{c}" d="{band}"/>'
+            f'<path class="rline c{c}" d="{line}"/></svg>'
+        )
+        yl = [(hi, "top"), (lo, "bot")]
+        if lo < 0 < hi and min(abs(hi), abs(lo)) > span * 0.22:
+            yl.append((0.0, "mid"))
+        ylab = "".join(
+            f'<span class="yl {k}" style="top:{y_of(t):.2f}%">'
+            f"{_sgn(t, 2) if abs(t) > 1e-9 else '0'}</span>"
+            for t, k in yl
+        )
+        vals = [v for _, v, _ in pts]
+        latest = vals[-1]
+        if name in avg:
+            mean, p10, p90, sd, vmin, vmax = avg[name]
+            shp = sum(1 for v in vals if v > 0) / len(vals)
+        else:
+            mean = sum(vals) / len(vals)
+            p10, p90 = _quantile(vals, 0.1), _quantile(vals, 0.9)
+            sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / max(len(vals) - 1, 1))
+            vmin, vmax = min(vals), max(vals)
+            shp = sum(1 for v in vals if v > 0) / len(vals)
+        tip = (
+            f"Spread {_num(sd)}, lowest {_sgn(vmin)}, highest {_sgn(vmax)}, above zero in "
+            f"{shp * 100:.0f}% of windows"
+        )
+        rows.append(
+            f'<tr><th scope="row"><span class="fname">{_key_swatch(f"cat c{c}")}{esc(name)}'
+            f"</span>{_sub(_plain_name(name))}</th>"
+            f'<td class="plot-cell"><div class="plot mini">{svg}'
+            f'<div class="ylabels" aria-hidden="true">{ylab}</div></div></td>'
+            f'<td class="num strong">{esc(_sgn(latest))}</td><td class="num">{esc(_sgn(mean))}</td>'
+            f'<td class="num range" title="{esc(tip)}">{esc(_sgn(p10, 2))} to '
+            f"{esc(_sgn(p90, 2))}</td></tr>"
+        )
+    xlab = "".join(
+        f'<span class="xl{"" if major else " minor"} '
+        f'{_edge(x_of_date(d))}" style="left:{x_of_date(d):.2f}%">{esc(lab)}</span>'
+        for d, lab, major in ticks
+    )
+    k = w.window
+    return (
+        f'<div class="win w-{k}"><p class="print-only win-cap">{k}-day window</p>'
+        '<table class="bars cols-3 rolling">'
+        f'<caption class="vh">Rolling {k}-day betas per factor with a pointwise 95% band; '
+        "latest, average and middle 80% of the estimates</caption>"
+        '<thead><tr><th scope="col">Factor</th><th scope="col" class="plot-h">'
+        '<span class="vh">Chart</span></th><th scope="col" class="num">Latest</th>'
+        '<th scope="col" class="num">Average</th><th scope="col" class="num">Middle 80%</th>'
+        f"</tr></thead><tbody>{''.join(rows)}</tbody>"
+        '<tfoot><tr class="axis-row" aria-hidden="true"><td></td>'
+        f'<td class="axis time">{xlab}</td><td colspan="3"></td></tr></tfoot></table>'
+        f'<p class="foot">Each point uses the previous {k} trading days, so the chart starts at '
+        f"the first full window, {_d_long(dates[i0])}. Latest is stamped {_d_long(dates[-1])}."
+        "</p></div>"
     )
 
 
 def _rolling_panel(report: FactorReport) -> str:
-    """Rolling-beta small multiples with the pointwise band, plus the average-beta table."""
-    wins = [w for w in report.rolling if w.dates]
+    wins = sorted(report.rolling, key=lambda x: x.window)
+    ab = report.average_beta
+    q = "Have the exposures been stable, or did they drift?"
+    head = _panel_head("roll", "Exposure over time", q)
     order = _factor_order(report)
-    missing = "".join(
-        f'<p class="cap">{w.window}-day window: {esc(w.reason)}.</p>'
-        for w in report.rolling
-        if w.status != "ok" and w.reason
-    )
-    if not wins or not order:
-        return _panel(
-            "Rolling betas", "", _empty("no rolling-beta series") + missing, pid="rolling"
+    ok = [w for w in wins if w.status == "ok" and w.dates]
+    if not ok or not order:
+        reason = next((w.reason for w in wins if w.reason), None)
+        body = (
+            _empty(
+                reason,
+                "Rolling betas need more trading days than the window length. "
+                "Choose an earlier start date.",
+            )
+            if reason
+            else _nodata("no rolling-beta series.")
         )
-    full = {s.name: _fin(s.beta) for s in report.regression.factors}
-    longest = max(wins, key=lambda w: w.window)
-    cards: list[str] = []
-    for n, name in enumerate(order):
-        idx = _fidx(name, order)
-        series = longest.betas.get(name, [])
-        last = next((v for v in reversed(series) if _fin(v) is not None), None)
-        now_txt = _sign_fmt(last, 2)[0]
-        full_txt = _sign_fmt(full.get(name), 2)[0]
-        right = f"{longest.window}d last {now_txt} &middot; full {full_txt}"
-        svg = _rolling_svg(name, idx, wins, full.get(name), f"ro{n}")
-        cards.append(
-            f'<div class="card"><header><b><i class="sw sw{idx}"></i>{esc(name)}</b>'
-            f'<span class="r">{right}</span></header><div class="cb">{svg}</div></div>'
+        return _section("rolling", head, body)
+    primary = ab.window if any(w.window == ab.window for w in ok) else max(w.window for w in ok)
+    avg: dict[str, tuple[float, float, float, float, float, float]] = {}
+    if ab.status == "ok":
+        for a in ab.factors:
+            parts = (a.mean, a.p10, a.p90, a.sd, a.min, a.max)
+            if all(_fin(p) is not None for p in parts):
+                avg[a.name] = (
+                    float(a.mean or 0.0),
+                    float(a.p10 or 0.0),
+                    float(a.p90 or 0.0),
+                    float(a.sd or 0.0),
+                    float(a.min or 0.0),
+                    float(a.max or 0.0),
+                )
+    radios: list[str] = []
+    labels: list[str] = []
+    blocks: list[str] = []
+    for w in wins:
+        k = w.window
+        radios.append(
+            f'<input class="vh win-radio" type="radio" name="window" id="win-{k}" value="{k}"'
+            f"{' checked' if k == primary else ''}>"
         )
-    by_len = sorted(wins, key=lambda w: -w.window)
-    legend = (
-        '<div class="legend"><span>Thick line: '
-        + esc(" / ".join(f"{w.window}d" for w in by_len[:1]))
-        + " with its 95% band</span><span>Thin, lighter: "
-        + esc(" / ".join(f"{w.window}d" for w in by_len[1:]) or "n/a")
-        + "</span><span>Dashed: full-sample beta</span>"
-        "<span>Gaps: warm-up (trailing windows only)</span></div>"
+        labels.append(f'<label for="win-{k}">{k} days</label>')
+        if w.status == "ok" and w.dates:
+            blocks.append(_rolling_block(w, order, avg if k == ab.window else {}))
+        else:
+            what = w.reason or f"The {k}-day window could not be computed."
+            action = "Choose an earlier start date or the shorter window."
+            blocks.append(f'<div class="win w-{k}">{_empty(what, action)}</div>')
+    toggle = (
+        '<div class="seg" role="group" aria-label="Rolling window length"><span class="seg-lab" '
+        f'aria-hidden="true">Window</span><span class="seg-btns">{"".join(labels)}</span></div>'
     )
-    caption = longest.caption + (
-        " The thin "
-        + ", ".join(f"{w.window}-day" for w in by_len[1:])
-        + " line works the same way."
-        if len(by_len) > 1
-        else ""
-    )
-    return _panel(
-        "Rolling betas",
-        "trailing windows, trading days",
-        f'<div class="sm-grid">{"".join(cards)}</div>{legend}{missing}{_average_table(report)}',
-        foot=_foot(report, caption, longest.labels),
-        pid="rolling",
+    captions = [w.caption for w in ok if w.caption]
+    fold = [
+        *captions[:1],
+        "Every row uses the same vertical span, centred on its own values, so wiggles compare "
+        "across factors.",
+        *_label_texts(report, ok[0].labels),
+    ]
+    return (
+        f"{''.join(radios)}"
+        f'<section class="panel" id="rolling" aria-labelledby="roll-t">'
+        f"{_panel_head('roll', 'Exposure over time', q, toggle)}"
+        f"{''.join(blocks)}"
+        f"{_footnote(f'{_desc(report)} The band is a pointwise 95% interval.', fold)}</section>"
     )
 
 
+# --------------------------------------------------------------------------------------------
+# Panel 9: data and audit, regression detail
+# --------------------------------------------------------------------------------------------
 def _dates_text(dates: Sequence[date], limit: int = 6) -> str:
-    """Up to ``limit`` ISO dates, then a count of the rest."""
+    """Up to ``limit`` dates, then a count of the rest."""
     if not dates:
         return ""
-    shown = ", ".join(d.isoformat() for d in dates[:limit])
+    shown = ", ".join(_d_long(d) for d in dates[:limit])
     more = len(dates) - limit
-    return f" Dates: {shown}" + (f" and {more} more." if more > 0 else ".")
+    return f" ({shown}" + (f" and {more} more)" if more > 0 else ")")
 
 
 def _data_panel(report: FactorReport) -> str:
-    """Requested vs actual dates, exclusions, uncovered tail, audit findings, caveats."""
     d = report.data
+    q = "What went into these numbers, and what was left out?"
     reasons = ", ".join(
-        f"{EXCLUSION_TEXT.get(k, k)} {v}" for k, v in sorted(d.excluded_by_reason.items())
+        f"{v} {EXCLUSION_TEXT.get(k, k)}" for k, v in sorted(d.excluded_by_reason.items())
     )
     unc = d.uncovered
-    tail = (
-        f"{unc.n:,} days, {esc(unc.first)} to {esc(unc.last)}; raw compounded return "
-        f"{_plain(unc.compounded_return, 2, 100, '%')}"
-        if unc.n
-        else "none"
-    )
+    after = f"{unc.n} price days (raw return {_pct(unc.compounded_return)}, not analysed)"
     downloaded = (
-        esc(d.factors_downloaded_at.strftime("%Y-%m-%d %H:%M")) + " UTC"
+        d.factors_downloaded_at.strftime("%Y-%m-%d %H:%M") + " UTC"
         if d.factors_downloaded_at
-        else "not recorded (factors supplied directly)"
+        else "Injected, not downloaded"
     )
-    kv = (
-        '<dl class="kv">'
-        f"<dt>Requested</dt><dd>{esc(d.requested_start)} to {esc(d.requested_end)}</dd>"
-        f"<dt>Actual sample</dt><dd>{esc(d.actual_start)} to {esc(d.actual_end)}</dd>"
-        f"<dt>Observations</dt><dd>{d.n_obs:,}</dd>"
-        f"<dt>Excluded rows</dt><dd>{d.n_excluded:,}{' (' + esc(reasons) + ')' if reasons else ''}"
-        "</dd>"
-        f"<dt>After factor data</dt><dd>{tail}</dd>"
-        f"<dt>Before factor data</dt><dd>{d.dropped_price_dates_before_factors:,} days</dd>"
-        f"<dt>Factors through</dt><dd>{esc(d.factors_last_date)} "
-        f"({d.factors_days_behind} days before the report date)</dd>"
-        f"<dt>Factors downloaded</dt><dd>{downloaded}</dd>"
-        f"<dt>Price source</dt><dd>{esc(d.price_source)}</dd>"
-        f"<dt>Factor source</dt><dd>{esc(d.factors_source_url)}</dd>"
-        f"<dt>Schema</dt><dd>v{esc(report.schema_version)}, generated "
-        f"{esc(report.generated_at.strftime('%Y-%m-%d %H:%M'))} UTC</dd></dl>"
+    facts = [
+        ("Requested", f"{_d_long(d.requested_start)} to {_d_long(d.requested_end)}"),
+        (
+            "Analysed",
+            f"{_d_long(d.actual_start)} to {_d_long(d.actual_end)}, "
+            f"{_plural(d.n_obs, 'trading day', 'trading days')}",
+        ),
+        ("Excluded inside the range", f"{d.n_excluded}" + (f" ({reasons})" if reasons else "")),
+        ("After factor data", after if unc.n else "none"),
+        ("Before factor data", f"{d.dropped_price_dates_before_factors} price days"),
+        (
+            "Factor data ends",
+            f"{_d_long(d.factors_last_date)}, {d.factors_days_behind} days before the report",
+        ),
+        ("Factor file downloaded", downloaded),
+        ("Prices", d.price_source),
+        ("Factors", d.factors_source_url),
+    ]
+    dl = "".join(f"<div><dt>{esc(a)}</dt><dd>{esc(b)}</dd></div>" for a, b in facts)
+    finds = "".join(
+        f'<li class="sev-{esc(f.severity)}">{GLYPHS.get(f.severity, "")}'
+        f'<span class="sev">{esc(f.severity.capitalize())}</span>'
+        f'<span class="msg">{esc(f.message)}'
+        f'<span class="dates">{esc(_dates_text(f.dates))}</span></span></li>'
+        for f in d.audit_findings
+    ) or (
+        '<li class="sev-none"><span class="msg">No findings. Prices passed every check.</span></li>'
     )
-    if d.audit_findings:
-        items = "".join(
-            f'<li><span class="sev {esc(f.severity)}">{esc(f.severity)}</span>'
-            f'<span class="num">{esc(f.code)}</span> {esc(f.message)}'
-            f"{esc(_dates_text(f.dates))}</li>"
-            for f in d.audit_findings
+    notes = "".join(f"<li>{esc(n)}</li>" for n in report.notes)
+    vintage = report.label_text.get("L-VINTAGE")
+    if vintage and vintage not in report.notes:
+        notes += f"<li>{esc(vintage)}</li>"
+    return (
+        f'<section class="panel data" id="data" aria-labelledby="data-t">'
+        f"{_panel_head('data', 'Data and audit', q)}"
+        '<div class="data-grid"><div><h3>Coverage</h3>'
+        f'<dl class="facts">{dl}</dl></div><div><h3>Audit findings</h3>'
+        f'<ul class="findings">{finds}</ul><h3>Caveats</h3><ul class="notes">{notes}</ul></div>'
+        "</div>"
+        + _footnote("Audit findings are reported, never acted on: no price is changed or removed.")
+        + "</section>"
+    )
+
+
+def _reg_table(label: str, heads: Sequence[str], rows: Sequence[str], rd: int | None = None) -> str:
+    cols = "".join(
+        f'<th scope="col" class="{"rd" if i == rd else "num"}">{esc(h)}</th>'
+        for i, h in enumerate(heads)
+        if i > 0
+    )
+    return (
+        f'<div class="scroll-x" tabindex="0" role="region" aria-label="{esc(label)}, scrolls '
+        f'sideways"><table class="reg"><thead><tr><th scope="col">{esc(heads[0])}</th>{cols}'
+        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _term_rows(
+    alpha_ann: float | None,
+    alpha_se: float | None,
+    alpha_z: float | None,
+    alpha_p: float | None,
+    alpha_ci: tuple[float | None, float | None],
+    alpha_tag: str | None,
+    stats: Sequence[FactorStat],
+    vif: dict[str, float | None] | None,
+) -> list[str]:
+    a_ns = alpha_tag != "reliable"
+    ci = f"{_pct(alpha_ci[0])} to {_pct(alpha_ci[1])}"
+    rows = [
+        f'<tr class="{"ns" if a_ns else ""}"><th scope="row">Alpha, a year</th>'
+        f'<td class="num">{esc(_pct(alpha_ann))}</td>'
+        f'<td class="num">{esc(_pct(alpha_se, 2, False))}</td>'
+        f'<td class="num">{esc(_tstat(alpha_z))}</td><td class="num">{_pval(alpha_p)}</td>'
+        f'<td class="num">single test</td><td class="num">{esc(ci)}</td>'
+        + ('<td class="num">&#8211;</td>' if vif is not None else "")
+        + f'<td class="num sig">{"No" if a_ns else "Yes"}</td></tr>'
+    ]
+    for s in stats:
+        ns = not _is_reliable(s)
+        vif_cell = (
+            f'<td class="num">{esc(_num(vif.get(s.name), 2))}</td>' if vif is not None else ""
         )
-        findings = f'<ul class="list">{items}</ul>'
-    else:
-        findings = '<p class="cap">No audit findings.</p>'
-    warnings = (
-        '<ul class="list">'
-        + "".join(
-            f'<li><span class="sev warning">{esc(w.code)}</span> {esc(w.message)}</li>'
-            for w in report.warnings
+        rows.append(
+            f'<tr class="{"ns" if ns else ""}"><th scope="row">{esc(s.name)}</th>'
+            f'<td class="num">{esc(_sgn(s.beta))}</td><td class="num">{esc(_num(s.se, 4))}</td>'
+            f'<td class="num">{esc(_tstat(s.z))}</td><td class="num">{_pval(s.p)}</td>'
+            f'<td class="num">{_pval(s.p_adj_bh)}</td>'
+            f'<td class="num">{esc(_sgn(s.ci_low))} to {esc(_sgn(s.ci_high))}</td>'
+            f'{vif_cell}<td class="num sig">{"No" if ns else "Yes"}</td></tr>'
         )
-        + "</ul>"
-        if report.warnings
-        else '<p class="cap">No warnings.</p>'
-    )
-    notes = (
-        '<ul class="list">' + "".join(f"<li>{esc(n)}</li>" for n in report.notes) + "</ul>"
-        if report.notes
-        else '<p class="cap">No caveats supplied.</p>'
-    )
-    left = _panel("Data coverage", "requested vs actual", kv, foot=None, pid="data")
-    right = _panel(
-        "Warnings, audit and caveats",
-        f"audit: {d.audit_status}",
-        f'<h3 id="warnings">Warnings</h3>{warnings}<h3>Audit findings</h3>{findings}'
-        f"<h3>Caveats</h3>{notes}",
-        foot=None,
-        pid="audit",
-    )
-    return f'<div class="grid g-data">{left}{right}</div>'
+    return rows
 
 
 def _detail_panel(report: FactorReport) -> str:
-    """Full regression table, including VIF and collinearity notes."""
     rg = report.regression
-    rows: list[str] = []
-    a_z, _ = _sign_fmt(rg.alpha_z, 2)
-    a_ci = (
-        f"{_plain(rg.alpha_ci_low_annual, 2, 100, '%')} to "
-        f"{_plain(rg.alpha_ci_high_annual, 2, 100, '%')}"
+    head = _panel_head(
+        "detail",
+        "Regression detail",
+        "OLS with an intercept and Newey-West standard errors.",
     )
-    rows.append(
-        "<tr><td>Alpha (annual)</td>"
-        f'<td class="n">{_signed_html(rg.alpha_annual, 2, 100, "%")}</td>'
-        f'<td class="n">{_plain(rg.alpha_se_annual, 2, 100, "%")}</td>'
-        f'<td class="n">{esc(a_z)}</td><td class="n">{_pval(rg.alpha_p)}</td>'
-        f'<td class="n">single test</td><td class="n">{esc(a_ci)}</td><td class="n">n/a</td>'
-        f'<td class="n">{esc(rg.alpha_tag or "n/a")}</td></tr>'
+    if rg.status != "ok":
+        return _section("detail", head, _empty(rg.reason or "The regression is not available."))
+    heads = [
+        "Term",
+        "Estimate",
+        "Std. error",
+        "t",
+        "p",
+        "p, adjusted",
+        "95% interval",
+        "VIF",
+        "Significant",
+    ]
+    table = _reg_table(
+        "Regression detail table",
+        heads,
+        _term_rows(
+            rg.alpha_annual,
+            rg.alpha_se_annual,
+            rg.alpha_z,
+            rg.alpha_p,
+            (rg.alpha_ci_low_annual, rg.alpha_ci_high_annual),
+            rg.alpha_tag,
+            rg.factors,
+            rg.vif,
+        ),
     )
-    for s in rg.factors:
-        ci = f"{_plain(s.ci_low, 3)} to {_plain(s.ci_high, 3)}"
-        vif = _plain(rg.vif.get(s.name), 2)
-        rows.append(
-            f"<tr><td>{esc(s.name)}</td><td class='n'>{_signed_html(s.beta, 4)}</td>"
-            f"<td class='n'>{_plain(s.se, 4)}</td>"
-            f"<td class='n'>{esc(_sign_fmt(s.z, 2)[0])}</td><td class='n'>{_pval(s.p)}</td>"
-            f"<td class='n'>{_pval(s.p_adj_bh)}</td><td class='n'>{esc(ci)}</td>"
-            f"<td class='n'>{vif}</td><td class='n'>{esc(s.tag or 'n/a')}</td></tr>"
-        )
-    table = (
-        '<div class="tablewrap"><table class="dt"><thead><tr><th>Term</th><th>Coef</th>'
-        "<th>HAC se</th><th>z</th><th>p</th><th>p (BH)</th><th>95% CI</th><th>VIF</th>"
-        f"<th>Tag</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
-    )
-    pairs = ", ".join(f"{p.a}/{p.b} {p.corr:+.2f}" for p in rg.high_corr_pairs)
-    cap = (
-        f"R² {_plain(rg.r2, 4)}, adjusted {_plain(rg.adj_r2, 4)}; residual volatility "
-        f"{_plain(rg.sigma_e_annual, 2, 100, '%')} a year. Newey-West lags {rg.hac_lags}. "
-        f"Condition number of the factor correlation matrix {_plain(rg.condition_number, 2)}"
-        + (f"; pairs with |correlation| above 0.6: {pairs}." if pairs else ".")
-    )
-    sentence = f'<p class="cap">{esc(rg.alpha_sentence)}</p>' if rg.alpha_sentence else ""
+    pairs = ", ".join(f"{p.a}/{p.b} {_sgn(p.corr, 2)}" for p in rg.high_corr_pairs)
+    sentence = f'<p class="reading">{esc(rg.alpha_sentence)}</p>' if rg.alpha_sentence else ""
     reads = [s.interpretation for s in rg.factors if s.interpretation]
     reading = (
-        "<h3>Reading the reliable betas</h3>"
-        '<ul class="list cap">' + "".join(f"<li>{esc(t)}</li>" for t in reads) + "</ul>"
+        '<h3 class="reg-title">Reading the significant betas</h3><ul class="notes">'
+        + "".join(f"<li>{esc(t)}</li>" for t in reads)
+        + "</ul>"
         if reads
         else ""
     )
-    return _panel(
-        "Regression detail",
-        "OLS with intercept, Newey-West HAC standard errors",
-        table
-        + f'<p class="cap">{esc(cap)}</p>'
-        + sentence
-        + reading
-        + _five_day_table(report)
-        + _diagnostics_table(report),
-        foot=_foot(report, rg.caption, rg.labels),
-        pid="detail",
+    foot = _footnote(
+        f"R² {_num(rg.r2, 4)}, adjusted {_num(rg.adj_r2, 4)}. Residual volatility "
+        f"{_pct(rg.sigma_e_annual, 2, False)} a year. Newey-West lags {rg.hac_lags}.",
+        [
+            rg.caption,
+            f"Condition number of the factor correlation matrix {_num(rg.condition_number, 2)}"
+            + (f"; pairs with |correlation| above 0.6: {pairs}." if pairs else "."),
+            *_label_texts(report, rg.labels),
+        ],
+    )
+    return (
+        f'<section class="panel" id="detail" aria-labelledby="detail-t">{head}{table}{sentence}'
+        f"{reading}{_five_day_table(report)}{_diagnostics_table(report)}{foot}</section>"
     )
 
 
@@ -1261,37 +1479,37 @@ def _five_day_table(report: FactorReport) -> str:
     five = report.five_day_regression
     if five.status != "ok":
         return ""
-    a_ci = (
-        f"{_plain(five.alpha_ci_low_annual, 2, 100, '%')} to "
-        f"{_plain(five.alpha_ci_high_annual, 2, 100, '%')}"
-    )
-    rows = [
-        "<tr><td>Alpha (annual)</td>"
-        f'<td class="n">{_signed_html(five.alpha_annual, 2, 100, "%")}</td>'
-        f'<td class="n">{_plain(five.alpha_se_annual, 2, 100, "%")}</td>'
-        f'<td class="n">{esc(_sign_fmt(five.alpha_z, 2)[0])}</td>'
-        f'<td class="n">{_pval(five.alpha_p)}</td><td class="n">single test</td>'
-        f'<td class="n">{esc(a_ci)}</td><td class="n">{esc(five.alpha_tag or "n/a")}</td></tr>'
+    heads = [
+        "Term",
+        "Estimate",
+        "Std. error",
+        "t",
+        "p",
+        "p, adjusted",
+        "95% interval",
+        "Significant",
     ]
-    for s in five.factors:
-        rows.append(
-            f"<tr><td>{esc(s.name)}</td><td class='n'>{_signed_html(s.beta, 4)}</td>"
-            f"<td class='n'>{_plain(s.se, 4)}</td>"
-            f"<td class='n'>{esc(_sign_fmt(s.z, 2)[0])}</td><td class='n'>{_pval(s.p)}</td>"
-            f"<td class='n'>{_pval(s.p_adj_bh)}</td>"
-            f"<td class='n'>{esc(f'{_plain(s.ci_low, 3)} to {_plain(s.ci_high, 3)}')}</td>"
-            f"<td class='n'>{esc(s.tag or 'n/a')}</td></tr>"
-        )
+    table = _reg_table(
+        "5-day estimate table",
+        heads,
+        _term_rows(
+            five.alpha_annual,
+            five.alpha_se_annual,
+            five.alpha_z,
+            five.alpha_p,
+            (five.alpha_ci_low_annual, five.alpha_ci_high_annual),
+            five.alpha_tag,
+            five.factors,
+            None,
+        ),
+    )
     cap = (
-        f"{five.caption} R² {_plain(five.r2, 4)}, residual volatility "
-        f"{_plain(five.sigma_e_annual, 2, 100, '%')} a year, Newey-West lags {five.hac_lags}."
+        f"{five.caption} R² {_num(five.r2, 4)}, residual volatility "
+        f"{_pct(five.sigma_e_annual, 2, False)} a year, Newey-West lags {five.hac_lags}."
     )
     return (
-        f"<h3>5-day estimate ({five.n_blocks:,} blocks)</h3>"
-        '<div class="tablewrap"><table class="dt"><thead><tr><th>Term</th><th>Coef</th>'
-        "<th>HAC se</th><th>z</th><th>p</th><th>p (BH)</th><th>95% CI</th><th>Tag</th>"
-        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
-        f'<p class="cap">{esc(cap)}</p>'
+        f'<h3 class="reg-title">5-day estimate ({five.n_blocks:,} blocks)</h3>{table}'
+        f'<p class="foot">{esc(cap)}</p>'
     )
 
 
@@ -1299,48 +1517,105 @@ def _diagnostics_table(report: FactorReport) -> str:
     """Residual diagnostics of M3.5 with their plain-language readings."""
     rd = report.residual_diagnostics
     if rd.status != "ok":
-        return f"<h3>Residual diagnostics</h3>{_empty(rd.reason or 'not available')}"
+        return '<h3 class="reg-title">Residual diagnostics</h3>' + _empty(
+            rd.reason or "Not available."
+        )
     rows = [
-        "<tr><td>Lag-1 autocorrelation</td>"
-        f'<td class="n">{esc(_sign_fmt(rd.lag1_autocorrelation, 3)[0])}</td>'
-        f'<td class="n">z {esc(_sign_fmt(rd.lag1_z, 1)[0])}</td>'
-        f'<td class="n">{_pval(rd.lag1_p)}</td>'
+        "<tr><th scope='row'>Lag-1 autocorrelation</th>"
+        f'<td class="num">{esc(_sgn(rd.lag1_autocorrelation))}</td>'
+        f'<td class="num">z {esc(_tstat(rd.lag1_z))}</td><td class="num">{_pval(rd.lag1_p)}</td>'
         f'<td class="rd">{esc(rd.lag1_reading or "")}</td></tr>'
     ]
     for t in rd.tests:
         rows.append(
-            f"<tr><td>{esc(t.name)}</td><td class='n'>{_plain(t.statistic, 2)}</td>"
-            f"<td class='n'>{'' if t.df is None else f'df {t.df}'}</td>"
-            f"<td class='n'>{_pval(t.p)}</td><td class='rd'>{esc(t.reading)}</td></tr>"
+            f"<tr><th scope='row'>{esc(t.name)}</th><td class=\"num\">{esc(_num(t.statistic, 2))}"
+            f'</td><td class="num">{"" if t.df is None else f"df {t.df}"}</td>'
+            f'<td class="num">{_pval(t.p)}</td><td class="rd">{esc(t.reading)}</td></tr>'
         )
-    return (
-        "<h3>Residual diagnostics</h3>"
-        '<div class="tablewrap"><table class="dt"><thead><tr><th>Test</th><th>Statistic</th>'
-        '<th>Reference</th><th>p</th><th class="rd">Reading</th></tr></thead>'
-        f"<tbody>{''.join(rows)}</tbody></table></div>"
-        f'<p class="cap">{esc(rd.note)} {esc(rd.caption)}</p>'
+    table = _reg_table(
+        "Residual diagnostics table", ["Test", "Statistic", "Reference", "p", "Reading"], rows, rd=4
     )
+    return (
+        f'<h3 class="reg-title">Residual diagnostics</h3>{table}'
+        f'<p class="foot">{esc(rd.note)} {esc(rd.caption)}</p>'
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Page
+# --------------------------------------------------------------------------------------------
+def _add_roles(body: str) -> str:
+    """Explicit table roles: narrow screens restyle rows as grids, which can drop semantics."""
+
+    def fix(m: re.Match[str]) -> str:
+        t = m.group(0)
+        t = t.replace('<table class="bars', '<table role="table" class="bars')
+        t = re.sub(r"<tr(?=[ >])", '<tr role="row"', t)
+        t = t.replace('<th scope="row"', '<th role="rowheader" scope="row"')
+        t = t.replace('<th scope="col"', '<th role="columnheader" scope="col"')
+        t = re.sub(r"<td(?=[ >])", '<td role="cell"', t)
+        return re.sub(r"<(thead|tbody|tfoot)>", lambda g: f'<{g.group(1)} role="rowgroup">', t)
+
+    return re.sub(r'<table class="bars.*?</table>', fix, body, flags=re.S)
+
+
+def _colophon(report: FactorReport) -> str:
+    g = report.generated_at
+    stamp = f"{g.day} {MONTHS[g.month - 1]} {g.year}, {g:%H:%M} UTC"
+    return (
+        f'<footer class="colophon"><p>factordesk report, schema v{esc(report.schema_version)}, '
+        f"generated {stamp}. Descriptive statistics on past data; nothing here is a forecast "
+        "or advice.</p></footer>"
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Public helpers for the panel modules of the optional sections (schema v3 contract, SC3.3)
+# --------------------------------------------------------------------------------------------
+panel_head = _panel_head
+panel_section = _section
+empty_state = _empty
+footnote = _footnote
+fmt_num = _num
+fmt_signed = _sgn
+fmt_pct = _pct
+fmt_tstat = _tstat
+fmt_pval = _pval
+date_long = _d_long
+label_texts = _label_texts
+
+# Core panels, in page order (contract SC4). Positions between them are free for later panels.
+register_panel("header", 100, _header)
+register_panel("equation", 200, _equation)
+register_panel("kpis", 300, _kpis)
+register_panel("price", 400, _price_panel)
+register_panel("exposures", 500, _exposures_panel)
+register_panel("returns", 600, _return_panel)
+register_panel("risk", 700, _risk_panel)
+register_panel("rolling", 800, _rolling_panel)
+register_panel("data", 900, _data_panel)
+register_panel("regression_detail", 1000, _detail_panel)
+register_panel("colophon", 1100, _colophon)
 
 
 def render_report_html(report: FactorReport) -> str:
-    """Render ``report`` as a single self-contained HTML document (no external resources)."""
-    title = f"{report.ticker} factor report"
-    main = (
-        '<div class="grid g-main">'
-        f"{_price_panel(report)}{_betas_panel(report)}</div>"
-        f'<div class="grid g-two">{_return_panel(report)}{_risk_panel(report)}</div>'
-        f'<div class="grid" style="grid-template-columns:minmax(0,1fr)">'
-        f"{_rolling_panel(report)}</div>"
-        f"{_data_panel(report)}"
-        f'<div class="grid" style="grid-template-columns:minmax(0,1fr)">'
-        f"{_detail_panel(report)}</div>"
-    )
+    """Render ``report`` as a single self-contained HTML document (no external resources).
+
+    Draws every registered panel in position order; a panel that returns ``None`` (an absent
+    optional section) adds nothing, not even its stylesheet.
+    """
+    title = f"{report.ticker} factor profile"
+    windows = [w.window for w in report.rolling]
+    drawn = [(spec, spec.render(report)) for spec in registered_panels()]
+    panels = [html_text for _, html_text in drawn if html_text is not None]
+    panel_css = "".join(spec.css for spec, html_text in drawn if html_text is not None)
+    body = "\n".join([HATCH_DEFS, '<main class="report">', *panels, "</main>"])
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"<title>{esc(title)}</title><style>{CSS}</style></head>"
-        f'<body><div class="wrap">{_header(report)}{_kpis(report)}{_gate_callout(report)}'
-        f"<main>{main}</main></div>"
+        '<meta name="color-scheme" content="light dark">'
+        f"<title>{esc(title)}</title><style>\n{font_faces()}{base_css()}\n"
+        f"{_window_css(windows)}{panel_css}</style></head>\n<body>\n{_add_roles(body)}\n"
         "</body></html>\n"
     )
 

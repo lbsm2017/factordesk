@@ -1,0 +1,31 @@
+/* Styles for the header, equation, KPI strip, gate callout and colophon (T5).
+   Tokens only; no colour literal belongs here. Everything else comes from styles/report.css. */
+
+.masthead .mast-meta { gap: var(--s-2); }
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-1);
+  font-weight: 560;
+  text-decoration: none;
+}
+.btn-secondary:hover { background: var(--sunk); }
+
+a.term:focus-visible { outline-offset: 4px; }
+tbody tr:focus { outline: none; }
+tbody tr:focus-visible > th { box-shadow: inset 2px 0 0 var(--ink); }
+
+.notice a { color: var(--ink); text-underline-offset: 3px; }
+
+.report-region .colophon { margin-top: var(--s-5); }
+
+@media screen and (max-width: 719px) {
+  .btn-secondary { min-height: 44px; }
+  .masthead .chip, .masthead a.chip { min-height: 44px; }
+}

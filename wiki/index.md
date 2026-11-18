@@ -17,6 +17,7 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 
 - [Factor data source: the Ken French Data Library](decision-factor-data-source-french-library.md) [Decided]: one public library is the single source of truth for factors.
 - [Prices from Yahoo, with adjusted-close care](decision-prices-from-yahoo-with-adjusted-close-care.md) [Decided]: raw bars, total return from adjusted close, independent recomputation, same-day cache.
+- [Parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) [Decided-pending-implementation]: a few tickers at a time, spaced requests, slow retries and a stop switch, because Yahoo publishes no rate limit.
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md) [Proposed]: regional factor files, US dollar conversion and an optional currency regressor.
 
 ### Statistics
@@ -33,6 +34,8 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 ### Product and design
 
 - [Report design: colour is evidence](decision-report-design-colour-is-evidence.md) [Decided]: colour only encodes data, every chart is also a table, and the equation is the one bold element.
+- [Report density, width cap and range controls](decision-report-density-and-range-controls.md) [Decided-pending-implementation]: a narrow, less dense report; range and ticker pickers belong to the dashboard.
+- [Dashboard server and interface](decision-dashboard-server-and-interface.md) [Decided-pending-implementation]: FastAPI server plus one scrolling React page with ticker search and range chips; plain CSS tokens; static report stays as export.
 
 ### Engineering and process
 
@@ -42,6 +45,9 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [No data and no secrets in the repository](decision-no-data-and-no-secrets-in-the-repo.md) [Decided]: data downloaded at run time, keys only in `.env`.
 - [Branches and pull requests](decision-branches-and-pull-requests.md) [Decided]: `prod`, `dev`, feature and fix branches, maintainer merges.
 - [Independent validation and mutation testing](decision-independent-validation-and-mutation-testing.md) [Decided]: a second recomputation plus deliberately injected bugs.
+- [No citation without verification](decision-citations-and-verification.md) [Decided]: every source is looked up and checked by a script, and what we cannot check is listed as unverified.
+- [Precision of the fast rolling regression](decision-rolling-fast-path-precision.md) [Decided-pending-implementation]: the fast path is about 1e-12 from the exact one on real data; its safety check is tighter and costs no speed.
+- [One contract for the five new report sections](decision-schema-v3-contract.md) [Decided-pending-implementation]: optional sections, one file per feature and layer, panel registries, report format version 4.
 
 ### Open source
 

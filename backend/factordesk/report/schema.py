@@ -18,124 +18,65 @@ Conventions (apply to every model in this module; see ``docs/methodology.md`` M0
 
 Version 3 adds ``residual_diagnostics`` (M3.5), ``quality_gate`` and ``five_day_regression``
 (M3.6). When the gate fires, ``regression`` tags follow the conjunction rule of M3.6.
+
+Version 4 is the schema v3 contract (``docs/specs/schema-v3-contract.md``): five optional
+sections, each defined in its own module under ``report/sections/`` and ``None`` when not computed
+(``lead_lag``, ``shrunk_betas``, ``fragility``, ``residual``, ``kalman_betas``), and the exclusion
+reason ``lead_after_sample_end``. Version 3 files still load (SC5). The shared building blocks
+(``SampleInfo``, the statistic base, the status and label types) live in ``report/base.py`` and
+are re-exported here.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
-SCHEMA_VERSION = "3"
+from factordesk.report.base import FACTOR_NAMES as FACTOR_NAMES
+from factordesk.report.base import LABEL_TEXT as LABEL_TEXT
+from factordesk.report.base import ExcludedRow as ExcludedRow
+from factordesk.report.base import ExclusionReason as ExclusionReason
+from factordesk.report.base import FactorVintage as FactorVintage
+from factordesk.report.base import FrozenModel as FrozenModel
+from factordesk.report.base import LabelKey as LabelKey
+from factordesk.report.base import ReportWarning as ReportWarning
+from factordesk.report.base import SampleInfo as SampleInfo
+from factordesk.report.base import SectionModel as SectionModel
+from factordesk.report.base import SectionSpec as SectionSpec
+from factordesk.report.base import Severity as Severity
+from factordesk.report.base import StatisticModel as StatisticModel
+from factordesk.report.base import Status as Status
+from factordesk.report.base import Tag as Tag
+from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
+from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
+from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
+from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
+from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
 
-FACTOR_NAMES: tuple[str, ...] = ("Mkt-RF", "SMB", "HML", "RMW", "CMA")
-"""Canonical Fama-French 5-factor display names and order (ties are broken by this order)."""
+SCHEMA_VERSION = "4"
+"""Version written by this code (the schema v3 contract; contract SC5)."""
 
-Severity = Literal["info", "warning", "error"]
-Status = Literal["ok", "insufficient_data", "not_applicable", "failed"]
-Tag = Literal["reliable", "noise"]
-ExclusionReason = Literal["multi_day_return", "no_factor_row", "price_missing", "factor_missing"]
+SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4")
+"""Versions this code reads. Version 3 files have no optional sections; they load unchanged."""
+
 AuditStatus = Literal["clean", "warnings", "errors"]
-LabelKey = Literal["L-DESC", "L-ARITH", "L-BAND", "L-OVERLAP", "L-EXPL", "L-PROXY", "L-VINTAGE"]
 
-LABEL_TEXT: dict[str, str] = {
-    "L-DESC": "Descriptive, in-sample, not predictive.",
-    "L-ARITH": "Arithmetic contributions (not compounded); they add up exactly.",
-    "L-BAND": (
-        "Pointwise 95% band. Even with a constant true beta, about 1 point in 20 falls outside."
-    ),
-    "L-OVERLAP": "Overlapping windows: consecutive values share most of their data.",
-    "L-EXPL": "Exploratory long-run link, not a trading signal.",
-    "L-PROXY": "Return-based proxy, not a valuation spread.",
-    "L-VINTAGE": (
-        "Uses the current Fama-French data vintage; historical factor values can be revised."
-    ),
-}
-"""Standard footnote texts, methodology M0.9. Keys are referenced by ``labels`` fields."""
-
-
-class _Frozen(BaseModel):
-    """Base class: immutable, strict types, unknown keys rejected, NaN/inf rejected."""
-
-    model_config = ConfigDict(frozen=True, strict=True, extra="forbid", allow_inf_nan=False)
-
-
-# ------------------------------------------------------------------------------ sample metadata
-class ExcludedRow(_Frozen):
-    """One return row left out of the analysis sample, with the reason (M2)."""
-
-    date: date
-    reason: ExclusionReason
-
-
-class FactorVintage(_Frozen):
-    """Which French file the numbers come from (M0.8)."""
-
-    last_date: date = Field(description="Last date in the French factor file.")
-    downloaded_at: datetime | None = Field(
-        description="UTC time the file was downloaded; None when the factors were injected."
-    )
-
-
-class SampleInfo(_Frozen):
-    """Sample metadata carried by every statistic (M0.8)."""
-
-    n: int = Field(ge=0, description="Rows of the analysis sample used.")
-    start: date | None = Field(description="Actual first date used.")
-    end: date | None = Field(description="Actual last date used (the stamp of in-sample stats).")
-    requested_start: date
-    requested_end: date
-    window: int | None = Field(description="Trailing-window length in rows, if any.")
-    n_excluded: int = Field(ge=0)
-    excluded: list[ExcludedRow]
-    factor_vintage: FactorVintage
-
-    @model_validator(mode="after")
-    def _count_matches(self) -> SampleInfo:
-        """``n_excluded`` must equal the number of listed rows."""
-        if self.n_excluded != len(self.excluded):
-            raise ValueError("n_excluded must equal len(excluded)")
-        return self
-
-
-def _floats(value: object) -> Iterator[float]:
-    """Every float reachable inside a dumped model (dicts and lists walked recursively)."""
-    if isinstance(value, float):
-        yield value
-    elif isinstance(value, dict):
-        for v in cast(dict[object, object], value).values():
-            yield from _floats(v)
-    elif isinstance(value, list):
-        for v in cast(list[object], value):
-            yield from _floats(v)
-
-
-class _Statistic(_Frozen):
-    """Common fields of every statistic (M14)."""
-
-    status: Status
-    reason: str | None = Field(description="Human-readable reason when status is not 'ok'.")
-    sample: SampleInfo
-    labels: list[LabelKey] = Field(description="Standard footnotes that apply (keys of M0.9).")
-    caption: str = Field(description="Section-specific label text (methodology wording).")
-
-    @model_validator(mode="after")
-    def _status_consistent(self) -> _Statistic:
-        """``reason`` is required iff not ok; not-ok statistics carry no numbers (M0.7)."""
-        if (self.status == "ok") != (self.reason is None):
-            raise ValueError("reason must be None exactly when status is 'ok'")
-        if self.status != "ok":
-            dumped = self.model_dump(exclude={"sample"})
-            if any(True for _ in _floats(dumped)):
-                raise ValueError(f"status {self.status!r} but numeric values are present")
-        return self
+SECTIONS: tuple[SectionSpec, ...] = (
+    LEAD_LAG_SECTION,
+    SHRUNK_SECTION,
+    FRAGILITY_SECTION,
+    RESIDUAL_ALPHA_SECTION,
+    KALMAN_SECTION,
+)
+"""The optional sections of the schema v3 contract, in panel order (contract SC3.1, SC4)."""
 
 
 # ------------------------------------------------------------------------------ data provenance
-class AuditFinding(_Frozen):
+class AuditFinding(FrozenModel):
     """One data-quality finding from the price audit (reported, never acted on)."""
 
     code: str = Field(description="Stable machine-readable code, e.g. 'large_return'.")
@@ -146,7 +87,7 @@ class AuditFinding(_Frozen):
     )
 
 
-class UncoveredTail(_Frozen):
+class UncoveredTail(FrozenModel):
     """Price dates after the last factor date (M2 step 6). Never part of any statistic."""
 
     n: int = Field(ge=0, description="Trading days after the factor file's last date.")
@@ -159,7 +100,7 @@ class UncoveredTail(_Frozen):
     )
 
 
-class DataInfo(_Frozen):
+class DataInfo(FrozenModel):
     """Provenance and coverage of the data behind the report."""
 
     requested_start: date
@@ -187,15 +128,8 @@ class DataInfo(_Frozen):
     audit_findings: list[AuditFinding] = Field(default_factory=lambda: [])
 
 
-class ReportWarning(_Frozen):
-    """A report-level warning (short history, collinearity, audit status, data lag, ...)."""
-
-    code: str
-    message: str
-
-
 # ------------------------------------------------------------------------------ regression (M3)
-class FactorStat(_Frozen):
+class FactorStat(FrozenModel):
     """Full-sample OLS coefficient for one factor. ``beta`` is a unitless sensitivity."""
 
     name: str
@@ -212,7 +146,7 @@ class FactorStat(_Frozen):
     )
 
 
-class CorrPair(_Frozen):
+class CorrPair(FrozenModel):
     """A factor pair whose sample correlation exceeds 0.6 in absolute value (M3.4)."""
 
     a: str
@@ -220,7 +154,7 @@ class CorrPair(_Frozen):
     corr: float
 
 
-class Regression(_Statistic):
+class Regression(StatisticModel):
     """Full-sample excess-return regression ``y = alpha + sum(b_i f_i) + e`` (M3)."""
 
     alpha_annual: float | None = Field(description="Annualised alpha, decimal per year (x252).")
@@ -257,7 +191,7 @@ DiagnosticCode = Literal[
 ]
 
 
-class DiagnosticTest(_Frozen):
+class DiagnosticTest(FrozenModel):
     """One residual diagnostic (M3.5). Informational: never drives tags or alerts."""
 
     code: DiagnosticCode
@@ -270,7 +204,7 @@ class DiagnosticTest(_Frozen):
     reading: str = Field(description="Plain-language reading of the result.")
 
 
-class ResidualDiagnostics(_Statistic):
+class ResidualDiagnostics(StatisticModel):
     """Diagnostics of the full-sample regression residuals (M3.5)."""
 
     lag1_autocorrelation: float | None = Field(
@@ -284,7 +218,7 @@ class ResidualDiagnostics(_Statistic):
     note: str = Field(description="HAC is used whatever the tests show.")
 
 
-class QualityGate(_Statistic):
+class QualityGate(StatisticModel):
     """Residual quality gate for non-synchronous prices (M3.6)."""
 
     rho_threshold: float | None = Field(description="Fires when lag-1 autocorrelation < this.")
@@ -299,7 +233,7 @@ class QualityGate(_Statistic):
     message: str | None = Field(description="The caveat shown in the report when fired.")
 
 
-class MultiDayRegression(_Statistic):
+class MultiDayRegression(StatisticModel):
     """Regression on sums over non-overlapping 5-day blocks (M3.6); only when the gate fired."""
 
     horizon_days: int = Field(ge=0, description="Block length in trading days (5).")
@@ -323,7 +257,7 @@ class MultiDayRegression(_Statistic):
 
 
 # ------------------------------------------------------------------------------ rolling (M4, M5)
-class RollingWindow(_Statistic):
+class RollingWindow(StatisticModel):
     """Trailing-window betas. ``betas[name][i]`` belongs to ``dates[i]``; None during warm-up.
 
     Each stamp uses exactly ``window`` rows of the sample ending on (and including) its date.
@@ -361,7 +295,7 @@ class RollingWindow(_Statistic):
         return self
 
 
-class AverageBeta(_Frozen):
+class AverageBeta(FrozenModel):
     """Distribution of the rolling betas of the primary window for one factor (M5)."""
 
     name: str
@@ -375,7 +309,7 @@ class AverageBeta(_Frozen):
     share_positive: float | None = Field(description="Share of stamps with beta > 0.")
 
 
-class AverageBetaPanel(_Statistic):
+class AverageBetaPanel(StatisticModel):
     """Average beta over all stamps of the primary window (M5). Stamped at the sample end."""
 
     window: int = Field(gt=0)
@@ -384,7 +318,7 @@ class AverageBetaPanel(_Statistic):
 
 
 # ------------------------------------------------------------------------------ attribution (M6)
-class ReturnContribution(_Statistic):
+class ReturnContribution(StatisticModel):
     """Static arithmetic return attribution, annualised decimals (M6.1, M6.4).
 
     ``sum(factors) + alpha + residual == total_annualised_mean_excess_return`` up to
@@ -401,7 +335,7 @@ class ReturnContribution(_Statistic):
     memo: list[str] = Field(description="Memo rows: uncovered dates and excluded rows (D8).")
 
 
-class RiskFactorDetail(_Frozen):
+class RiskFactorDetail(FrozenModel):
     """Exposure x volatility x correlation view of one factor's risk share (M7)."""
 
     name: str
@@ -413,7 +347,7 @@ class RiskFactorDetail(_Frozen):
     )
 
 
-class RiskContribution(_Statistic):
+class RiskContribution(StatisticModel):
     """Euler risk decomposition over the full sample (M7). Shares may be negative."""
 
     factors: dict[str, float | None] = Field(description="RC_i, share of variance per factor.")
@@ -430,7 +364,7 @@ class RiskContribution(_Statistic):
 
 
 # ------------------------------------------------------------------------------ price + report
-class PriceSeries(_Frozen):
+class PriceSeries(FrozenModel):
     """Adjusted close for charting only (never used for regression here)."""
 
     dates: list[date]
@@ -447,7 +381,7 @@ class PriceSeries(_Frozen):
         return self
 
 
-class FactorReport(_Frozen):
+class FactorReport(FrozenModel):
     """Everything the UI or an exported file needs to describe one ticker's factor exposures."""
 
     schema_version: str = SCHEMA_VERSION
@@ -471,6 +405,46 @@ class FactorReport(_Frozen):
     label_text: dict[str, str] = Field(
         default_factory=lambda: dict(LABEL_TEXT), description="Footnote texts by label key."
     )
+    # Optional sections of the schema v3 contract (docs/specs/schema-v3-contract.md), in panel
+    # order. None: the feature did not run for this report (always None in version 3 files).
+    lead_lag: LeadLagSection | None = Field(
+        default=None, description="Lead-lag betas (docs/specs/lead-lag-betas.md)."
+    )
+    shrunk_betas: list[ShrunkBetas] | None = Field(
+        default=None,
+        description="Shrunk betas, one entry per scope: full sample, then latest window "
+        "(docs/specs/shrunk-betas.md).",
+    )
+    fragility: FragilitySection | None = Field(
+        default=None, description="Fragility score (docs/specs/fragility-score.md)."
+    )
+    residual: ResidualAnalysis | None = Field(
+        default=None,
+        description="Residual alpha analysis (docs/methodology-residual-analysis.md).",
+    )
+    kalman_betas: KalmanBetaSeries | None = Field(
+        default=None, description="Kalman-filter betas (docs/specs/kalman-betas.md)."
+    )
+
+    @field_validator("schema_version")
+    @classmethod
+    def _supported_version(cls, value: str) -> str:
+        """Only versions this code can read (contract SC5)."""
+        if value not in SUPPORTED_SCHEMA_VERSIONS:
+            raise ValueError(
+                f"schema_version {value!r} is not supported; supported versions: "
+                + ", ".join(SUPPORTED_SCHEMA_VERSIONS)
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _sections_need_version_4(self) -> FactorReport:
+        """A version 3 file has no optional sections."""
+        if self.schema_version == "3":
+            present = [s.report_field for s in SECTIONS if getattr(self, s.report_field)]
+            if present:
+                raise ValueError(f"a version 3 report cannot hold {', '.join(present)}")
+        return self
 
     @model_validator(mode="after")
     def _utc_timestamp(self) -> FactorReport:
@@ -480,7 +454,101 @@ class FactorReport(_Frozen):
         return self
 
 
-STATISTIC_MODELS: tuple[type[_Statistic], ...] = (
+# ------------------------------------------------- API envelope (not part of FactorReport)
+
+RangePreset = Literal["3Y", "5Y", "FULL"]
+RANGE_PRESETS: tuple[RangePreset, ...] = ("3Y", "5Y", "FULL")
+"""Range presets in display order (dashboard spec DB2.2; owner decision of 2026-11-18 dropped
+YTD and 1Y)."""
+
+ErrorCode = Literal[
+    "invalid_ticker",
+    "unknown_ticker",
+    "bad_range",
+    "insufficient_history",
+    "degenerate_input",
+    "factor_data_invalid",
+    "network",
+    "upstream_refused",
+    "not_found",
+    "internal",
+    "bad_request",
+]
+"""Error codes of the local API (dashboard spec DB2.3). ``bad_request`` covers any other
+malformed request parameter."""
+
+
+class Health(FrozenModel):
+    """Liveness answer; reads no disk and no network."""
+
+    status: Literal["ok"]
+    version: str
+    schema_version: str
+
+
+class FactorDataStatus(FrozenModel):
+    """Coverage and age of the cached Fama-French file; ``available`` is False when none."""
+
+    available: bool
+    first_date: date | None
+    last_date: date | None
+    days_behind: int | None
+    last_download_at: datetime | None
+    stale: bool | None
+    source_url: str
+
+
+class TickerSuggestion(FrozenModel):
+    ticker: str
+    last_fetched: date
+
+
+class TickerSuggestions(FrozenModel):
+    items: list[TickerSuggestion]
+
+
+class RangeOption(FrozenModel):
+    """One range preset for one ticker; ``reason`` is None exactly when ``available``."""
+
+    preset: RangePreset
+    start: date | None
+    n_obs: int
+    available: bool
+    reason: str | None
+
+    @model_validator(mode="after")
+    def _reason_iff_unavailable(self) -> RangeOption:
+        if self.available != (self.reason is None):
+            raise ValueError("reason must be None exactly when the option is available")
+        return self
+
+
+class RangeOptions(FrozenModel):
+    """Availability of every preset for one ticker (always three, in preset order)."""
+
+    ticker: str
+    first_return_date: date
+    last_price_date: date
+    factors_last_date: date
+    min_obs: int
+    options: list[RangeOption]
+
+    @model_validator(mode="after")
+    def _presets_in_order(self) -> RangeOptions:
+        if tuple(option.preset for option in self.options) != RANGE_PRESETS:
+            raise ValueError("options must hold every preset exactly once, in preset order")
+        return self
+
+
+class ApiError(FrozenModel):
+    """Every error body: ``message`` says what went wrong, ``action`` what to do."""
+
+    code: ErrorCode
+    message: str
+    action: str
+
+
+STATISTIC_MODELS: tuple[type[StatisticModel], ...] = (
     Regression,
     RollingWindow,
     AverageBetaPanel,
@@ -489,8 +557,24 @@ STATISTIC_MODELS: tuple[type[_Statistic], ...] = (
     ResidualDiagnostics,
     QualityGate,
     MultiDayRegression,
+    *(model for spec in SECTIONS for model in spec.statistic_models),
 )
-"""Every statistic model in the report (each carries status, reason and SampleInfo)."""
+"""Every statistic model in the report (each carries status, reason and SampleInfo): the core
+statistics, then the nested statistics of the optional sections."""
+
+
+def report_label_text(
+    present: Mapping[str, object | None], sections: Sequence[SectionSpec] = SECTIONS
+) -> dict[str, str]:
+    """``LABEL_TEXT`` plus the footnote texts of every section whose value is not ``None``.
+
+    ``present`` maps report field names to the section values (contract SC1 item 5).
+    """
+    out = dict(LABEL_TEXT)
+    for spec in sections:
+        if present.get(spec.report_field) is not None:
+            out.update(spec.label_text)
+    return out
 
 
 def report_json_schema() -> dict[str, object]:
@@ -499,7 +583,11 @@ def report_json_schema() -> dict[str, object]:
 
 
 def load_report(path: str | Path) -> FactorReport:
-    """Read and validate a report previously written as JSON (UTF-8)."""
+    """Read and validate a report previously written as JSON (UTF-8).
+
+    Reads every version in ``SUPPORTED_SCHEMA_VERSIONS``. A version 3 file loads with the optional
+    sections ``None`` and keeps ``schema_version == "3"``.
+    """
     return FactorReport.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
 

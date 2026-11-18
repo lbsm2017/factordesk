@@ -16,7 +16,7 @@ from factordesk.analytics.rolling import rolling_betas
 from factordesk.analytics.sample import FACTOR_CODES, InsufficientHistoryError, build_sample
 from factordesk.data.factors import load_ff5_daily
 from factordesk.data.prices import PriceDataError, YFinanceProvider
-from factordesk.pipeline import build_report
+from factordesk.pipeline import assemble_report, build_report
 from factordesk.report import (
     FACTOR_NAMES,
     FactorReport,
@@ -65,7 +65,7 @@ def test_build_report_end_to_end() -> None:
     assert "factor_data_lag" in codes and "short_history" not in codes
     assert any("survivor" in n.lower() for n in rep.notes)
     page = render_report_html(rep)
-    assert "SYN" in page and "Memo (not part of any sum)" in page
+    assert "SYN" in page and "Not in the sum" in page
 
 
 def test_t35_refusal_and_short_history_warning() -> None:
@@ -85,6 +85,61 @@ def test_build_report_validates_inputs() -> None:
     assert provider.calls == []
     with pytest.raises(ValueError, match="timezone-aware"):
         build_report("SYN", provider, factors=d.factors, now=datetime(2026, 11, 18))
+
+
+def test_requested_range_reaches_every_sample() -> None:
+    d = dgp_a(rng_for(108), n=1300)
+    factors = d.factors.iloc[:1280]
+    start, end = date(2011, 2, 1), date(2014, 6, 30)
+    rep = build_report(
+        "syn", StaticProvider(d.history), factors=factors, now=NOW, start=start, end=end
+    )
+    stats = [
+        rep.regression,
+        *rep.rolling,
+        rep.average_beta,
+        rep.return_contribution,
+        rep.risk_contribution,
+        rep.residual_diagnostics,
+        rep.quality_gate,
+        rep.five_day_regression,
+    ]
+    for stat in stats:
+        assert (stat.sample.requested_start, stat.sample.requested_end) == (start, end)
+    assert (rep.data.requested_start, rep.data.requested_end) == (start, end)
+    assert rep.data.actual_start is not None and rep.data.actual_start >= start
+    assert rep.data.actual_end is not None and rep.data.actual_end <= end
+    assert rep.data.uncovered.n == 0
+    expected = build_sample(d.history, factors, start, end)
+    assert rep.data.n_obs == expected.n
+    # assemble_report takes the same keywords
+    direct = assemble_report(
+        "SYN",
+        d.history,
+        factors,
+        now=NOW,
+        factors_downloaded_at=None,
+        start=start,
+        end=end,
+    )
+    assert direct == rep
+
+
+def test_default_range_is_the_whole_history() -> None:
+    d = dgp_a(rng_for(108), n=700)
+    factors = d.factors.iloc[:680]
+    default = build_report("syn", StaticProvider(d.history), factors=factors, now=NOW)
+    explicit = build_report(
+        "syn",
+        StaticProvider(d.history),
+        factors=factors,
+        now=NOW,
+        start=d.dates[0].date(),
+        end=d.dates[-1].date(),
+    )
+    assert default == explicit
+    assert default.data.requested_start == d.dates[0].date()
+    assert default.data.requested_end == d.dates[-1].date()
 
 
 def _is_statistic(value: object) -> bool:

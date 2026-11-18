@@ -6,6 +6,7 @@ Standard library only; imports nothing from the project and modifies nothing out
 
     uv run --no-project python docs/design/prototype/build_prototype.py
     uv run --no-project python docs/design/prototype/build_prototype.py --empty   # empty-state demo
+    uv run --no-project python docs/design/prototype/build_prototype.py --controls # dashboard controls mock
 """
 
 from __future__ import annotations
@@ -105,8 +106,14 @@ def pos(v: float, lo: float, hi: float) -> float:
 
 
 # ----------------------------------------------------------------------------- small pieces
-def footnote(text: str) -> str:
-    return f'<p class="foot">{text}</p>'
+def footnote(text: str, more: str = "") -> str:
+    """One visible line or two; the method detail folds into a native <details> (open in print)."""
+    if not more:
+        return f'<p class="foot">{text}</p>'
+    return (
+        f'<div class="foot"><p>{text}</p><details class="how"><summary>How this is computed</summary>'
+        f"<p>{more}</p></details></div>"
+    )
 
 
 def panel_head(pid: str, title: str, question: str, extra: str = "") -> str:
@@ -154,34 +161,54 @@ def bar(v: float, lo: float, hi: float, cls: str) -> str:
 
 
 # ----------------------------------------------------------------------------- panels
-def header(r: dict) -> str:
+WARN_PLAIN = {
+    "residual_reversal": "Prices look out of step with the factor data, so R\u00b2 is probably understated and residual volatility overstated.",
+    "short_history": "The history is short, so the betas rest on a small sample.",
+    "audit_errors": "The price audit found errors, so the headline numbers are not interpretable until they are explained; see Data and audit.",
+}
+GLYPH_WARN = (
+    '<svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 1.5 15 14.5H1z"/>'
+    '<path class="cut" d="M8 6v4M8 11.6v1"/></svg>'
+)
+
+
+def range_line(r: dict) -> str:
     d = r["data"]
-    cov = (
-        f"Daily returns from {d_long(d['actual_start'])} to {d_long(d['actual_end'])}, "
-        f"{d['n_obs']:,} trading days. Factor data ends {d_long(d['factors_last_date'])}, "
-        f"{d['factors_days_behind']} days before this report"
-    )
+    s = f"Analysed {d_long(d['actual_start'])} to {d_long(d['actual_end'])}, {d['n_obs']:,} trading days."
     if d["uncovered"]["n"]:
-        cov += f"; the last {d['uncovered']['n']} price days are shown but not analysed"
-    cov += "."
-    gen = datetime.fromisoformat(r["generated_at"].replace("Z", "+00:00"))
-    warn = ""
-    if r["warnings"]:
-        items = "".join(
-            f'<li><svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 1.5 15 14.5H1z"/>'
-            f'<path class="cut" d="M8 6v4M8 11.6v1"/></svg><span><span class="vh">Warning: </span>'
-            f"{e(w['message'])}</span></li>"
-            for w in r["warnings"]
+        s += f" The last {d['uncovered']['n']} price days are charted but not analysed."
+    return s
+
+
+def header(r: dict, controls: bool = False) -> str:
+    d = r["data"]
+    ws = r["warnings"]
+    chips = (
+        f'<span class="chip">Factor data ends {d_long(d["factors_last_date"])} '
+        f'({d["factors_days_behind"]} days ago)</span>'
+    )
+    if ws:
+        chips += f'<a class="chip warn" href="#notice">{len(ws)} warning{"" if len(ws) == 1 else "s"}</a>'
+    top = (
+        f'<div class="mast-top"><h1><span class="ticker">{e(r["ticker"])}</span>'
+        f'<span class="what">Fama&#8211;French five-factor profile</span></h1>'
+        f'<p class="mast-meta">{chips}</p></div>'
+    )
+    notice = ""
+    if ws:
+        summ = " ".join(WARN_PLAIN.get(w["code"], w["message"]) for w in ws[:2])
+        more = "".join(f"<li>{e(w['message'])}</li>" for w in ws)
+        notice = (
+            f'<aside class="notice" id="notice" aria-label="Data quality">{GLYPH_WARN}'
+            f'<div><p class="notice-sum"><span class="vh">Warning: </span>{e(summ)}</p>'
+            f'<details class="how"><summary>Details</summary><ul>{more}</ul></details></div></aside>'
         )
-        warn = f'<ul class="warnings" aria-label="Report warnings">{items}</ul>'
+    line = "" if controls else f'<p class="coverage">{e(range_line(r))}</p>'
     return f"""
 <header class="masthead">
-  <div class="mast-top">
-    <h1><span class="ticker">{e(r['ticker'])}</span><span class="what">Fama&#8211;French five-factor profile</span></h1>
-    <p class="gen">Generated {gen.day} {gen.strftime('%b %Y, %H:%M')} UTC</p>
-  </div>
-  <p class="coverage">{e(cov)}</p>
-  {warn}
+  {top}
+  {line}
+  {notice}
 </header>"""
 
 
@@ -228,27 +255,23 @@ def equation(r: dict) -> str:
 def kpis(r: dict) -> str:
     g, d = r["regression"], r["data"]
     if g["status"] != "ok":
-        return f'<section class="kpis" aria-label="Headline statistics">{empty_state(g["reason"], "Widen the date range to at least 60 trading days and run the report again.")}</section>'
+        return f'<section class="kpis" aria-label="Headline statistics">{empty_state(g["reason"], "Widen the date range and run the report again.")}</section>'
     a_ns = g["alpha_tag"] != "reliable"
-    alpha_note = (
-        f"t {tstat(g['alpha_z'])}, p {pval(g['alpha_p'])}. "
-        + ("Not distinguishable from zero." if a_ns else "Distinguishable from zero at 5%.")
-    )
-    sev = {"info": 0, "warning": 0, "error": 0}
-    for f in d["audit_findings"]:
-        sev[f["severity"]] += 1
-    audit_word = {"clean": "Clean", "warnings": "Warnings", "errors": "Errors"}[d["audit_status"]]
-    parts = [f"{v} {k}{'' if v == 1 else 's'}" for k, v in sev.items() if v]
-    audit_note = ", ".join(parts) if parts else "No findings"
+    # Validation F4: with audit errors the fitted tiles are muted and alpha makes no significance claim.
+    audit_errors = d["audit_status"] == "errors"
+    fit_cls = "ns" if audit_errors else ""
+    if audit_errors:
+        alpha_note, a_ns = "Not interpretable: the price audit found errors", True
+    else:
+        alpha_note = "Not distinguishable from zero" if a_ns else "Distinguishable from zero at 5%"
     excl = d["n_excluded"]
     cells = [
         ("Alpha, a year", pct(g["alpha_annual"]), alpha_note, "ns" if a_ns else ""),
-        ("R&#178;", f"{g['r2']:.4f}", "Share of daily variance the five factors explain", ""),
-        ("Adjusted R&#178;", f"{g['adj_r2']:.4f}", "Penalised for the five regressors", ""),
+        ("R&#178;", f"{g['r2']:.4f}", "Share of daily variance the factors explain", fit_cls),
+        ("Residual volatility", pct(g["sigma_e_annual"], 1, False), "A year, left unexplained by the factors", fit_cls),
         ("Observations", f"{d['n_obs']:,}", f"Trading days; {excl} excluded" if excl else "Trading days; none excluded", ""),
-        ("Sample", f"{d_short(d['actual_start'])} to {d_short(d['actual_end'])}",
+        ("Analysed range", f"{d_short(d['actual_start'])} to {d_short(d['actual_end'])}",
          f"Requested {d_long(d['requested_start'])} to {d_long(d['requested_end'])}", "dates"),
-        ("Data audit", audit_word, audit_note, "audit-" + d["audit_status"]),
     ]
     body = "".join(
         f'<div class="kpi {cls}"><dt>{lab}</dt><dd class="v">{val}</dd><dd class="n">{e(note)}</dd></div>'
@@ -277,7 +300,7 @@ def price_panel(r: dict) -> str:
     p = r["price_series"]
     dates, px = p["dates"], p["adj_close"]
     pts = [(i, v) for i, v in enumerate(px) if v is not None]
-    head = panel_head("price", "Price", "How has the price moved over the window?")
+    head = panel_head("price", "Price", "How has the price moved over the window? Shaded days are not in the analysis.")
     if len(pts) < 2:
         return f'<section class="panel" aria-labelledby="price-t">{head}{empty_state("No prices were returned for this ticker and window.", "Check the ticker symbol or choose a later start date.")}</section>'
     cov = p["factor_coverage_end"]
@@ -290,7 +313,18 @@ def price_panel(r: dict) -> str:
     main = [(X(i), Y(v)) for i, v in pts if i <= cut]
     tail = [(X(i), Y(v)) for i, v in pts if i >= cut]
     grid = "".join(f'<line class="grid" x1="0" x2="1000" y1="{Y(t):.2f}" y2="{Y(t):.2f}"/>' for t in ticks)
-    shade = f'<rect class="tailzone" x="{X(cut):.1f}" y="0" width="{1000 - X(cut):.1f}" height="100"/>' if cut < n else ""
+    start_i = next((i for i, s in enumerate(dates) if s >= r["data"]["actual_start"]), 0)
+    shade = ""
+    if cut < n:
+        shade += (
+            f'<rect class="tailzone" x="{X(cut):.1f}" y="0" width="{1000 - X(cut):.1f}" height="100"/>'
+            f'<line class="cutline" x1="{X(cut):.1f}" x2="{X(cut):.1f}" y1="0" y2="100"/>'
+        )
+    if start_i > 0:
+        shade += (
+            f'<rect class="tailzone" x="0" y="0" width="{X(start_i):.1f}" height="100"/>'
+            f'<line class="cutline" x1="{X(start_i):.1f}" x2="{X(start_i):.1f}" y1="0" y2="100"/>'
+        )
     svg = (
         f'<svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">{shade}{grid}'
         f'<path class="price-line" d="{path_xy(*zip(*main))}"/>'
@@ -303,8 +337,10 @@ def price_panel(r: dict) -> str:
         f'<span class="xl{" minor" if not major else ""} {edge(X(i) / 10)}" style="left:{X(i) / 10:.2f}%">{lab}</span>' for i, lab, major in xt
     )
     tail_lab = (
-        f'<span class="zone-label">Shaded: no factor data</span>' if cut < n else ""
+        f'<span class="zone-label">Not analysed: factor data ends {d_long(cov)}</span>' if cut < n else ""
     )
+    if start_i > 0:
+        tail_lab += f'<span class="zone-label l">Not analysed: before {d_long(dates[start_i])}</span>'
     d = r["data"]
     first, last_in, last = px[pts[0][0]], px[cut], pts[-1][1]
     u = d["uncovered"]
@@ -327,7 +363,7 @@ def price_panel(r: dict) -> str:
     <table class="side"><caption class="vh">Price points</caption>
       <thead class="vh"><tr><th scope="col">Point</th><th scope="col">Adjusted close</th></tr></thead><tbody>{side}</tbody></table>
   </div>
-  {footnote(f"Adjusted close from {e(d['price_source'])}, for context only; no statistic uses the price line. The shaded tail after {d_long(cov)} has no factor data.")}
+  {footnote(f"Adjusted close from {e(d['price_source'])}, for context only; no statistic uses the price line.")}
 </section>"""
 
 
@@ -346,14 +382,22 @@ def exposures_panel(r: dict) -> str:
         cls = ("pos" if b >= 0 else "neg") + (" faded" if ns else "")
         whisk = (
             f'<line class="ci" x1="{pos(f["ci_low"], lo, hi)}%" x2="{pos(f["ci_high"], lo, hi)}%" y1="50%" y2="50%"/>'
-            f'<line class="ci" x1="{pos(f["ci_low"], lo, hi)}%" x2="{pos(f["ci_low"], lo, hi)}%" y1="34%" y2="66%"/>'
-            f'<line class="ci" x1="{pos(f["ci_high"], lo, hi)}%" x2="{pos(f["ci_high"], lo, hi)}%" y1="34%" y2="66%"/>'
         )
+        if pos(f["ci_high"], lo, hi) - pos(f["ci_low"], lo, hi) >= 1.2:  # caps only when the interval is wide enough to read
+            whisk += (
+                f'<line class="ci" x1="{pos(f["ci_low"], lo, hi)}%" x2="{pos(f["ci_low"], lo, hi)}%" y1="46.5%" y2="53.5%"/>'
+                f'<line class="ci" x1="{pos(f["ci_high"], lo, hi)}%" x2="{pos(f["ci_high"], lo, hi)}%" y1="46.5%" y2="53.5%"/>'
+            )
         tip = (
             f"{f['name']}: beta {sgn(b)}, 95% interval {sgn(f['ci_low'])} to {sgn(f['ci_high'])}, "
             f"t {tstat(f['z'])}, adjusted p {pval(f['p_adj_bh'])}"
         )
         a = avg.get(f["name"])
+        if a is not None:
+            whisk += (
+                f'<svg class="avgm" x="{pos(a, lo, hi)}%" y="50%" overflow="visible" aria-hidden="true">'
+                '<path d="M0 -3.6 3.6 0 0 3.6-3.6 0z"/></svg>'
+            )
         rows.append(
             f'<tr id="beta-{f["name"]}" class="{"ns" if ns else ""}" tabindex="-1">'
             f'<th scope="row"><span class="fname">{e(f["name"])}</span><span class="sub">{PLAIN[f["name"]]}</span></th>'
@@ -369,7 +413,8 @@ def exposures_panel(r: dict) -> str:
         '<li><svg class="sw" aria-hidden="true"><rect class="pos" width="14" height="10" rx="2"/></svg>Positive</li>'
         '<li><svg class="sw" aria-hidden="true"><rect class="neg" width="14" height="10" rx="2"/></svg>Negative</li>'
         '<li><svg class="sw" aria-hidden="true"><rect class="pos faded" x="0.5" y="0.5" width="13" height="9" rx="2"/></svg>Faded: not significant</li>'
-        '<li><svg class="sw" aria-hidden="true"><line class="ci" x1="1" x2="15" y1="5" y2="5"/><line class="ci" x1="1" x2="1" y1="1" y2="9"/><line class="ci" x1="15" x2="15" y1="1" y2="9"/></svg>95% interval</li>'
+        '<li><svg class="sw" aria-hidden="true"><line class="ci" x1="1" x2="15" y1="5" y2="5"/><line class="ci" x1="1" x2="1" y1="3.5" y2="6.5"/><line class="ci" x1="15" x2="15" y1="3.5" y2="6.5"/></svg>95% interval</li>'
+        f'<li><svg class="sw" aria-hidden="true"><path class="avgm-sw" d="M8 1.4 11.6 5 8 8.6 4.4 5z"/></svg>Average {ab.get("window", 252)}d beta</li>'
         "</ul>"
     )
     return f"""
@@ -384,7 +429,7 @@ def exposures_panel(r: dict) -> str:
     <tbody>{''.join(rows)}</tbody>
     <tfoot>{axis_row(ticks, lo, hi, lambda t: sgn(t, 2) if t else "0", 4)}</tfoot>
   </table>
-  {footnote(f"In-sample, descriptive, not predictive. OLS on daily excess returns with Newey&#8211;West standard errors ({g['hac_lags']} lags). Significant means the Benjamini&#8211;Hochberg adjusted p is below 0.05 across the {g['bh_family_size']} betas. Average {ab.get('window', 252)}d is the mean of the overlapping rolling estimates.")}
+  {footnote("In-sample, descriptive, not predictive. Significant means the adjusted p is below 0.05.", f"OLS on daily excess returns with Newey&#8211;West standard errors ({g['hac_lags']} lags). Significant means the Benjamini&#8211;Hochberg adjusted p is below 0.05 across the {g['bh_family_size']} betas. The diamond and the Avg {ab.get('window', 252)}d column are the mean of the overlapping rolling estimates.")}
 </section>"""
 
 
@@ -482,7 +527,7 @@ def return_panel(r: dict) -> str:
     <tfoot>{axis_row(ticks, lo, hi, lambda t: pct(t, 0 if abs(t * 100 - round(t * 100)) < 1e-9 else 1) if t else "0%", 2)}</tfoot>
   </table>
   <div class="memo"><h3>Not in the sum</h3><ul>{memo}</ul></div>
-  {footnote("In-sample, descriptive, not predictive. Each factor's share is its full-sample beta times the factor's average return, times 252. Arithmetic, not compounded, so the rows add up exactly to the total.")}
+  {footnote("In-sample, descriptive, not predictive. The rows add up exactly to the total.", "Each factor's share is its full-sample beta times the factor's average return, times 252. Arithmetic, not compounded.")}
 </section>"""
 
 
@@ -539,7 +584,7 @@ def risk_panel(r: dict) -> str:
     <tbody>{''.join(rows)}</tbody>
     <tfoot>{axis_row(ticks, lo, hi, lambda t: pct(t, 0, False) if t >= 0 else pct(t, 0), 4)}</tfoot>
   </table>
-  {footnote("In-sample, descriptive, not predictive. Euler decomposition of variance: share = beta &#215; factor vol &#215; correlation with the factor-driven return, divided by total vol. Shares add to 100% and can be negative when a factor offsets the others.")}
+  {footnote("In-sample, descriptive, not predictive. Shares add to 100% and can be negative when a factor offsets the others.", "Euler decomposition of variance: share = beta &#215; factor vol &#215; correlation with the factor-driven return, divided by total vol.")}
 </section>"""
 
 
@@ -598,12 +643,18 @@ def rolling_block(w: dict, avg: dict | None) -> str:
             mean, p10, p90 = a["mean"], a["p10"], a["p90"]
         else:
             mean, p10, p90 = sum(vals) / len(vals), _quantile(vals, 0.1), _quantile(vals, 0.9)
+        if a and a.get("sd") is not None:
+            sd, vmin, vmax, shp = a["sd"], a["min"], a["max"], a["share_positive"]
+        else:
+            sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / max(len(vals) - 1, 1))
+            vmin, vmax, shp = min(vals), max(vals), sum(1 for v in vals if v > 0) / len(vals)
+        tip = f"Spread {num(sd)}, lowest {sgn(vmin)}, highest {sgn(vmax)}, above zero in {shp * 100:.0f}% of windows"
         rows.append(
             f'<tr><th scope="row"><span class="fname"><svg class="key" aria-hidden="true"><rect class="cat c{SLOT[name]}" width="8" height="8" rx="1"/></svg>{e(name)}</span>'
             f'<span class="sub">{PLAIN[name]}</span></th>'
             f'<td class="plot-cell"><div class="plot mini">{svg}<div class="ylabels" aria-hidden="true">{ylab}</div></div></td>'
             f'<td class="num strong">{sgn(latest)}</td><td class="num">{sgn(mean)}</td>'
-            f'<td class="num range">{sgn(p10, 2)} to {sgn(p90, 2)}</td></tr>'
+            f'<td class="num range" title="{e(tip)}">{sgn(p10, 2)} to {sgn(p90, 2)}</td></tr>'
         )
     xlab = "".join(
         f'<span class="xl{" minor" if not major else ""} {edge((i - i0) / max(n - i0, 1) * 100)}" style="left:{(i - i0) / max(n - i0, 1) * 100:.2f}%">{lab}</span>' for i, lab, major in xt
@@ -649,7 +700,7 @@ def rolling_panel(r: dict) -> str:
 <section class="panel" id="rolling" aria-labelledby="roll-t">
   {panel_head(*head_args, toggle)}
   {''.join(blocks)}
-  {footnote("In-sample, descriptive, not predictive. Shaded band: pointwise 95% interval; about 1 point in 20 falls outside it even when the true beta is constant. Overlapping windows share most of their data. Every row uses the same vertical span, centred on its own values, so wiggles compare across factors.")}
+  {footnote("In-sample, descriptive, not predictive. The band is a pointwise 95% interval.", "About 1 point in 20 falls outside the band even when the true beta is constant. Overlapping windows share most of their data. Every row uses the same vertical span, centred on its own values, so wiggles compare across factors.")}
 </section>"""
 
 
@@ -748,7 +799,44 @@ def font_faces() -> str:
 CSS = (HERE / "report.css").read_text(encoding="utf-8") if (HERE / "report.css").exists() else ""
 
 
-def page(r: dict) -> str:
+def controls_bar(r: dict) -> str:
+    """Dashboard-only controls (design mock). The static report shows range_line() instead."""
+    d = r["data"]
+    n = d["n_obs"]
+    presets = [("YTD", 1), ("1Y", 252), ("3Y", 756), ("5Y", 1260), ("Full history", 0)]
+    chips, off = [], []
+    for lab, need in presets:
+        dis = need > n
+        if dis:
+            off.append(lab)
+        chips.append(
+            f'<label class="chip-opt{" off" if dis else ""}"><input type="radio" name="range" value="{lab}"'
+            f'{" disabled" if dis else ""}{" checked" if lab == "Full history" else ""}><span>{lab}</span></label>'
+        )
+    why = (
+        f'<p class="ctl-why" id="ctl-why">{" and ".join(off)} need more trading days than {e(r["ticker"])} has in this '
+        f"sample ({n:,}). Choose a shorter range.</p>"
+        if off
+        else ""
+    )
+    return f"""
+<section class="controls" aria-label="Report controls">
+  <form class="ctl-row" onsubmit="return false">
+    <div class="ctl-search"><label class="vh" for="tk">Ticker</label>
+      <input id="tk" type="text" value="{e(r['ticker'])}" autocomplete="off" spellcheck="false" aria-describedby="ctl-why">
+      <button type="button" class="btn">Factor it</button></div>
+    <fieldset class="ctl-range"><legend class="vh">Date range</legend>
+      <span class="chips">{''.join(chips)}</span>
+      <span class="ctl-custom"><label>From <input type="date" value="{d['actual_start']}" max="{d['factors_last_date']}"></label>
+      <label>To <input type="date" value="{d['actual_end']}" max="{d['factors_last_date']}"></label></span>
+    </fieldset>
+  </form>
+  <p class="ctl-label"><b>{e(range_line(r))}</b> Factor data ends {d_long(d['factors_last_date'])}, so later dates cannot be chosen.</p>
+  {why}
+</section>"""
+
+
+def page(r: dict, controls: bool = False) -> str:
     hatch_defs = (
         '<svg class="defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>'
         '<pattern id="hatch" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">'
@@ -759,7 +847,8 @@ def page(r: dict) -> str:
         [
             hatch_defs,
             '<main class="report">',
-            header(r),
+            controls_bar(r) if controls else "",
+            header(r, controls),
             equation(r),
             kpis(r),
             price_panel(r),
@@ -768,7 +857,7 @@ def page(r: dict) -> str:
             risk_panel(r),
             rolling_panel(r),
             data_section(r),
-            f'<footer class="colophon"><p>factordesk report, schema v{e(r["schema_version"])}. '
+            f'<footer class="colophon"><p>factordesk report, schema v{e(r["schema_version"])}, generated {gen_stamp(r)}. '
             "Descriptive statistics on past data; nothing here is a forecast or advice.</p></footer>",
             "</main>",
         ]
@@ -793,6 +882,11 @@ def page(r: dict) -> str:
 """
 
 
+def gen_stamp(r: dict) -> str:
+    g = datetime.fromisoformat(r["generated_at"].replace("Z", "+00:00"))
+    return f"{g.day} {g.strftime('%b %Y, %H:%M')} UTC"
+
+
 def add_roles(body: str) -> str:
     """Explicit table roles: narrow screens restyle rows as grids, which can drop native semantics."""
     def fix(m: re.Match[str]) -> str:
@@ -809,7 +903,7 @@ def add_roles(body: str) -> str:
 def make_empty(r: dict) -> dict:
     """Mutate a copy of the fixture so every statistic reports insufficient data."""
     x = copy.deepcopy(r)
-    msg = "Not enough data: the sample has 41 trading days and this needs at least 60."
+    msg = "Not enough data: the sample has 41 trading days and this needs at least 504."
     for key in ("regression", "return_contribution", "risk_contribution", "average_beta"):
         x[key]["status"] = "insufficient_data"
         x[key]["reason"] = msg
@@ -822,10 +916,11 @@ def make_empty(r: dict) -> dict:
 def main() -> None:
     r = json.loads(FIXTURE.read_text(encoding="utf-8"))
     empty = "--empty" in sys.argv
+    controls = "--controls" in sys.argv
     if empty:
         r = make_empty(r)
-    out = HERE / ("report-empty.html" if empty else "report.html")
-    out.write_text(page(r), encoding="utf-8", newline="\n")
+    out = HERE / ("report-empty.html" if empty else "report-controls.html" if controls else "report.html")
+    out.write_text(page(r, controls), encoding="utf-8", newline="\n")
     print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
 
 

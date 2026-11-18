@@ -1,0 +1,17 @@
+/* Exposure-over-time panel: the pieces report.css has no rule for (ECharts container, x labels, zoom reset). */
+.plot.mini .rolling-chart { position: absolute; inset: 0; }
+.axis.time .xl-wrap { position: relative; height: 100%; margin-left: 52px; }
+.rolling-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.zoom-reset { margin: 0; font: inherit; font-size: var(--fs-1); cursor: pointer; }
+.zoom-reset:hover { background: var(--sunk); }
+@media screen and (max-width: 719px) {
+  /* report.css already insets the whole axis cell by 44px on narrow screens. */
+  .axis.time .xl-wrap { margin-left: 0; }
+  .zoom-reset { min-height: 44px; }
+}
+/* Phones: report.css hides minor x labels. Keep the first and last (and the major ones that fit)
+   so the time span can be read. RollingPanel decides which labels carry .keep. */
+@media screen and (max-width: 719px) {
+  .axis.time .xl.keep { display: block; }
+  .axis.time .xl:not(.keep) { display: none; }
+}
