@@ -26,12 +26,16 @@ interface Row {
 const INPUT_ID = "ticker-input";
 const ERROR_ID = "ticker-error";
 
+/** Input types that take no typed text: "/" from one of these still focuses the search field. */
+const NON_TEXT_INPUTS = new Set(["radio", "checkbox", "button", "submit", "reset", "image", "range", "color", "file"]);
+
 /** True when a key press came from a place where "/" is just a character. */
 function isTextTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  if (tag === "INPUT") return !NON_TEXT_INPUTS.has((target as HTMLInputElement).type);
+  return tag === "TEXTAREA" || tag === "SELECT";
 }
 
 /**

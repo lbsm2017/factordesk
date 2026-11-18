@@ -29,6 +29,10 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await page.goto("/");
   const ticker = page.getByRole("combobox", { name: "Ticker" });
   await expect(ticker).toBeVisible();
+  // No ticker yet: the range controls are disabled, with the reason as visible text.
+  await expect(page.getByRole("radio", { name: "3Y" })).toBeDisabled();
+  await expect(page.getByLabel("From")).toBeDisabled();
+  await expect(page.getByText("Choose a ticker first.")).toBeVisible();
   await ticker.fill("SYN");
   await ticker.press("Enter");
   await expect(page).toHaveURL(/[?&]t=SYN\b/);
@@ -56,6 +60,12 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await expect(ticker).not.toBeFocused();
   await page.keyboard.press("/");
   await expect(ticker).toBeFocused();
+  // It also works from a radio, which is not a text field.
+  await page.getByRole("radio", { name: "3Y" }).focus();
+  await expect(ticker).not.toBeFocused();
+  await page.keyboard.press("/");
+  await expect(ticker).toBeFocused();
+  await expect(ticker).not.toHaveValue(/\//);
 
   // Rolling window by keyboard: arrow keys move between the radios and change `win`.
   const rolling = page.getByRole("group", { name: "Rolling window length" });
@@ -73,6 +83,27 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
     "href",
     /\/api\/report\/SYN\/html\?.*range=3Y/,
   );
+
+  // A typed year is partial input: Chrome emits 0002, 0020, 0202 on the way to 2013, and none of
+  // them may reach the URL, the history or the server. Enter commits the finished date once.
+  const apiStarts: string[] = [];
+  page.on("request", (request) => {
+    const start = new URL(request.url()).searchParams.get("start");
+    if (start !== null) apiStarts.push(start);
+  });
+  const historyBefore = await page.evaluate(() => window.history.length);
+  const from = page.getByRole("group", { name: "Custom dates" }).getByLabel("From");
+  await from.focus();
+  await page.keyboard.type("01012013");
+  await expect(from).toHaveValue("2013-01-01");
+  expect(page.url()).not.toMatch(/[?&]start=/);
+  expect(await page.evaluate(() => window.history.length)).toBe(historyBefore);
+  expect(apiStarts).toEqual([]);
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/[?&]start=2013-01-01(&|$)/);
+  expect(await page.evaluate(() => window.history.length)).toBe(historyBefore + 1);
+  await expect(kpis).toContainText("Analysed range");
+  expect(new Set(apiStarts)).toEqual(new Set(["2013-01-01"]));
 
   // No sideways scroll at 1440 and at 390; screenshots of the synthetic report.
   await page.evaluate(() => window.scrollTo(0, 0));

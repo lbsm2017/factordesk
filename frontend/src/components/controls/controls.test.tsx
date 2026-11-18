@@ -108,6 +108,34 @@ describe("TickerSearch", () => {
     other.remove();
   });
 
+  it("focuses the field on / when a radio has focus, but not in a date field or textarea", () => {
+    const { input } = search();
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    document.body.append(radio);
+    radio.focus();
+    const onRadio = new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
+    radio.dispatchEvent(onRadio);
+    expect(onRadio.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+    radio.remove();
+
+    for (const make of [
+      () => Object.assign(document.createElement("input"), { type: "date" }),
+      () => Object.assign(document.createElement("input"), { type: "search" }),
+      () => document.createElement("textarea"),
+    ]) {
+      const field = make();
+      document.body.append(field);
+      field.focus();
+      const event = new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
+      field.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(field);
+      field.remove();
+    }
+  });
+
   it("shows an inline sentence for an error and marks the field invalid", () => {
     const { input } = search({ error: "BRK B is not a valid ticker." });
     expect(screen.getByRole("alert").textContent).toBe("BRK B is not a valid ticker.");
@@ -162,24 +190,91 @@ describe("CustomRange", () => {
     expect(to.max).toBe("2026-09-30");
   });
 
-  it("commits a complete, valid pair on change", () => {
+  it("commits a complete, valid pair on blur, not on change", () => {
     const onCommit = vi.fn();
     render(<CustomRange start="2024-08-08" end="2026-09-30" max="2026-09-30" onCommit={onCommit} />);
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2025-01-02" } });
+    const from = screen.getByLabelText("From");
+    fireEvent.change(from, { target: { value: "2025-01-02" } });
+    expect(onCommit).not.toHaveBeenCalled();
+    fireEvent.blur(from);
+    expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenCalledWith("2025-01-02", "2026-09-30");
   });
 
-  it("sends nothing for an incomplete date", () => {
+  it("commits on Enter", () => {
+    const onCommit = vi.fn();
+    render(<CustomRange start="2024-08-08" end="2026-09-30" max="2026-09-30" onCommit={onCommit} />);
+    const to = screen.getByLabelText("To");
+    fireEvent.change(to, { target: { value: "2026-01-02" } });
+    fireEvent.keyDown(to, { key: "Enter" });
+    expect(onCommit).toHaveBeenCalledWith("2024-08-08", "2026-01-02");
+  });
+
+  it("sends nothing while a year is typed: 0002, 0020, 0202 are partial input, 2023 commits once", () => {
+    const onCommit = vi.fn();
+    render(<CustomRange start="2024-08-08" end="2026-09-30" max="2026-09-30" onCommit={onCommit} />);
+    const from = screen.getByLabelText("From");
+    for (const year of ["0002", "0020", "0202"]) {
+      fireEvent.change(from, { target: { value: `${year}-08-08` } });
+      expect(screen.queryByRole("alert")).toBeNull();
+    }
+    expect(onCommit).not.toHaveBeenCalled();
+    fireEvent.change(from, { target: { value: "2023-08-08" } });
+    fireEvent.blur(from);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith("2023-08-08", "2026-09-30");
+  });
+
+  it("rejects a year before 1970 on blur with a sentence and sends nothing", () => {
+    const onCommit = vi.fn();
+    render(<CustomRange start="2024-08-08" end="2026-09-30" max="2026-09-30" onCommit={onCommit} />);
+    const from = screen.getByLabelText("From") as HTMLInputElement;
+    expect(from.min).toBe("1970-01-01");
+    fireEvent.change(from, { target: { value: "0202-08-08" } });
+    fireEvent.blur(from);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(
+      "8 Aug 202 is too early. Dates before 1 Jan 1970 cannot be chosen. Choose a later date.",
+    );
+    expect(from.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(from, { target: { value: "2023-08-08" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("does nothing when the dates are unchanged", () => {
+    const onCommit = vi.fn();
+    render(<CustomRange start="2024-08-08" end="2026-09-30" max="2026-09-30" onCommit={onCommit} />);
+    const from = screen.getByLabelText("From");
+    fireEvent.change(from, { target: { value: "2025-01-02" } });
+    fireEvent.change(from, { target: { value: "2024-08-08" } });
+    fireEvent.blur(from);
+    fireEvent.keyDown(from, { key: "Enter" });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("explains an incomplete date on blur and sends nothing", () => {
     const onCommit = vi.fn();
     render(<CustomRange start="2024-08-08" end="2026-09-30" max={null} onCommit={onCommit} />);
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "" } });
+    const from = screen.getByLabelText("From");
+    fireEvent.change(from, { target: { value: "" } });
     expect(onCommit).not.toHaveBeenCalled();
+    fireEvent.blur(from);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain("Enter a complete date");
+  });
+
+  it("disables both fields when asked", () => {
+    render(<CustomRange start="" end="" max={null} onCommit={vi.fn()} disabled />);
+    expect((screen.getByLabelText("From") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("To") as HTMLInputElement).disabled).toBe(true);
   });
 
   it("explains a start after the end and sends nothing", () => {
     const onCommit = vi.fn();
     render(<CustomRange start="2024-08-08" end="2026-09-30" max="2026-09-30" onCommit={onCommit} />);
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-10-01" } });
+    fireEvent.blur(screen.getByLabelText("From"));
     expect(onCommit).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toContain("is after");
   });
@@ -188,6 +283,7 @@ describe("CustomRange", () => {
     const onCommit = vi.fn();
     render(<CustomRange start="2024-08-08" end="2026-09-30" max="2026-09-30" onCommit={onCommit} />);
     fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-12-01" } });
+    fireEvent.blur(screen.getByLabelText("To"));
     expect(onCommit).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toBe(
       "Factor data ends 30 Sep 2026, so 1 Dec 2026 cannot be chosen. Choose an earlier date.",
@@ -299,6 +395,26 @@ describe("ControlsStrip", () => {
     expect(document.getElementById("ctl-why")).toBeNull();
   });
 
+  it("disables the range chips and the date fields on the landing page and says why", () => {
+    strip({ state: EMPTY_URL_STATE, ranges: undefined, report: undefined });
+    for (const radio of screen.getAllByRole("radio")) {
+      expect((radio as HTMLInputElement).disabled).toBe(true);
+      expect((radio as HTMLInputElement).checked).toBe(false);
+    }
+    expect((screen.getByLabelText("From") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("To") as HTMLInputElement).disabled).toBe(true);
+    const reason = screen.getByText("Choose a ticker first. The date range applies to a loaded report.");
+    expect(reason.closest("[id]")?.id).toBe("ctl-why");
+    expect(screen.getByRole("group", { name: "Date range" }).getAttribute("aria-describedby")).toBe("ctl-why");
+  });
+
+  it("enables the range controls once a ticker is chosen", () => {
+    strip();
+    expect((screen.getByLabelText("From") as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole("radio", { name: "3Y" }) as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByText(/Choose a ticker first/)).toBeNull();
+  });
+
   it("selects Full history when the URL has no range, and the preset when it has one", () => {
     const { view, all } = strip();
     expect(screen.getByRole("radio", { name: "Full history" })).toHaveProperty("checked", true);
@@ -328,12 +444,14 @@ describe("ControlsStrip", () => {
   it("commits complete custom dates, which clears the chip", () => {
     const { onCommit } = strip();
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2025-03-03" } });
+    fireEvent.blur(screen.getByLabelText("From"));
     expect(onCommit).toHaveBeenCalledWith({ range: null, start: "2025-03-03", end: "2026-09-30" });
   });
 
   it("sends nothing when From is after To", () => {
     const { onCommit } = strip();
     fireEvent.change(screen.getByLabelText("To"), { target: { value: "2024-01-01" } });
+    fireEvent.blur(screen.getByLabelText("To"));
     expect(onCommit).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toContain("Choose a start date before the end date.");
   });

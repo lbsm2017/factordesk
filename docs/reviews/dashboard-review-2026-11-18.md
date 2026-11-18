@@ -137,3 +137,10 @@ Result in one line: the page is close to the approved design and every owner-fee
 18. **C1, C2, C3, C5, C6 (minor).** Shared helpers, data-theme observer, dead print rule, test-shell note, label consistency.
 
 Counts: 0 blockers, 5 major, 21 minor.
+
+### Fixed 2026-11-18 (branch fix/dashboard-controls-input)
+
+- **S1:** custom dates commit only on blur or Enter; a year before 1970, a date after the last factor date, From after To and an incomplete date show a sentence and send nothing; unchanged values do nothing. The smoke test types a year and checks no request or history entry until Enter.
+- **A3:** control borders use `--axis` (at least 3:1 in light and dark); a style test checks the ratio and the rules.
+- **A5:** `/` focuses the search from a radio; text-like inputs, textareas and selects still keep it.
+- **S5:** on the landing page the chips and date fields are disabled, none is selected, and a visible sentence says to choose a ticker first.
