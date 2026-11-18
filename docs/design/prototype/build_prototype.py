@@ -162,7 +162,7 @@ def bar(v: float, lo: float, hi: float, cls: str) -> str:
 
 # ----------------------------------------------------------------------------- panels
 WARN_PLAIN = {
-    "residual_reversal": "Prices look out of step with the factor data, so R\u00b2 and residual volatility are probably understated.",
+    "residual_reversal": "Prices look out of step with the factor data, so R\u00b2 is probably understated and residual volatility overstated.",
     "short_history": "The history is short, so the betas rest on a small sample.",
     "audit_errors": "The price audit found errors, so the headline numbers are not interpretable until they are explained; see Data and audit.",
 }
