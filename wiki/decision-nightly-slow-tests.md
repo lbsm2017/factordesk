@@ -14,6 +14,7 @@ A scheduled workflow runs the tests that normal checks skip: the statistical tes
 - Job `live` runs `pytest -m live` (3 tests). It is allowed to fail, and its summary says whether it passed.
 - The workflow can only read the repository and uses no secrets. Two nightly runs never overlap.
 - The Kalman simulation tests run at their default replication count. The setting that raises them to the specification's 200 is not on this branch, so the workflow does not use it.
+- 2026-11-18 (later, after PR #2 merged into `dev`): the `slow` job sets `FACTORDESK_KB_REPS` to 200 in `.github/workflows/nightly.yml`, so the Kalman simulation tests run at the specification's 200 replications. The previous bullet describes the state before this change. About 11 minutes on a developer machine for the Kalman tests alone; not yet measured on a GitHub runner. The 45-minute limit stays.
 
 ## Why
 

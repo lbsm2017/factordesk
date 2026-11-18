@@ -121,3 +121,8 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 ## 2026-11-18 (integration)
 
 - Shrunk betas and Kalman betas merged into `integrate/features` (stacked on PR #1); both validated, not merged to prod. Residual alpha is merged later.
+
+## 2026-11-18 (after PRs #1, #2 and #3 merged into dev)
+
+- `docs/ROADMAP.md` updated (update 3): ranks 1, 8, 12 and 14 are Done on `dev`, not on `prod`; the nightly workflow is merged but has not run on GitHub; three new tickets (currency check N1, browser and accessibility pass N2, Kalman screen-reader strings N3) and an open-items list added.
+- The nightly `slow` job now sets `FACTORDESK_KB_REPS` to 200 (`.github/workflows/nightly.yml`, `wiki/decision-nightly-slow-tests.md`). Not verified until it runs on GitHub.
