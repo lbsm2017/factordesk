@@ -72,3 +72,6 @@
   background: var(--border);
   border-radius: 2px;
 }
+
+/* Error state: the ticker heading sits above the notice. */
+.req-error .masthead + .notice { margin-top: var(--s-4); }

@@ -14,7 +14,8 @@ import {
 } from "./api/queries";
 import type { FactorReport } from "./api/types";
 import { ControlsStrip } from "./components/controls/ControlsStrip";
-import { ErrorNotice, Landing } from "./components/controls/ReportStates";
+import { Landing } from "./components/controls/ReportStates";
+import { ErrorFrame } from "./components/report/ErrorFrame";
 import { LoadingFrame } from "./components/report/LoadingFrame";
 import { ReportView } from "./components/report/ReportView";
 import { addRecent, useRecent } from "./state/recent";
@@ -82,7 +83,7 @@ function Dashboard() {
       {state.ticker === null ? (
         <Landing recent={recent} onPick={(ticker) => commit({ ticker })} />
       ) : report.isError ? (
-        <ErrorNotice error={toApiError(report.error)} />
+        <ErrorFrame ticker={state.ticker} error={toApiError(report.error)} />
       ) : shown === undefined ? (
         <LoadingFrame ticker={state.ticker} />
       ) : (

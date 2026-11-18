@@ -21,7 +21,8 @@ const FRAMES = [
 
 /**
  * First load (dashboard spec DB6.4): the page frame at final heights, with placeholders for the
- * ticker, the equation and the KPI cells and `--sunk` panel bodies. No spinner. The heights come
+ * ticker (the page heading, outside the hidden part), the equation and the KPI cells and `--sunk`
+ * panel bodies. No spinner. The heights come
  * from the rendered panels (see `frame.css`), so the report arrives without layout shift.
  */
 export function LoadingFrame({ ticker }: { ticker: string }) {
@@ -30,19 +31,19 @@ export function LoadingFrame({ ticker }: { ticker: string }) {
       <p className="vh" role="status">
         {`Loading the report for ${ticker}.`}
       </p>
+      <header className="masthead sk-head">
+        <div className="mast-top">
+          <h1>
+            <span className="ticker">{ticker}</span>
+            <span className="what">Fama–French five-factor profile</span>
+          </h1>
+          <p className="mast-meta" aria-hidden="true">
+            <span className="chip sk-chip" />
+            <span className="btn-secondary sk-chip" />
+          </p>
+        </div>
+      </header>
       <div aria-hidden="true">
-        <header className="masthead sk-head">
-          <div className="mast-top">
-            <h1>
-              <span className="ticker">{ticker}</span>
-              <span className="what">Fama–French five-factor profile</span>
-            </h1>
-            <p className="mast-meta">
-              <span className="chip sk-chip" />
-              <span className="btn-secondary sk-chip" />
-            </p>
-          </div>
-        </header>
         <div className="sk-notice" />
         <div className="model sk-eq" />
         <div className="kpis sk-kpis">
