@@ -585,7 +585,7 @@ def _kpis(report: FactorReport) -> str:
     if g.status != "ok":
         body = _empty(
             g.reason or "The regression could not be computed.",
-            "Widen the date range to at least 60 trading days and run the report again.",
+            "Widen the date range and run the report again.",
         )
         return f'<section class="kpis" aria-label="Headline statistics">{body}</section>'
     if g.alpha_tag == "reliable":

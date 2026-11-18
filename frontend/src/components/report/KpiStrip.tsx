@@ -20,7 +20,7 @@ export function KpiStrip({ report }: ReportPanelProps) {
       <section className="kpis" id="kpis" aria-label="Headline statistics">
         <EmptyState
           reason={g.reason ?? "The regression could not be computed."}
-          action="Widen the date range to at least 60 trading days and run the report again."
+          action="Widen the date range and run the report again."
         />
       </section>
     );

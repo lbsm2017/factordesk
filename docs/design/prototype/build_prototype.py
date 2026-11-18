@@ -254,7 +254,7 @@ def equation(r: dict) -> str:
 def kpis(r: dict) -> str:
     g, d = r["regression"], r["data"]
     if g["status"] != "ok":
-        return f'<section class="kpis" aria-label="Headline statistics">{empty_state(g["reason"], "Widen the date range to at least 60 trading days and run the report again.")}</section>'
+        return f'<section class="kpis" aria-label="Headline statistics">{empty_state(g["reason"], "Widen the date range and run the report again.")}</section>'
     a_ns = g["alpha_tag"] != "reliable"
     alpha_note = "Not distinguishable from zero" if a_ns else "Distinguishable from zero at 5%"
     excl = d["n_excluded"]
@@ -896,7 +896,7 @@ def add_roles(body: str) -> str:
 def make_empty(r: dict) -> dict:
     """Mutate a copy of the fixture so every statistic reports insufficient data."""
     x = copy.deepcopy(r)
-    msg = "Not enough data: the sample has 41 trading days and this needs at least 60."
+    msg = "Not enough data: the sample has 41 trading days and this needs at least 504."
     for key in ("regression", "return_contribution", "risk_contribution", "average_beta"):
         x[key]["status"] = "insufficient_data"
         x[key]["reason"] = msg
