@@ -74,6 +74,27 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
     /\/api\/report\/SYN\/html\?.*range=3Y/,
   );
 
+  // A typed year is partial input: Chrome emits 0002, 0020, 0202 on the way to 2013, and none of
+  // them may reach the URL, the history or the server. Enter commits the finished date once.
+  const apiStarts: string[] = [];
+  page.on("request", (request) => {
+    const start = new URL(request.url()).searchParams.get("start");
+    if (start !== null) apiStarts.push(start);
+  });
+  const historyBefore = await page.evaluate(() => window.history.length);
+  const from = page.getByRole("group", { name: "Custom dates" }).getByLabel("From");
+  await from.focus();
+  await page.keyboard.type("01012013");
+  await expect(from).toHaveValue("2013-01-01");
+  expect(page.url()).not.toMatch(/[?&]start=/);
+  expect(await page.evaluate(() => window.history.length)).toBe(historyBefore);
+  expect(apiStarts).toEqual([]);
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/[?&]start=2013-01-01(&|$)/);
+  expect(await page.evaluate(() => window.history.length)).toBe(historyBefore + 1);
+  await expect(kpis).toContainText("Analysed range");
+  expect(new Set(apiStarts)).toEqual(new Set(["2013-01-01"]));
+
   // No sideways scroll at 1440 and at 390; screenshots of the synthetic report.
   await page.evaluate(() => window.scrollTo(0, 0));
   await noSideScroll(page);

@@ -197,6 +197,8 @@ describe("committing changes", () => {
     renderAt("/?t=SPY&range=3Y");
     await screen.findByTestId("report-ticker");
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2025-01-02" } });
+    expect(window.location.search).toBe("?t=SPY&range=3Y");
+    fireEvent.blur(screen.getByLabelText("From"));
     expect(window.location.search).toBe("?t=SPY&start=2025-01-02&end=2026-09-30");
     for (const radio of screen.getAllByRole("radio")) expect((radio as HTMLInputElement).checked).toBe(false);
     await waitFor(() => expect(requests).toContain("/api/report/SPY?start=2025-01-02&end=2026-09-30"));

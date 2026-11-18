@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { dateLong, isIsoDate } from "../../format";
 
 export interface CustomRangeProps {
@@ -7,49 +8,75 @@ export interface CustomRangeProps {
   end: string;
   /** Last factor date (the `max` of both date fields), or null while unknown. */
   max: string | null;
-  /** Called when a complete, valid pair is entered. */
+  /** Called when a complete, valid pair is entered and the user leaves the field or presses Enter. */
   onCommit: (start: string, end: string) => void;
+  /** No ticker is loaded yet, so the dates have no effect. */
+  disabled?: boolean;
 }
 
-/** A sentence for a pair that must not be sent, or null when the pair is fine or incomplete. */
+/** The earliest date that can be chosen: no factor or price series starts before this. */
+export const MIN_DATE = "1970-01-01";
+
+/** A sentence for a pair that must not be sent, or null when the pair is fine. */
 function problem(start: string, end: string, max: string | null): string | null {
-  if (isIsoDate(start) && isIsoDate(end) && start > end) {
+  for (const date of [start, end]) {
+    if (!isIsoDate(date)) return "Enter a complete date with day, month and year, for example 8 Aug 2024.";
+  }
+  if (start > end) {
     return `The start date ${dateLong(start)} is after the end date ${dateLong(end)}. Choose a start date before the end date.`;
   }
-  if (max !== null) {
-    for (const date of [start, end]) {
-      if (isIsoDate(date) && date > max) {
-        return `Factor data ends ${dateLong(max)}, so ${dateLong(date)} cannot be chosen. Choose an earlier date.`;
-      }
+  for (const date of [start, end]) {
+    if (date < MIN_DATE) {
+      return `${dateLong(date)} is too early. Dates before ${dateLong(MIN_DATE)} cannot be chosen. Choose a later date.`;
+    }
+    if (max !== null && date > max) {
+      return `Factor data ends ${dateLong(max)}, so ${dateLong(date)} cannot be chosen. Choose an earlier date.`;
     }
   }
   return null;
 }
 
 /**
- * From and To (dashboard spec DB6.3). A complete, valid pair commits on change; a start after the
- * end, or a date after the factor data, shows a sentence and sends nothing.
+ * From and To (dashboard spec DB6.3). Typing only edits a draft: the pair is checked and committed
+ * when a field loses focus or Enter is pressed, never on partial input (a typed year passes through
+ * 0002, 0020 and 0202 on its way to 2023). An invalid pair shows a sentence and sends nothing; an
+ * unchanged pair does nothing.
  */
-export function CustomRange({ start, end, max, onCommit }: CustomRangeProps) {
+export function CustomRange({ start, end, max, onCommit, disabled = false }: CustomRangeProps) {
   const [draft, setDraft] = useState({ start, end });
   const [seen, setSeen] = useState({ start, end });
+  const [message, setMessage] = useState<string | null>(null);
   if (seen.start !== start || seen.end !== end) {
     setSeen({ start, end });
     setDraft({ start, end });
+    setMessage(null);
   }
   const errorId = useId();
 
-  const change = (next: { start: string; end: string }) => {
+  const edit = (next: { start: string; end: string }) => {
     setDraft(next);
-    if (!isIsoDate(next.start) || !isIsoDate(next.end)) return;
-    if (problem(next.start, next.end, max) !== null) return;
-    if (next.start === start && next.end === end) return;
-    onCommit(next.start, next.end);
+    setMessage(null);
   };
 
-  const message = problem(draft.start, draft.end, max);
+  const commit = () => {
+    if (draft.start === start && draft.end === end) {
+      setMessage(null);
+      return;
+    }
+    const found = problem(draft.start, draft.end, max);
+    setMessage(found);
+    if (found === null) onCommit(draft.start, draft.end);
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commit();
+    }
+  };
+
   const described = message !== null ? { "aria-describedby": errorId } : {};
-  const limit = max !== null ? { max } : {};
+  const limit = { min: MIN_DATE, ...(max !== null ? { max } : {}) };
   return (
     <div className="ctl-custom-wrap">
       <div className="ctl-custom" role="group" aria-label="Custom dates">
@@ -59,9 +86,12 @@ export function CustomRange({ start, end, max, onCommit }: CustomRangeProps) {
             type="date"
             value={draft.start}
             {...limit}
+            disabled={disabled}
             aria-invalid={message !== null}
             {...described}
-            onChange={(event) => change({ start: event.target.value, end: draft.end })}
+            onChange={(event) => edit({ start: event.target.value, end: draft.end })}
+            onBlur={commit}
+            onKeyDown={onKeyDown}
           />
         </label>
         <label>
@@ -70,9 +100,12 @@ export function CustomRange({ start, end, max, onCommit }: CustomRangeProps) {
             type="date"
             value={draft.end}
             {...limit}
+            disabled={disabled}
             aria-invalid={message !== null}
             {...described}
-            onChange={(event) => change({ start: draft.start, end: event.target.value })}
+            onChange={(event) => edit({ start: draft.start, end: event.target.value })}
+            onBlur={commit}
+            onKeyDown={onKeyDown}
           />
         </label>
       </div>
