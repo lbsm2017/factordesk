@@ -79,7 +79,7 @@ READING = {
         "equals the regression alpha exactly."
     ),
     "t-statistic": (
-        "Distance of the residual return from zero in standard errors. Between -2 and 2 (p above "
+        "Distance of the residual return from zero in standard errors. Between −2 and 2 (p above "
         "0.05), you cannot tell it from zero."
     ),
     "Residual volatility a year": (
@@ -179,7 +179,7 @@ PANEL_CSS = """
   line-height: 1.45;
 }
 .ra-lead { margin-top: var(--s-4); max-width: 76ch; }
-.ra-plot { height: 220px; margin: var(--s-4) 0 34px 52px; border-bottom: 1px solid var(--axis); }
+.ra-plot { height: 220px; margin: var(--s-4) 0 42px 52px; border-bottom: 1px solid var(--axis); }
 .ra-plot.short { height: 150px; }
 .line-svg .ra-l { fill: none; }
 .line-svg .ra-l.full { stroke: var(--ink-3); stroke-width: 1.5; }
@@ -210,7 +210,7 @@ PANEL_CSS = """
   .ra-tab th.nar { width: 74px; }
   .ra-tab th.mid { width: 92px; }
   .ra-plot { margin-left: 44px; height: 180px; }
-  .ra-plot.short { height: 130px; }
+  .ra-plot.short { height: 150px; }
   .ra-find { grid-template-columns: 1fr; }
 }
 @media print {
