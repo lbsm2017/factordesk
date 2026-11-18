@@ -7,6 +7,12 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (dashboard built)
+
+- The dashboard was built as tickets T1 to T10 of `docs/specs/dashboard.md`, all on branch `feat/report-ui-feedback` (25 commits ahead of `dev` as of commit `f36255e`; nothing merged to `dev` yet). T1 API skeleton `5ef6922`, T2 report endpoints `d958ebc`, T3 frontend scaffold `2df0bff`, T4 controls and URL state `380694f`, T5 to T8 panels (`b6d5472`, `534996b`, `b45d6de`, `10ed53c`), T9 serve command `afefd9a` with static serving `32c04f0`, T10 fake backend, browser smoke test and CI `9ae81a9` and `f36255e`. A batch price download (`deca962`) and the reduction of range presets to 3Y, 5Y and Full history (`96f0b2f`) landed on the same branch.
+- Pending as of `f36255e`: the T11 design and accessibility review, a smoke test on live Yahoo data, and peer comparison using the batch price fetch. Three follow-up branches (CI action pinning, frontend bundle split, real-data smoke) were started from `f36255e`; none had commits of its own yet.
+- Added the runbook [docs/dashboard.md](../docs/dashboard.md) and updated [dashboard server and interface](decision-dashboard-server-and-interface.md) with facts as of `f36255e`. The roadmap moved the dashboard from Next to Now.
+
 ## 2026-11-18 (parallel price downloads)
 
 - Added [parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) after the owner asked for chunked, parallel Yahoo downloads with care over throttling. Status Decided-pending-implementation until merged. No Yahoo limit is claimed: the repo records none as published.

@@ -1,7 +1,7 @@
 # Decision: build the dashboard server and interface now
 
 Date: 2026-11-18
-Status: Decided-pending-implementation
+Status: Decided-pending-implementation (built on branch `feat/report-ui-feedback` as of commit `f36255e`; becomes Decided when merged to `dev` and reviewed)
 
 ## In one sentence
 
@@ -32,7 +32,16 @@ A range picker and ticker selector must rerun the regression, which a static fil
 - Two renderers to keep in line: the Python static report and the React page. The design document and shared tests are the guard.
 - A server is a new thing to run. The offline report keeps working for people who do not want one.
 - The earlier stack decision ([application stack](decision-application-stack.md)) named Tailwind and shadcn/ui; this decision supersedes that part.
-- Not verified as of 2026-11-18: the page has not been built or tested yet.
+- Not verified as of commit `f36255e` (2026-11-18): the dashboard has not been run against live Yahoo data, and the design and accessibility review (ticket T11) has not been done.
+
+## As of commit f36255e
+
+- Tickets T1 to T10 are done on branch `feat/report-ui-feedback`, which is 25 commits ahead of `dev`. T11 (review) is pending.
+- `uv run factordesk serve [--host] [--port] [--static DIR] [--dev] [--open]` serves the API and the built page on one port (default `127.0.0.1:8000`). `npm --prefix frontend run dev` runs the API with reload and Vite on port 5173.
+- The endpoints are `GET /api/health`, `GET /api/factors/status`, `POST /api/factors/refresh`, `GET /api/tickers`, `GET /api/report/{ticker}`, `GET /api/report/{ticker}/ranges` and `GET /api/report/{ticker}/html`.
+- The range presets are 3Y, 5Y and Full history, as decided. The URL holds the state, for example `/?t=SPY&range=3Y`, with `start`, `end` and `win` as other parameters.
+- Tests: pytest, a frontend suite (typecheck, lint, Vitest, build) and a Playwright smoke test against a fake backend (`backend/factordesk/tests/fixtures/fake_app.py`) that makes no network call. CI runs all three on pull requests to `dev` and `prod`.
+- The dashboard calls the single-ticker price fetch. The batch fetch from [parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) is merged on the same branch but not used by the dashboard yet.
 
 ## What would change our mind
 
@@ -41,6 +50,7 @@ If keeping two renderers in line proves costly, we would render the report from 
 ## Sources
 
 - [docs/specs/dashboard.md](../docs/specs/dashboard.md), including the "Owner decisions" section.
+- [docs/dashboard.md](../docs/dashboard.md), the runbook (how to start, test and troubleshoot it).
 - [docs/PLAN.md](../docs/PLAN.md), stack and API list.
 - The owner's messages of 2026-11-18 and their answers to the three spec questions.
 
