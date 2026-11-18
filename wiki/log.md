@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (owner re-rank)
+
+- Rank 7 (one-shot install and run) moved to very later. The work is built and stays in PR #1; only the release is deferred. See [the roadmap](../docs/ROADMAP.md#changes-in-this-update-update-2).
+
 ## 2026-11-18 (roadmap update 2)
 
 - Roadmap update 2: PR #1 open with CI green, the SPY hardening, rolling speed-up conditions and schema contract marked Done, three feature agents resumed, confidence re-scored, a nightly workflow proposed (not ranked). See [the roadmap](../docs/ROADMAP.md#changes-in-this-update-update-2).
