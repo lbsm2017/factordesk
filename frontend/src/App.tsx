@@ -14,7 +14,8 @@ import {
 } from "./api/queries";
 import type { FactorReport } from "./api/types";
 import { ControlsStrip } from "./components/controls/ControlsStrip";
-import { ErrorNotice, Landing, LoadingFrame } from "./components/controls/ReportStates";
+import { ErrorNotice, Landing } from "./components/controls/ReportStates";
+import { LoadingFrame } from "./components/report/LoadingFrame";
 import { ReportView } from "./components/report/ReportView";
 import { addRecent, useRecent } from "./state/recent";
 import type { RollingWindowDays } from "./state/url";
