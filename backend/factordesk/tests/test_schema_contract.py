@@ -165,8 +165,17 @@ def test_every_section_has_a_fixture_that_validates() -> None:
         items = value if spec.many else [value]
         assert items and all(isinstance(v, spec.model) for v in items)
         assert FactorReport.model_validate_json(rep.model_dump_json()) == rep
-        # Nothing else changes.
-        assert rep.model_copy(update={spec.report_field: None}) == base
+        # Nothing else changes, except the section's own footnote texts.
+        assert rep.label_text == {**base.label_text, **spec.label_text}
+        stripped = rep.model_copy(update={spec.report_field: None, "label_text": base.label_text})
+        assert stripped == base
+
+
+def test_label_fixture_equals_the_section_specs() -> None:
+    from factordesk.tests.fixtures.sections import section_labels
+
+    for spec in SECTIONS:
+        assert section_labels(spec.report_field) == dict(spec.label_text), spec.report_field
 
 
 # ----------------------------------------------------------------------------- status rules

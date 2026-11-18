@@ -39,7 +39,6 @@ from factordesk.report.render_html import (
 from factordesk.report.schema import FactorReport
 from factordesk.report.sections.residual_alpha import (
     QUESTION,
-    RESIDUAL_LABEL_TEXT,
     ResidualAlphaDiagnostics,
     ResidualAnalysis,
     ResidualStats,
@@ -882,7 +881,7 @@ def _fold(section: ResidualAnalysis, report: FactorReport) -> str:
     if section.point_in_time.status == "ok":
         paras.append(section.point_in_time.caption)
     for key in FOLD_LABELS:
-        paras.append(report.label_text.get(key) or RESIDUAL_LABEL_TEXT.get(key, ""))
+        paras.append(report.label_text.get(key))
     seen: list[str] = []
     for text in paras:
         if text and text not in seen:

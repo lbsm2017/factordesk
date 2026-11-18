@@ -1,0 +1,12 @@
+{
+  "lead_lag": {},
+  "shrunk_betas": {},
+  "fragility": {},
+  "residual": {
+    "L-INSAMPLE": "In-sample: betas are fitted on this same period.",
+    "L-PIT": "Point-in-time: each day uses betas estimated only from earlier days.",
+    "L-DESC-PIT": "Descriptive and point-in-time, not predictive.",
+    "L-HEDGE": "Compounded daily: a paper long-short hedge, rebalanced daily, before trading costs, financing and borrowing fees."
+  },
+  "kalman_betas": {}
+}

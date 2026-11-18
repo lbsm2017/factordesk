@@ -5,7 +5,7 @@ import { cloneReport } from "../../../test/fixture";
 import { withSection } from "../../../test/sectionFixtures";
 import { ResidualAlphaBody as ResidualAlphaPanel, keptText } from "./ResidualAlphaBody";
 
-/** The label texts the backend adds to a report that has the residual section (SC3.1). */
+/** The label texts the backend adds to a report that has the residual section (SC3.1). The section fixture carries them. */
 const LABELS = {
   "L-INSAMPLE": "In-sample: betas are fitted on this same period.",
   "L-PIT": "Point-in-time: each day uses betas estimated only from earlier days.",
@@ -16,7 +16,6 @@ const LABELS = {
 
 function reportWith(edit?: (section: ResidualAnalysis, report: FactorReport) => void): FactorReport {
   const report = withSection(cloneReport(), "residual");
-  report.label_text = { ...report.label_text, ...LABELS };
   if (edit) edit(report.residual as ResidualAnalysis, report);
   return report;
 }

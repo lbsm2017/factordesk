@@ -25,4 +25,13 @@ describe("schema v3 contract fixtures", () => {
       expect(mockReport[field]).toBeNull();
     }
   });
+
+  it("adds the footnote texts of the residual section, as the pipeline does", () => {
+    expect(mockReport.label_text["L-INSAMPLE"]).toBeUndefined();
+    const report = withSection(cloneReport(), "residual");
+    for (const key of ["L-INSAMPLE", "L-PIT", "L-DESC-PIT", "L-HEDGE"]) {
+      expect(report.label_text[key], key).toBeTruthy();
+    }
+    expect(report.label_text["L-VINTAGE"]).toBe(mockReport.label_text["L-VINTAGE"]);
+  });
 });

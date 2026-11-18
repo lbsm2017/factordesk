@@ -31,6 +31,7 @@ def _mock() -> FactorReport:
 def _with(payload: dict[str, Any]) -> FactorReport:
     data = json.loads(_mock().model_dump_json())
     data["residual"] = payload
+    data["label_text"] = {**data["label_text"], **RESIDUAL_LABEL_TEXT}
     return FactorReport.model_validate_json(json.dumps(data))
 
 
@@ -177,6 +178,14 @@ def test_labels_sit_in_the_fold() -> None:
     text = _text(fold)
     for key in ("L-INSAMPLE", "L-PIT", "L-DESC-PIT", "L-HEDGE"):
         assert RESIDUAL_LABEL_TEXT[key] in text, key
+
+
+def test_report_with_the_section_carries_its_label_texts() -> None:
+    """The fixture report has the footnote texts the pipeline adds, so the panel needs no copy."""
+    report = report_with_section(_mock(), "residual")
+    for key, text in RESIDUAL_LABEL_TEXT.items():
+        assert report.label_text[key] == text, key
+    assert "L-INSAMPLE" not in _mock().label_text
 
 
 def test_chart_draws_the_three_lines_and_the_rolling_band() -> None:
