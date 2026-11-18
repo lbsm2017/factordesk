@@ -42,13 +42,11 @@ iframe{{display:block;border:0;width:{w}px;height:{h}px}}</style>
 SHOTS = [
     ("shot_v3_1920_light", 1920, 1080, "", None),
     ("shot_v3_1440_light", 1440, 900, "", None),
-    ("shot_v3_1440_dark", 1440, 900, "dark", None),
     ("shot_v3_1440_stats_on", 1440, 900, "stats", None),
     ("shot_v3_1024_light", 1024, 768, "", None),
     ("shot_v3_390_light", 390, 844, "", None),
     ("shot_v3_390_drawer", 390, 844, "menu", None),
     ("shot_v3_1440_full_light", 1440, None, "", None),
-    ("shot_v3_1440_full_dark", 1440, None, "dark", None),
     ("shot_v3_390_full_light", 390, None, "", None),
     ("shot_v3_crop_drivers", 1440, None, "", "drivers,world"),
     ("shot_v3_crop_exposures_stats_off", 1440, None, "", "exposures,returns"),
