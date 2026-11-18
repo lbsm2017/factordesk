@@ -224,6 +224,21 @@ describe("RollingPanel", () => {
     expect(option.series[0]?.data[0]?.[1]).toBeCloseTo(row.lower[0] as number, 12);
   });
 
+  it("draws every rolling estimate, so a one-day spike in a beta is never thinned away and nothing is downsampled (F11)", () => {
+    const w = mockReport.rolling.find((x) => x.window === 252)!;
+    const block = buildRollingBlock(mockReport, w)!;
+    const row = structuredClone(block.rows[1]!);
+    const at = 150;
+    row.beta[at] = 50;
+    const option = buildRowOption(block, row, readChartTokens()) as {
+      series: { name: string; data: [number, number][] }[];
+    };
+    const beta = option.series.find((s) => s.name === "beta")!;
+    expect(beta.data).toHaveLength(row.ms.length);
+    expect(beta.data[at]).toEqual([row.ms[at], 50]);
+    for (const s of option.series) expect(s).not.toHaveProperty("sampling");
+  });
+
   it("shows a per-window reason inside the panel when one window is not ok", () => {
     const report = cloneReport();
     const w = report.rolling.find((x) => x.window === 126)!;

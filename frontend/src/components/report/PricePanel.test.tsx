@@ -192,6 +192,26 @@ describe("priceOption", () => {
     expect(full.dataZoom[0]?.startValue).toBe(toMs("2024-08-08"));
   });
 
+  it("draws every price, so a one-day spike survives on a long series and nothing is downsampled (F11)", () => {
+    const r = cloneReport();
+    const n = 8640;
+    const spikeAt = 4321;
+    const day0 = Date.UTC(1990, 0, 1);
+    r.price_series.dates = Array.from({ length: n }, (_, i) => new Date(day0 + i * 86_400_000).toISOString().slice(0, 10));
+    r.price_series.adj_close = Array.from({ length: n }, (_, i) => (i === spikeAt ? 1000 : 100 + (i % 7)));
+    r.price_series.factor_coverage_end = r.price_series.dates[n - 1] as string;
+    r.data.actual_start = r.price_series.dates[0] as string;
+    r.data.actual_end = r.price_series.dates[n - 1] as string;
+    const m = priceModel(r);
+    if (!m) throw new Error("no model");
+    const opt = priceOption(m, tokens, { full: true }) as unknown as Opt;
+    const line = opt.series.find((s) => s.name === "Adjusted close");
+    expect(line?.data).toHaveLength(n);
+    expect(line?.data[spikeAt]).toEqual([toMs(r.price_series.dates[spikeAt] as string), 1000]);
+    // ECharts draws every point unless a series asks for `sampling` (lttb, average, min, max).
+    for (const s of opt.series) expect(s).not.toHaveProperty("sampling");
+  });
+
   it("escapes every string in the tooltip", () => {
     expect(escapeHtml(`<b>"x" & 'y'</b>`)).toBe("&lt;b&gt;&quot;x&quot; &amp; &#39;y&#39;&lt;/b&gt;");
     expect(tooltipHtml(toMs("2025-03-04"), 1234.5)).toBe("4 Mar 2025<br/><b>1,234.50</b>");
