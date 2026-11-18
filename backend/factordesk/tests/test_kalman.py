@@ -669,3 +669,50 @@ def test_tkb13_causal_with_drifting_betas() -> None:
         assert v0.lam == pytest.approx(v1.lam, rel=1e-12)
         assert v0.resid_var == pytest.approx(v1.resid_var, rel=1e-12)
     assert np.abs(base.betas[star:] - other.betas[star:]).max() > 1e-3
+
+
+# ============================== drift term of the batched passes against independent references
+def test_batched_passes_match_statsmodels_at_positive_lambda() -> None:
+    """Output pass: states and bands equal statsmodels' filter, in every vintage, at lambda > 0.
+
+    statsmodels is independent of this package's recursion. A missing, rescaled or doubled
+    state-noise term in ``_output_pass`` moves the betas and the bands away from it (the live
+    SPY tests caught these changes; this one needs no cached data).
+    """
+    y, f = _drifting(1100, 20261118 + 692)
+    res = kalman_betas(y, f)
+    assert len(res.vintages) == 3
+    for v in res.vintages:
+        assert v.lam > 1e-6, v.lam
+        lo, hi = v.valid_from - 1, v.valid_to
+        states, cov, _ = sm_filter(y[:hi], f[:hi], v.lam, v.resid_var, _scale_m(f, v.rows))
+        assert np.abs(res.betas[lo:hi] - states[lo:hi, 1:]).max() < 1e-9
+        sd = np.sqrt(np.diagonal(cov[lo:hi], axis1=1, axis2=2)[:, 1:])
+        assert np.abs(res.band_low[lo:hi] - (states[lo:hi, 1:] - Z_975 * sd)).max() < 1e-9
+        assert np.abs(res.band_high[lo:hi] - (states[lo:hi, 1:] + Z_975 * sd)).max() < 1e-9
+
+
+def test_grid_pass_picks_the_maximiser_of_the_single_path_likelihood() -> None:
+    """Grid pass: each vintage's lambda is the refined maximiser of ``filter_path`` likelihoods.
+
+    ``filter_path`` is tied to statsmodels by TKB02. If ``_grid_pass`` used a different
+    state-noise term from the output pass (for example ``Q`` doubled), the grid would pick a
+    lambda that is off by that factor, and this comparison fails.
+    """
+    y, f = _drifting(800, 20261118 + 693)
+    res = kalman_betas(y, f)
+    assert [v.rows for v in res.vintages] == [504, 756]
+    for v in res.vintages:
+        assert v.lam > 1e-6, v.lam
+        m_inv = _scale_m(f, v.rows)
+        loglik = np.array(
+            [
+                filter_path(y[: v.rows], f[: v.rows], float(g), drift_shape=m_inv).loglik
+                for g in LAMBDA_GRID
+            ]
+        )
+        lam, bound = refine_lambda(LAMBDA_GRID, loglik)
+        assert v.lam == pytest.approx(lam, rel=1e-8, abs=0.0)
+        assert v.lam_at_bound == bound
+        path = filter_path(y[: v.rows], f[: v.rows], lam, drift_shape=m_inv)
+        assert v.resid_var == pytest.approx(path.r_hat, rel=1e-8)
