@@ -139,6 +139,14 @@ describe("priceOption", () => {
     expect(o.xAxis.max).toBe(toMs("2026-11-13"));
   });
 
+  it("asks for few y ticks (design D4: three to four labels)", () => {
+    const m = priceModel(mockReport);
+    if (!m) throw new Error("no model");
+    fake.option = priceOption(m, tokens, { full: false }) as never;
+    const y = (fake.option as unknown as { yAxis: { splitNumber: number } }).yAxis;
+    expect(y.splitNumber).toBeLessThanOrEqual(2);
+  });
+
   it("shades the right band with the grid token and a 1 px dashed rule at its true position", () => {
     const m = priceModel(mockReport);
     if (!m) throw new Error("no model");

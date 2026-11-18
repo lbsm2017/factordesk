@@ -137,3 +137,18 @@ Result in one line: the page is close to the approved design and every owner-fee
 18. **C1, C2, C3, C5, C6 (minor).** Shared helpers, data-theme observer, dead print rule, test-shell note, label consistency.
 
 Counts: 0 blockers, 5 major, 21 minor.
+
+## Fixes
+
+Fixed 2026-11-18 on `fix/dashboard-panels-a11y`:
+
+- **A1.** The rolling tfoot row carries `aria-hidden`; axe reports no violations at 390 px (light and dark) and at 1440 px.
+- **A2.** The "Significant" header keeps its full word in the accessibility tree under 720 px; "Sig." stays the visible text.
+- **A6.** The Middle 80% detail is repeated as screen-reader text in the cell, beside the `title`.
+- **DF1.** The gate callout is gone; its numbers are a paragraph under the notice Details, before the 5-day line.
+- **DF2.** The price y axis asks for two intervals (three or four labels).
+- **DF3.** The regression tables are sized to their content. Only the main table keeps the scroll region; the 5-day and diagnostics tables become one block per row on a phone.
+- **DF4.** "Factor file downloaded" reads like "1 Nov 2026, 00:00 UTC".
+- **DF5 (React page only).** The 5-day line says "significant" or "not significant"; the exposures method note no longer says "reliable" or "noise". `render_html.py` still does (lines 593 and 843).
+- **DF8.** The first and last x labels stay on the rolling charts under 720 px, plus the major ones that fit.
+- **DF6** is in `KpiStrip.tsx` and was not touched here.
