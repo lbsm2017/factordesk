@@ -311,3 +311,19 @@ def test_tp40_hook_returns_the_failed_state_when_the_statistics_raise(
 
 if __name__ == "__main__":
     FIXTURE.write_text(synthetic_section().model_dump_json() + "\n", encoding="utf-8")
+
+
+def test_tp54_an_interval_that_ends_exactly_at_zero_includes_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, ctx = _spy_context()
+    real = hook.performance_stats
+    for ci in ((0.0, 0.8), (-0.8, 0.0)):
+
+        def at_zero(*args: Any, _ci: tuple[float, float] = ci, **kwargs: Any) -> Any:
+            return dataclasses.replace(real(*args, **kwargs), sharpe_ci95=_ci)
+
+        monkeypatch.setattr(hook, "performance_stats", at_zero)
+        sec = hook.build_performance(ctx)
+        assert sec is not None and sec.sharpe is not None
+        assert sec.sharpe.ci_includes_zero is True
