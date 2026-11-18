@@ -535,7 +535,7 @@ def test_tr18_verdict_copy() -> None:
         "point_in_time_only", a_c=0.0, a_pit=-0.052, survival_ratio=None, **kw
     ) == (
         "The point-in-time residual return is reliably negative (-5.2% a year), but the "
-        "full-period alpha is not. This usually means the betas moved; check the Exposures tab."
+        "full-period alpha is not. This usually means the betas moved; check the Exposures section."
     )
     assert "(more than 200% kept)" in verdict_message(
         "survives", a_c=0.04, a_pit=0.1, survival_ratio=2.5, **kw
