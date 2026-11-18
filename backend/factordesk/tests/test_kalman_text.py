@@ -132,7 +132,6 @@ def test_empty_states_print_the_chosen_next_steps(status: str, step_key: str) ->
         "betas": {},
         "band_low": {},
         "band_high": {},
-        "ex_ante_betas": {},
         "vintage_index": [],
         "vintages": [],
         "latest": {},
@@ -156,7 +155,6 @@ def test_warm_up_wording() -> None:
             betas={k: null for k in factors},
             band_low={k: null for k in factors},
             band_high={k: null for k in factors},
-            ex_ante_betas={k: null for k in factors},
         )
     )
     assert html is not None

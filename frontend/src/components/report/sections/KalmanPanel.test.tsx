@@ -202,7 +202,6 @@ describe("thinning keeps spikes", () => {
         s.betas[name] = grow(s.betas[name]!, () => 1);
         s.band_low[name] = grow(s.band_low[name]!, () => 0.5);
         s.band_high[name] = grow(s.band_high[name]!, () => 1.5);
-        s.ex_ante_betas[name] = grow(s.ex_ante_betas[name]!, () => 1);
       }
       const at = 1300 + 2500;
       s.betas["Mkt-RF"]![at] = 4;

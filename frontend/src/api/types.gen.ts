@@ -653,13 +653,6 @@ export interface components {
                 [key: string]: (number | null)[];
             };
             /**
-             * Ex Ante Betas
-             * @description Predicted beta for explaining each date, from rows before it only.
-             */
-            ex_ante_betas: {
-                [key: string]: (number | null)[];
-            };
-            /**
              * Vintage Index
              * @description Vintage that produced each stamp.
              */

@@ -104,9 +104,6 @@ class KalmanBetaSeries(SectionModel):
     )
     band_low: dict[str, list[float | None]]
     band_high: dict[str, list[float | None]]
-    ex_ante_betas: dict[str, list[float | None]] = Field(
-        description="Predicted beta for explaining each date, from rows before it only."
-    )
     vintage_index: list[int | None] = Field(description="Vintage that produced each stamp.")
     vintages: list[KalmanVintage]
     latest: dict[str, KalmanLatest] = Field(description="Per factor, at the last date.")
@@ -116,7 +113,7 @@ class KalmanBetaSeries(SectionModel):
     @model_validator(mode="after")
     def _consistent(self) -> KalmanBetaSeries:
         """Shapes, warm-up nulls and band order (an ``ok`` section); empty otherwise."""
-        keyed = (self.betas, self.band_low, self.band_high, self.ex_ante_betas)
+        keyed = (self.betas, self.band_low, self.band_high)
         if self.status != "ok":
             empty = (
                 not self.dates

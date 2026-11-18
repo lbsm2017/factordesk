@@ -1685,24 +1685,6 @@
             "type": "object",
             "title": "Band High"
           },
-          "ex_ante_betas": {
-            "additionalProperties": {
-              "items": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "type": "array"
-            },
-            "type": "object",
-            "title": "Ex Ante Betas",
-            "description": "Predicted beta for explaining each date, from rows before it only."
-          },
           "vintage_index": {
             "items": {
               "anyOf": [
@@ -1770,7 +1752,6 @@
           "betas",
           "band_low",
           "band_high",
-          "ex_ante_betas",
           "vintage_index",
           "vintages",
           "latest",

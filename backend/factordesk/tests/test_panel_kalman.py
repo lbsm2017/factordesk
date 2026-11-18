@@ -52,7 +52,6 @@ def _not_ok(base: FactorReport, status: str, reason: str) -> FactorReport:
         "betas": {},
         "band_low": {},
         "band_high": {},
-        "ex_ante_betas": {},
         "vintage_index": [],
         "vintages": [],
         "latest": {},
@@ -145,7 +144,6 @@ def test_warm_up_only_section_shows_an_empty_state(base: FactorReport) -> None:
         "betas": {k: null for k in FACTOR_NAMES},
         "band_low": {k: null for k in FACTOR_NAMES},
         "band_high": {k: null for k in FACTOR_NAMES},
-        "ex_ante_betas": {k: null for k in FACTOR_NAMES},
     }
     html = render_kalman_panel(_with(base, **changes))
     assert html is not None and "No estimate yet" in html

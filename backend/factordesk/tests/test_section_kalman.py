@@ -93,11 +93,10 @@ def _reject_constant(name: str) -> float:
     raise AssertionError(f"non-finite JSON constant {name}")
 
 
-def test_ex_ante_is_the_previous_filtered_beta() -> None:
-    s = _model(_payload())
-    for name in FACTOR_NAMES:
-        assert s.ex_ante_betas[name][503] is None
-        assert s.ex_ante_betas[name][504:] == s.betas[name][503:-1]
+def test_the_payload_carries_no_ex_ante_series() -> None:
+    """Owner decision 2026-11-18: the one-day-shifted series is derived from ``betas``."""
+    assert "ex_ante_betas" not in KalmanBetaSeries.model_fields
+    assert "ex_ante_betas" not in _payload()
 
 
 # ---------------------------------------------------------------------------- schema rules
@@ -182,7 +181,7 @@ def _not_ok(status: str, reason: str | None) -> dict[str, Any]:
         labels=[],
         warnings=[],
     )
-    for key in ("betas", "band_low", "band_high", "ex_ante_betas"):
+    for key in ("betas", "band_low", "band_high"):
         p[key] = {}
     return p
 
@@ -269,7 +268,6 @@ def test_n_504_gives_exactly_one_stamp() -> None:
     assert sum(v is not None for v in s.vintage_index) == 1 and s.vintage_index[503] == 0
     assert len(s.vintages) == 1 and s.vintages[0].valid_from == s.vintages[0].valid_to
     assert all(series[503] is not None for series in s.betas.values())
-    assert all(series[503] is None for series in s.ex_ante_betas.values())
 
 
 def test_singular_burn_in_is_a_failed_section() -> None:
@@ -335,7 +333,7 @@ def _kalman_stamped(rep: FactorReport, cutoff: date) -> dict[str, list[float | i
         "alpha": list(sec.alpha[:k]),
         "vintage_index": list(sec.vintage_index[:k]),
     }
-    for kind in ("betas", "band_low", "band_high", "ex_ante_betas"):
+    for kind in ("betas", "band_low", "band_high"):
         for name, series in getattr(sec, kind).items():
             out[f"{kind}/{name}"] = list(series[:k])
     return out
