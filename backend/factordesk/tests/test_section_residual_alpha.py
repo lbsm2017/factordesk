@@ -385,3 +385,28 @@ def test_wipe_out_becomes_a_warning() -> None:
 
 if __name__ == "__main__":
     FIXTURE.write_text(synthetic_section().model_dump_json() + "\n", encoding="utf-8")
+
+
+def test_a_constant_factor_in_one_half_only_fails_the_split_half() -> None:
+    """F2: a hook must not raise for data reasons (SC3.2).
+
+    The CMA factor is zero on rows 1 to 700 of 1300, so the pooled split-half design is singular.
+    The split-half part says so; the rest of the section still builds.
+    """
+    rng = rng_tr(38)
+    f = rng.multivariate_normal(MU, SIGMA_F, size=1300)
+    f[:700, 4] = 0.0
+    d = dgp_a(rng, n=1300, f=f)
+    report = assemble_report("SYN", d.history, d.factors, now=NOW, factors_downloaded_at=None)
+    s = _section(report)
+    assert s.status == "ok"
+    assert s.split_half.status == "failed"
+    assert s.split_half.reason == (
+        "The split-half regression could not be fitted (singular factor design in one half)."
+    )
+    assert s.split_half.alpha_first_annual is None and s.split_half.difference_p is None
+    assert s.in_sample.status == "ok"
+    # the point-in-time betas need every window fitted; that part degrades with its own reason
+    assert s.point_in_time.status in {"ok", "failed", "insufficient_data"}
+    assert s.gap.status == s.point_in_time.status
+    assert s.calendar_years.status == "ok"

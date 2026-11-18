@@ -33,10 +33,18 @@ from factordesk.analytics.regression import (
     two_sided_p,
 )
 from factordesk.analytics.rolling import RollingBetas
-from factordesk.analytics.sample import DISPLAY_NAMES, FACTOR_CODES, AnalysisSample
+from factordesk.analytics.sample import (
+    DISPLAY_NAMES,
+    FACTOR_CODES,
+    AnalysisSample,
+    DegenerateInputError,
+)
 
 FloatArray = NDArray[np.float64]
 Status = Literal["ok", "insufficient_data", "not_applicable", "failed"]
+SPLIT_HALF_FAILED = (
+    "The split-half regression could not be fitted (singular factor design in one half)."
+)
 
 WINDOW = 252
 """Rolling alpha window and one-year window length, fixed (R5.1, RD9)."""
@@ -216,11 +224,16 @@ def split_half_alpha(sample: AnalysisSample) -> SplitHalfResult:
     g = (np.arange(n) >= n1).astype(np.float64)
     design = np.column_stack([f, g, f * g[:, None]])
     names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
-    fit = ols_hac(
-        y,
-        design,
-        names=(*names, "second-half dummy", *(f"second half x {nm}" for nm in names)),
-    )
+    try:
+        fit = ols_hac(
+            y,
+            design,
+            names=(*names, "second-half dummy", *(f"second half x {nm}" for nm in names)),
+        )
+    except DegenerateInputError:
+        # A factor that is constant in one half makes the pooled design singular. The rest of
+        # the section does not depend on this fit, so only this part is reported as not fitted.
+        return replace(base, status="failed", reason=SPLIT_HALF_FAILED)
     k_gamma = 6  # index of the split-dummy coefficient (0 is the constant)
     cov = fit.cov
     a1 = float(fit.params[0])
