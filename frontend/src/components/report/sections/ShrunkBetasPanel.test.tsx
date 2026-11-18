@@ -173,7 +173,7 @@ describe("ShrunkBetasPanel", () => {
     const heads = within(tables[1] as HTMLElement)
       .getAllByRole("columnheader")
       .map((h) => h.textContent);
-    expect(heads).toEqual(["Factor", "Chart", "OLS beta", "se", "shrunk beta", "95% credible interval", "pull"]);
+    expect(heads).toEqual(["Factor", "Chart", "OLS beta", "se", "Shrunk beta", "95% credible interval", "Pull"]);
     expect(within(tables[1] as HTMLElement).getAllByRole("rowheader")).toHaveLength(5);
     for (const svg of container.querySelectorAll("tbody svg.bar-svg")) expect(svg.getAttribute("aria-hidden")).toBe("true");
     expect(container.querySelector("tfoot tr.axis-row")?.getAttribute("aria-hidden")).toBe("true");
@@ -183,5 +183,90 @@ describe("ShrunkBetasPanel", () => {
     );
     // rows can take focus from a link target, as in the other panels
     expect(container.querySelector("tbody tr")?.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("draws the moved-away word and L-CORR-MOVE only where the pull marker is drawn", () => {
+    // SMB moved away but its pull is below 0.05; HML in the full sample (pull 0.0007) is flagged too.
+    const report = reportWith((s) => {
+      const hml = s[0]?.betas[2];
+      if (hml) hml.moved_away = true;
+      s[0]?.labels.push("L-CORR-MOVE");
+      const smb = s[1]?.betas[1];
+      if (smb) smb.pull = 0.04;
+    });
+    const { container } = render(<ShrunkBetasPanel report={report} />);
+    expect(container.querySelector(".moved")).toBeNull();
+    expect(container.textContent).not.toContain("Moved away from typical");
+    expect(container.querySelector("details.how")?.textContent).not.toContain(LABELS["L-CORR-MOVE"]);
+  });
+
+  it("shows the moved-away word and the label again once the pull reaches 0.05", () => {
+    const report = reportWith((s) => {
+      const smb = s[1]?.betas[1];
+      if (smb) smb.pull = 0.05;
+    });
+    const { container } = render(<ShrunkBetasPanel report={report} />);
+    expect(container.querySelectorAll(".moved")).toHaveLength(1);
+    expect(container.querySelector("details.how")?.textContent).toContain(LABELS["L-CORR-MOVE"]);
+  });
+
+  it("uses the same words as the static panel", () => {
+    const { container } = render(<ShrunkBetasPanel report={reportWith()} />);
+    const text = container.textContent ?? "";
+    // headings
+    expect(screen.getByRole("heading", { level: 3, name: "Full sample (559 days)" })).toBeTruthy();
+    expect(screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent)).toEqual([
+      "What the test behind the reliable tags could detect",
+      "What the test behind the reliable tags could detect",
+    ]);
+    // legend, pull note, interval format, no-pull line
+    expect(container.querySelector(".legend")?.textContent).toContain("Pulled 5% or more toward typical");
+    expect(text).toContain(
+      "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, 100% means all the way.",
+    );
+    expect(text).toContain("[+0.996, +1.022]");
+    expect(text).toContain("Shrinkage moves no beta by a visible amount: this sample is long enough.");
+    // the prior sentence, then the model labels, inside the fold
+    expect(container.querySelector("details.how p")?.textContent).toMatch(
+      /^Prior centre and spread per factor: Mkt-RF 1\.000 and 0\.209; SMB 0\.000 and 0\.764; HML 0\.000 and 0\.341; RMW 0\.000 and 0\.329; CMA 0\.000 and 0\.254\. The spread comes from 49 industry and 75 size portfolios, 2016-09-21 to 2026-09-30\. Pulled toward typical:/,
+    );
+    expect(container.querySelector("caption.vh")?.textContent).toBe(
+      "OLS and shrunk betas with standard errors, 95% credible intervals and pull; a marker is drawn only where the pull is at least 5%",
+    );
+  });
+
+  it("names a next step by status for a scope that is not ok", () => {
+    const failed = reportWith((s) => {
+      const w = s[1];
+      if (!w) return;
+      w.status = "failed";
+      w.reason = "The prior files are missing.";
+      w.betas = [];
+      w.power = [];
+      w.prior = null;
+    });
+    const { container } = render(<ShrunkBetasPanel report={failed} />);
+    expect(
+      within(scopeOf(container, "latest_window")).getByText(
+        "Run the report again; if it repeats, check the factor data in Data and audit.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("draws no footnote or legend when no scope is ok", () => {
+    const report = reportWith((s) => {
+      for (const w of s) {
+        w.status = "failed";
+        w.reason = "The prior files are missing.";
+        w.betas = [];
+        w.power = [];
+        w.prior = null;
+        w.labels = [];
+      }
+    });
+    const { container } = render(<ShrunkBetasPanel report={report} />);
+    expect(container.querySelector(".foot")).toBeNull();
+    expect(container.querySelector(".legend")).toBeNull();
+    expect(container.querySelectorAll(".empty")).toHaveLength(2);
   });
 });

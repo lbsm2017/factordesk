@@ -6,18 +6,21 @@ Spec: ``docs/specs/shrunk-betas.md`` (SB5 power wording, SB6 display rules). Reg
 Per scope that is ``ok``: a table (OLS beta, standard error, shrunk beta, 95% credible interval,
 pull) and, beneath it, the power statement of each factor. A hollow diamond marks a shrunk beta
 only when its pull is at least ``PULL_DISPLAY_THRESHOLD``; when no pull reaches it the panel says
-so in one line (SB6 rule 2). A scope that is not ``ok`` shows the model's ``reason`` and one next
-step. The chart is a table (design principle 2); no mark relies on colour.
+so in one line (SB6 rule 2). The words "Moved away from typical" and the label L-CORR-MOVE show only
+on a row whose diamond is drawn. A scope that is not ``ok`` shows the model's ``reason`` and one
+next step. The chart is a table (design principle 2); no mark relies on colour.
+
+The words of this panel are the words of the React panel (``ShrunkBetasPanel.tsx``): both are
+pinned by a test on each side, so a change here needs the same change there.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from factordesk.analytics.shrinkage import PULL_DISPLAY_THRESHOLD, any_visible_pull, display_pull
+from factordesk.analytics.shrinkage import any_visible_pull, display_pull
 from factordesk.report.panel_registry import register_panel
 from factordesk.report.render_html import (
-    date_long,
     empty_state,
     esc,
     fmt_num,
@@ -27,7 +30,7 @@ from factordesk.report.render_html import (
     panel_section,
 )
 from factordesk.report.schema import FactorReport
-from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrinkagePrior, ShrunkBetas
+from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBeta, ShrunkBetas
 
 PANEL_ID = "shrunk"
 TITLE = "Pulled toward typical"
@@ -36,12 +39,21 @@ QUESTION = (
 )
 NO_VISIBLE_PULL = "Shrinkage moves no beta by a visible amount: this sample is long enough."
 NEXT_STEP = "Widen the date range and run the report again."
+NEXT_STEP_FAILED = "Run the report again; if it repeats, check the factor data in Data and audit."
+POWER_HEADING = "What the test behind the reliable tags could detect"
+LEGEND_TEXT = "Pulled 5% or more toward typical"
+MOVED_WORD = "Moved away from typical"
+CAPTION = (
+    "OLS and shrunk betas with standard errors, 95% credible intervals and pull; a marker is "
+    "drawn only where the pull is at least 5%"
+)
+CROSS_SECTION_WORDS = {"industry49": "industry", "size_char75": "size"}
+DEFAULT_DESC = "Descriptive, in-sample, not predictive."
 PULL_NOTE = (
     "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, "
     "100% means all the way."
 )
 SCOPE_ID = {"full_sample": "shrunk-full", "latest_window": "shrunk-latest"}
-FOLDED_LABELS = ("L-SHRINK-PRIOR", "L-CRED", "L-MDE", "L-CORR-MOVE")
 
 CSS = (
     ".shr-scope{margin-top:var(--s-5)}"
@@ -63,21 +75,10 @@ CSS = (
     "fill:none;stroke:var(--ink-3);stroke-width:1.5;stroke-linejoin:round}"
     ".legend .dm{margin-right:0}"
     ".shr-note{margin-top:var(--s-2);font-size:var(--fs-1);color:var(--ink-3);max-width:76ch}"
-    ".shr-power{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:var(--s-4)}"
-    ".shr-power thead th{font-size:var(--fs-1);font-weight:500;color:var(--ink-2);text-align:left;"
-    "padding:0 0 6px;border-bottom:1px solid var(--border);vertical-align:bottom}"
-    ".shr-power thead th.num{text-align:right;width:172px}"
-    ".shr-power thead th:first-child{width:var(--label-w)}"
-    ".shr-power thead th:last-child{padding-left:var(--s-3)}"
-    ".shr-power tbody th{text-align:left;font-weight:560;padding:7px var(--s-3) 7px 0;"
-    "vertical-align:top}"
-    ".shr-power tbody td{padding:7px 0 7px var(--s-3);vertical-align:top;color:var(--ink-2)}"
-    ".shr-power tbody td.num{text-align:right;color:var(--ink);font-weight:560;white-space:nowrap}"
-    ".shr-power tbody tr+tr>*{border-top:1px solid var(--grid)}"
-    ".shr-prior{margin-top:var(--s-2);border-collapse:collapse;font-size:var(--fs-1);"
+    ".shr-power-h{margin:var(--s-4) 0 var(--s-1);font-size:var(--fs-1);font-weight:560;"
     "color:var(--ink-2)}"
-    ".shr-prior th,.shr-prior td{padding:2px var(--s-4) 2px 0;text-align:left;font-weight:400}"
-    ".shr-prior td.num,.shr-prior th.num{text-align:right}"
+    ".shr-power{max-width:76ch;font-size:var(--fs-1);color:var(--ink-2);line-height:1.45}"
+    ".shr-power li{padding:2px 0}"
     "@media screen and (max-width:719px){"
     "table.reg.shr{min-width:0}"
     ".shr,.shr tbody,.shr thead{display:block}"
@@ -89,15 +90,6 @@ CSS = (
     ".shr tbody td::before{content:attr(data-l);display:block;font-size:var(--fs-1);"
     "font-weight:400;color:var(--ink-3)}"
     ".shr tbody td.sh .moved{justify-content:flex-start;white-space:normal}"
-    ".shr-power,.shr-power tbody{display:block}"
-    ".shr-power thead{display:none}"
-    ".shr-power tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;"
-    "column-gap:var(--s-3);padding:8px 0}"
-    ".shr-power tbody tr+tr{border-top:1px solid var(--grid)}"
-    ".shr-power tbody tr>*{border:0!important;padding:0}"
-    ".shr-power tbody td:last-child{grid-column:1 / -1;margin-top:2px}"
-    ".shr-power tbody td.num::before{content:'Smallest beta detected ';font-weight:400;"
-    "color:var(--ink-3)}"
     "}"
 )
 
@@ -111,23 +103,22 @@ _AWAY_GLYPH = (
 
 
 def _scope_title(s: ShrunkBetas) -> str:
-    if s.scope == "latest_window" and s.window is not None:
-        return f"Latest {s.window}-day window"
-    return "Full sample"
-
-
-def _scope_sub(s: ShrunkBetas) -> str:
-    """Where the regression came from, in words (the section keeps its own sample metadata)."""
-    n, start, end = s.sample.n, s.sample.start, s.sample.end
     if s.scope == "latest_window":
-        tail = f", ending {date_long(end)}" if end is not None else ""
-        return f"The latest window of the rolling regression{tail}."
-    span = f", {date_long(start)} to {date_long(end)}" if start and end else ""
-    return f"The whole sample: {n:,} daily returns{span}."
+        return f"Latest {s.window}-day window" if s.window is not None else "Latest window"
+    return f"Full sample ({s.sample.n:,} days)"
+
+
+def _next_step(s: ShrunkBetas) -> str:
+    return NEXT_STEP if s.status == "insufficient_data" else NEXT_STEP_FAILED
 
 
 def _is_visible(pull: float | None) -> bool:
     return pull is not None and any_visible_pull([pull])
+
+
+def _moved_shown(b: ShrunkBeta) -> bool:
+    """The word and the label L-CORR-MOVE belong to rows whose pull marker is drawn."""
+    return _is_visible(b.pull) and b.moved_away is True
 
 
 def _pull_text(pull: float | None) -> str:
@@ -139,21 +130,20 @@ def _beta_rows(s: ShrunkBetas, moved_title: str) -> str:
     for b in s.betas:
         visible = _is_visible(b.pull)
         moved = ""
-        if b.moved_away:
+        if _moved_shown(b):
             moved = (
-                f'<span class="moved" title="{esc(moved_title)}">'
-                f"{_AWAY_GLYPH}Moved away from typical</span>"
+                f'<span class="moved" title="{esc(moved_title)}">{_AWAY_GLYPH}{MOVED_WORD}</span>'
             )
         rows.append(
             f'<tr role="row" id="{SCOPE_ID[s.scope]}-{esc(b.factor)}">'
             f'<th role="rowheader" scope="row">{esc(b.factor)}</th>'
-            f'<td role="cell" class="num strong" data-l="OLS beta">'
+            f'<td role="cell" class="num strong" data-l="OLS">'
             f"{esc(fmt_signed(b.beta_ols))}</td>"
             f'<td role="cell" class="num" data-l="se">{esc(fmt_num(b.se_hac))}</td>'
-            f'<td role="cell" class="num strong sh" data-l="Shrunk beta">'
+            f'<td role="cell" class="num strong sh" data-l="Shrunk">'
             f"{_DIAMOND if visible else ''}{esc(fmt_signed(b.beta_shrunk))}{moved}</td>"
             f'<td role="cell" class="num" data-l="95% credible interval">'
-            f"{esc(fmt_signed(b.cred95_low))} to {esc(fmt_signed(b.cred95_high))}</td>"
+            f"[{esc(fmt_signed(b.cred95_low))}, {esc(fmt_signed(b.cred95_high))}]</td>"
             f'<td role="cell" class="num{"" if visible else " quiet"}" data-l="Pull">'
             f"{esc(_pull_text(b.pull))}</td></tr>"
         )
@@ -165,8 +155,7 @@ def _beta_table(s: ShrunkBetas, moved_title: str) -> str:
     return (
         f'<div class="scroll-x" tabindex="0" role="region" aria-label="{esc(scope)}, shrunk '
         'betas, scrolls sideways"><table class="reg shr" role="table">'
-        f'<caption class="vh">{esc(scope)}: OLS and shrunk betas with standard errors, 95% '
-        "credible intervals and pull</caption>"
+        f'<caption class="vh">{CAPTION}</caption>'
         '<thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Factor</th>'
         '<th role="columnheader" scope="col" class="num">OLS beta</th>'
         '<th role="columnheader" scope="col" class="num"><abbr title="Newey-West standard error '
@@ -177,30 +166,25 @@ def _beta_table(s: ShrunkBetas, moved_title: str) -> str:
     )
 
 
-def _power_table(s: ShrunkBetas) -> str:
-    rows = "".join(
-        f'<tr><th scope="row">{esc(p.factor)}</th>'
-        f'<td class="num">{esc(fmt_num(p.mde80))}</td><td>{esc(p.text or "")}</td></tr>'
-        for p in s.power
-    )
+def _power_list(s: ShrunkBetas) -> str:
+    items = "".join(f"<li>{esc(p.text)}</li>" for p in s.power if p.text)
+    if not items:
+        return ""
+    title = esc(_scope_title(s))
     return (
-        f'<table class="shr-power"><caption class="vh">{esc(_scope_title(s))}: smallest beta '
-        "each factor could detect, and what that means</caption>"
-        '<thead><tr><th scope="col">Factor</th>'
-        '<th scope="col" class="num">Smallest beta detected</th>'
-        '<th scope="col">What that means</th></tr></thead>'
-        f"<tbody>{rows}</tbody></table>"
+        f'<h4 class="shr-power-h">{POWER_HEADING}</h4>'
+        f'<ul class="shr-power" aria-label="Power statements, {title}">{items}</ul>'
     )
 
 
 def _scope_html(s: ShrunkBetas, *, first: bool, moved_title: str) -> str:
     head = (
         f'<div class="shr-scope{" first" if first else ""}" id="{SCOPE_ID[s.scope]}">'
-        f'<h3>{esc(_scope_title(s))}</h3><span class="sub">{esc(_scope_sub(s))}</span>'
+        f"<h3>{esc(_scope_title(s))}</h3>"
     )
     if s.status != "ok":
         what = s.reason or "Insufficient data: no shrunk betas available."
-        return head + empty_state(what, NEXT_STEP) + "</div>"
+        return head + empty_state(what, _next_step(s)) + "</div>"
     reading = (
         ""
         if any(_is_visible(b.pull) for b in s.betas)
@@ -211,56 +195,44 @@ def _scope_html(s: ShrunkBetas, *, first: bool, moved_title: str) -> str:
         + reading
         + _beta_table(s, moved_title)
         + f'<p class="shr-note">{esc(PULL_NOTE)}</p>'
-        + _power_table(s)
+        + _power_list(s)
         + "</div>"
     )
 
 
-def _prior_html(prior: ShrinkagePrior, names: Sequence[str]) -> str:
-    rows = "".join(
-        f'<tr><th scope="row">{esc(n)}</th><td class="num">{esc(fmt_signed(c))}</td>'
-        f'<td class="num">{esc(fmt_num(t))}</td></tr>'
-        for n, c, t in zip(names, prior.centre, prior.tau, strict=True)
+def _prior_sentence(ok: Sequence[ShrunkBetas]) -> str:
+    """Prior centre and spread per factor, and where the spread comes from (one sentence pair)."""
+    source = next((x for x in ok if x.prior is not None), None)
+    if source is None or source.prior is None:
+        return ""
+    prior = source.prior
+    per_factor = "; ".join(
+        f"{b.factor} {fmt_num(c)} and {fmt_num(t)}"
+        for b, c, t in zip(source.betas, prior.centre, prior.tau, strict=False)
     )
-    counts = prior.n_portfolios
-    industry = next((v for k, v in counts.items() if k.startswith("industry")), None)
-    size = next((v for k, v in counts.items() if k.startswith("size")), None)
-    source = ""
-    if industry is not None and size is not None:
-        source = (
-            f"<p>The spread comes from {industry} industry and {size} size portfolios, "
-            f"{esc(date_long(prior.window_start))} to {esc(date_long(prior.window_end))}.</p>"
-        )
+    sizes = " and ".join(
+        f"{n} {CROSS_SECTION_WORDS.get(k, k)}" for k, n in prior.n_portfolios.items()
+    )
     return (
-        f'{source}<table class="shr-prior"><caption class="vh">Prior centre and spread per '
-        'factor</caption><thead><tr><th scope="col">Factor</th><th scope="col" class="num">'
-        'Centre</th><th scope="col" class="num">Spread</th></tr></thead>'
-        f"<tbody>{rows}</tbody></table>"
+        f"Prior centre and spread per factor: {per_factor}. "
+        f"The spread comes from {sizes} portfolios, {prior.window_start} to {prior.window_end}."
     )
 
 
 def _footnote_html(texts: dict[str, str], ok: Sequence[ShrunkBetas]) -> str:
-    desc = texts.get("L-DESC", "Descriptive, in-sample, not predictive.")
-    shown = {k for s in ok for k in s.labels} | {"L-SHRINK-PRIOR"}
-    folded = "".join(f"<p>{esc(texts[k])}</p>" for k in FOLDED_LABELS if k in shown and k in texts)
-    priors: list[tuple[ShrinkagePrior, list[str]]] = []
-    for s in ok:
-        if s.prior is None:
-            continue
-        for known, scopes in priors:
-            if known.centre == s.prior.centre and known.tau == s.prior.tau:
-                scopes.append(_scope_title(s))
-                break
-        else:
-            priors.append((s.prior, [_scope_title(s)]))
-    names = [b.factor for b in ok[0].betas]
-    for prior, scopes in priors:
-        who = f"<p>Prior for: {esc(', '.join(scopes))}.</p>" if len(priors) > 1 else ""
-        folded += who + _prior_html(prior, names)
-    return (
-        f'<div class="foot"><p>{esc(desc)} {esc(texts.get("L-SHRINK", ""))}</p>'
-        f'<details class="how"><summary>How this is computed</summary>{folded}</details></div>'
+    desc = texts.get("L-DESC", DEFAULT_DESC)
+    moved = any(_moved_shown(b) for s in ok for b in s.betas)
+    keys = list(dict.fromkeys(k for s in ok for k in s.labels))
+    parts = [_prior_sentence(ok)] + [
+        texts[k] for k in keys if k != "L-DESC" and k in texts and (moved or k != "L-CORR-MOVE")
+    ]
+    how = " ".join(p for p in parts if p)
+    details = (
+        f'<details class="how"><summary>How this is computed</summary><p>{esc(how)}</p></details>'
+        if how
+        else ""
     )
+    return f'<div class="foot"><p>{esc(desc)}</p>{details}</div>'
 
 
 def render_shrunk_panel(report: FactorReport) -> str | None:
@@ -272,10 +244,7 @@ def render_shrunk_panel(report: FactorReport) -> str | None:
     ok = [s for s in sections if s.status == "ok"]
     legend = ""
     if any(_is_visible(b.pull) for s in ok for b in s.betas):
-        legend = (
-            '<ul class="legend" aria-label="Legend"><li>'
-            f"{_DIAMOND}Pulled {PULL_DISPLAY_THRESHOLD:.0%} or more toward typical</li></ul>"
-        )
+        legend = f'<ul class="legend" aria-label="Legend"><li>{_DIAMOND}{LEGEND_TEXT}</li></ul>'
     moved_title = texts.get("L-CORR-MOVE", "")
     body = "".join(
         _scope_html(s, first=i == 0, moved_title=moved_title) for i, s in enumerate(sections)

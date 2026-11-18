@@ -9,9 +9,14 @@ from typing import Any
 
 from factordesk.report import FactorReport, load_report, render_report_html
 from factordesk.report.panels.shrunk import (
+    CAPTION,
     CSS,
+    LEGEND_TEXT,
+    MOVED_WORD,
     NEXT_STEP,
+    NEXT_STEP_FAILED,
     NO_VISIBLE_PULL,
+    POWER_HEADING,
     render_shrunk_panel,
 )
 from factordesk.report.render_html import esc
@@ -71,7 +76,7 @@ def test_full_sample_numbers() -> None:
     )
     assert row is not None
     cells = _text(row.group(0))
-    for printed in ("+1.009", "0.007", "+0.996 to +1.022", "0.1%"):
+    for printed in ("+1.009", "0.007", "[+0.996, +1.022]", "0.1%"):
         assert printed in cells
     assert cells.count("+1.009") == 2  # OLS beta and shrunk beta
 
@@ -81,7 +86,7 @@ def test_latest_window_numbers_and_marker() -> None:
     mkt = re.search(r'<tr[^>]*id="shrunk-latest-Mkt-RF".*?</tr>', scope, re.S)
     assert mkt is not None
     cells = _text(mkt.group(0))
-    for printed in ("+1.484", "0.222", "+1.227", "+0.929 to +1.526", "53.0%"):
+    for printed in ("+1.484", "0.222", "+1.227", "[+0.929, +1.526]", "53.0%"):
         assert printed in cells
     assert 'class="dm"' in mkt.group(0)  # pull of 53% draws the hollow diamond
     cma = _text(re.search(r'<tr[^>]*id="shrunk-latest-CMA".*?</tr>', scope, re.S).group(0))  # type: ignore[union-attr]
@@ -90,7 +95,7 @@ def test_latest_window_numbers_and_marker() -> None:
 
 def test_scope_headings() -> None:
     page = _panel(_report())
-    assert "<h3>Full sample</h3>" in page
+    assert "<h3>Full sample (559 days)</h3>" in page
     assert "<h3>Latest 252-day window</h3>" in page
     assert page.index("Full sample") < page.index("Latest 252-day window")
 
@@ -137,17 +142,17 @@ def test_marker_threshold_is_five_percent() -> None:
     assert "0.0%" in scope  # clipped to 0
 
 
-def test_power_statements_and_detectable_values() -> None:
+def test_power_statements_are_a_list_under_their_heading() -> None:
     html = _panel(_report())
     latest = _scope(html, "shrunk-latest")
-    for mde in ("0.759", "0.899", "0.998", "1.223", "1.856"):
-        assert f'<td class="num">{mde}</td>' in latest
+    assert POWER_HEADING == "What the test behind the reliable tags could detect"
+    assert f'<h4 class="shr-power-h">{POWER_HEADING}</h4>' in latest
     report = _report()
     assert report.shrunk_betas is not None
     for section in report.shrunk_betas:
-        for p in section.power:
-            assert p.text is not None
-            assert esc(p.text) in html
+        scope = _scope(html, f"shrunk-{'full' if section.scope == 'full_sample' else 'latest'}")
+        items = re.findall(r"<li>(.*?)</li>", scope.split('class="shr-power"')[1], re.S)
+        assert items == [esc(p.text or "") for p in section.power]
     assert "would take more than 50 years" in latest
     assert "is already detectable" in _scope(html, "shrunk-full")
 
@@ -156,11 +161,35 @@ def test_moved_away_beta_has_a_word_and_a_glyph() -> None:
     scope = _scope(_panel(_report()), "shrunk-latest")
     smb = re.search(r'<tr[^>]*id="shrunk-latest-SMB".*?</tr>', scope, re.S)
     assert smb is not None
-    assert "Moved away from typical" in _text(smb.group(0))
+    assert MOVED_WORD in _text(smb.group(0))
     assert "<svg" in smb.group(0)
     assert "+0.563" in _text(smb.group(0))
     assert esc(LABEL_TEXT["L-CORR-MOVE"]) in smb.group(0)
-    assert scope.count("Moved away from typical") == 1  # only SMB moved away
+    assert scope.count(MOVED_WORD) == 1  # only SMB moved away
+    assert MOVED_WORD == "Moved away from typical"
+
+
+def test_moved_away_shows_only_where_the_pull_marker_is_drawn() -> None:
+    """A moved-away flag on a row with a negligible pull draws neither the word nor L-CORR-MOVE."""
+
+    def edit(sections: list[dict[str, Any]]) -> None:
+        sections[0]["betas"][2]["moved_away"] = True  # HML, pull 0.0007 in the full sample
+        sections[0]["labels"].append("L-CORR-MOVE")
+        sections[1]["betas"][1]["pull"] = 0.04  # SMB: moved away, but pull below 0.05
+
+    html = _panel(_edited(edit))
+    assert MOVED_WORD not in html
+    foot = html[html.index('<div class="foot">') :]
+    assert esc(LABEL_TEXT["L-CORR-MOVE"]) not in foot
+
+    # the flag and the label come back once a visible pull carries them
+    def back(sections: list[dict[str, Any]]) -> None:
+        edit(sections)
+        sections[1]["betas"][1]["pull"] = 0.05
+
+    again = _panel(_edited(back))
+    assert again.count(MOVED_WORD) == 1
+    assert esc(LABEL_TEXT["L-CORR-MOVE"]) in again[again.index('<div class="foot">') :]
 
 
 def test_labels_are_footnote_texts() -> None:
@@ -205,6 +234,18 @@ def test_not_ok_scope_shows_reason_and_one_next_step() -> None:
     assert '<div class="foot">' in html
 
 
+def test_next_step_depends_on_the_status() -> None:
+    def failed(sections: list[dict[str, Any]]) -> None:
+        _not_ok(sections)
+        sections[1]["status"] = "failed"
+
+    latest = _scope(_panel(_edited(failed)), "shrunk-latest")
+    assert NEXT_STEP_FAILED in latest and NEXT_STEP not in latest
+    assert NEXT_STEP_FAILED == (
+        "Run the report again; if it repeats, check the factor data in Data and audit."
+    )
+
+
 def test_every_scope_not_ok_draws_frame_and_empty_states_only() -> None:
     def edit(sections: list[dict[str, Any]]) -> None:
         for s in sections:
@@ -239,15 +280,37 @@ def test_missing_power_text_renders_an_empty_cell() -> None:
     assert "None" not in html
 
 
-def test_two_scopes_with_different_priors_are_both_listed() -> None:
-    def edit(sections: list[dict[str, Any]]) -> None:
-        sections[1]["prior"]["tau"] = [0.3, 0.8, 0.4, 0.4, 0.3]
-
-    foot = _panel(_edited(edit))
+def test_prior_sentence_reads_as_in_the_react_panel() -> None:
+    foot = _panel(_report())
     foot = foot[foot.index('<div class="foot">') :]
-    assert "Prior for: Full sample." in foot
-    assert "Prior for: Latest 252-day window." in foot
-    assert "0.764" in foot and "0.800" in foot
+    assert (
+        "Prior centre and spread per factor: Mkt-RF 1.000 and 0.209; SMB 0.000 and 0.764; "
+        "HML 0.000 and 0.341; RMW 0.000 and 0.329; CMA 0.000 and 0.254. "
+        "The spread comes from 49 industry and 75 size portfolios, 2016-09-21 to 2026-09-30."
+    ) in foot
+    # the descriptive label is the footnote; the model labels sit in the fold, after the prior
+    assert foot.index("Descriptive, in-sample, not predictive.") < foot.index("<details")
+    assert foot.index("Prior centre and spread") < foot.index(esc(LABEL_TEXT["L-SHRINK"]))
+
+
+def test_shared_wording_is_fixed() -> None:
+    """The words the React panel repeats (pinned there too): change both or neither."""
+    html = _panel(_report())
+    assert LEGEND_TEXT == "Pulled 5% or more toward typical"
+    assert (
+        NO_VISIBLE_PULL
+        == "Shrinkage moves no beta by a visible amount: this sample is long enough."
+    )
+    assert NEXT_STEP == "Widen the date range and run the report again."
+    assert f'<caption class="vh">{CAPTION}</caption>' in html
+    assert CAPTION == (
+        "OLS and shrunk betas with standard errors, 95% credible intervals and pull; "
+        "a marker is drawn only where the pull is at least 5%"
+    )
+    assert (
+        "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, "
+        "100% means all the way."
+    ) in html
 
 
 def test_no_monospace_and_no_all_caps_eyebrow() -> None:

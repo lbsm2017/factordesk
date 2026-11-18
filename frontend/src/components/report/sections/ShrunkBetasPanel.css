@@ -22,6 +22,7 @@ line.cred { stroke: var(--ink-2); stroke-width: 1.25; }
 .bars.shrunk thead th.num { padding-left: var(--s-3); }
 .bars.shrunk td.num.ci-text { white-space: nowrap; }
 
+.pull-note { margin-top: var(--s-2); font-size: var(--fs-1); color: var(--ink-3); max-width: 76ch; }
 .power-h { margin: var(--s-4) 0 var(--s-1); font-size: var(--fs-1); font-weight: 560; color: var(--ink-2); }
 .power { max-width: 76ch; font-size: var(--fs-1); color: var(--ink-2); line-height: 1.45; }
 .power li { padding: 2px 0; }

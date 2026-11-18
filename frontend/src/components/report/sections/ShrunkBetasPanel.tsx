@@ -19,6 +19,14 @@ const DEFAULT_DESC = "Descriptive, in-sample, not predictive.";
 const MIN_VISIBLE_PULL = 0.05;
 const NO_PULL_LINE = "Shrinkage moves no beta by a visible amount: this sample is long enough.";
 const NOTHING = "n/a";
+/* The words below are the words of the static panel (backend/factordesk/report/panels/shrunk.py); a
+   test on each side pins them, so a change here needs the same change there. */
+const LEGEND_TEXT = "Pulled 5% or more toward typical";
+const PULL_NOTE =
+  "Pull is the share of the way from the OLS beta to its typical value: 0% means no move, 100% means all the way.";
+const POWER_HEADING = "What the test behind the reliable tags could detect";
+const CAPTION =
+  "OLS and shrunk betas with standard errors, 95% credible intervals and pull; a marker is drawn only where the pull is at least 5%";
 type ShrunkBeta = ShrunkBetas["betas"][number];
 const CROSS_SECTION_WORDS: Record<string, string> = { industry49: "industry", size_char75: "size" };
 
@@ -136,10 +144,7 @@ function MovedAway({ row }: { row: Row }) {
 function ShrunkTable({ id, rows, domain }: { id: string; rows: readonly Row[]; domain: NiceDomain }) {
   return (
     <table role="table" className="bars shrunk" aria-labelledby={`${id}-h`}>
-      <caption className="vh">
-        OLS betas with the betas pulled toward typical, their 95% credible intervals and the pull; a marker is drawn
-        only where the pull is at least 5%
-      </caption>
+      <caption className="vh">{CAPTION}</caption>
       <thead role="rowgroup">
         <tr role="row">
           <th role="columnheader" scope="col">
@@ -155,13 +160,13 @@ function ShrunkTable({ id, rows, domain }: { id: string; rows: readonly Row[]; d
             se
           </th>
           <th role="columnheader" scope="col" className="num">
-            shrunk beta
+            Shrunk beta
           </th>
           <th role="columnheader" scope="col" className="num">
             95% credible interval
           </th>
           <th role="columnheader" scope="col" className="num">
-            pull
+            Pull
           </th>
         </tr>
       </thead>
@@ -241,9 +246,10 @@ function ScopeBlock({ s }: { s: ShrunkBetas }) {
       <h3 id={`${id}-h`}>{title}</h3>
       {rows.some((r) => r.marked) ? null : <p className="reading">{NO_PULL_LINE}</p>}
       <ShrunkTable id={id} rows={rows} domain={domain} />
+      <p className="pull-note">{PULL_NOTE}</p>
       {powers.length > 0 ? (
         <>
-          <h4 className="power-h">What the test behind the reliable tags could detect</h4>
+          <h4 className="power-h">{POWER_HEADING}</h4>
           <ul className="power" aria-label={`Power statements, ${title}`}>
             {powers.map((p) => (
               <li key={p.factor}>{p.text}</li>
@@ -286,9 +292,13 @@ export function ShrunkBetasPanel({ report }: ReportPanelProps) {
   const sections = report.shrunk_betas;
   if (sections === null) return null;
   const texts = report.label_text;
-  const listed = [...new Set(sections.flatMap((s) => s.labels))].filter((k) => k !== "L-DESC");
   const ok = sections.filter((s) => s.status === "ok");
   const anyMark = ok.some((s) => s.betas.some((b) => rowOf(b).marked));
+  // The word and the label L-CORR-MOVE belong to rows whose pull marker is drawn.
+  const anyMoved = ok.some((s) => s.betas.some((b) => rowOf(b).movedAway));
+  const listed = [...new Set(ok.flatMap((s) => s.labels))].filter(
+    (k) => k !== "L-DESC" && (anyMoved || k !== "L-CORR-MOVE"),
+  );
   const how = [priorSentence(sections), ...listed.flatMap((k) => (texts[k] ? [texts[k]] : []))]
     .filter(Boolean)
     .join(" ");
@@ -307,7 +317,7 @@ export function ShrunkBetasPanel({ report }: ReportPanelProps) {
                     <line className="cred" x1="1" x2="15" y1="5" y2="5" />
                     <path className="shrm-sw" d="M8 0.8 12.2 5 8 9.2 3.8 5z" />
                   </svg>
-                  Pulled toward typical, with 95% credible interval
+                  {LEGEND_TEXT}
                 </>,
               ]
             : []),
@@ -320,8 +330,8 @@ export function ShrunkBetasPanel({ report }: ReportPanelProps) {
       title="Pulled toward typical"
       question={QUESTION}
       legend={legend}
-      footnote={texts["L-DESC"] ?? DEFAULT_DESC}
-      how={how || undefined}
+      footnote={ok.length === 0 ? undefined : (texts["L-DESC"] ?? DEFAULT_DESC)}
+      how={ok.length === 0 ? undefined : how || undefined}
     >
       {sections.map((s) => (
         <ScopeBlock key={s.scope} s={s} />
