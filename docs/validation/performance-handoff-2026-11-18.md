@@ -103,3 +103,13 @@ SPY on the 5-year range from 2021-11-18 (1,220 days): 12.1444% a year, volatilit
 ## 7. Gates (final state)
 
 See `docs/registry/tests.jsonl` lines `T-20261118-1001` to `1008` for the test results. Gate counts at the end of the work are in the report of the branch author (pytest, ruff, pyright, typecheck, lint, vitest, build, size, e2e all pass).
+
+## 8. After validation (2026-11-19)
+
+Review: `docs/reviews/performance-validation-2026-11-19.md` (merge with conditions; the validator's tests TP52 to TP54 are merged). Changes made on this branch in answer:
+
+- **F1 (recovery tolerance).** `analytics/performance.py` compares the path with the running peak using `PEAK_TOLERANCE = 1e-9` (relative), in the regained-peak test and in the peak update (the peak value keeps the larger of the two, the peak date moves to the later day). TP53 is no longer an expected failure and passes; TP55 pins that a real shortfall (0.007%) is still "not recovered". Add the tolerance to P3 when the methodology is written: an episode ends at the first point with `W >= peak x (1 - 1e-9)`.
+- **F2 (dashboard needs).** Owner option (a) applied: `drawdown.series` (`dates`, `values`) holds the drawdown `W_j / max W - 1` at each of the n + 1 path points (the origin, then every analysed date), values rounded to 4 decimals, dates as ISO dates like the other series; `TOP_EPISODES` is 5 and `drawdown.episodes` keeps its name. Both are additive; `SCHEMA_VERSION` stays "4". On real SPY from 1993: 8,475 points, 173,551 bytes of JSON (35,013 bytes gzip) in a report of 4,783,987 bytes. Tests TP56 to TP59. The OpenAPI document, the generated types and the section fixture are regenerated.
+- **F3 (arithmetic average).** The window sentence no longer quotes `mean_return_annual` (still in the data). The fold says it is higher than the compound figure when returns swing widely because large swings cut compound growth, and that it is not what an investor earned. TP61.
+- **F4 (wording).** Sharpe note and worst-fall note use the strings of DV4.7 of dashboard-v2 (TP43, TP44, TP46, TP60). The tile still reads "Worst fall" where DV4.7 says "Largest fall"; the label was left as is.
+- **Not done here.** F6 (note on excluded days) and F9 (methodology text) follow later; the React panel is still a placeholder (it can now read `drawdown.series` for the L.6 chart).
