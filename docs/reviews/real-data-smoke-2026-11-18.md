@@ -38,11 +38,12 @@ Evidence: Playwright text of `#analysed-range` and `#data` on Full and 3Y histor
 Status: fixed. A shared `count()` in `frontend/src/format/numbers.ts` is used by the range line and the Data and audit facts. Regression tests in `format.test.ts`, `controls.test.tsx` and `DataAuditPanel.test.tsx`.
 Commit: 0e37aec.
 
-### F2. Full-history report is slow to compute (open, not in scope)
+### F2. Full-history report is slow to compute (rolling part fixed)
 
 What: a Full-history result takes 10 to 16 s cold, and every new long custom range takes 5 to 7 s. About two thirds is `rolling_ols_hac` (`einsum` in `backend/factordesk/analytics/rolling.py`), the rest the residual diagnostics.
 Evidence: cProfile of `assemble_report` for SPY Full: `rolling_betas` 27.6 s of 40.5 s under the profiler, `acorr_*` 7.9 s.
-Status: open. The page shows a loading state meanwhile, and repeat requests are served from cache. A fix touches statistics code, so it was not attempted.
+Status: fixed on 2026-11-18 for the rolling part (branch `perf/rolling-regression-speed`). The rolling regression was already batched, not one statsmodels fit per window; the time went to `einsum` (72 %), the per-window QR and the design guard. `rolling_ols_hac` now solves healthy windows from cumulative-sum Gram matrices (each window standardised by its own factor spreads) and builds the Newey-West sum with three batched matrix products instead of one per lag; any window near a guard limit still goes through the old per-window QR path. Same lag rule, same degrees-of-freedom conventions.
+Numbers (same machine, best of 3, SPY real cached series, 8,474 rows, windows 126 and 252): rolling step 4.2 s before, 0.8 s after (5x; 11.0 s to 1.7 s measured on the loaded machine of the smoke test); synthetic 8,500 rows 3.7 s to 0.8 s. `assemble_report` for SPY Full, cold: 1.4 s in total. Maximum absolute difference to the previous implementation: betas 7e-13, standard errors 1e-13, R2 1e-13, NaN positions identical (`test_rolling_equivalence.py`, tolerance 1e-9). The residual diagnostics (`acorr_*`) were not touched.
 
 ### F3. SPY over Full history fires the residual-reversal gate (open, data or method question)
 
