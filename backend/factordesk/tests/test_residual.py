@@ -888,3 +888,27 @@ def test_tr18_message_rounds_half_points_away_from_zero() -> None:
         "survives_not_significant", a_c=0.04, a_pit=0.045, survival_ratio=1.125, **kw
     )
     assert "(115% kept with point-in-time betas)" in g6
+
+
+# ----------------------------------------------------------------------------- after validation
+def test_verdict_uses_the_gated_alpha_tag() -> None:
+    """F1: when the quality gate tags the in-sample alpha 'noise', the verdict agrees with it.
+
+    The daily p-value is far below 0.05 here, but the gated tag says 'noise': the verdict must not
+    read the in-sample alpha as reliable (no 'distinguishable from zero' next to a 'noise' chip).
+    """
+    a = analyse(dgp_rplus(rng_tr(19)))
+    assert a.reg.alpha_tag == "reliable" and a.reg.fit.pvalues[0] < 0.05
+    assert a.result.gap.verdict == "survives"
+    gated = dataclasses.replace(a.reg, alpha_tag="noise")
+    r = res_mod.residual_analysis(a.sample, gated, a.rolling, exact_fit=False)
+    assert r.in_sample.tag == "noise"
+    assert r.gap.verdict == "point_in_time_only"
+    assert r.gap_message is not None and "distinguishable from zero" not in r.gap_message
+    # the tag and the verdict also agree on the rules, not only on the real run
+    v = decide_verdict(0.125, 0.01, 0.125, 0.109375, 0.01, in_sample_reliable=False)
+    assert v.code == "point_in_time_only"
+    v = decide_verdict(0.125, 0.01, 0.125, 0.109375, 0.30, in_sample_reliable=False)
+    assert v.code == "no_reliable_alpha"
+    v = decide_verdict(0.125, 0.20, 0.125, 0.109375, 0.01, in_sample_reliable=True)
+    assert v.code == "survives"

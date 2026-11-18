@@ -395,15 +395,27 @@ class Verdict:
 
 
 def decide_verdict(
-    alpha_ann: float, p_is: float, a_c: float, a_pit: float, p_pit: float
+    alpha_ann: float,
+    p_is: float,
+    a_c: float,
+    a_pit: float,
+    p_pit: float,
+    *,
+    in_sample_reliable: bool | None = None,
 ) -> Verdict:
-    """First matching rule of R4.8 (G1-G7). Thresholds are fixed (RD8)."""
+    """First matching rule of R4.8 (G1-G7). Thresholds are fixed (RD8).
+
+    ``in_sample_reliable`` is the quality-gated alpha tag of the in-sample regression
+    (``reg.alpha_tag == "reliable"``): the same tag the in-sample column shows, so the chip and
+    the verdict cannot disagree. When it is left out the daily p-value ``p_is`` decides.
+    """
     q = None if alpha_ann == 0.0 else a_c / alpha_ann
     s = None if a_c == 0.0 else a_pit / a_c
+    is_reliable = p_is < ALPHA_LEVEL if in_sample_reliable is None else in_sample_reliable
     code: GapVerdictCode
-    if p_is >= ALPHA_LEVEL and p_pit >= ALPHA_LEVEL:
+    if not is_reliable and p_pit >= ALPHA_LEVEL:
         code = "no_reliable_alpha"
-    elif p_is >= ALPHA_LEVEL:
+    elif not is_reliable:
         code = "point_in_time_only"
     elif alpha_ann * a_c <= 0.0 or (q is not None and q < WARMUP_SHARE_THRESHOLD):
         code = "concentrated_in_warmup"
@@ -513,7 +525,14 @@ def gap_statistics(
     else:
         gap_test = hac_location_test(gap)
     assert pit.p is not None
-    verdict = decide_verdict(reg.alpha_ann, float(reg.fit.pvalues[0]), a_c, a_pit, pit.p)
+    verdict = decide_verdict(
+        reg.alpha_ann,
+        float(reg.fit.pvalues[0]),
+        a_c,
+        a_pit,
+        pit.p,
+        in_sample_reliable=reg.alpha_tag == "reliable",
+    )
     message = verdict_message(
         verdict.code,
         a_c=a_c,
