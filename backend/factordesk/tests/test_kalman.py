@@ -2,14 +2,16 @@
 
 The independent references live here and nowhere else: a naive matrix Kalman recursion written
 for the test (true-unit ``R``, textbook formulas), and statsmodels ``MLEModel`` and
-``RecursiveLS`` (spec KB8.2). The simulation tests (marker ``slow``) use 100 replications instead
-of the spec's 200 to bound the run time; every threshold is the spec's.
+``RecursiveLS`` (spec KB8.2). The simulation tests (marker ``slow``) use 100 replications by
+default instead of the spec's 200 to bound the run time; set ``FACTORDESK_KB_REPS=200`` to run
+them as the spec writes them. Every threshold is the spec's.
 """
 
 from __future__ import annotations
 
 import ast
 import math
+import os
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -38,6 +40,8 @@ from factordesk.tests.fixtures.dgp import MU, SD, SIGMA_F, dgp_a, rng_for
 
 FloatArray = NDArray[np.float64]
 B = kf.BURN_IN_ROWS
+KB_REPS = int(os.environ.get("FACTORDESK_KB_REPS", "100"))
+"""Replications of the slow simulation tests (the spec writes 200)."""
 _sm: Any = sm
 _MLEModel: Any = MLEModel
 
@@ -305,7 +309,7 @@ def test_tkb09_equivalent_window(lam: float) -> None:
     window = round(2 / math.sqrt(lam))
     m_inv = np.diag(1 / SD**2)
     kf_sq = roll_sq = 0.0
-    reps = 100
+    reps = KB_REPS
     truth = np.array([1.10, 0.30, -0.40, 0.25, 0.15])
     for _ in range(reps):
         f = rng.normal(MU, SD, size=(3000, 5))
@@ -319,7 +323,7 @@ def test_tkb09_equivalent_window(lam: float) -> None:
 
 
 # ============================================================ simulations (DGP-KB)
-KB_ALPHA, KB_SIGMA_E, KB_N, KB_REPS = 0.0002, 0.012, 2520, 100
+KB_ALPHA, KB_SIGMA_E, KB_N = 0.0002, 0.012, 2520
 KB_BETA = np.array([1.10, 0.30, -0.40, 0.25, 0.15])
 
 
