@@ -480,6 +480,99 @@ class FactorReport(_Frozen):
         return self
 
 
+# ------------------------------------------------- API envelope (not part of FactorReport)
+
+RangePreset = Literal["YTD", "1Y", "3Y", "5Y", "FULL"]
+RANGE_PRESETS: tuple[RangePreset, ...] = ("YTD", "1Y", "3Y", "5Y", "FULL")
+"""Range presets in display order (dashboard spec DB2.2)."""
+
+ErrorCode = Literal[
+    "invalid_ticker",
+    "unknown_ticker",
+    "bad_range",
+    "insufficient_history",
+    "degenerate_input",
+    "factor_data_invalid",
+    "network",
+    "upstream_refused",
+    "not_found",
+    "internal",
+    "bad_request",
+]
+"""Error codes of the local API (dashboard spec DB2.3). ``bad_request`` covers any other
+malformed request parameter."""
+
+
+class Health(_Frozen):
+    """Liveness answer; reads no disk and no network."""
+
+    status: Literal["ok"]
+    version: str
+    schema_version: str
+
+
+class FactorDataStatus(_Frozen):
+    """Coverage and age of the cached Fama-French file; ``available`` is False when none."""
+
+    available: bool
+    first_date: date | None
+    last_date: date | None
+    days_behind: int | None
+    last_download_at: datetime | None
+    stale: bool | None
+    source_url: str
+
+
+class TickerSuggestion(_Frozen):
+    ticker: str
+    last_fetched: date
+
+
+class TickerSuggestions(_Frozen):
+    items: list[TickerSuggestion]
+
+
+class RangeOption(_Frozen):
+    """One range preset for one ticker; ``reason`` is None exactly when ``available``."""
+
+    preset: RangePreset
+    start: date | None
+    n_obs: int
+    available: bool
+    reason: str | None
+
+    @model_validator(mode="after")
+    def _reason_iff_unavailable(self) -> RangeOption:
+        if self.available != (self.reason is None):
+            raise ValueError("reason must be None exactly when the option is available")
+        return self
+
+
+class RangeOptions(_Frozen):
+    """Availability of every preset for one ticker (always five, in preset order)."""
+
+    ticker: str
+    first_return_date: date
+    last_price_date: date
+    factors_last_date: date
+    min_obs: int
+    options: list[RangeOption]
+
+    @model_validator(mode="after")
+    def _five_presets_in_order(self) -> RangeOptions:
+        if tuple(option.preset for option in self.options) != RANGE_PRESETS:
+            raise ValueError("options must hold every preset exactly once, in preset order")
+        return self
+
+
+class ApiError(_Frozen):
+    """Every error body: ``message`` says what went wrong, ``action`` what to do."""
+
+    code: ErrorCode
+    message: str
+    action: str
+
+
 STATISTIC_MODELS: tuple[type[_Statistic], ...] = (
     Regression,
     RollingWindow,
