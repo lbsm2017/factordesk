@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (nightly slow tests)
+
+- The owner approved a nightly GitHub Actions workflow for the slow and live tests. Added [the decision page](decision-nightly-slow-tests.md). The workflow has not yet run on GitHub.
+
 ## 2026-11-18 (bibliography)
 
 - References verified: 63 bibliography entries, each checked against Crossref or arXiv (58, by the new script) or by hand against the page or file (5). Of 11 items first listed as unverified, 4 are resolved with a source, 2 partly, and 5 have no source (listed with file and line in the references page). See [references](../docs/references.md), [references.bib](../docs/references.bib) and the rule in [no citation without verification](decision-citations-and-verification.md).
