@@ -119,6 +119,24 @@ describe("ShrunkBetasPanel", () => {
     expect(within(full).getAllByRole("listitem")[1]?.textContent).toContain("An SMB beta of 0.05 is already detectable.");
   });
 
+  it("colours bars and beta values by sign, and fades a beta whose credible interval includes zero", () => {
+    const { container } = render(<ShrunkBetasPanel report={reportWith()} />);
+    const win = scopeOf(container, "latest_window");
+    const row = (f: string) =>
+      Array.from(win.querySelectorAll("tbody tr")).find((tr) => tr.querySelector("th .fname")?.textContent === f);
+    const mkt = row("Mkt-RF");
+    expect(mkt?.querySelector("rect.pos:not(.faded)")).not.toBeNull();
+    expect(mkt?.querySelector("td.ols")?.classList.contains("num-pos")).toBe(true);
+    expect(mkt?.querySelector("td.shr")?.classList.contains("num-pos")).toBe(true);
+    const hml = row("HML");
+    expect(hml?.querySelector("rect.neg:not(.faded)")).not.toBeNull();
+    expect(hml?.querySelector("td.ols")?.classList.contains("num-neg")).toBe(true);
+    const cma = row("CMA");
+    expect([mkt, hml, cma].every(Boolean)).toBe(true);
+    expect(cma?.querySelector("rect.faded")).not.toBeNull();
+    expect(cma?.querySelector("td.ols.num-pos, td.ols.num-neg, td.shr.num-pos, td.shr.num-neg")).toBeNull();
+  });
+
   it("uses the true minus sign and the shared signed format in every beta column", () => {
     const { container } = render(<ShrunkBetasPanel report={reportWith()} />);
     const win = scopeOf(container, "latest_window");

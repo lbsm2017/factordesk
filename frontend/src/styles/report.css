@@ -170,9 +170,7 @@ rect.hatch { fill: url(#hatch); stroke: var(--ink-3); stroke-width: 1; }
 .hatch-ink { fill: var(--ink-3); }
 .total-line { stroke: var(--ink); stroke-width: 2; }
 .total-cap { stroke: var(--ink); stroke-width: 3; }
-/* Factor exposures use sign colour (owner, 2026-11-19, later message); shrunk betas stay neutral ink */
-#shrunk rect.pos, #shrunk rect.neg { fill: var(--ink-2); }
-#shrunk rect.faded { fill: var(--mark-ns); fill-opacity: 1; stroke: var(--ink-2); }
+/* Factor exposures and shrunk betas use sign colour (owner, 2026-11-19) */
 rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--f3); } rect.c4 { fill: var(--f4); } rect.c5 { fill: var(--f5); }
 
 /* line charts */
