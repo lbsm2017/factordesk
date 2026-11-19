@@ -132,6 +132,19 @@ describe("track-record upload", () => {
     expect(window.location.search).toBe("?m=track");
   });
 
+  it("summarises the analysed months in the sidebar once the record is analysed, and not before", async () => {
+    answerUpload();
+    renderAt("/?m=track");
+    expect(document.querySelector("#analysed-range")).toBeNull();
+    chooseFile(csv());
+    fireEvent.click(screen.getByRole("button", { name: "Factor it" }));
+    await screen.findByTestId("report-ticker");
+    const summary = document.querySelector("#analysed-range") as HTMLElement;
+    expect(summary.querySelector(".cov-size")?.textContent).toBe("84 months");
+    expect(summary.querySelector("[data-part='analysed']")).toBeTruthy();
+    expect(summary.textContent).not.toContain("trading day");
+  });
+
   it("leaves the name and fee basis out when they are not given", async () => {
     answerUpload();
     renderAt("/?m=track");
