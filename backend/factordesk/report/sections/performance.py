@@ -4,7 +4,9 @@ Contract: ``docs/specs/schema-v3-contract.md`` (a sixth optional section, see
 ``docs/validation/performance-contract-note-2026-11-18.md``); definitions in
 ``analytics/performance.py``. ``PerformanceSection`` is the optional ``FactorReport.performance``
 field (``None`` when the feature did not run). Every number is computed over the analysed sample,
-the same trading days as the regression. Decimals throughout (0.1 is 10%).
+the same periods as the regression (trading days, or months when ``subject.periods`` = 12).
+Annualised figures use ``P`` observations a year: 252, or ``subject.periods`` when the report
+has a subject block. Decimals throughout (0.1 is 10%).
 
 The section has no footnote keys of its own and no nested ``StatisticModel``: its parts are plain
 objects answered for by the section's ``status``.
@@ -22,34 +24,51 @@ from factordesk.report.base import FrozenModel, SectionModel, SectionSpec
 class PerformancePeriods(FrozenModel):
     """The analysed span."""
 
-    n_days: int = Field(ge=0, description="Daily observations of the analysed sample.")
+    n_days: int = Field(
+        ge=0,
+        description="Periods of the analysed sample (trading days, or months when "
+        "subject.periods = 12).",
+    )
     start: date = Field(description="First analysed date.")
     end: date = Field(description="Last analysed date.")
-    years: float = Field(description="n_days / 252.")
+    years: float = Field(
+        description="n_days / P, with P the observations a year (252, or subject.periods)."
+    )
 
 
 class PerformanceReturns(FrozenModel):
-    """Growth of the stock over the window (simple daily total returns, M1.3)."""
+    """Growth of the subject over the window (simple total returns per period, M1.3)."""
 
-    cagr: float = Field(description="Compound annual growth rate: prod(1 + r)^(252 / n) - 1.")
+    cagr: float = Field(
+        description="Compound annual growth rate: prod(1 + r)^(P / n) - 1, with P the "
+        "observations a year (252, or subject.periods)."
+    )
     cumulative_return: float = Field(description="prod(1 + r) - 1 over the window.")
     mean_return_annual: float = Field(
-        description="Arithmetic mean of daily returns times 252; ignores compounding."
+        description="Arithmetic mean of the periodic returns times P (252, or subject.periods); "
+        "ignores compounding."
     )
 
 
 class PerformanceSharpe(FrozenModel):
-    """Sharpe ratio of the daily excess returns (stock return minus the factor file's RF)."""
+    """Sharpe ratio of the periodic excess returns (subject return minus the factor file's RF)."""
 
     ratio_annual: float | None = Field(
-        description="sqrt(252) x mean(excess) / sd(excess), ddof 1; None when the excess returns "
-        "do not vary (the ratio is not defined)."
+        description="sqrt(P) x mean(excess) / sd(excess), ddof 1, with P the observations a year "
+        "(252, or subject.periods); None when the excess returns do not vary (the ratio is not "
+        "defined)."
     )
-    ratio_daily: float | None = Field(description="mean(excess) / sd(excess); None as above.")
-    mean_excess_annual: float = Field(description="252 x mean of daily excess returns.")
+    ratio_daily: float | None = Field(
+        description="Ratio per period, mean(excess) / sd(excess): per trading day, or per month "
+        "when subject.periods = 12 (the name is kept for compatibility); None as above."
+    )
+    mean_excess_annual: float = Field(
+        description="P x mean of the periodic excess returns (P = 252, or subject.periods)."
+    )
     sharpe_se_iid: float | None = Field(
-        description="Approximate standard error of the annual ratio, sqrt(252) x sqrt((1 + "
-        "SR_daily^2 / 2) / n) (Lo 2002). Assumes independent, identically distributed returns."
+        description="Approximate standard error of the annual ratio, sqrt(P) x sqrt((1 + "
+        "ratio_daily^2 / 2) / n) (Lo 2002), P = 252 or subject.periods. Assumes independent, "
+        "identically distributed returns."
     )
     ci95_low: float | None = Field(description="ratio_annual - 1.96 x sharpe_se_iid.")
     ci95_high: float | None = Field(description="ratio_annual + 1.96 x sharpe_se_iid.")
@@ -68,14 +87,19 @@ class DrawdownEpisodeInfo(FrozenModel):
         description="First date after the trough where the path regains the peak; None when it "
         "has not."
     )
-    days_peak_to_trough: int = Field(ge=1, description="Trading days from peak to trough.")
+    days_peak_to_trough: int = Field(
+        ge=1,
+        description="Periods from peak to trough (trading days, or months when "
+        "subject.periods = 12).",
+    )
     days_trough_to_recovery: int | None = Field(
-        description="Trading days from trough to recovery; None when not recovered."
+        description="Periods from trough to recovery (trading days, or months when "
+        "subject.periods = 12); None when not recovered."
     )
 
 
 class DrawdownSeries(FrozenModel):
-    """The fall from the running peak on every day of the compounded return path, for a chart."""
+    """The fall from the running peak at every date of the compounded return path, for a chart."""
 
     dates: list[date] = Field(
         description="The path origin (the price date before the first analysed return), then "
@@ -102,26 +126,36 @@ class PerformanceDrawdown(FrozenModel):
     peak_date: date | None = Field(description="None when there was no drawdown.")
     trough_date: date | None
     recovery_date: date | None = Field(description="None when not recovered or no drawdown.")
-    days_peak_to_trough: int | None
-    days_trough_to_recovery: int | None
+    days_peak_to_trough: int | None = Field(
+        description="Periods from peak to trough (trading days, or months when "
+        "subject.periods = 12); None when there was no drawdown."
+    )
+    days_trough_to_recovery: int | None = Field(
+        description="Periods from trough to recovery (trading days, or months when "
+        "subject.periods = 12); None when not recovered or no drawdown."
+    )
     episodes: list[DrawdownEpisodeInfo] = Field(
         description="Up to five distinct, non-overlapping episodes, deepest first; the first "
         "equals the maximum drawdown. Empty when there was no drawdown."
     )
-    series: DrawdownSeries = Field(description="Daily drawdown over the analysed window.")
+    series: DrawdownSeries = Field(
+        description="Drawdown at each analysed date (trading days, or month-ends when "
+        "subject.periods = 12)."
+    )
 
 
 class PerformanceSection(SectionModel):
-    """Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed stock.
+    """Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed subject.
 
     Descriptive and in-sample: it says what happened over the window, not what will happen.
-    Statuses: ``ok``; ``insufficient_data`` (fewer than 60 daily observations); ``failed``.
+    Statuses: ``ok``; ``insufficient_data`` (fewer than 60 observations); ``failed``.
     """
 
     periods: PerformancePeriods | None
     returns: PerformanceReturns | None
     volatility_annual: float | None = Field(
-        description="sqrt(252) x sample sd (ddof 1) of daily simple returns."
+        description="sqrt(P) x sample sd (ddof 1) of the periodic simple returns, with P the "
+        "observations a year (252, or subject.periods)."
     )
     sharpe: PerformanceSharpe | None
     drawdown: PerformanceDrawdown | None

@@ -241,7 +241,10 @@ class CorrPair(FrozenModel):
 class Regression(StatisticModel):
     """Full-sample excess-return regression ``y = alpha + sum(b_i f_i) + e`` (M3)."""
 
-    alpha_annual: float | None = Field(description="Annualised alpha, decimal per year (x252).")
+    alpha_annual: float | None = Field(
+        description="Annualised alpha, decimal per year: P x intercept, with P the observations "
+        "a year (252, or subject.periods)."
+    )
     alpha_se_annual: float | None
     alpha_z: float | None
     alpha_p: float | None
@@ -256,7 +259,9 @@ class Regression(StatisticModel):
     )
     r2: float | None
     adj_r2: float | None
-    sigma_e_annual: float | None = Field(description="Residual volatility, sqrt(252) x sd.")
+    sigma_e_annual: float | None = Field(
+        description="Residual volatility, sqrt(P) x sd, P = 252 or subject.periods."
+    )
     hac_lags: int = Field(ge=0, description="Newey-West lag length L(n).")
     bh_family_size: int = Field(ge=0, description="Number of betas in the BH family (F1).")
     factors: list[FactorStat]
@@ -409,9 +414,15 @@ class ReturnContribution(StatisticModel):
     ``identity_residual``. Memo rows are outside every sum.
     """
 
-    factors: dict[str, float | None] = Field(description="252 x beta_i x mean(f_i) per factor.")
-    alpha: float | None = Field(description="252 x alpha (daily intercept).")
-    residual: float | None = Field(description="252 x mean(residual); 0 by construction.")
+    factors: dict[str, float | None] = Field(
+        description="P x beta_i x mean(f_i) per factor, with P the observations a year (252, or "
+        "subject.periods)."
+    )
+    alpha: float | None = Field(
+        description="P x alpha (the intercept per period: trading day, or month when "
+        "subject.periods = 12)."
+    )
+    residual: float | None = Field(description="P x mean(residual); 0 by construction.")
     total_annualised_mean_excess_return: float | None
     identity_residual: float | None = Field(
         description="total - (sum(factors) + alpha + residual); float error only (~1e-17)."
@@ -425,7 +436,10 @@ class RiskFactorDetail(FrozenModel):
     name: str
     share: float | None = Field(description="Euler share of variance RC_i (may be negative).")
     beta: float | None
-    sigma_annual: float | None = Field(description="Factor volatility, sqrt(252) x sd.")
+    sigma_annual: float | None = Field(
+        description="Factor volatility, sqrt(P) x sd, with P the observations a year (252, or "
+        "subject.periods)."
+    )
     rho_sys: float | None = Field(
         description="Correlation of the factor with the systematic return beta'f."
     )
@@ -439,7 +453,7 @@ class RiskContribution(StatisticModel):
     sums_to_one_residual: float | None = Field(
         description="1 - (sum(factors) + idiosyncratic); float error only."
     )
-    total_vol_annual: float | None = Field(description="sqrt(252 x V).")
+    total_vol_annual: float | None = Field(description="sqrt(P x V), P = 252 or subject.periods.")
     order: list[str] = Field(
         description="Display order: factors by share descending, then 'Idiosyncratic'."
     )
