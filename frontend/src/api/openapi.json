@@ -3832,6 +3832,24 @@
             "title": "N Rebalances",
             "description": "Month-end closes at which the weights were reset to target."
           },
+          "n_dates_dropped": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Dates Dropped",
+            "description": "Trading days inside the window on which at least one instrument had no price. They are skipped for all instruments."
+          },
+          "data_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Note",
+            "description": "Plain-words note on those skipped days; None when there were none."
+          },
           "cost_bps": {
             "type": "number",
             "minimum": 0.0,
@@ -3883,6 +3901,8 @@
           "end_limited_by",
           "n_instruments",
           "n_rebalances",
+          "n_dates_dropped",
+          "data_note",
           "cost_bps",
           "total_cost",
           "average_turnover",

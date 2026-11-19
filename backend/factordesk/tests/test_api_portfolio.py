@@ -6,6 +6,7 @@ one), the factor frame is ``dgp_a``'s, the clock is fixed and ``tmp_path`` is th
 
 from __future__ import annotations
 
+import dataclasses
 import socket
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
@@ -23,7 +24,12 @@ from fastapi.testclient import TestClient
 from factordesk.api.deps import AppDeps
 from factordesk.api.main import create_app
 from factordesk.api.portfolio_models import PortfolioTree
-from factordesk.api.portfolio_report import backtest_portfolio, canonical_digest, plan_of
+from factordesk.api.portfolio_report import (
+    _common_returns,  # pyright: ignore[reportPrivateUsage]
+    backtest_portfolio,
+    canonical_digest,
+    plan_of,
+)
 from factordesk.data.factors import FactorStatus
 from factordesk.data.prices import (
     BatchResult,
@@ -41,6 +47,7 @@ NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
 DOWNLOADED = datetime(2026, 10, 2, 8, 30, tzinfo=UTC)
 N = 1400
 CUT = 30
+GAP_ROW = 500
 
 
 class ApiClient(Protocol):
@@ -129,6 +136,11 @@ def make_world(tmp_path: Path) -> World:
         # starts after EARLY ends
         "AFTER": _history("AFTER", 5, full[900:]),
     }
+    aaa = histories["AAA"]
+    # the same prices as AAA with one day missing inside the window
+    histories["GAP"] = dataclasses.replace(
+        aaa, ticker="GAP", frame=aaa.frame.drop(aaa.frame.index[GAP_ROW])
+    )
     provider = FakeBatchProvider(histories)
     status = FactorStatus(
         last_date=factors.index[-1].date(),
@@ -519,3 +531,55 @@ def test_a_refusal_is_not_cached(world: World, client: ApiClient) -> None:
 def test_a_ticker_starting_with_a_dot_is_422(client: ApiClient) -> None:
     error = refused(post(client, tree([holding(0, ".AAA", 1.0)])), 422, "invalid_portfolio")
     assert "'.AAA' is not a valid ticker" in error.message
+
+
+# --------------------------------------------------------------------------- a day missing
+def test_a_missing_day_is_compounded_into_the_next_common_day(world: World) -> None:
+    aaa = world.provider.histories["AAA"].frame["adj_close"]
+    gap_day, before, after = aaa.index[GAP_ROW], aaa.index[GAP_ROW - 1], aaa.index[GAP_ROW + 1]
+    plan = plan_for(world, [holding(0, "GAP", 0.5), holding(1, "AAA", 0.5)])
+    common = _common_returns(plan, world.provider.histories, rf_of(world))
+    assert gap_day not in common.leaf_ret.index and gap_day not in common.calendar
+    assert common.n_dropped == 1
+    expected = aaa[after] / aaa[before] - 1.0
+    for key in ("i:h0", "i:h1"):  # the gap leaf and the leaf that has the day
+        got = common.leaf_ret[key].to_numpy()[common.leaf_ret.index.get_loc(after)]
+        assert got == pytest.approx(expected, abs=1e-12)
+    # not the sum of the two daily returns
+    two_days = (aaa[gap_day] / aaa[before] - 1.0) + (aaa[after] / aaa[gap_day] - 1.0)
+    assert abs(expected - two_days) > 1e-9
+
+
+def test_a_single_leaf_with_a_gap_has_one_return_fewer_and_no_refusal(world: World) -> None:
+    aaa = world.provider.histories["AAA"].frame["adj_close"]
+    plan = plan_for(world, [holding(0, "GAP", 1.0)])
+    subject, summary = backtest_portfolio(plan, world.provider.histories, rf_of(world))
+    full = total_returns(world, "AAA")
+    assert len(subject.returns) == len(full) - 1
+    after = aaa.index[GAP_ROW + 1]
+    assert subject.returns[after] == pytest.approx(
+        aaa[after] / aaa.iloc[GAP_ROW - 1] - 1.0, abs=1e-12
+    )
+    assert summary.n_dates_dropped == 0  # a lone instrument has no common-calendar loss
+
+
+def test_rf_is_compounded_across_the_gap(world: World) -> None:
+    aaa = world.provider.histories["AAA"].frame["adj_close"]
+    gap_day, after = aaa.index[GAP_ROW], aaa.index[GAP_ROW + 1]
+    plan = plan_for(world, [holding(0, "GAP", 0.5), holding(1, "AAA", 0.4)])
+    rf = rf_of(world)
+    common = _common_returns(plan, world.provider.histories, rf)
+    assert common.rf[after] == pytest.approx((1 + rf[gap_day]) * (1 + rf[after]) - 1.0, abs=1e-15)
+    plain = aaa.index[GAP_ROW + 5]
+    assert common.rf[plain] == pytest.approx(rf[plain], abs=1e-15)
+
+
+def test_the_route_reports_skipped_days_as_a_data_note(client: ApiClient) -> None:
+    body = tree([holding(0, "GAP", 0.5), holding(1, "AAA", 0.4)])
+    section = report_of(post(client, body)).portfolio_backtest
+    assert section is not None
+    assert section.n_dates_dropped == 1
+    assert section.data_note is not None and "1 trading day" in section.data_note
+    clean = report_of(post(client, tree([holding(0, "AAA", 0.5)]))).portfolio_backtest
+    assert clean is not None and clean.n_dates_dropped == 0 and clean.data_note is None
+

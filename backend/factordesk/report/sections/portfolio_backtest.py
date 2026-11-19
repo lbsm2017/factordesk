@@ -48,6 +48,14 @@ class PortfolioBacktestSection(SectionModel):
     n_rebalances: int = Field(
         ge=0, description="Month-end closes at which the weights were reset to target."
     )
+    n_dates_dropped: int = Field(
+        ge=0,
+        description="Trading days inside the window on which at least one instrument had no "
+        "price. They are skipped for all instruments.",
+    )
+    data_note: str | None = Field(
+        description="Plain-words note on those skipped days; None when there were none."
+    )
     cost_bps: float = Field(ge=0.0, description="Cost per unit of turnover, basis points.")
     total_cost: float = Field(
         ge=0.0,

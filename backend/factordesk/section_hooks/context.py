@@ -66,6 +66,7 @@ class PortfolioBacktestInput:
     end_limited_by: tuple[str, ...]
     n_instruments: int
     n_rebalances: int
+    n_dates_dropped: int
     cost_bps: float
     total_cost: float
     average_turnover: float

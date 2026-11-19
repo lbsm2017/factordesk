@@ -14,6 +14,16 @@ from factordesk.report.sections.portfolio_backtest import (
 from factordesk.section_hooks.context import SectionContext
 
 
+def _data_note(n_dropped: int) -> str | None:
+    if n_dropped == 0:
+        return None
+    days = "day" if n_dropped == 1 else "days"
+    return (
+        f"{n_dropped} trading {days} without a price for every instrument were skipped; the "
+        "return of each instrument over a gap is compounded into the next day all of them have."
+    )
+
+
 def build_portfolio_backtest(ctx: SectionContext) -> PortfolioBacktestSection | None:
     """The backtest summary of a portfolio subject, or ``None`` without a backtest input."""
     info = ctx.inputs.portfolio_backtest
@@ -29,6 +39,8 @@ def build_portfolio_backtest(ctx: SectionContext) -> PortfolioBacktestSection | 
         end_limited_by=list(info.end_limited_by),
         n_instruments=info.n_instruments,
         n_rebalances=info.n_rebalances,
+        n_dates_dropped=info.n_dates_dropped,
+        data_note=_data_note(info.n_dates_dropped),
         cost_bps=info.cost_bps,
         total_cost=info.total_cost,
         average_turnover=info.average_turnover,

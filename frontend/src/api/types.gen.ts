@@ -1556,6 +1556,16 @@ export interface components {
              */
             n_rebalances: number;
             /**
+             * N Dates Dropped
+             * @description Trading days inside the window on which at least one instrument had no price. They are skipped for all instruments.
+             */
+            n_dates_dropped: number;
+            /**
+             * Data Note
+             * @description Plain-words note on those skipped days; None when there were none.
+             */
+            data_note: string | null;
+            /**
              * Cost Bps
              * @description Cost per unit of turnover, basis points.
              */

@@ -189,16 +189,108 @@ def fetch_histories(provider: PriceProvider, tickers: Sequence[str]) -> dict[str
 
 
 # ----------------------------------------------------------------------------------- backtest
-def _leaf_frame(plan: PortfolioPlan, histories: dict[str, PriceHistory]) -> pd.DataFrame:
+@dataclass(frozen=True)
+class CommonReturns:
+    """The backtest inputs built on the common calendar of the weighted instruments."""
+
+    leaf_ret: pd.DataFrame
+    """One column per leaf: the simple return between consecutive common dates."""
+    rf: pd.Series
+    """The risk-free rate compounded over the same intervals; NaN where the factor file ends."""
+    calendar: pd.DatetimeIndex
+    """The common price dates, the origin first."""
+    n_dropped: int
+    """Dates inside the common span on which at least one instrument had no price."""
+    start_keys: tuple[str, ...]
+    """Leaves whose first price is the latest: they set the start of the common calendar."""
+    end_keys: tuple[str, ...]
+    """Leaves whose last price is the earliest: they set the end of the common calendar."""
+
+
+def _adjusted_close(history: PriceHistory) -> pd.Series:
+    """Adjusted close with one row per date; a missing or non-positive price is left out."""
     from factordesk.pipeline import unique_dates
 
-    returns: dict[str, pd.Series] = {}
+    adj = unique_dates(history).frame["adj_close"].astype("float64")
+    return adj[adj > 0].dropna()
+
+
+def _compounded_rf(rf: pd.Series, calendar: pd.DatetimeIndex) -> pd.Series:
+    """``prod(1 + rf)`` over each ``(calendar[i-1], calendar[i]]`` minus 1, indexed by
+    ``calendar[1:]``. NaN when the interval ends past the last or before the first ``rf`` date,
+    so cash ends the window where the factor file ends."""
+    clean = rf.dropna()
+    if clean.empty:
+        return pd.Series(np.nan, index=calendar[1:], name="rf")
+    level = (1.0 + clean).cumprod()
+    pos = np.asarray(level.index.searchsorted(calendar, side="right")) - 1
+    values = np.where(pos >= 0, level.to_numpy()[np.maximum(pos, 0)], 1.0)
+    ratio = values[1:] / values[:-1] - 1.0
+    outside = (calendar[1:] > level.index[-1]) | (calendar[1:] < level.index[0])
+    ratio[np.asarray(outside)] = np.nan
+    return pd.Series(ratio, index=calendar[1:], name="rf")
+
+
+def _common_returns(
+    plan: PortfolioPlan, histories: dict[str, PriceHistory], rf: pd.Series
+) -> CommonReturns:
+    """Returns of every weighted leaf between consecutive dates all of them have a price on.
+
+    A day on which one instrument has no price is skipped for all of them, so that instrument's
+    return over the gap is compounded into the next common day (adjusted close over adjusted
+    close, not a sum of daily returns). Raises ``ApiException`` (422) when the instruments share
+    fewer than two price dates.
+    """
+    prices: dict[str, pd.Series] = {}
     for row in plan.holdings:
         assert row.key is not None and row.ticker is not None
-        returns[row.key] = unique_dates(histories[row.ticker]).total_returns.rename(row.key)
-    frame = pd.DataFrame(returns)
+        prices[row.key] = _adjusted_close(histories[row.ticker])
+    labels = _labels(plan)
+    common: pd.DatetimeIndex | None = None
+    for series in prices.values():
+        idx = pd.DatetimeIndex(series.index)
+        common = idx if common is None else common.intersection(idx)
+    assert common is not None
+    common = pd.DatetimeIndex(common.sort_values(), name="date")
+    if len(common) < 2:
+        raise _no_common_period(prices, labels)
+    span = (common[0], common[-1])
+    union = common
+    for series in prices.values():
+        union = union.union(pd.DatetimeIndex(series.index))
+    in_span = int(((union >= span[0]) & (union <= span[1])).sum())
+    frame = pd.DataFrame(
+        {key: series.loc[common].pct_change().iloc[1:] for key, series in prices.items()}
+    )
     frame.index = pd.DatetimeIndex(frame.index, name="date")
-    return frame
+    first = {k: s.index[0] for k, s in prices.items()}
+    last = {k: s.index[-1] for k, s in prices.items()}
+    return CommonReturns(
+        start_keys=tuple(k for k in prices if first[k] == max(first.values())),
+        end_keys=tuple(k for k in prices if last[k] == min(last.values())),
+        leaf_ret=frame,
+        rf=_compounded_rf(rf, common),
+        calendar=common,
+        n_dropped=in_span - len(common),
+    )
+
+
+def _no_common_period(prices: dict[str, pd.Series], labels: dict[str, str]) -> ApiException:
+    firsts = {k: _day(s.index[0]) for k, s in prices.items()}
+    lasts = {k: _day(s.index[-1]) for k, s in prices.items()}
+    late = max(firsts, key=lambda k: firsts[k])
+    early = min(lasts, key=lambda k: lasts[k])
+    if firsts[late] > lasts[early]:
+        return _invalid(
+            f"The instruments share no trading period: {labels[late]} starts on "
+            f"{firsts[late]:%d %b %Y}, after {labels[early]} ends on {lasts[early]:%d %b %Y}.",
+            "Remove an instrument with a short history, or choose proxies that cover the same "
+            "years.",
+        )
+    return _invalid(
+        "The instruments share fewer than two trading days with a price for every one of them.",
+        "Remove an instrument with a short history, or choose proxies that cover the same years.",
+    )
 
 
 def _labels(plan: PortfolioPlan) -> dict[str, str]:
@@ -248,8 +340,28 @@ def _plural(n: int) -> str:
     return f"{n} instrument" if n == 1 else f"{n} instruments"
 
 
+def _limiting(
+    keys: tuple[str, ...],
+    bt_keys: tuple[str, ...],
+    bt_edge: date,
+    own_edge: date,
+    labels: dict[str, str],
+) -> tuple[str, ...]:
+    """Display names of what limits one edge of the window.
+
+    ``keys`` are the instruments that limit the common price calendar, ``bt_keys`` the backtest's
+    own answer, which adds USD cash (its risk-free rate ends with the factor file). Cash alone
+    limits an edge when the window is cut inside the common calendar.
+    """
+    if CASH_ID not in bt_keys:
+        return tuple(labels[k] for k in keys)
+    if bt_edge != own_edge:
+        return (labels[CASH_ID],)
+    return (*(labels[k] for k in keys), labels[CASH_ID])
+
+
 def _summary(
-    plan: PortfolioPlan, bt: BacktestResult, labels: dict[str, str]
+    plan: PortfolioPlan, bt: BacktestResult, common: CommonReturns, labels: dict[str, str]
 ) -> PortfolioBacktestInput:
     days = pd.DatetimeIndex(bt.rebalance_dates)
     on_rebalance = bt.turnover[bt.turnover.index.isin(days)]
@@ -257,8 +369,17 @@ def _summary(
     return PortfolioBacktestInput(
         window_start=bt.start,
         window_end=bt.end,
-        start_limited_by=tuple(labels[k] for k in bt.start_leaves),
-        end_limited_by=tuple(labels[k] for k in bt.end_leaves),
+        start_limited_by=_limiting(
+            common.start_keys,
+            bt.start_leaves,
+            bt.start,
+            _day(common.leaf_ret.index[0]),
+            labels,
+        ),
+        end_limited_by=_limiting(
+            common.end_keys, bt.end_leaves, bt.end, _day(common.leaf_ret.index[-1]), labels
+        ),
+        n_dates_dropped=common.n_dropped,
         n_instruments=len(plan.rows),
         n_rebalances=len(bt.rebalance_dates),
         cost_bps=bt.cost_bps,
@@ -270,19 +391,14 @@ def _summary(
     )
 
 
-def _subject(
-    plan: PortfolioPlan, bt: BacktestResult, leaf_index: pd.DatetimeIndex
-) -> ReturnSubject:
+def _subject(plan: PortfolioPlan, bt: BacktestResult, common: pd.DatetimeIndex) -> ReturnSubject:
     """The daily portfolio subject: net returns on the backtest window.
 
-    The calendar's origin is the last date before the window in the leaves' own calendar (or the
-    business day before when there is none); the level index is growth of 100 from it.
+    The calendar's origin is the last common price date before the window; the level index is
+    growth of 100 from it.
     """
     index = pd.DatetimeIndex(bt.ret.index)
-    pos = int(leaf_index.searchsorted(index[0]))
-    origin = (
-        pd.Timestamp(leaf_index[pos - 1]) if pos > 0 else index[0] - pd.offsets.BDay(1)
-    ).normalize()
+    origin = pd.Timestamp(common[int(common.searchsorted(index[0])) - 1]).normalize()
     calendar = pd.DatetimeIndex([origin, *index], name="date")
     values = bt.ret.to_numpy(dtype=np.float64)
     levels = pd.Series(
@@ -311,17 +427,18 @@ def backtest_portfolio(
     on the whole common window of the instruments with a weight above 0; USD cash, at ``rf``,
     joins it only when some weight is held there. A refusal is an ``ApiException`` (422).
     """
-    frame = _leaf_frame(plan, histories)
+    common = _common_returns(plan, histories, rf)
+    frame = common.leaf_ret
     weights = {row.key: row.weight for row in plan.holdings if row.key is not None}
     labels = _labels(plan)
     try:
-        bt = run_backtest(frame, weights, rf, plan.cost_bps)
+        bt = run_backtest(frame, weights, common.rf, plan.cost_bps)
     except ValueError as exc:
         cash_held = sum(weights.values()) < 1.0 - WEIGHT_TOLERANCE
         seen = rf.dropna().index
         span = (_day(seen[0]), _day(seen[-1])) if cash_held and len(seen) else None
         raise _window_refusal(exc, frame, span, labels) from exc
-    return _subject(plan, bt, pd.DatetimeIndex(frame.index)), _summary(plan, bt, labels)
+    return _subject(plan, bt, common.calendar), _summary(plan, bt, common, labels)
 
 
 def build_portfolio_report(
