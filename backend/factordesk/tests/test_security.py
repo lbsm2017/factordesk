@@ -374,7 +374,9 @@ def test_the_mock_report_carries_the_demo_security() -> None:
     rep = load_report(MOCK)
     assert rep.schema_version == SCHEMA_VERSION == "4"
     assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4")
-    assert rep.data.security == SecurityInfo(name="Example Corp", currency="USD", exchange="NASDAQ")
+    assert rep.data.security == SecurityInfo(
+        name="Example Corp", currency="USD", exchange="NASDAQ", quote_type="Equity"
+    )
     assert FactorReport.model_validate_json(rep.model_dump_json()) == rep
 
 
@@ -424,6 +426,17 @@ def test_assemble_report_records_the_security(synthetic: tuple[PriceHistory, pd.
         name="Zoom Communications, Inc.", currency="USD", exchange="NasdaqGS"
     )
     assert rep.schema_version == "4"
+
+
+@pytest.mark.parametrize(
+    ("quote_type", "badge"),
+    [("ETF", "ETF"), ("EQUITY", "Equity"), ("MUTUALFUND", None), (None, None)],
+)
+def test_assemble_report_maps_the_quote_type_to_a_badge(
+    synthetic: tuple[PriceHistory, pd.DataFrame], quote_type: str | None, badge: str | None
+) -> None:
+    rep = _assemble(synthetic, Security(name="X Fund", quote_type=quote_type))
+    assert rep.data.security is not None and rep.data.security.quote_type == badge
 
 
 @pytest.mark.parametrize("security", [None, Security(quote_type="EQUITY")])

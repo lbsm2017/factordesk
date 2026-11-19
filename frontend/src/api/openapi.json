@@ -5913,7 +5913,19 @@
               }
             ],
             "title": "Exchange",
-            "description": "Exchange name, e.g. 'NasdaqGS'."
+            "description": "Exchange label, e.g. 'NASDAQ'."
+          },
+          "quote_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Type",
+            "description": "Security type for the header badge: 'ETF' or 'Equity'; omitted otherwise."
           }
         },
         "additionalProperties": false,
@@ -5921,7 +5933,8 @@
         "required": [
           "name",
           "currency",
-          "exchange"
+          "exchange",
+          "quote_type"
         ],
         "title": "SecurityInfo",
         "description": "What Yahoo says the ticker is; every field is None when Yahoo did not say."

@@ -2280,9 +2280,14 @@ export interface components {
             currency: string | null;
             /**
              * Exchange
-             * @description Exchange name, e.g. 'NasdaqGS'.
+             * @description Exchange label, e.g. 'NASDAQ'.
              */
             exchange: string | null;
+            /**
+             * Quote Type
+             * @description Security type for the header badge: 'ETF' or 'Equity'; omitted otherwise.
+             */
+            quote_type: string | null;
         };
         /**
          * ShrinkagePrior

@@ -722,10 +722,19 @@ def _warnings(
     return out
 
 
+_QUOTE_TYPE_LABELS = {"ETF": "ETF", "EQUITY": "Equity"}
+"""Yahoo ``quoteType`` values shown as a badge; any other type is left out."""
+
+
 def _security_info(security: Security | None) -> SecurityInfo | None:
     if security is None or (security.name, security.currency, security.exchange) == (None,) * 3:
         return None
-    return SecurityInfo(name=security.name, currency=security.currency, exchange=security.exchange)
+    return SecurityInfo(
+        name=security.name,
+        currency=security.currency,
+        exchange=security.exchange,
+        quote_type=_QUOTE_TYPE_LABELS.get((security.quote_type or "").upper()),
+    )
 
 
 def _excluded_by_reason(sample: AnalysisSample) -> dict[str, int]:

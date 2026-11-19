@@ -121,7 +121,11 @@ class SecurityInfo(FrozenModel):
     currency: str | None = Field(
         default=None, description="Quote currency as Yahoo reports it, e.g. 'USD' or 'GBp'."
     )
-    exchange: str | None = Field(default=None, description="Exchange name, e.g. 'NasdaqGS'.")
+    exchange: str | None = Field(default=None, description="Exchange label, e.g. 'NASDAQ'.")
+    quote_type: str | None = Field(
+        default=None,
+        description="Security type for the header badge: 'ETF' or 'Equity'; omitted otherwise.",
+    )
 
 
 class DataInfo(FrozenModel):
