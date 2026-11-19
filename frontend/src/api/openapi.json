@@ -3,7 +3,7 @@
   "info": {
     "title": "factordesk",
     "summary": "Local Fama-French 5-factor analysis API.",
-    "version": "4"
+    "version": "5"
   },
   "paths": {
     "/api/health": {
@@ -86,7 +86,7 @@
     "/api/tickers": {
       "get": {
         "summary": "Get Tickers",
-        "description": "Tickers already fetched (prefix match, newest first). Makes no network call.",
+        "description": "Tickers already fetched (prefix match, newest first), with the company name when its\nmetadata is cached. Makes no network call.",
         "operationId": "get_tickers_api_tickers_get",
         "parameters": [
           {
@@ -645,6 +645,7 @@
               "bad_range",
               "insufficient_history",
               "degenerate_input",
+              "unsupported_currency",
               "factor_data_invalid",
               "network",
               "upstream_refused",
@@ -1041,6 +1042,17 @@
             },
             "type": "array",
             "title": "Audit Findings"
+          },
+          "security": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecurityInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Company name, currency and exchange from Yahoo metadata; None when the read failed or the report is older than schema version 5."
           }
         },
         "additionalProperties": false,
@@ -1062,7 +1074,8 @@
           "excluded_by_reason",
           "uncovered",
           "audit_status",
-          "audit_findings"
+          "audit_findings",
+          "security"
         ],
         "title": "DataInfo",
         "description": "Provenance and coverage of the data behind the report."
@@ -1309,7 +1322,7 @@
           "schema_version": {
             "type": "string",
             "title": "Schema Version",
-            "default": "4"
+            "default": "5"
           },
           "ticker": {
             "type": "string",
@@ -5120,6 +5133,55 @@
         "title": "SampleInfo",
         "description": "Sample metadata carried by every statistic (M0.8)."
       },
+      "SecurityInfo": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Company or fund name."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Quote currency as Yahoo reports it, e.g. 'USD' or 'GBp'."
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange",
+            "description": "Exchange name, e.g. 'NasdaqGS'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "currency",
+          "exchange"
+        ],
+        "title": "SecurityInfo",
+        "description": "What Yahoo says the ticker is; every field is None when Yahoo did not say."
+      },
       "ShrinkagePrior": {
         "properties": {
           "source": {
@@ -5681,13 +5743,26 @@
             "type": "string",
             "format": "date",
             "title": "Last Fetched"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Company name when its metadata is already cached."
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "ticker",
-          "last_fetched"
+          "last_fetched",
+          "name"
         ],
         "title": "TickerSuggestion"
       },

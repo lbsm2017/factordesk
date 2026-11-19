@@ -57,11 +57,12 @@ from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
 
-SCHEMA_VERSION = "4"
-"""Version written by this code (the schema v3 contract; contract SC5)."""
+SCHEMA_VERSION = "5"
+"""Version written by this code: 4 plus the optional ``data.security`` (contract SC5)."""
 
-SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4")
-"""Versions this code reads. Version 3 files have no optional sections; they load unchanged."""
+SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4", "5")
+"""Versions this code reads. Version 3 files have no optional sections and version 3 and 4 files
+have no ``data.security``; they load unchanged (the new fields are absent, so ``None``)."""
 
 AuditStatus = Literal["clean", "warnings", "errors"]
 
@@ -100,6 +101,16 @@ class UncoveredTail(FrozenModel):
     )
 
 
+class SecurityInfo(FrozenModel):
+    """What Yahoo says the ticker is; every field is None when Yahoo did not say."""
+
+    name: str | None = Field(default=None, description="Company or fund name.")
+    currency: str | None = Field(
+        default=None, description="Quote currency as Yahoo reports it, e.g. 'USD' or 'GBp'."
+    )
+    exchange: str | None = Field(default=None, description="Exchange name, e.g. 'NasdaqGS'.")
+
+
 class DataInfo(FrozenModel):
     """Provenance and coverage of the data behind the report."""
 
@@ -126,6 +137,11 @@ class DataInfo(FrozenModel):
     uncovered: UncoveredTail
     audit_status: AuditStatus
     audit_findings: list[AuditFinding] = Field(default_factory=lambda: [])
+    security: SecurityInfo | None = Field(
+        default=None,
+        description="Company name, currency and exchange from Yahoo metadata; None when the "
+        "read failed or the report is older than schema version 5.",
+    )
 
 
 # ------------------------------------------------------------------------------ regression (M3)
@@ -447,6 +463,13 @@ class FactorReport(FrozenModel):
         return self
 
     @model_validator(mode="after")
+    def _security_needs_version_5(self) -> FactorReport:
+        """A version 3 or 4 file has no ``data.security``."""
+        if self.schema_version in ("3", "4") and self.data.security is not None:
+            raise ValueError(f"a version {self.schema_version} report cannot hold data.security")
+        return self
+
+    @model_validator(mode="after")
     def _utc_timestamp(self) -> FactorReport:
         """``generated_at`` must be timezone-aware with a zero UTC offset."""
         if self.generated_at.utcoffset() != timedelta(0):
@@ -467,6 +490,7 @@ ErrorCode = Literal[
     "bad_range",
     "insufficient_history",
     "degenerate_input",
+    "unsupported_currency",
     "factor_data_invalid",
     "network",
     "upstream_refused",
@@ -501,6 +525,9 @@ class FactorDataStatus(FrozenModel):
 class TickerSuggestion(FrozenModel):
     ticker: str
     last_fetched: date
+    name: str | None = Field(
+        default=None, description="Company name when its metadata is already cached."
+    )
 
 
 class TickerSuggestions(FrozenModel):

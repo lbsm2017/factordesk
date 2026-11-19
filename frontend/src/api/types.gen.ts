@@ -73,7 +73,8 @@ export interface paths {
         };
         /**
          * Get Tickers
-         * @description Tickers already fetched (prefix match, newest first). Makes no network call.
+         * @description Tickers already fetched (prefix match, newest first), with the company name when its
+         *     metadata is cached. Makes no network call.
          */
         get: operations["get_tickers_api_tickers_get"];
         put?: never;
@@ -187,7 +188,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request";
+            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request";
             /** Message */
             message: string;
             /** Action */
@@ -376,6 +377,8 @@ export interface components {
             audit_status: "clean" | "warnings" | "errors";
             /** Audit Findings */
             audit_findings: components["schemas"]["AuditFinding"][];
+            /** @description Company name, currency and exchange from Yahoo metadata; None when the read failed or the report is older than schema version 5. */
+            security: components["schemas"]["SecurityInfo"] | null;
         };
         /**
          * DatasetStamp
@@ -476,7 +479,7 @@ export interface components {
         FactorReport: {
             /**
              * Schema Version
-             * @default 4
+             * @default 5
              */
             schema_version: string;
             /** Ticker */
@@ -1920,6 +1923,27 @@ export interface components {
             factor_vintage: components["schemas"]["FactorVintage"];
         };
         /**
+         * SecurityInfo
+         * @description What Yahoo says the ticker is; every field is None when Yahoo did not say.
+         */
+        SecurityInfo: {
+            /**
+             * Name
+             * @description Company or fund name.
+             */
+            name: string | null;
+            /**
+             * Currency
+             * @description Quote currency as Yahoo reports it, e.g. 'USD' or 'GBp'.
+             */
+            currency: string | null;
+            /**
+             * Exchange
+             * @description Exchange name, e.g. 'NasdaqGS'.
+             */
+            exchange: string | null;
+        };
+        /**
          * ShrinkagePrior
          * @description The prior the betas were pulled toward (SB2) and what it was estimated from.
          */
@@ -2131,6 +2155,11 @@ export interface components {
              * Format: date
              */
             last_fetched: string;
+            /**
+             * Name
+             * @description Company name when its metadata is already cached.
+             */
+            name: string | null;
         };
         /** TickerSuggestions */
         TickerSuggestions: {

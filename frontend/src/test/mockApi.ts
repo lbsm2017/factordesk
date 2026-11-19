@@ -40,9 +40,9 @@ export function mockRanges(ticker: string): RangeOptions {
 }
 
 export const mockTickers: TickerSuggestion[] = [
-  { ticker: "SPY", last_fetched: "2026-11-13" },
-  { ticker: "SPXL", last_fetched: "2026-11-10" },
-  { ticker: "QQQ", last_fetched: "2026-11-12" },
+  { ticker: "SPY", last_fetched: "2026-11-13", name: null },
+  { ticker: "SPXL", last_fetched: "2026-11-10", name: null },
+  { ticker: "QQQ", last_fetched: "2026-11-12", name: null },
 ];
 
 /** Every request path (with query) the app made, in order. */

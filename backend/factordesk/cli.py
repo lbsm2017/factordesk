@@ -41,7 +41,12 @@ from factordesk.data.factors import (
     load_ff5_daily,
 )
 from factordesk.data.portfolios import PortfolioError, refresh_portfolio_frames
-from factordesk.data.prices import PriceDataError, PriceProvider, validate_ticker
+from factordesk.data.prices import (
+    PriceDataError,
+    PriceProvider,
+    UnsupportedCurrencyError,
+    validate_ticker,
+)
 
 EXIT_OK = 0
 EXIT_DATA = 1
@@ -253,6 +258,9 @@ def _cmd_report(
         return EXIT_DATA
     except DegenerateInputError as exc:
         _err(f"cannot analyse {symbol}: {exc.reason}")
+        return EXIT_DATA
+    except UnsupportedCurrencyError as exc:
+        _err(str(exc))
         return EXIT_DATA
     except PriceDataError as exc:
         _err(f"{exc}. Check the symbol; if it is right, check your network connection")

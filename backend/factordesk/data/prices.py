@@ -5,6 +5,8 @@ Every rule below is a researched yfinance pitfall (see docs/PLAN.md, "Prices").
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import logging
 import os
 import random
@@ -12,12 +14,12 @@ import re
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 import numpy as np
 import pandas as pd
@@ -60,6 +62,49 @@ class PriceDataError(Exception):
     """Raised for an invalid ticker, no data, or an all-NaN price history."""
 
 
+SECURITY_MAX_AGE = timedelta(days=7)
+"""A cached security record is refreshed when it is older than this."""
+
+SUPPORTED_CURRENCY = "USD"
+"""The only quote currency accepted until European factors exist (roadmap N1)."""
+
+
+@dataclass(frozen=True)
+class Security:
+    """What Yahoo says a ticker is: company name, quote currency, exchange and quote type.
+
+    Every field is optional because Yahoo omits any of them for some symbols.
+    """
+
+    name: str | None = None
+    currency: str | None = None
+    exchange: str | None = None
+    quote_type: str | None = None
+
+
+class UnsupportedCurrencyError(Exception):
+    """The ticker is quoted in a currency other than US dollars (roadmap N1, methodology M1.5)."""
+
+    def __init__(self, ticker: str, currency: str) -> None:
+        self.ticker = ticker
+        self.currency = currency
+        super().__init__(
+            f"Only tickers quoted in US dollars are supported for now. "
+            f"{ticker} is quoted in {currency}."
+        )
+
+
+def check_currency(ticker: str, security: Security | None) -> None:
+    """Raise ``UnsupportedCurrencyError`` when the currency is known and is not USD.
+
+    An unknown currency (no metadata, or no currency in it) passes: the check refuses only on
+    evidence. Pence quotes (``GBp``, ``GBX``) are not USD, so they are refused like any other.
+    """
+    currency = None if security is None else security.currency
+    if currency is not None and currency.strip().upper() != SUPPORTED_CURRENCY:
+        raise UnsupportedCurrencyError(ticker, currency.strip())
+
+
 @dataclass(frozen=True)
 class PriceHistory:
     """Daily price history for one ticker.
@@ -95,6 +140,29 @@ class PriceHistory:
 
 class PriceProvider(Protocol):
     def fetch(self, ticker: str) -> PriceHistory: ...
+
+
+class SecurityProvider(Protocol):
+    """Optional second capability of a price provider: the metadata of a ticker, never raising."""
+
+    def fetch_security(self, ticker: str) -> Security | None: ...
+
+
+def security_of(provider: object, ticker: str) -> Security | None:
+    """The security record of ``ticker`` from ``provider``, or None.
+
+    None when the provider has no ``fetch_security`` (a fake or an adapter without metadata) or
+    when the read fails for any reason: metadata never blocks a report.
+    """
+    fetch = getattr(provider, "fetch_security", None)
+    if not callable(fetch):
+        return None
+    try:
+        found: object = fetch(ticker)
+    except Exception:
+        logger.warning("Security metadata read for %s failed", ticker, exc_info=True)
+        return None
+    return found if isinstance(found, Security) else None
 
 
 FailureReason = Literal[
@@ -299,6 +367,87 @@ def normalize_frame(
     return frame[order].astype("float64"), duplicates
 
 
+def _download_info(ticker: str) -> Mapping[str, object]:
+    """Yahoo's quote summary for one ticker (one request; yfinance 1.8.0 ``Ticker.get_info``).
+
+    ``fast_info`` is cheaper but has no company name; ``get_info`` has ``longName``,
+    ``shortName``, ``currency``, ``exchange``, ``fullExchangeName`` and ``quoteType``.
+    """
+    import yfinance as yf  # pyright: ignore[reportMissingTypeStubs]
+
+    info = cast(object, yf.Ticker(ticker).get_info())  # pyright: ignore[reportUnknownMemberType]
+    return cast(Mapping[str, object], info) if isinstance(info, Mapping) else {}
+
+
+def _clean(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = " ".join(value.split())
+    return text or None
+
+
+def security_from_info(info: Mapping[str, object]) -> Security | None:
+    """The ``Security`` in a Yahoo quote summary; None when it holds none of its fields.
+
+    The name is ``longName``, else ``shortName``. The exchange is the readable
+    ``fullExchangeName`` (for example ``NasdaqGS``), else the short ``exchange`` code.
+    """
+    found = Security(
+        name=_clean(info.get("longName")) or _clean(info.get("shortName")),
+        currency=_clean(info.get("currency")),
+        exchange=_clean(info.get("fullExchangeName")) or _clean(info.get("exchange")),
+        quote_type=_clean(info.get("quoteType")),
+    )
+    return found if found != Security() else None
+
+
+def _security_path(cache_dir: Path, ticker: str) -> Path:
+    return cache_dir / f"{ticker}_security.json"
+
+
+def _read_security_file(path: Path) -> tuple[Security, datetime] | None:
+    """The record and its fetch time from a cache file; None when absent or unreadable."""
+    try:
+        raw = cast(object, json.loads(path.read_text(encoding="utf-8")))
+        if not isinstance(raw, dict):
+            raise ValueError("not an object")
+        fields = cast(dict[str, object], raw)
+        fetched = datetime.fromisoformat(str(fields["fetched_at"]))
+        if fetched.tzinfo is None:
+            fetched = fetched.replace(tzinfo=UTC)
+        security = Security(
+            name=_clean(fields.get("name")),
+            currency=_clean(fields.get("currency")),
+            exchange=_clean(fields.get("exchange")),
+            quote_type=_clean(fields.get("quote_type")),
+        )
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError, KeyError):
+        logger.warning("Unreadable security cache %s; ignoring it", path.name, exc_info=True)
+        return None
+    return security, fetched
+
+
+def read_cached_security(cache_dir: Path, ticker: str) -> Security | None:
+    """The cached security record of ``ticker`` whatever its age; no network, never raises."""
+    found = _read_security_file(_security_path(cache_dir, ticker))
+    return None if found is None else found[0]
+
+
+def _atomic_write_text(text: str, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    os.close(fd)
+    tmp = Path(tmp_name)
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def _atomic_write_parquet(frame: pd.DataFrame, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
@@ -326,6 +475,7 @@ class YFinanceProvider:
         *,
         settings: BatchSettings | None = None,
         download: Callable[[str], pd.DataFrame] | None = None,
+        info: Callable[[str], Mapping[str, object]] | None = None,
         monotonic: Callable[[], float] | None = None,
         sleep: Callable[[float], None] | None = None,
         rng: JitterSource | None = None,
@@ -335,6 +485,7 @@ class YFinanceProvider:
         self._now: Callable[[], datetime] = now or (lambda: datetime.now(UTC))
         self._settings = settings
         self._download: Callable[[str], pd.DataFrame] = download or _download_history
+        self._info: Callable[[str], Mapping[str, object]] = info or _download_info
         self._monotonic: Callable[[], float] = monotonic or time.monotonic
         self._sleep: Callable[[float], None] = sleep or time.sleep
         self._rng: JitterSource = rng or random.Random()
@@ -343,6 +494,7 @@ class YFinanceProvider:
         )
         self._locks_guard = threading.Lock()
         self._symbol_locks: dict[str, threading.Lock] = {}
+        self._security_limiter: RateLimiter | None = None
 
     @property
     def cache_dir(self) -> Path:
@@ -413,6 +565,73 @@ class YFinanceProvider:
         # appending increments to an older download would mix adjustment bases.
         raw = self._download(symbol)
         return self._normalize_and_store(raw, symbol, now_utc, path)
+
+    # ------------------------------------------------------------ security metadata
+
+    def fetch_security(self, ticker: str) -> Security | None:
+        """Company name, currency, exchange and quote type of ``ticker``; None when unknown.
+
+        Cached as ``{TICKER}_security.json`` next to the price cache and refreshed after
+        ``SECURITY_MAX_AGE``. The read obeys the price settings (spacing, attempts, backoff,
+        breaker) and NEVER raises or blocks a report: an invalid ticker, a throttled or failed
+        read, or an answer with none of the fields returns None (a stale cached record is
+        returned instead when there is one).
+        """
+        try:
+            symbol = validate_ticker(ticker)
+        except PriceDataError:
+            return None
+        now_utc = self._now()
+        path = _security_path(self.cache_dir, symbol)
+        cached = _read_security_file(path)
+        if cached is not None and now_utc - cached[1] < SECURITY_MAX_AGE:
+            logger.info("Security cache hit for %s", symbol)
+            return cached[0]
+        try:
+            with self._symbol_lock(symbol):
+                found = self._download_security(symbol)
+        except Exception:
+            logger.warning("%s: security metadata read failed", symbol, exc_info=True)
+            found = None
+        if found is None:
+            return None if cached is None else cached[0]
+        record = {"fetched_at": now_utc.isoformat(), **dataclasses.asdict(found)}
+        try:
+            _atomic_write_text(json.dumps(record, ensure_ascii=False), path)
+        except OSError:
+            logger.warning("Could not write security cache for %s", symbol, exc_info=True)
+        return found
+
+    def _download_security(self, symbol: str) -> Security | None:
+        """One metadata read with the price settings' retries; None on any failure."""
+        settings = self._settings or _settings_from_config()
+        with self._locks_guard:
+            if self._security_limiter is None:
+                self._security_limiter = RateLimiter(
+                    settings.min_interval_seconds, self._monotonic, self._sleep, self._rng
+                )
+            limiter = self._security_limiter
+        breaker = CircuitBreaker(settings.breaker_threshold)
+        for attempt in range(1, settings.max_attempts + 1):
+            limiter.wait()
+            try:
+                info = self._info(symbol)
+            except Exception as exc:
+                if is_rate_limited(exc):
+                    if breaker.record_rate_limited() or attempt == settings.max_attempts:
+                        logger.warning("%s: security read rate limited by Yahoo", symbol)
+                        return None
+                elif is_transient(exc):
+                    if attempt == settings.max_attempts:
+                        logger.warning("%s: security read network error, giving up", symbol)
+                        return None
+                else:
+                    logger.warning("%s: unexpected security read error", symbol, exc_info=True)
+                    return None
+                self._sleep(backoff_delay(attempt, retry_after_seconds(exc), self._rng))
+            else:
+                return security_from_info(info)
+        return None
 
     # ------------------------------------------------------------ batch download
 

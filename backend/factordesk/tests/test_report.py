@@ -41,6 +41,7 @@ from factordesk.report.schema import (
     RiskFactorDetail,
     RollingWindow,
     SampleInfo,
+    SecurityInfo,
     UncoveredTail,
 )
 
@@ -385,6 +386,7 @@ def build_mock_report() -> FactorReport:
             compounded_return=0.0123,
         ),
         audit_status="warnings",
+        security=SecurityInfo(name="Example Corp", currency="USD", exchange="NASDAQ"),
         audit_findings=[
             AuditFinding(code="mock_info", severity="info", message="MOCK: no splits in window."),
             AuditFinding(
@@ -447,7 +449,7 @@ def test_schema_round_trip(tmp_path: Path) -> None:
 
 def test_schema_is_frozen_strict_and_versioned() -> None:
     rep = build_mock_report()
-    assert rep.schema_version == "4"
+    assert rep.schema_version == "5"
     with pytest.raises(ValidationError):
         rep.ticker = "QQQ"  # type: ignore[misc]
     with pytest.raises(ValidationError):

@@ -64,8 +64,11 @@ from factordesk.data.audit import AuditReport, audit_prices
 from factordesk.data.prices import (
     PriceHistory,
     PriceProvider,
+    Security,
     YFinanceProvider,
+    check_currency,
     collapse_duplicate_dates,
+    security_of,
     validate_ticker,
 )
 from factordesk.report.schema import (
@@ -93,6 +96,7 @@ from factordesk.report.schema import (
     RiskFactorDetail,
     RollingWindow,
     SampleInfo,
+    SecurityInfo,
     Severity,
     Status,
     UncoveredTail,
@@ -115,8 +119,9 @@ NOTE_SURVIVORSHIP = (
 )
 NOTE_US_FACTORS = (
     "The factors are US Fama-French factors in USD. Applied to a non-US stock or a non-USD "
-    "price series, betas mix factor exposure with currency and local-market effects; this "
-    "version does not check the ticker's currency."
+    "price series, betas mix factor exposure with currency and local-market effects. A ticker "
+    "that Yahoo reports in another currency is refused; when Yahoo reports no currency, the "
+    "ticker is analysed without that check."
 )
 NOTE_DESC = "Every statistic is descriptive and in-sample, not predictive."
 
@@ -715,6 +720,12 @@ def _warnings(
     return out
 
 
+def _security_info(security: Security | None) -> SecurityInfo | None:
+    if security is None or (security.name, security.currency, security.exchange) == (None,) * 3:
+        return None
+    return SecurityInfo(name=security.name, currency=security.currency, exchange=security.exchange)
+
+
 def _excluded_by_reason(sample: AnalysisSample) -> dict[str, int]:
     counts: dict[str, int] = {}
     for e in sample.excluded:
@@ -735,13 +746,17 @@ def assemble_report(
     start: date | None = None,
     end: date | None = None,
     section_inputs: SectionInputs | None = None,
+    security: Security | None = None,
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
     ``start`` and ``end`` are the requested range (M2); None means the first return date and
     the last price date. They are reported as given, so nothing is clipped silently.
-    ``section_inputs`` holds extra data for the optional sections (None: none).
+    ``section_inputs`` holds extra data for the optional sections (None: none). ``security`` is
+    the Yahoo metadata of the ticker (None: unknown); a known currency other than USD raises
+    ``UnsupportedCurrencyError`` (roadmap N1, an unknown currency does not).
     """
+    check_currency(ticker, security)
     history = unique_dates(history)
     audit = audit_prices(history.frame, duplicate_dates=history.duplicate_dates)
     sample = build_sample(history, factor_frame, start, end)
@@ -791,6 +806,7 @@ def assemble_report(
             factor_last_date=sample.factor_last_date,
             compounded_return=sample.uncovered.compounded_return,
         ),
+        security=_security_info(security),
         audit_status=_audit_status(audit),
         audit_findings=[
             AuditFinding(
@@ -890,9 +906,11 @@ def build_report(
     ``start`` and ``end`` limit the requested range (None: the whole price history).
     ``section_inputs`` is the extra data of the optional sections; None fetches it through
     ``section_hooks.load_section_inputs`` (nothing is fetched when ``factors`` is injected).
-    Raises ``PriceDataError`` (bad or unknown ticker), ``FactorError`` (factor data
-    unavailable), ``InsufficientHistoryError`` (fewer than 504 aligned rows) or
-    ``DegenerateInputError`` (price that does not move, singular factor design; D30).
+    Raises ``PriceDataError`` (bad or unknown ticker), ``UnsupportedCurrencyError`` (Yahoo
+    reports a currency other than USD; checked before the price history is downloaded),
+    ``FactorError`` (factor data unavailable), ``InsufficientHistoryError`` (fewer than 504
+    aligned rows) or ``DegenerateInputError`` (price that does not move, singular factor
+    design; D30).
     """
     if now is None:
         now = datetime.now(UTC)
@@ -912,6 +930,8 @@ def build_report(
     provider: PriceProvider = (
         price_provider if price_provider is not None else YFinanceProvider(now=lambda: now_utc)
     )
+    security = security_of(provider, symbol)
+    check_currency(symbol, security)
     history = provider.fetch(symbol)
     inputs = (
         section_inputs
@@ -931,6 +951,7 @@ def build_report(
         start=start,
         end=end,
         section_inputs=inputs,
+        security=security,
     )
 
 

@@ -25,6 +25,7 @@ const KNOWN_CODES: readonly ErrorCode[] = [
   "bad_range",
   "insufficient_history",
   "degenerate_input",
+  "unsupported_currency",
   "factor_data_invalid",
   "network",
   "upstream_refused",

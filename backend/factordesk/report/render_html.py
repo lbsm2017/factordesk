@@ -536,6 +536,14 @@ def _notice(report: FactorReport, items: list[tuple[str, str]]) -> str:
     )
 
 
+def _security_line(report: FactorReport) -> str:
+    """One small line under the ticker: company, exchange and currency; empty when unknown."""
+    sec = report.data.security
+    parts = [] if sec is None else [sec.name, sec.exchange, sec.currency]
+    text = " · ".join(p for p in parts if p)
+    return f'<p class="coverage">{esc(text)}</p>' if text else ""
+
+
 def _header(report: FactorReport) -> str:
     d = report.data
     items = _notice_items(report)
@@ -550,6 +558,7 @@ def _header(report: FactorReport) -> str:
         f'<span class="ticker">{esc(report.ticker)}</span>'
         '<span class="what">Fama&#8211;French five-factor profile</span></h1>'
         f'<p class="mast-meta">{chips}</p></div>'
+        f"{_security_line(report)}"
         f'<p class="coverage">{esc(_range_line(report))}</p>{_notice(report, items)}</header>'
     )
 
