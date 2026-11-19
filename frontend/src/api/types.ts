@@ -43,6 +43,8 @@ export type KalmanBetaSeries = Schemas["KalmanBetaSeries"];
 export type WorldBetaSection = Schemas["WorldBetaSection"];
 export type AlphaStrip = Schemas["AlphaStrip"];
 export type AlphaStripRow = Schemas["AlphaStripRow"];
+export type PortfolioBacktestSection = Schemas["PortfolioBacktestSection"];
+export type TargetWeightRow = Schemas["TargetWeightRow"];
 
 /** Canonical factor names and order: the five of FF5 (backend FACTOR_NAMES), then Mom, the sixth factor of FF6. */
 export const FACTOR_NAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"] as const;

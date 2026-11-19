@@ -34,6 +34,7 @@ const KNOWN_CODES: readonly ErrorCode[] = [
   "bad_request",
   "invalid_upload",
   "upload_too_large",
+  "invalid_portfolio",
 ];
 
 function isApiError(value: unknown): value is ApiError {
