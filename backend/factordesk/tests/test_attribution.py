@@ -133,11 +133,15 @@ def test_t61_negative_contribution() -> None:
     tagged = risk_sentences(
         NAMES, list(beta), shares, ["reliable", "reliable", "noise", "noise", "noise"]
     )
-    assert "SMB reduces total risk because it offsets your other exposures." in tagged
+    assert (
+        "SMB has a negative share: it offsets part of the other exposures in the variance split."
+        in tagged
+    )
+    assert not any("because" in t or "your" in t for t in tagged)
     untagged = risk_sentences(
         NAMES, list(beta), shares, ["reliable", "noise", "noise", "noise", "noise"]
     )
-    assert not any("reduces total risk" in t for t in untagged)
+    assert not any("negative share" in t for t in untagged)
 
 
 def test_t62_disagreement_sentence() -> None:
@@ -151,13 +155,13 @@ def test_t62_disagreement_sentence() -> None:
     out = risk_sentences(NAMES, betas, shares_for((2, 3, 4, 1, 5)), tags)  # type: ignore[arg-type]
     assert out == [
         "RMW ranks #1 by risk but only #4 by beta size: the factor is volatile or moves with "
-        "your other exposures."
+        "the other exposures."
     ]
     # Boundary of M7's rule rank_RC <= rank_beta - 2: a gap of exactly 2 emits the sentence.
     edge = risk_sentences(NAMES, betas, shares_for((2, 3, 1, 4, 5)), tags)  # type: ignore[arg-type]
     assert edge == [
         "HML ranks #1 by risk but only #3 by beta size: the factor is volatile or moves with "
-        "your other exposures."
+        "the other exposures."
     ]
 
 

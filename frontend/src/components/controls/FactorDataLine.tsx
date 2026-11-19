@@ -1,5 +1,6 @@
 import type { FactorDataStatus } from "../../api/types";
 import { dateLong } from "../../format";
+import { Icon } from "../shell/icons";
 
 export interface FactorDataLineProps {
   status: FactorDataStatus | undefined;
@@ -20,9 +21,10 @@ function sentence(status: FactorDataStatus | undefined): string {
 /** Where the factor data ends, plus a quiet button that asks the server for a newer file. */
 export function FactorDataLine({ status, refreshing, message, onRefresh }: FactorDataLineProps) {
   return (
-    <p className="ctl-factors">
+    <p className="ctl-factors side-note">
       <span>{sentence(status)}</span>{" "}
-      <button type="button" className="btn-quiet" onClick={onRefresh} disabled={refreshing}>
+      <button type="button" className="linkbtn" onClick={onRefresh} disabled={refreshing}>
+        <Icon name="refresh" />
         {refreshing ? "Checking for newer factor data" : "Check for newer factor data"}
       </button>{" "}
       <span className="ctl-msg" role="status" aria-live="polite">

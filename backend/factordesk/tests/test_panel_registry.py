@@ -21,7 +21,9 @@ ORDER = [
     ("equation", 200),
     ("kpis", 300),
     ("price", 400),
+    ("performance", 450),
     ("exposures", 500),
+    ("world_beta", 505),
     ("lead_lag", 510),
     ("shrunk", 520),
     ("fragility", 530),
@@ -37,13 +39,17 @@ ORDER = [
 """Static panel order of contract SC4 (the React page adds ``notice`` at 150)."""
 
 SECTION_PANELS = {
-    "lead_lag": ("lead-lag", "exposures"),
+    "performance": ("performance", "price"),
+    "lead_lag": ("lead-lag", "world-beta"),
     "shrunk_betas": ("shrunk", "lead-lag"),
     "fragility": ("fragility", "shrunk"),
+    "world_beta": ("world-beta", "exposures"),
     "residual": ("residual", "risk"),
     "kalman_betas": ("kalman", "rolling"),
 }
-"""Element id of each optional section's panel, and the panel it follows."""
+"""Element id of each optional section's panel, and the panel it follows.
+
+The world beta panel (505) follows the exposures (500); lead-lag (510) follows it."""
 
 
 def _panel_ids(page: str) -> list[str]:

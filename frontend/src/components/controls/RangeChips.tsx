@@ -14,22 +14,22 @@ export interface RangeChipsProps {
   disabled?: boolean;
 }
 
-const LABELS: Record<Preset, string> = { "3Y": "3Y", "5Y": "5Y", FULL: "Full history" };
+const LABELS: Record<Preset, string> = { "3Y": "3Y", "5Y": "5Y", "10Y": "10Y", FULL: "Full history" };
 
 /**
- * Range chips (dashboard spec DB6.3): native radios in a fieldset with a hidden legend, so arrow
- * keys work. An unavailable chip is disabled; its reason is shown by the controls strip.
+ * Range presets as a segmented control (design K.2): native radios in a fieldset with the visible
+ * legend "Date range", so arrow keys work. An unavailable chip is disabled; its reason is shown by the controls strip.
  */
 export function RangeChips({ options, selected, onSelect, describedBy, disabled = false }: RangeChipsProps) {
   return (
     <fieldset className="ctl-range" {...(describedBy ? { "aria-describedby": describedBy } : {})}>
-      <legend className="vh">Date range</legend>
-      <span className="chips">
+      <legend className="side-label">Date range</legend>
+      <span className="seg-range">
         {PRESETS.map((preset) => {
           const option = options?.find((o) => o.preset === preset);
           const off = disabled || (option !== undefined && !option.available);
           return (
-            <label key={preset} className={off ? "chip-opt off" : "chip-opt"}>
+            <label key={preset} className={off ? "seg-opt off" : "seg-opt"}>
               <input
                 type="radio"
                 name="range"

@@ -1,27 +1,28 @@
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { cloneReport } from "../../test/fixture";
 import { SECTION_FIELDS, withSection } from "../../test/sectionFixtures";
 import { orderedPanels, PANELS } from "./panelRegistry";
 import type { PanelEntry } from "./panelRegistry";
+import { NAV_ITEMS } from "../shell/SectionNav";
 import { ReportView } from "./ReportView";
 
-/** Panel order of the schema v3 contract (SC4). */
+/** Panel order of the schema v3 contract (SC4), without `equation` and `kpis` (dashboard v2, DV1). */
 const ORDER = [
   "header",
-  "notice",
-  "equation",
-  "kpis",
+  "summary",
   "price",
+  "performance",
   "exposures",
-  "lead_lag",
-  "shrunk",
-  "fragility",
+  "world_beta",
   "returns",
   "risk",
-  "residual_alpha",
   "rolling",
+  "residual_alpha",
   "kalman",
+  "shrunk",
+  "lead_lag",
+  "fragility",
   "data",
   "regression_detail",
   "colophon",
@@ -29,11 +30,13 @@ const ORDER = [
 
 /** Element id each optional section's panel uses, and the core panel it follows. */
 const SECTION_PANELS = {
-  lead_lag: { id: "lead-lag", after: "exposures" },
-  shrunk_betas: { id: "shrunk", after: "lead-lag" },
-  fragility: { id: "fragility", after: "shrunk" },
-  residual: { id: "residual", after: "risk" },
-  kalman_betas: { id: "kalman", after: "rolling" },
+  performance: { id: "performance", after: "price" },
+  lead_lag: { id: "lead-lag", after: "shrunk" },
+  shrunk_betas: { id: "shrunk", after: "kalman" },
+  fragility: { id: "fragility", after: "lead-lag" },
+  world_beta: { id: "world-beta", after: "exposures" },
+  residual: { id: "residual", after: "rolling" },
+  kalman_betas: { id: "kalman", after: "residual" },
 } as const;
 
 function ids(container: HTMLElement): string[] {
@@ -46,6 +49,20 @@ describe("panel registry", () => {
     expect(orderedPanels().map((p) => p.position)).toEqual(
       [...PANELS].map((p) => p.position).sort((a, b) => a - b),
     );
+  });
+
+  it("draws the panels in the same order as the sidebar items", () => {
+    const registryName = (navId: string) => (navId === "residual" ? "residual_alpha" : navId.replace(/-/g, "_"));
+    const names = orderedPanels().map((p) => p.name);
+    const navNames = NAV_ITEMS.map((item) => registryName(item.id));
+    for (const n of navNames) expect(names, n).toContain(n);
+    expect(names.filter((n) => navNames.includes(n))).toEqual(navNames);
+  });
+
+  it("no longer registers the equation or the KPI strip (owner, dashboard v2)", () => {
+    const names = PANELS.map((p) => p.name);
+    expect(names).not.toContain("equation");
+    expect(names).not.toContain("kpis");
   });
 
   it("refuses a name or a position used twice", () => {
@@ -62,6 +79,20 @@ describe("panel registry", () => {
       expect(container.querySelector(`#${id}`)).toBeNull();
     }
   });
+
+  it("shows an outcome sentence under the title of every panel it covers (DV4.9)", async () => {
+    let report = cloneReport();
+    for (const field of SECTION_FIELDS) report = withSection(report, field);
+    const { container } = render(<ReportView report={report} downloadHref="#" win={null} onWinChange={vi.fn()} />);
+    await waitFor(() => expect(container.querySelector("#world-beta > p.q.outcome")).not.toBeNull(), { timeout: 12_000 });
+    await waitFor(() => expect(container.querySelector("#performance > p.q.outcome")).not.toBeNull(), { timeout: 12_000 });
+    await waitFor(() => expect(container.querySelector("#regression-detail > p.q.outcome")).not.toBeNull(), { timeout: 12_000 });
+    for (const id of ["price", "performance", "exposures", "world-beta", "returns", "risk", "rolling", "data", "regression-detail"]) {
+      const line = container.querySelector(`#${id} > p.q.outcome`);
+      expect(line, id).not.toBeNull();
+      expect(line?.textContent?.length, id).toBeGreaterThan(30);
+    }
+  }, 30_000);
 
   it("draws each present section at its place, with the empty state of a placeholder", () => {
     let report = cloneReport();

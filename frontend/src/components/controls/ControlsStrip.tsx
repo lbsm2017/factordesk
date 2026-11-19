@@ -43,9 +43,9 @@ export function selectedPreset(state: UrlState): Preset | null {
 }
 
 /**
- * One framed strip above the header (design I, dashboard spec DB6.3): ticker search and "Factor it",
- * range chips, From and To, the analysed-range label, the factor-data line, and the reason for any
- * disabled chip as visible text.
+ * The controls in the sidebar (prototype v4a, design J.2; dashboard spec DB6.3): ticker search and
+ * "Factor it"; the date range (presets, From and To, the analysed-range line and the reason for any
+ * disabled preset as visible text); the factor-data line.
  */
 export function ControlsStrip({
   state,
@@ -69,7 +69,7 @@ export function ControlsStrip({
 
   return (
     <section className="controls" aria-label="Report controls">
-      <div className="ctl-row">
+      <div className="side-group">
         <TickerSearch
           value={state.ticker ?? ""}
           recent={recent}
@@ -90,6 +90,8 @@ export function ControlsStrip({
             onCommit({ ticker: checked.ticker });
           }}
         />
+      </div>
+      <div className="side-group">
         <RangeChips
           options={ranges?.options}
           selected={selectedPreset(state)}
@@ -104,20 +106,22 @@ export function ControlsStrip({
           disabled={noTicker}
           onCommit={(start, end) => onCommit({ range: null, start, end })}
         />
+        <AnalysedRange report={report} />
+        {noTicker ? (
+          <div className="ctl-why side-note" id={WHY_ID}>
+            <p>{LANDING_WHY}</p>
+          </div>
+        ) : unavailable.length > 0 ? (
+          <div className="ctl-why side-note" id={WHY_ID}>
+            {unavailable.map((option) => (
+              <p key={option.preset}>{option.reason}</p>
+            ))}
+          </div>
+        ) : null}
       </div>
-      <AnalysedRange report={report} />
-      <FactorDataLine status={factorStatus} refreshing={refreshing} message={refreshMessage} onRefresh={onRefreshFactors} />
-      {noTicker ? (
-        <div className="ctl-why" id={WHY_ID}>
-          <p>{LANDING_WHY}</p>
-        </div>
-      ) : unavailable.length > 0 ? (
-        <div className="ctl-why" id={WHY_ID}>
-          {unavailable.map((option) => (
-            <p key={option.preset}>{option.reason}</p>
-          ))}
-        </div>
-      ) : null}
+      <div className="side-group">
+        <FactorDataLine status={factorStatus} refreshing={refreshing} message={refreshMessage} onRefresh={onRefreshFactors} />
+      </div>
       <span className="vh" role="status">
         {busy ? "Loading the report." : ""}
       </span>

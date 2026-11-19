@@ -35,6 +35,19 @@ from factordesk.report.schema import (
 
 
 @dataclass(frozen=True)
+class WorldBenchmarkInput:
+    """The price history of a world beta proxy (ACWI, IEUR), or why there is none.
+
+    ``history`` is ``None`` when the proxy could not be fetched (``unavailable_reason`` says why).
+    ``note`` is set when the refresh failed and the cached history was used.
+    """
+
+    history: PriceHistory | None
+    unavailable_reason: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
 class SectionInputs:
     """Data a section needs that ``assemble_report`` does not already have.
 
@@ -44,6 +57,12 @@ class SectionInputs:
     shrinkage_portfolios: Mapping[str, pd.DataFrame] | None = None
     """Ken French portfolio return frames for the shrunk-betas prior, by dataset key (SB2.2).
     Owned by the shrunk-betas feature."""
+    world_benchmark: WorldBenchmarkInput | None = None
+    """ACWI prices for the world beta; ``None``: not fetched, the section does not run.
+    Owned by the world-beta feature."""
+    europe_benchmark: WorldBenchmarkInput | None = None
+    """IEUR prices for the Europe block of the world beta; ``None``: not fetched, the block is
+    null. Owned by the world-beta feature."""
 
 
 @dataclass(frozen=True)

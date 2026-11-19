@@ -1,44 +1,84 @@
-/* Design tokens, docs/design/report-design.md section A (light, dark by prefers-color-scheme,
-   and html[data-theme] overrides both ways). The only file that may contain colour literals. */
+/* Design tokens of dashboard v2 (prototype v4a, owner approval 2026-11-19; README-v4 and
+   docs/design/report-design.md rev 3). Light only: there is no dark set and the OS setting is
+   ignored. The only file that may contain colour literals.
+
+   Shape rule: panels and the analysis bar 8 px | inputs, buttons, nav items, segmented control
+   and type badge 6 px | segmented inner items 4 px | chart marks 2 px | switch track and thumb
+   fully round | everything else square. One 1 px border per box, no shadow.
+   Type (IBM Plex Sans, tabular lining numerals): 14 captions and table headers | 15 body and
+   tables | 16 sub-heads | 18 panel titles | 22 key figures | 26 page title. Nothing under 14 px. */
 
 :root {
   color-scheme: light;
-  /* named palette */
-  --chalk: #edf0f3;
-  --sheet: #ffffff;
-  --graphite: #16202b;
-  --slate: #465361;
-  --cobalt: #2a5bc0;
-  --copper: #b4560c;
-  /* semantic */
-  --page: var(--chalk);
-  --surface: var(--sheet);
-  --sunk: #f5f7f9;
-  --border: #d3d9e0;
-  --grid: #e5e9ee;
-  --axis: #8a95a2;
-  --ink: var(--graphite);
-  --ink-2: var(--slate);
-  --ink-3: #5f6b78;
-  --ink-faded: #777e85;
-  --focus: var(--graphite);
-  --accent: var(--graphite);
-  --pos: var(--cobalt);
-  --neg: var(--copper);
-  --f1: #7559c5; /* Mkt-RF */
-  --f2: #066e33; /* SMB */
-  --f3: #c25078; /* HML */
-  --f4: #1995ba; /* RMW */
-  --f5: #a18a21; /* CMA */
+  /* surfaces: one cool grey family */
+  --page: #F4F6FA;
+  --surface: #FFFFFF;
+  --soft: #F7F8FB;
+  --sunk: #F4F6FA;
+  --line: #DDE2EC;
+  --grid: #EBEEF4;
+  --rule: #0E1430;
+  --control-line: #7A839E;
+  --axis: #7A839E;
+  --mark-ns: #C3CAD9;
+  /* text */
+  --ink: #0E1430;
+  --ink-2: #4A5470;
+  --ink-3: #5A6482;
+  /* one accent family: teal on light surfaces, cyan only on the navy rail */
+  --accent: #0B7285;
+  --accent-hover: #095F6F;
+  --accent-50: #EDF6F8;
+  --on-accent: #FFFFFF;
+  --selection: #BFE3EA;
+  /* sign and evidence: red and green only for signed returns, alpha, Sharpe, drawdown and
+     return contributions; betas stay ink (owner, 2026-11-19). The word is always present. */
+  --pos: #007862;
+  --neg: #C23345;
+  --neg-50: #FBE9EC;
+  --pos-t: #9ECCC3;
+  --neg-t: #E8B1B8;
+  --caution: #8A5A00;
+  --caution-50: #FFF5E0;
+  /* navy rail: the sidebar and the phone top bar */
+  --rail: #141A33;
+  --rail-text: #FFFFFF;
+  --rail-2: #A9B3D1;
+  --rail-hover: #1F2747;
+  --rail-line: #2A3358;
+  --rail-track: #6B759A;
+  --rail-cyan: #3CC8E8;
+  --rail-cyan-hover: #6FD8F0;
+  --scrim: rgb(8 12 26 / 0.5);
+  /* factor identity, in the factor charts only */
+  --f1: #0E1430; /* Mkt-RF */
+  --f2: #066E33; /* SMB */
+  --f3: #C25078; /* HML */
+  --f4: #1995BA; /* RMW */
+  --f5: #A18A21; /* CMA */
+  /* names kept from rev 2 so the panel stylesheets read the new values */
+  --border: var(--line);
+  --focus: var(--accent);
+  --ink-faded: var(--ink-2);
   /* type */
-  --sans: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --math: "STIX Two Text", "Cambria Math", Cambria, "Times New Roman", serif;
-  --fs-1: 12.5px;
-  --fs-2: 15px;
-  --fs-3: 18px;
-  --fs-4: 21.6px;
-  --fs-5: 26px;
-  --fs-6: 44.8px;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fs-cap: 14px;
+  --fs-body: 15px;
+  --fs-sub: 16px;
+  --fs-panel: 18px;
+  --fs-kpi: 22px;
+  --fs-title: 26px;
+  --fs-1: var(--fs-cap);
+  --fs-2: var(--fs-body);
+  --fs-3: var(--fs-panel);
+  --fs-4: var(--fs-kpi);
+  --fs-5: var(--fs-title);
+  /* shape */
+  --r-panel: 8px;
+  --r-control: 6px;
+  --r-inner: 4px;
+  --r-mark: 2px;
+  --r-round: 999px;
   /* space */
   --s-1: 4px;
   --s-2: 8px;
@@ -47,62 +87,28 @@
   --s-5: 24px;
   --s-6: 32px;
   --s-7: 48px;
+  --gap: 16px;
+  --pad-x: 20px;
+  --pad-y: 16px;
+  --side-w: 264px;
+  --page-x: 24px;
+  --canvas-max: 1680px;
+  --row-h: 36px;
   --row: 44px;
   --label-w: 176px;
   --num-w: 92px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-    --chalk: #0e1318;
-    --sheet: #151b22;
-    --graphite: #e8edf2;
-    --slate: #b0bbc6;
-    --cobalt: #5f8ae6;
-    --copper: #d27c2e;
-    --sunk: #1b232c;
-    --border: #2c3743;
-    --grid: #212a34;
-    --axis: #66727f;
-    --ink-3: #8f9ba8;
-    --ink-faded: #8a929b;
-    --f1: #7053be;
-    --f2: #19783c;
-    --f3: #cb587f;
-    --f4: #1493b8;
-    --f5: #aa932d;
-  }
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --chalk: #0e1318;
-  --sheet: #151b22;
-  --graphite: #e8edf2;
-  --slate: #b0bbc6;
-  --cobalt: #5f8ae6;
-  --copper: #d27c2e;
-  --sunk: #1b232c;
-  --border: #2c3743;
-  --grid: #212a34;
-  --axis: #66727f;
-  --ink-3: #8f9ba8;
-  --ink-faded: #8a929b;
-  --f1: #7053be;
-  --f2: #19783c;
-  --f3: #cb587f;
-  --f4: #1493b8;
-  --f5: #aa932d;
+@media (max-width: 899px) {
+  :root { --page-x: 16px; }
 }
 
-/* print: light tokens even from a dark OS */
+@media (max-width: 719px) {
+  :root { --fs-title: 22px; --pad-x: 14px; --pad-y: 14px; --gap: 12px; }
+}
+
+/* print: a white page and the narrower label columns of A4 */
 @media print {
-  :root, :root[data-theme="dark"] {
-    color-scheme: light;
-    --chalk: #ffffff; --sheet: #ffffff; --graphite: #16202b; --slate: #465361;
-    --cobalt: #2a5bc0; --copper: #b4560c; --sunk: #f5f7f9; --border: #c9d0d8; --grid: #e5e9ee;
-    --axis: #8a95a2; --ink-3: #5f6b78; --ink-faded: #777e85;
-    --f1: #7559c5; --f2: #066e33; --f3: #c25078; --f4: #1995ba; --f5: #a18a21;
-    --label-w: 132px; --num-w: 72px;
-  }
+  :root { --page: #FFFFFF; --label-w: 132px; --num-w: 72px; }
 }

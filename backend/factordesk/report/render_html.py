@@ -536,6 +536,27 @@ def _notice(report: FactorReport, items: list[tuple[str, str]]) -> str:
     )
 
 
+_EXCHANGE_NAMES = {"NYSEArca": "NYSE Arca"}
+_CURRENCY_NAMES = {"USD": "US dollars"}
+
+
+def _security_text(name: str | None, exchange: str | None, currency: str | None) -> str:
+    """The company line as sentences: 'Name. Listed on Exchange, priced in US dollars.'"""
+    first = f"{name.rstrip('.')}." if name else ""
+    listed = f"listed on {_EXCHANGE_NAMES.get(exchange, exchange)}" if exchange else ""
+    priced = f"priced in {_CURRENCY_NAMES.get(currency, currency)}" if currency else ""
+    second = ", ".join(p for p in (listed, priced) if p)
+    second = f"{second[0].upper()}{second[1:]}." if second else ""
+    return " ".join(p for p in (first, second) if p)
+
+
+def _security_line(report: FactorReport) -> str:
+    """One small line under the ticker: company, exchange and currency; empty when unknown."""
+    sec = report.data.security
+    text = "" if sec is None else _security_text(sec.name, sec.exchange, sec.currency)
+    return f'<p class="coverage">{esc(text)}</p>' if text else ""
+
+
 def _header(report: FactorReport) -> str:
     d = report.data
     items = _notice_items(report)
@@ -550,6 +571,7 @@ def _header(report: FactorReport) -> str:
         f'<span class="ticker">{esc(report.ticker)}</span>'
         '<span class="what">Fama&#8211;French five-factor profile</span></h1>'
         f'<p class="mast-meta">{chips}</p></div>'
+        f"{_security_line(report)}"
         f'<p class="coverage">{esc(_range_line(report))}</p>{_notice(report, items)}</header>'
     )
 

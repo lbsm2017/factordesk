@@ -22,9 +22,11 @@ LABEL_FILE = "label_text.json"
 specs; the frontend reads the same file."""
 
 SECTION_FILES: dict[str, str] = {
+    "performance": "performance.json",
     "lead_lag": "lead_lag.json",
     "shrunk_betas": "shrunk.json",
     "fragility": "fragility.json",
+    "world_beta": "world_beta.json",
     "residual": "residual_alpha.json",
     "kalman_betas": "kalman.json",
 }

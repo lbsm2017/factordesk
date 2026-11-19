@@ -25,6 +25,14 @@ sections, each defined in its own module under ``report/sections/`` and ``None``
 reason ``lead_after_sample_end``. Version 3 files still load (SC5). The shared building blocks
 (``SampleInfo``, the statistic base, the status and label types) live in ``report/base.py`` and
 are re-exported here.
+
+The optional ``performance`` section (historical return, volatility, Sharpe ratio and maximum
+drawdown; ``report/sections/performance.py``) is additive and does not change the version number
+(contract SC5): a file written before it has ``performance`` absent and loads with ``None``.
+
+The optional section ``world_beta`` (the quick beta against the iShares MSCI ACWI ETF;
+``report/sections/world_beta.py``) is additive and ``None`` when not computed, so it does not bump
+the version (contract SC5).
 """
 
 from __future__ import annotations
@@ -54,18 +62,24 @@ from factordesk.report.base import Tag as Tag
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
+from factordesk.report.sections.performance import PERFORMANCE_SECTION, PerformanceSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
+from factordesk.report.sections.world_beta import WORLD_BETA_SECTION, WorldBetaSection
 
 SCHEMA_VERSION = "4"
-"""Version written by this code (the schema v3 contract; contract SC5)."""
+"""Version written by this code (the schema v3 contract; contract SC5). Additive optional fields
+such as ``data.security`` do not change it."""
 
 SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4")
-"""Versions this code reads. Version 3 files have no optional sections; they load unchanged."""
+"""Versions this code reads. Version 3 files have no optional sections; they load unchanged. A
+version 4 file written before ``data.security`` existed loads with it absent (``None``)."""
 
 AuditStatus = Literal["clean", "warnings", "errors"]
 
 SECTIONS: tuple[SectionSpec, ...] = (
+    WORLD_BETA_SECTION,
+    PERFORMANCE_SECTION,
     LEAD_LAG_SECTION,
     SHRUNK_SECTION,
     FRAGILITY_SECTION,
@@ -100,6 +114,20 @@ class UncoveredTail(FrozenModel):
     )
 
 
+class SecurityInfo(FrozenModel):
+    """What Yahoo says the ticker is; every field is None when Yahoo did not say."""
+
+    name: str | None = Field(default=None, description="Company or fund name.")
+    currency: str | None = Field(
+        default=None, description="Quote currency as Yahoo reports it, e.g. 'USD' or 'GBp'."
+    )
+    exchange: str | None = Field(default=None, description="Exchange label, e.g. 'NASDAQ'.")
+    quote_type: str | None = Field(
+        default=None,
+        description="Security type for the header badge: 'ETF' or 'Equity'; omitted otherwise.",
+    )
+
+
 class DataInfo(FrozenModel):
     """Provenance and coverage of the data behind the report."""
 
@@ -126,6 +154,11 @@ class DataInfo(FrozenModel):
     uncovered: UncoveredTail
     audit_status: AuditStatus
     audit_findings: list[AuditFinding] = Field(default_factory=lambda: [])
+    security: SecurityInfo | None = Field(
+        default=None,
+        description="Company name, currency and exchange from Yahoo metadata; None when the "
+        "read failed or the report was written before the field existed.",
+    )
 
 
 # ------------------------------------------------------------------------------ regression (M3)
@@ -407,6 +440,15 @@ class FactorReport(FrozenModel):
     )
     # Optional sections of the schema v3 contract (docs/specs/schema-v3-contract.md), in panel
     # order. None: the feature did not run for this report (always None in version 3 files).
+    world_beta: WorldBetaSection | None = Field(
+        default=None,
+        description="Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the "
+        "MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md).",
+    )
+    performance: PerformanceSection | None = Field(
+        default=None,
+        description="Historical return, volatility, Sharpe ratio and maximum drawdown.",
+    )
     lead_lag: LeadLagSection | None = Field(
         default=None, description="Lead-lag betas (docs/specs/lead-lag-betas.md)."
     )
@@ -456,10 +498,10 @@ class FactorReport(FrozenModel):
 
 # ------------------------------------------------- API envelope (not part of FactorReport)
 
-RangePreset = Literal["3Y", "5Y", "FULL"]
-RANGE_PRESETS: tuple[RangePreset, ...] = ("3Y", "5Y", "FULL")
+RangePreset = Literal["3Y", "5Y", "10Y", "FULL"]
+RANGE_PRESETS: tuple[RangePreset, ...] = ("3Y", "5Y", "10Y", "FULL")
 """Range presets in display order (dashboard spec DB2.2; owner decision of 2026-11-18 dropped
-YTD and 1Y)."""
+YTD and 1Y; owner decision of 2026-11-19 added 10Y between 5Y and FULL)."""
 
 ErrorCode = Literal[
     "invalid_ticker",
@@ -467,6 +509,7 @@ ErrorCode = Literal[
     "bad_range",
     "insufficient_history",
     "degenerate_input",
+    "unsupported_currency",
     "factor_data_invalid",
     "network",
     "upstream_refused",
@@ -501,6 +544,9 @@ class FactorDataStatus(FrozenModel):
 class TickerSuggestion(FrozenModel):
     ticker: str
     last_fetched: date
+    name: str | None = Field(
+        default=None, description="Company name when its metadata is already cached."
+    )
 
 
 class TickerSuggestions(FrozenModel):
@@ -524,7 +570,7 @@ class RangeOption(FrozenModel):
 
 
 class RangeOptions(FrozenModel):
-    """Availability of every preset for one ticker (always three, in preset order)."""
+    """Availability of every preset for one ticker (always four, in preset order)."""
 
     ticker: str
     first_return_date: date

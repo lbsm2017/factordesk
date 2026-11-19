@@ -5,35 +5,36 @@ import { describe, expect, it, vi } from "vitest";
 import { cloneReport } from "../../test/fixture";
 import { ReportView } from "./ReportView";
 
-const css = readFileSync(resolve(process.cwd(), "src/styles/frame.css"), "utf8");
+const css = readFileSync(resolve(process.cwd(), "src/styles/report.css"), "utf8");
 
-/** Selectors of the rule that spaces the KPI strip from what precedes it. */
-function gapSelectors(): string[] {
-  const rule = /((?:[.\w#]+ \+ \.kpis,?\s*)+)\{([^}]*)\}/.exec(css);
-  expect(rule?.[2]).toMatch(/margin-top:\s*var\(--s-4\)/);
-  return (rule?.[1] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+/** Body of the first rule that starts a line with `selector {`. */
+function rule(selector: string): string {
+  const at = css.indexOf(`\n${selector} {`);
+  expect(at, selector).toBeGreaterThanOrEqual(0);
+  const open = css.indexOf("{", at);
+  return css.slice(open + 1, css.indexOf("}", open));
 }
 
-describe("gap between the notice and the KPI empty state (review DF7)", () => {
-  it("applies when the regression failed, the equation is omitted and the KPI strip follows the notice", () => {
-    const r = cloneReport();
-    r.regression.status = "insufficient_data";
-    const { container } = render(<ReportView report={r} downloadHref="#" win={null} onWinChange={vi.fn()} />);
-    expect(container.querySelector("#equation")).toBeNull();
-    expect(container.querySelector("#kpis .empty")).not.toBeNull();
-    expect(container.querySelector("#kpis")?.previousElementSibling?.id).toBe("notice");
-    const matches = gapSelectors().filter((s) => container.querySelector(s) !== null);
-    expect(matches).toContain(".notice + .kpis");
+/**
+ * Review DF7 asked that no block of the report touches the one before it, whatever is omitted.
+ * Dashboard v2 spaces every block with the gap of the report grid, so an omitted panel (the
+ * equation and the KPI strip are gone; an empty optional section renders nothing) never leaves
+ * two blocks without space between them.
+ */
+describe("gap between the blocks of the report (review DF7)", () => {
+  it("comes from the grid gap of the report region, not from per-block margins", () => {
+    expect(rule(".report-region")).toMatch(/display:\s*grid/);
+    expect(rule(".report-region")).toMatch(/gap:\s*var\(--gap\)/);
+    expect(rule(".panel")).not.toMatch(/(^|[\s;])margin(-top)?:/);
   });
 
-  it("also applies when there is no notice, so the strip never touches the header", () => {
+  it("puts every block, the summary and the empty states included, in the grid", () => {
     const r = cloneReport();
     r.regression.status = "insufficient_data";
-    r.warnings = [];
-    r.quality_gate.fired = false;
     const { container } = render(<ReportView report={r} downloadHref="#" win={null} onWinChange={vi.fn()} />);
-    expect(container.querySelector("#notice")).toBeNull();
-    expect(container.querySelector("#kpis")?.previousElementSibling?.id).toBe("header");
-    expect(gapSelectors().filter((s) => container.querySelector(s) !== null)).toContain(".masthead + .kpis");
+    const main = container.querySelector("main.report-region") as HTMLElement;
+    const ids = Array.from(main.querySelectorAll(":scope > [id]")).map((el) => el.id);
+    expect(ids.slice(0, 3)).toEqual(["header", "summary", "price"]);
+    expect(main.querySelector(":scope > #exposures .empty")).not.toBeNull();
   });
 });

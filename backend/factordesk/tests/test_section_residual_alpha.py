@@ -123,7 +123,7 @@ def test_tr38_short_report_serialises_and_not_ok_statistics_hold_no_numbers() ->
     assert section.diagnostics[1].findings == []
     assert section.in_sample.status == "ok" and section.status == "ok"
     assert all(y.point_in_time_sum is None for y in section.calendar_years.years)
-    assert report.schema_version == "4"  # the contract's number (SC5), not "3" as R7.8 said
+    assert report.schema_version == "4"  # SC5, not "3" as R7.8 said
 
 
 def test_tr38_statistic_models_are_registered() -> None:

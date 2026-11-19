@@ -2,6 +2,8 @@
    screens restyle the rows as grids, which can drop the native table semantics. */
 /* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role */
 import type { FactorReport } from "../../api/types";
+import { useShowStats } from "../../state/stats";
+import { exposuresOutcome } from "../../text/outcome";
 import { exposureReading, plainName } from "../../text/plain";
 import { BarCell } from "../charts/BarCell";
 import { axisLabels, exposureModel, exposuresUnavailable } from "./exposureModel";
@@ -9,6 +11,7 @@ import type { ExposureModel } from "./exposureModel";
 import { SigHead } from "./barParts";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
+import "./signColor.css";
 
 const QUESTION = "What is this stock exposed to, and how sure are we?";
 const DEFAULT_DESC = "Descriptive, in-sample, not predictive.";
@@ -18,19 +21,13 @@ function Legend({ window, hasAverages }: { window: number; hasAverages: boolean 
     <ul className="legend" aria-label="Legend">
       <li>
         <svg className="sw" aria-hidden="true">
-          <rect className="pos" width="14" height="10" rx="2" />
+          <rect className="ink" width="14" height="10" rx="2" />
         </svg>
-        Positive
+        Beta
       </li>
       <li>
         <svg className="sw" aria-hidden="true">
-          <rect className="neg" width="14" height="10" rx="2" />
-        </svg>
-        Negative
-      </li>
-      <li>
-        <svg className="sw" aria-hidden="true">
-          <rect className="pos faded" x="0.5" y="0.5" width="13" height="9" rx="2" />
+          <rect className="ink faded" width="14" height="10" rx="2" />
         </svg>
         Faded: not significant
       </li>
@@ -54,10 +51,11 @@ function Legend({ window, hasAverages }: { window: number; hasAverages: boolean 
   );
 }
 
-function ExposureTable({ model }: { model: ExposureModel }) {
+/** With statistics off the t and average columns are left out (dashboard spec DV5). */
+function ExposureTable({ model, stats }: { model: ExposureModel; stats: boolean }) {
   const { domain, rows, window } = model;
   return (
-    <table role="table" className="bars cols-4">
+    <table role="table" className={stats ? "bars cols-4" : "bars cols-2"}>
       <caption className="vh">
         Full-sample factor betas with 95% intervals, t-statistics, significance and average rolling beta
       </caption>
@@ -72,13 +70,15 @@ function ExposureTable({ model }: { model: ExposureModel }) {
           <th role="columnheader" scope="col" className="num">
             Beta
           </th>
-          <th role="columnheader" scope="col" className="num">
-            t
-          </th>
+          {stats ? (
+            <th role="columnheader" scope="col" className="num">
+              t
+            </th>
+          ) : null}
           <th role="columnheader" scope="col" className="num">
             <SigHead />
           </th>
-          <th role="columnheader" scope="col" className="num">{`Avg ${window}d`}</th>
+          {stats ? <th role="columnheader" scope="col" className="num">{`Avg ${window}d`}</th> : null}
         </tr>
       </thead>
       <tbody role="rowgroup">
@@ -94,7 +94,7 @@ function ExposureTable({ model }: { model: ExposureModel }) {
                 hi={domain.hi}
                 ticks={domain.ticks}
                 value={r.beta}
-                fill="sign"
+                fill="neutral"
                 faded={r.faded}
                 ci={r.ci}
                 marker={r.beta === null ? null : r.average}
@@ -104,15 +104,19 @@ function ExposureTable({ model }: { model: ExposureModel }) {
             <td role="cell" className="num strong">
               {r.betaText}
             </td>
-            <td role="cell" className="num">
-              {r.tText}
-            </td>
-            <td role="cell" className="num sig">
+            {stats ? (
+              <td role="cell" className="num">
+                {r.tText}
+              </td>
+            ) : null}
+            <td role="cell" className={`num sig${r.significantText === "Yes" ? " yes" : ""}`}>
               {r.significantText}
             </td>
-            <td role="cell" className="num">
-              {r.averageText}
-            </td>
+            {stats ? (
+              <td role="cell" className="num">
+                {r.averageText}
+              </td>
+            ) : null}
           </tr>
         ))}
       </tbody>
@@ -126,7 +130,7 @@ function ExposureTable({ model }: { model: ExposureModel }) {
               </span>
             ))}
           </td>
-          <td role="cell" colSpan={4} />
+          <td role="cell" colSpan={stats ? 4 : 2} />
         </tr>
       </tfoot>
     </table>
@@ -148,6 +152,7 @@ function footnotes(report: FactorReport, window: number): { footnote: string; ho
 
 /** Panel 5 (design D5): betas as an SVG-in-table bar chart. Every number is also a text column. */
 export function ExposuresPanel({ report }: ReportPanelProps) {
+  const stats = useShowStats();
   const g = report.regression;
   if (exposuresUnavailable(report)) {
     return (
@@ -170,12 +175,13 @@ export function ExposuresPanel({ report }: ReportPanelProps) {
       id="exposures"
       title="Factor exposures"
       question={QUESTION}
+      outcome={exposuresOutcome(report)}
       legend={<Legend window={model.window} hasAverages={model.hasAverages} />}
       reading={reading || undefined}
       footnote={footnote}
       how={how}
     >
-      <ExposureTable model={model} />
+      <ExposureTable model={model} stats={stats} />
     </Panel>
   );
 }

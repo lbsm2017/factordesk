@@ -1,6 +1,6 @@
 /**
- * Page shell: URL state, the controls strip, the data flow and the states between them
- * (dashboard spec DB6). The 1216 px column is the `.report` class (design C).
+ * Page: URL state, the shell with the controls in the sidebar, the data flow and the states between
+ * them (dashboard spec DB6, prototype v4a). The "Show statistics" switch lives in `StatsProvider`.
  */
 import { useEffect, useState } from "react";
 import {
@@ -18,10 +18,13 @@ import { Landing } from "./components/controls/ReportStates";
 import { ErrorFrame } from "./components/report/ErrorFrame";
 import { LoadingFrame } from "./components/report/LoadingFrame";
 import { ReportView } from "./components/report/ReportView";
+import { Shell } from "./components/shell/Shell";
 import { addRecent, useRecent } from "./state/recent";
 import type { RollingWindowDays } from "./state/url";
+import { StatsProvider, useStatsSwitch } from "./state/stats";
 import { useUrlState } from "./state/useUrlState";
 import "./styles/controls.css";
+import { Switch } from "./ui/Switch";
 
 /** Development only: `/?demo=1` renders the mock report so the panels can be seen without the API. */
 function demoRequested(): boolean {
@@ -35,8 +38,18 @@ function DemoPage() {
     void import("./test/fixture").then((m) => setReport(m.mockReport));
   }, []);
   return (
-    <div className="report">
+    <Shell sidebar={<StatsSwitch />} report={report ?? undefined} ticker={report?.ticker ?? null}>
       {report ? <ReportView report={report} downloadHref="#" win={win} onWinChange={setWin} /> : null}
+    </Shell>
+  );
+}
+
+/** "Show statistics" in the sidebar (design K.1), stored in the URL as `stats=1`. */
+function StatsSwitch() {
+  const [on, setOn] = useStatsSwitch();
+  return (
+    <div className="side-group">
+      <Switch label="Show statistics" hint="t, p-values, intervals" checked={on} onChange={setOn} />
     </div>
   );
 }
@@ -62,8 +75,12 @@ function Dashboard() {
   }, [loadedTicker]);
 
   return (
-    <div className="report">
-      <ControlsStrip
+    <Shell
+      report={shown}
+      ticker={state.ticker}
+      sidebar={
+        <>
+          <ControlsStrip
         state={state}
         recent={recent}
         suggestions={suggestions.data?.items ?? []}
@@ -79,7 +96,11 @@ function Dashboard() {
           setRefreshMessage(null);
           refresh.mutate();
         }}
-      />
+          />
+          <StatsSwitch />
+        </>
+      }
+    >
       {state.ticker === null ? (
         <Landing recent={recent} onPick={(ticker) => commit({ ticker })} />
       ) : report.isError ? (
@@ -95,10 +116,10 @@ function Dashboard() {
           busy={busy}
         />
       )}
-    </div>
+    </Shell>
   );
 }
 
 export function App() {
-  return import.meta.env.DEV && demoRequested() ? <DemoPage /> : <Dashboard />;
+  return <StatsProvider>{import.meta.env.DEV && demoRequested() ? <DemoPage /> : <Dashboard />}</StatsProvider>;
 }

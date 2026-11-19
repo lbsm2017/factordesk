@@ -29,7 +29,7 @@ export function rangeLine(report: FactorReport): { head: string; tail: string } 
 export function AnalysedRange({ report }: AnalysedRangeProps) {
   const line = report ? rangeLine(report) : null;
   return (
-    <p className="ctl-label" id="analysed-range" aria-live="polite" aria-atomic="true">
+    <p className="ctl-label side-note" id="analysed-range" aria-live="polite" aria-atomic="true">
       {line ? (
         <>
           <b>{line.head}</b>

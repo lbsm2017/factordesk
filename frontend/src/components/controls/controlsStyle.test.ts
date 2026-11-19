@@ -44,27 +44,34 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe("control boundaries (WCAG 1.4.11)", () => {
-  const lightBlock = ruleBody(tokens, ":root {");
-  const darkBlock = ruleBody(ruleBody(tokens, "@media (prefers-color-scheme: dark)"), ":root:where");
-  const light = (name: string) => hex(name, lightBlock);
-  const dark = (name: string) => hex(name, darkBlock, lightBlock);
+describe("control boundaries on the rail and on light surfaces (WCAG 1.4.11)", () => {
+  const root = ruleBody(tokens, ":root {");
+  const t = (name: string) => hex(name, root);
 
-  it("--axis is at least 3:1 against --surface in light and dark", () => {
-    expect(contrast(light("--axis"), light("--surface"))).toBeGreaterThanOrEqual(3);
-    expect(contrast(dark("--axis"), dark("--surface"))).toBeGreaterThanOrEqual(3);
+  it("draws rail fields as white boxes and the range track in --rail-track, both 3:1 on the navy", () => {
+    expect(ruleBody(controls, '.controls input[type="text"], .controls input[type="date"]')).toMatch(
+      /border:\s*1px solid var\(--surface\)/,
+    );
+    expect(contrast(t("--surface"), t("--rail"))).toBeGreaterThanOrEqual(3);
+    expect(ruleBody(controls, ".seg-range {")).toMatch(/border:\s*1px solid var\(--rail-track\)/);
+    expect(contrast(t("--rail-track"), t("--rail"))).toBeGreaterThanOrEqual(3);
   });
 
-  it("--border, the old control boundary, stays below 3:1 (so the check above is meaningful)", () => {
-    expect(contrast(light("--border"), light("--surface"))).toBeLessThan(3);
-    expect(contrast(dark("--border"), dark("--surface"))).toBeLessThan(3);
+  it("marks the chosen preset in cyan with navy text, and cyan only appears on the rail", () => {
+    const checked = ruleBody(controls, ".seg-opt input:checked + span");
+    expect(checked).toMatch(/background:\s*var\(--rail-cyan\)/);
+    expect(checked).toMatch(/color:\s*var\(--rail\)/);
+    expect(contrast(t("--rail"), t("--rail-cyan"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(t("--rail-2"), t("--rail"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it.each([
-    ["text and date inputs", '.controls .ctl-row input[type="text"]'],
-    ["range chips", ".controls .chip-opt span"],
-    ["recent-ticker buttons", ".landing button.chip"],
-  ])("%s draw their boundary with --axis", (_name, selector) => {
-    expect(ruleBody(controls, selector)).toMatch(/border-color:\s*var\(--axis\)/);
+  it("uses --control-line, at least 3:1 on white, for controls on light surfaces", () => {
+    expect(contrast(t("--control-line"), t("--surface"))).toBeGreaterThanOrEqual(3);
+    expect(ruleBody(controls, ".landing button.chip")).toMatch(/border-color:\s*var\(--control-line\)/);
+    expect(ruleBody(controls, ".ctl-list {")).toMatch(/border:\s*1px solid var\(--control-line\)/);
+  });
+
+  it("keeps --line, the panel hairline, below 3:1 (it is decoration, never a control boundary)", () => {
+    expect(contrast(t("--line"), t("--surface"))).toBeLessThan(3);
   });
 });

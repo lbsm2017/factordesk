@@ -468,7 +468,7 @@ def verdict_message(
         return (
             f"The point-in-time residual return is reliably {sign} ({percent_text(a_pit)} a year), "
             "but the full-period alpha is not. This usually means the betas moved; check the "
-            "Exposures tab."
+            "Exposures section."
         )
     if code == "concentrated_in_warmup":
         return (

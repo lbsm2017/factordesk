@@ -31,7 +31,7 @@ from fastapi import Request
 
 from factordesk.api import ranges
 from factordesk.api.runtime import Runtime
-from factordesk.data.prices import PriceHistory
+from factordesk.data.prices import PriceHistory, Security, check_currency, security_of
 from factordesk.report.render_html import render_report_html
 from factordesk.report.schema import FactorReport, RangeOptions, RangePreset
 
@@ -51,6 +51,7 @@ def assemble_report(
     start: date | None = None,
     end: date | None = None,
     section_inputs: SectionInputs | None = None,
+    security: Security | None = None,
 ) -> FactorReport:
     """``factordesk.pipeline.assemble_report``, imported on first use.
 
@@ -68,6 +69,7 @@ def assemble_report(
         start=start,
         end=end,
         section_inputs=section_inputs,
+        security=security,
     )
 
 
@@ -135,6 +137,10 @@ class SingleFlight[K: Hashable, V]:
             self._running.pop(key, None)
 
 
+class _NoSecurity(Exception):
+    """Internal: the metadata read gave nothing; keeps ``SingleFlight`` from caching a None."""
+
+
 def _retrieve(task: asyncio.Task[object]) -> None:
     """Mark a failure as seen even when every waiter has gone (the waiters re-raise it)."""
     if not task.cancelled() and task.exception() is not None:
@@ -156,6 +162,7 @@ class LoadedFactors:
 
 
 type PriceKey = tuple[str, date]
+type SecurityKey = tuple[str, date]
 type RangesKey = tuple[str, Vintage, date]
 type ReportKey = tuple[str, date | None, date | None, Vintage, date]
 
@@ -181,6 +188,7 @@ class ReportService:
         self.reports: SingleFlight[ReportKey, FactorReport] = SingleFlight(
             self.deps.report_cache_size
         )
+        self.securities: SingleFlight[SecurityKey, Security] = SingleFlight(PRICE_CACHE_SIZE * 4)
         self.inputs: SingleFlight[tuple[Vintage, date], SectionInputs | None] = SingleFlight(1)
         self.vintage: Vintage | None = None
 
@@ -197,6 +205,7 @@ class ReportService:
         ranges.check_request(preset, start, end)
         now = self._now()
         loaded = await self._factors()
+        security = await self._security(ticker, now.date())
         history = await self._history(ticker, now.date())
         cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
         first, last = ranges.resolve(preset, start, end, cov)
@@ -204,6 +213,7 @@ class ReportService:
 
         async def make() -> FactorReport:
             inputs = await self._section_inputs(loaded.vintage, now)
+            inputs = await self._with_world_benchmark(inputs)
 
             def build() -> FactorReport:
                 return assemble_report(
@@ -215,6 +225,7 @@ class ReportService:
                     start=first,
                     end=last,
                     section_inputs=inputs,
+                    security=security,
                 )
 
             return await self.runtime.run(build)
@@ -225,6 +236,7 @@ class ReportService:
         """Availability of every preset for an already validated ticker."""
         now = self._now()
         loaded = await self._factors()
+        await self._security(ticker, now.date())
         history = await self._history(ticker, now.date())
         key: RangesKey = (ticker, loaded.vintage, now.date())
 
@@ -280,6 +292,43 @@ class ReportService:
             return await self.runtime.run(loader, now)
 
         return await self.inputs.get((vintage, now.date()), make)
+
+    async def _security(self, ticker: str, today: date) -> Security | None:
+        """The ticker's Yahoo metadata, or None when unavailable; refuses a non-USD currency.
+
+        Metadata never blocks a report: a missing or failed read gives None (not cached, so the
+        next request tries again). A known currency other than USD raises
+        ``UnsupportedCurrencyError`` before the price history is downloaded (roadmap N1).
+        """
+
+        async def make() -> Security:
+            found = await self.runtime.run(security_of, self.deps.price_provider, ticker)
+            if found is None:
+                raise _NoSecurity
+            return found
+
+        try:
+            security = await self.securities.get((ticker, today), make)
+        except _NoSecurity:
+            return None
+        check_currency(ticker, security)
+        return security
+
+    async def _with_world_benchmark(self, inputs: SectionInputs | None) -> SectionInputs | None:
+        """``inputs`` plus the ACWI and IEUR histories, refreshed now (None: not wired)."""
+        loader = self.deps.load_world_benchmark
+        if loader is None:
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import SectionInputs
+
+        benchmark = await self.runtime.run(loader)
+        europe_loader = self.deps.load_europe_benchmark
+        europe = None if europe_loader is None else await self.runtime.run(europe_loader)
+        return dataclasses.replace(
+            inputs or SectionInputs(), world_benchmark=benchmark, europe_benchmark=europe
+        )
 
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:

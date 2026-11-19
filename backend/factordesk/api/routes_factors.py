@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from factordesk.api.runtime import Runtime, get_runtime
-from factordesk.data.prices import PriceDataError, validate_ticker
+from factordesk.data.prices import PriceDataError, read_cached_security, validate_ticker
 from factordesk.report.schema import (
     SCHEMA_VERSION,
     ApiError,
@@ -85,12 +85,21 @@ def cached_tickers(price_dir: Path) -> dict[str, date]:
     return found
 
 
+def _cached_name(price_dir: Path, ticker: str) -> str | None:
+    """The company name from the security cache, or None. Reads one small file, no network."""
+    found = read_cached_security(price_dir, ticker)
+    return None if found is None else found.name
+
+
 def suggest(price_dir: Path, q: str, limit: int) -> TickerSuggestions:
     prefix = q.upper()
     matches = [(t, d) for t, d in cached_tickers(price_dir).items() if t.startswith(prefix)]
     matches.sort(key=lambda item: (-item[1].toordinal(), item[0]))
     return TickerSuggestions(
-        items=[TickerSuggestion(ticker=t, last_fetched=d) for t, d in matches[:limit]]
+        items=[
+            TickerSuggestion(ticker=t, last_fetched=d, name=_cached_name(price_dir, t))
+            for t, d in matches[:limit]
+        ]
     )
 
 
@@ -100,5 +109,6 @@ async def get_tickers(
     q: Annotated[str, Query(max_length=12)] = "",
     limit: Annotated[int, Query(ge=1, le=20)] = 8,
 ) -> TickerSuggestions:
-    """Tickers already fetched (prefix match, newest first). Makes no network call."""
+    """Tickers already fetched (prefix match, newest first), with the company name when its
+    metadata is cached. Makes no network call."""
     return await runtime.run(suggest, runtime.deps.data_dir / "prices", q, limit)

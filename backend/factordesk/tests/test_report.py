@@ -41,6 +41,7 @@ from factordesk.report.schema import (
     RiskFactorDetail,
     RollingWindow,
     SampleInfo,
+    SecurityInfo,
     UncoveredTail,
 )
 
@@ -385,6 +386,9 @@ def build_mock_report() -> FactorReport:
             compounded_return=0.0123,
         ),
         audit_status="warnings",
+        security=SecurityInfo(
+            name="Example Corp", currency="USD", exchange="NASDAQ", quote_type="Equity"
+        ),
         audit_findings=[
             AuditFinding(code="mock_info", severity="info", message="MOCK: no splits in window."),
             AuditFinding(

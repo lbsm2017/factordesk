@@ -21,7 +21,7 @@ type KalmanLatest = components["schemas"]["KalmanLatest"];
  * `report/kalman_text.json` that the static panel reads too (a test on each side compares them).
  * Placeholders are written `{name}`.
  */
-const TITLE = text.title;
+const TITLE = "Tracked day by day";
 const QUESTION = text.question;
 
 function fill(template: string, values: Record<string, string | number>): string {

@@ -73,7 +73,8 @@ export interface paths {
         };
         /**
          * Get Tickers
-         * @description Tickers already fetched (prefix match, newest first). Makes no network call.
+         * @description Tickers already fetched (prefix match, newest first), with the company name when its
+         *     metadata is cached. Makes no network call.
          */
         get: operations["get_tickers_api_tickers_get"];
         put?: never;
@@ -187,7 +188,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request";
+            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request";
             /** Message */
             message: string;
             /** Action */
@@ -283,6 +284,49 @@ export interface components {
             factors: components["schemas"]["AverageBeta"][];
         };
         /**
+         * BetaFit
+         * @description One single-factor regression of the stock's excess return, with Newey-West inference.
+         */
+        BetaFit: {
+            /** Beta */
+            beta: number;
+            /**
+             * Se
+             * @description Newey-West standard error of the beta (M0.5).
+             */
+            se: number;
+            /**
+             * Ci Low
+             * @description Normal 95% interval of the beta, lower end.
+             */
+            ci_low: number;
+            /**
+             * Ci High
+             * @description Normal 95% interval of the beta, upper end.
+             */
+            ci_high: number;
+            /**
+             * R2
+             * @description R squared of the regression.
+             */
+            r2: number;
+            /**
+             * Correlation
+             * @description Correlation of the two excess returns.
+             */
+            correlation: number;
+            /**
+             * Alpha Annual
+             * @description Intercept times 252, as a decimal a year.
+             */
+            alpha_annual: number;
+            /**
+             * Alpha T
+             * @description HAC t of the intercept; null on an exact fit.
+             */
+            alpha_t: number | null;
+        };
+        /**
          * CorrPair
          * @description A factor pair whose sample correlation exceeds 0.6 in absolute value (M3.4).
          */
@@ -376,6 +420,8 @@ export interface components {
             audit_status: "clean" | "warnings" | "errors";
             /** Audit Findings */
             audit_findings: components["schemas"]["AuditFinding"][];
+            /** @description Company name, currency and exchange from Yahoo metadata; None when the read failed or the report was written before the field existed. */
+            security: components["schemas"]["SecurityInfo"] | null;
         };
         /**
          * DatasetStamp
@@ -432,6 +478,58 @@ export interface components {
              * @description Plain-language reading of the result.
              */
             reading: string;
+        };
+        /**
+         * DrawdownEpisodeInfo
+         * @description One fall of the compounded return path from a running peak, and its recovery.
+         */
+        DrawdownEpisodeInfo: {
+            /**
+             * Depth
+             * @description Trough value / peak value - 1; negative.
+             */
+            depth: number;
+            /**
+             * Peak Date
+             * Format: date
+             */
+            peak_date: string;
+            /**
+             * Trough Date
+             * Format: date
+             */
+            trough_date: string;
+            /**
+             * Recovery Date
+             * @description First date after the trough where the path regains the peak; None when it has not.
+             */
+            recovery_date: string | null;
+            /**
+             * Days Peak To Trough
+             * @description Trading days from peak to trough.
+             */
+            days_peak_to_trough: number;
+            /**
+             * Days Trough To Recovery
+             * @description Trading days from trough to recovery; None when not recovered.
+             */
+            days_trough_to_recovery: number | null;
+        };
+        /**
+         * DrawdownSeries
+         * @description The fall from the running peak on every day of the compounded return path, for a chart.
+         */
+        DrawdownSeries: {
+            /**
+             * Dates
+             * @description The path origin (the price date before the first analysed return), then each analysed date.
+             */
+            dates: string[];
+            /**
+             * Values
+             * @description Value / running peak - 1 on each date, rounded to 4 decimals; 0.0 at a new high, never positive. Same length as dates.
+             */
+            values: number[];
         };
         /**
          * ExcludedRow
@@ -515,6 +613,10 @@ export interface components {
             label_text: {
                 [key: string]: string;
             };
+            /** @description Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md). */
+            world_beta: components["schemas"]["WorldBetaSection"] | null;
+            /** @description Historical return, volatility, Sharpe ratio and maximum drawdown. */
+            performance: components["schemas"]["PerformanceSection"] | null;
             /** @description Lead-lag betas (docs/specs/lead-lag-betas.md). */
             lead_lag: components["schemas"]["LeadLagSection"] | null;
             /**
@@ -937,6 +1039,159 @@ export interface components {
             windows: components["schemas"]["AlphaWindow"][];
         };
         /**
+         * PerformanceDrawdown
+         * @description Maximum drawdown and the deepest episodes.
+         */
+        PerformanceDrawdown: {
+            /**
+             * Max Drawdown
+             * @description Deepest fall from a running peak; 0 when the path never fell.
+             */
+            max_drawdown: number;
+            /**
+             * Peak Date
+             * @description None when there was no drawdown.
+             */
+            peak_date: string | null;
+            /** Trough Date */
+            trough_date: string | null;
+            /**
+             * Recovery Date
+             * @description None when not recovered or no drawdown.
+             */
+            recovery_date: string | null;
+            /** Days Peak To Trough */
+            days_peak_to_trough: number | null;
+            /** Days Trough To Recovery */
+            days_trough_to_recovery: number | null;
+            /**
+             * Episodes
+             * @description Up to five distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown.
+             */
+            episodes: components["schemas"]["DrawdownEpisodeInfo"][];
+            /** @description Daily drawdown over the analysed window. */
+            series: components["schemas"]["DrawdownSeries"];
+        };
+        /**
+         * PerformancePeriods
+         * @description The analysed span.
+         */
+        PerformancePeriods: {
+            /**
+             * N Days
+             * @description Daily observations of the analysed sample.
+             */
+            n_days: number;
+            /**
+             * Start
+             * Format: date
+             * @description First analysed date.
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             * @description Last analysed date.
+             */
+            end: string;
+            /**
+             * Years
+             * @description n_days / 252.
+             */
+            years: number;
+        };
+        /**
+         * PerformanceReturns
+         * @description Growth of the stock over the window (simple daily total returns, M1.3).
+         */
+        PerformanceReturns: {
+            /**
+             * Cagr
+             * @description Compound annual growth rate: prod(1 + r)^(252 / n) - 1.
+             */
+            cagr: number;
+            /**
+             * Cumulative Return
+             * @description prod(1 + r) - 1 over the window.
+             */
+            cumulative_return: number;
+            /**
+             * Mean Return Annual
+             * @description Arithmetic mean of daily returns times 252; ignores compounding.
+             */
+            mean_return_annual: number;
+        };
+        /**
+         * PerformanceSection
+         * @description Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed stock.
+         *
+         *     Descriptive and in-sample: it says what happened over the window, not what will happen.
+         *     Statuses: ``ok``; ``insufficient_data`` (fewer than 60 daily observations); ``failed``.
+         */
+        PerformanceSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            periods: components["schemas"]["PerformancePeriods"] | null;
+            returns: components["schemas"]["PerformanceReturns"] | null;
+            /**
+             * Volatility Annual
+             * @description sqrt(252) x sample sd (ddof 1) of daily simple returns.
+             */
+            volatility_annual: number | null;
+            sharpe: components["schemas"]["PerformanceSharpe"] | null;
+            drawdown: components["schemas"]["PerformanceDrawdown"] | null;
+        };
+        /**
+         * PerformanceSharpe
+         * @description Sharpe ratio of the daily excess returns (stock return minus the factor file's RF).
+         */
+        PerformanceSharpe: {
+            /**
+             * Ratio Annual
+             * @description sqrt(252) x mean(excess) / sd(excess), ddof 1; None when the excess returns do not vary (the ratio is not defined).
+             */
+            ratio_annual: number | null;
+            /**
+             * Ratio Daily
+             * @description mean(excess) / sd(excess); None as above.
+             */
+            ratio_daily: number | null;
+            /**
+             * Mean Excess Annual
+             * @description 252 x mean of daily excess returns.
+             */
+            mean_excess_annual: number;
+            /**
+             * Sharpe Se Iid
+             * @description Approximate standard error of the annual ratio, sqrt(252) x sqrt((1 + SR_daily^2 / 2) / n) (Lo 2002). Assumes independent, identically distributed returns.
+             */
+            sharpe_se_iid: number | null;
+            /**
+             * Ci95 Low
+             * @description ratio_annual - 1.96 x sharpe_se_iid.
+             */
+            ci95_low: number | null;
+            /**
+             * Ci95 High
+             * @description ratio_annual + 1.96 x sharpe_se_iid.
+             */
+            ci95_high: number | null;
+            /**
+             * Ci Includes Zero
+             * @description True when the 95% interval contains 0; None when the ratio is not defined.
+             */
+            ci_includes_zero: boolean | null;
+        };
+        /**
          * PowerStatement
          * @description What the test behind the tags can detect for one factor (SB5).
          */
@@ -987,6 +1242,95 @@ export interface components {
              * @description Last date with factor data; later points are drawn muted.
              */
             factor_coverage_end: string;
+        };
+        /**
+         * ProxyBeta
+         * @description The quick beta against one more proxy (Europe: IEUR), with its own status.
+         *
+         *     Holds what the ACWI fields of ``WorldBetaSection`` hold, for one proxy: the beta against the
+         *     proxy and against the US market on the same days, the comparison, the days and the price
+         *     history it rests on. It answers for its own numbers: a block that is not ``ok`` has no fit.
+         */
+        ProxyBeta: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            /**
+             * Label
+             * @description Index the proxy stands in for, for example 'MSCI Europe'.
+             */
+            label: string;
+            /**
+             * Proxy
+             * @description Yahoo ticker of the proxy fund, for example 'IEUR'.
+             */
+            proxy: string;
+            /**
+             * N Days
+             * @description Days common to the analysis sample and the proxy.
+             */
+            n_days: number;
+            /**
+             * Start
+             * @description First of those common days.
+             */
+            start: string | null;
+            /**
+             * End
+             * @description Last of those common days.
+             */
+            end: string | null;
+            /**
+             * Hac Lags
+             * @description Newey-West lags of both regressions; null if none.
+             */
+            hac_lags: number | null;
+            /**
+             * N Not In Benchmark
+             * @description Rows of the analysis sample with no usable proxy return.
+             */
+            n_not_in_benchmark: number;
+            /**
+             * First Date
+             * @description First date of the proxy price history used; null if there is none.
+             */
+            first_date: string | null;
+            /**
+             * Last Date
+             * @description Last date of the proxy price history used; null if there is none.
+             */
+            last_date: string | null;
+            /**
+             * Note
+             * @description Set when the proxy refresh failed: where the cached history ends, or why there is none.
+             */
+            note: string | null;
+            /**
+             * Audit Warnings
+             * @description Warnings of the proxy price audit (M1.4).
+             */
+            audit_warnings: string[];
+            /** @description Against the proxy fund, excess of RF. */
+            benchmark: components["schemas"]["BetaFit"] | null;
+            /** @description Against the US market, same days. */
+            us_market: components["schemas"]["BetaFit"] | null;
+            /**
+             * Comparison
+             * @description Proxy beta against the US market beta: about_the_same when the two 95% intervals overlap, otherwise higher or lower (a reading of the intervals, not a test).
+             */
+            comparison: ("about_the_same" | "higher" | "lower") | null;
+            /**
+             * Comparison Text
+             * @description The plain reading of the comparison.
+             */
+            comparison_text: string | null;
         };
         /**
          * QualityGate
@@ -1050,7 +1394,7 @@ export interface components {
              * Preset
              * @enum {string}
              */
-            preset: "3Y" | "5Y" | "FULL";
+            preset: "3Y" | "5Y" | "10Y" | "FULL";
             /** Start */
             start: string | null;
             /** N Obs */
@@ -1062,7 +1406,7 @@ export interface components {
         };
         /**
          * RangeOptions
-         * @description Availability of every preset for one ticker (always three, in preset order).
+         * @description Availability of every preset for one ticker (always four, in preset order).
          */
         RangeOptions: {
             /** Ticker */
@@ -1920,6 +2264,32 @@ export interface components {
             factor_vintage: components["schemas"]["FactorVintage"];
         };
         /**
+         * SecurityInfo
+         * @description What Yahoo says the ticker is; every field is None when Yahoo did not say.
+         */
+        SecurityInfo: {
+            /**
+             * Name
+             * @description Company or fund name.
+             */
+            name: string | null;
+            /**
+             * Currency
+             * @description Quote currency as Yahoo reports it, e.g. 'USD' or 'GBp'.
+             */
+            currency: string | null;
+            /**
+             * Exchange
+             * @description Exchange label, e.g. 'NASDAQ'.
+             */
+            exchange: string | null;
+            /**
+             * Quote Type
+             * @description Security type for the header badge: 'ETF' or 'Equity'; omitted otherwise.
+             */
+            quote_type: string | null;
+        };
+        /**
          * ShrinkagePrior
          * @description The prior the betas were pulled toward (SB2) and what it was estimated from.
          */
@@ -2131,6 +2501,11 @@ export interface components {
              * Format: date
              */
             last_fetched: string;
+            /**
+             * Name
+             * @description Company name when its metadata is already cached.
+             */
+            name: string | null;
         };
         /** TickerSuggestions */
         TickerSuggestions: {
@@ -2174,6 +2549,82 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WorldBetaSection
+         * @description The quick beta against ACWI next to the beta against the US market, on the same days.
+         */
+        WorldBetaSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Proxy
+             * @description Yahoo ticker of the world proxy.
+             * @constant
+             */
+            proxy: "ACWI";
+            /**
+             * Hac Lags
+             * @description Newey-West lags of both regressions; null if none.
+             */
+            hac_lags: number | null;
+            /**
+             * N Sample
+             * @description Rows of the analysis sample.
+             */
+            n_sample: number;
+            /**
+             * N Not In Benchmark
+             * @description Rows of the analysis sample with no usable ACWI return.
+             */
+            n_not_in_benchmark: number;
+            /**
+             * Acwi First Date
+             * @description First date of the ACWI price history used; null if there is none.
+             */
+            acwi_first_date: string | null;
+            /**
+             * Acwi Last Date
+             * @description Last date of the ACWI price history used; null if there is none.
+             */
+            acwi_last_date: string | null;
+            /**
+             * Acwi Note
+             * @description Set when the ACWI refresh failed: where the cached history ends, or why there is none.
+             */
+            acwi_note: string | null;
+            /**
+             * Audit Warnings
+             * @description Warnings of the ACWI price audit (M1.4).
+             */
+            audit_warnings: string[];
+            /** @description Against the world: ACWI, excess of RF. */
+            world: components["schemas"]["BetaFit"] | null;
+            /** @description Against the US market, same days. */
+            us_market: components["schemas"]["BetaFit"] | null;
+            /**
+             * Comparison
+             * @description World beta against the US market beta: about_the_same when the two 95% intervals overlap, otherwise higher or lower (a reading of the intervals, not a test).
+             */
+            comparison: ("about_the_same" | "higher" | "lower") | null;
+            /**
+             * Comparison Text
+             * @description The plain reading of the comparison.
+             */
+            comparison_text: string | null;
+            /** @description The same quick beta against the Europe proxy (IEUR, stand-in for MSCI Europe), with its own status and reason; null when it was not computed. The section status is that of the ACWI fields above, so a failed Europe block never changes it. */
+            europe: components["schemas"]["ProxyBeta"] | null;
+            /** Labels */
+            labels: ("L-DESC" | "L-WORLD-PROXY" | "L-WORLD-ASYNC")[];
         };
     };
     responses: never;
@@ -2374,7 +2825,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Range preset; not together with start or end. */
-                range?: ("3Y" | "5Y" | "FULL") | null;
+                range?: ("3Y" | "5Y" | "10Y" | "FULL") | null;
                 /** @description First requested date, YYYY-MM-DD. */
                 start?: string | null;
                 /** @description Last requested date, YYYY-MM-DD. */
@@ -2457,7 +2908,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Range preset; not together with start or end. */
-                range?: ("3Y" | "5Y" | "FULL") | null;
+                range?: ("3Y" | "5Y" | "10Y" | "FULL") | null;
                 /** @description First requested date, YYYY-MM-DD. */
                 start?: string | null;
                 /** @description Last requested date, YYYY-MM-DD. */

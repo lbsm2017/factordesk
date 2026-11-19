@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
+import { StatsProvider } from "../../state/stats";
 import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
 import { buildRollingBlock, buildRowOption, ROLLING_GROUP, RollingPanel } from "./RollingPanel";
@@ -48,7 +49,7 @@ function cells(row: Element): string[] {
 describe("ReturnPanel", () => {
   it("shows every contribution, the hatched residual, the total and the memo list", () => {
     const { container } = render(<ReturnPanel report={mockReport} />);
-    expect(screen.getByRole("heading", { level: 2, name: "Where the return came from" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Return sources" })).toBeTruthy();
     const rows = Array.from(container.querySelectorAll("tbody tr"));
     expect(rows.map((r) => cells(r).filter((_, i) => i !== 1))).toEqual([
       ["Mkt-RFMarket", "+11.57%", "Yes"],
@@ -67,9 +68,36 @@ describe("ReturnPanel", () => {
     expect(container.querySelector("tr.total line.total-cap")).not.toBeNull();
     expect(screen.getByText("Not in the sum")).toBeTruthy();
     expect(container.querySelectorAll(".memo li")).toHaveLength(2);
-    expect(container.querySelector(".reading")?.textContent).toBe(
-      "Of the 12.64% average excess return a year, market exposure accounts for 11.57%. Alpha adds +0.81%, but it is not significant.",
+    expect(container.querySelector(".q")?.textContent).toBe(
+      "Market exposure accounts for most of the 12.6% a year SPY earned above cash (+11.6%).",
     );
+    expect(container.querySelector(".q")?.getAttribute("title")).toBe(
+      "How much of the average yearly return does each factor explain?",
+    );
+    expect(container.querySelector(".reading")).toBeNull();
+  });
+
+  it("colours signed values green or red, leaves zero ink, and quiets rows that could be noise", () => {
+    const { container } = render(<ReturnPanel report={mockReport} />);
+    const value = (id: string) => container.querySelector(`#${id} td.num.strong`);
+    expect(value("ret-Mkt-RF")?.classList.contains("num-pos")).toBe(true);
+    expect(container.querySelector("#ret-Mkt-RF rect")?.getAttribute("class")).toBe("pos bar-pos");
+    expect(value("ret-alpha")?.classList.contains("num-pos")).toBe(true);
+    expect(container.querySelector("#ret-alpha")?.classList.contains("is-noise")).toBe(true);
+    expect(container.querySelector("#ret-Mkt-RF")?.classList.contains("is-noise")).toBe(false);
+    expect(value("ret-CMA")?.className).toBe("num strong");
+    expect(container.querySelector("tr.resid td.num.strong")?.className).toBe("num strong");
+    expect(container.querySelector("tr.total td.num.strong")?.classList.contains("num-pos")).toBe(true);
+  });
+
+  it("colours a negative contribution and a negative total red", () => {
+    const report = cloneReport();
+    report.return_contribution.factors["SMB"] = -0.0042;
+    report.return_contribution.total_annualised_mean_excess_return = -0.03;
+    const { container } = render(<ReturnPanel report={report} />);
+    expect(container.querySelector("#ret-SMB td.num.strong")?.classList.contains("num-neg")).toBe(true);
+    expect(container.querySelector("#ret-SMB rect")?.getAttribute("class")).toBe("neg bar-neg");
+    expect(container.querySelector("tr.total td.num.strong")?.classList.contains("num-neg")).toBe(true);
   });
 
   it("keeps the footnote to one sentence plus a folded method note", () => {
@@ -109,8 +137,18 @@ describe("ReturnPanel", () => {
 });
 
 describe("RiskPanel", () => {
-  it("lists rows in the report's order with share, beta, factor vol and correlation", () => {
+  it("shows only the share while statistics are off", () => {
     const { container } = render(<RiskPanel report={mockReport} />);
+    const heads = Array.from(container.querySelectorAll("thead th")).map((h) => h.textContent);
+    expect(heads).toEqual(["Source", "Chart", "Share"]);
+  });
+
+  it("lists rows in the report's order with share, beta, factor vol and correlation", () => {
+    const { container } = render(
+      <StatsProvider initial>
+        <RiskPanel report={mockReport} />
+      </StatsProvider>,
+    );
     const rows = Array.from(container.querySelectorAll("tbody tr"));
     expect(rows.map((r) => (r.querySelector("th .fname")?.textContent ?? ""))).toEqual([
       "Mkt-RF",
@@ -135,8 +173,11 @@ describe("RiskPanel", () => {
 
   it("reads the top share, the stock-specific share, total volatility and the sentences", () => {
     const { container } = render(<RiskPanel report={mockReport} />);
+    expect(container.querySelector(".q")?.textContent).toBe(
+      "Market exposure drives 99.4% of SPY's day-to-day risk; 0.5% is specific to SPY.",
+    );
     expect(container.querySelector(".reading")?.textContent).toBe(
-      "Mkt-RF drives 99.4% of the variance; stock-specific risk is 0.5%. Total volatility is 17.0% a year. MOCK: SMB ranks #2 by risk but only #4 by beta size.",
+      "Total volatility is 17.0% a year. MOCK: SMB ranks #2 by risk but only #4 by beta size.",
     );
     expect(container.querySelector("details.how")?.textContent).toContain("Euler decomposition");
   });
@@ -144,7 +185,7 @@ describe("RiskPanel", () => {
   it("extends the domain to the left for a negative share", () => {
     const { container } = render(<RiskPanel report={mockReport} />);
     const labels = Array.from(container.querySelectorAll("tr.axis-row .axis span")).map((s) => s.textContent);
-    expect(labels).toEqual(["−50%", "0%", "50%", "100%", "150%"]);
+    expect(labels).toEqual(["0%", "50%", "100%"]);
   });
 
   it("shows an empty state when the statistic is not ok", () => {

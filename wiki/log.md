@@ -7,6 +7,20 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-18 (performance metrics)
+
+- The owner asked for the stock's own annualised return, volatility, Sharpe ratio and maximum drawdown in the report. Added [the decision page](decision-performance-metrics.md) and an index entry. The section is built on `feat/performance` and not yet independently validated.
+## 2026-11-19 (world beta, after validation)
+
+- Updated [the world beta decision page](decision-world-beta.md) after the independent validation: names aligned with the dashboard spec, one short attempt when a cache exists, late dividends and a monthly full download, no alpha t on an exact fit, audit errors only inside the overlap fail the section. "Many non-US stocks" stays (MSCI ACWI factsheet, 30 October 2026: United States 64.63%).
+
+## 2026-11-19 (world beta)
+
+- Added [the world beta decision page](decision-world-beta.md): a quick beta against the iShares MSCI ACWI ETF (a stand-in for the MSCI ACWI index, which has no free daily data), shown next to the US market beta on the same days. Rejected: MSCI index data, a global factor model, a Dimson correction. The ACWI price cache is refreshed incrementally on every report build (owner instruction, 2026-11-18). Built on `feat/world-beta`; not validated yet.
+## 2026-11-18 (dashboard v2 specification)
+
+- Added [Dashboard v2: outcome first with a sidebar](decision-dashboard-v2.md) from the owner's answers of 2026-11-18 (sidebar holds controls and section links, formula removed, dashboard first, company name, stack unchanged, performance and world beta sections, fintech-tool palette and IBM Plex Sans). Specified on branch `feat/ui-v2-spec` in `docs/specs/dashboard-v2.md` and `docs/design/report-design.md` revision 3 (commits `dabbff7`, `07d77a7`). Nothing is built; the look waits for the owner's approval of the prototype.
+
 ## 2026-11-18 (nightly slow tests)
 
 - The owner approved a nightly GitHub Actions workflow for the slow and live tests. Added [the decision page](decision-nightly-slow-tests.md). The workflow has not yet run on GitHub.
@@ -126,3 +140,14 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 
 - `docs/ROADMAP.md` updated (update 3): ranks 1, 8, 12 and 14 are Done on `dev`, not on `prod`; the nightly workflow is merged but has not run on GitHub; three new tickets (currency check N1, browser and accessibility pass N2, Kalman screen-reader strings N3) and an open-items list added.
 - The nightly `slow` job now sets `FACTORDESK_KB_REPS` to 200 (`.github/workflows/nightly.yml`, `wiki/decision-nightly-slow-tests.md`). Not verified until it runs on GitHub.
+
+## 2026-11-19 (integration of the dashboard v2 branches)
+
+- Company name and currency refusal, performance, world beta, the dashboard v2 specification and the design prototypes merged into `integrate/ui-v2`. Not merged to dev.
+- The schema version stays at 4: the `performance` and `world_beta` sections and `data.security` are additive optional fields (contract SC5). The "5" that the security branch wrote was reverted; a version 4 file written before `data.security` still loads.
+- `SECTIONS` and the section fields are listed in panel order: world beta (350), performance (450), then the five of the contract.
+
+## 2026-11-19 (Europe benchmark for the world beta)
+
+- The world beta section gets an optional `europe` block (IEUR, stand-in for MSCI Europe), computed by the same hook, cache and refresh as ACWI, with its own status. Schema version stays 4. `wiki/decision-world-beta.md` has the plain-English entry; the hand-off has the field names and live numbers (section 10).
+- The static world beta panel moved from position 350 to 505, and the static header company line is now a sentence.

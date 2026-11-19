@@ -1,10 +1,11 @@
 /**
  * Ordered panel registry of the report page (schema v3 contract, SC3.4 and SC4). `ReportView` draws
- * `orderedPanels()` in position order. Names and positions match the static report's registry
- * (`backend/factordesk/report/panel_registry.py`); `notice` exists only here, because the static
- * page draws the notice inside its header.
+ * `orderedPanels()` in position order. Names match the static report's registry
+ * (`backend/factordesk/report/panel_registry.py`) where they exist there; positions follow the
+ * sidebar order (prototype v4a), which the static report does not; `summary` replaces the old
+ * notice, equation and KPI strip, and carries the data notes (anchor `#notice`).
  *
- * The five optional sections are already listed, each pointing at its own component under
+ * The optional sections are already listed, each pointing at its own component under
  * `sections/`; a feature fills its component in and never edits this file. Each of those
  * components renders nothing while its report field is null.
  */
@@ -13,21 +14,19 @@ import type { FactorReport } from "../../api/types";
 import type { RollingWindowDays } from "../../state/url";
 import { Colophon } from "./Colophon";
 import { DataAuditPanel } from "./DataAuditPanel";
-import { Equation } from "./Equation";
 import { ExposuresPanel } from "./ExposuresPanel";
 import { Header } from "./Header";
-import { KpiStrip } from "./KpiStrip";
-import { Notice } from "./Notice";
 import { PricePanel } from "./PricePanel";
-import { RegressionDetail } from "./RegressionDetail";
 import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
 import { RollingPanel } from "./RollingPanel";
+import { SummaryPanel } from "./SummaryPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
-import { KalmanPanel } from "./sections/KalmanPanel";
+import { LazyKalmanPanel, LazyRegressionDetail, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
+import { PerformancePanel } from "./sections/PerformancePanel";
 import { ResidualAlphaPanel } from "./sections/ResidualAlphaPanel";
-import { ShrunkBetasPanel } from "./sections/ShrunkBetasPanel";
+import { WorldBetaPanel } from "./sections/WorldBetaPanel";
 
 /** What `ReportView` hands to every panel; each panel reads the props it needs. */
 export interface PanelHostProps {
@@ -49,21 +48,21 @@ export interface PanelEntry {
 
 export const PANELS: readonly PanelEntry[] = [
   { name: "header", position: 100, Component: Header },
-  { name: "notice", position: 150, Component: Notice },
-  { name: "equation", position: 200, Component: Equation },
-  { name: "kpis", position: 300, Component: KpiStrip },
+  { name: "summary", position: 200, Component: SummaryPanel },
   { name: "price", position: 400, Component: PricePanel },
+  { name: "performance", position: 450, Component: PerformancePanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
-  { name: "lead_lag", position: 510, Component: LeadLagPanel },
-  { name: "shrunk", position: 520, Component: ShrunkBetasPanel },
-  { name: "fragility", position: 530, Component: FragilityPanel },
+  { name: "world_beta", position: 505, Component: WorldBetaPanel },
   { name: "returns", position: 600, Component: ReturnPanel },
   { name: "risk", position: 700, Component: RiskPanel },
-  { name: "residual_alpha", position: 710, Component: ResidualAlphaPanel },
-  { name: "rolling", position: 800, Component: RollingPanel },
-  { name: "kalman", position: 810, Component: KalmanPanel },
+  { name: "rolling", position: 710, Component: RollingPanel },
+  { name: "residual_alpha", position: 800, Component: ResidualAlphaPanel },
+  { name: "kalman", position: 810, Component: LazyKalmanPanel },
+  { name: "shrunk", position: 820, Component: LazyShrunkBetasPanel },
+  { name: "lead_lag", position: 830, Component: LeadLagPanel },
+  { name: "fragility", position: 840, Component: FragilityPanel },
   { name: "data", position: 900, Component: DataAuditPanel },
-  { name: "regression_detail", position: 1000, Component: RegressionDetail },
+  { name: "regression_detail", position: 1000, Component: LazyRegressionDetail },
   { name: "colophon", position: 1100, Component: Colophon },
 ];
 

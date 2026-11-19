@@ -16,6 +16,9 @@ export interface ChartTokens {
   sans: string;
 }
 
+/** Smallest text size in px anywhere on the page, chart text included (design rev 3). */
+export const CHART_FONT_PX = 14;
+
 const FALLBACK = "currentColor";
 
 /** Read the tokens from `element` (default: the document root). Empty values fall back to currentColor. */

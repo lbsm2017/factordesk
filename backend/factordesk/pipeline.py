@@ -64,8 +64,11 @@ from factordesk.data.audit import AuditReport, audit_prices
 from factordesk.data.prices import (
     PriceHistory,
     PriceProvider,
+    Security,
     YFinanceProvider,
+    check_currency,
     collapse_duplicate_dates,
+    security_of,
     validate_ticker,
 )
 from factordesk.report.schema import (
@@ -93,6 +96,7 @@ from factordesk.report.schema import (
     RiskFactorDetail,
     RollingWindow,
     SampleInfo,
+    SecurityInfo,
     Severity,
     Status,
     UncoveredTail,
@@ -102,8 +106,10 @@ from factordesk.section_hooks import fragility as fragility_hook
 from factordesk.section_hooks import kalman as kalman_hook
 from factordesk.section_hooks import lead_lag as lead_lag_hook
 from factordesk.section_hooks import load_section_inputs
+from factordesk.section_hooks import performance as performance_hook
 from factordesk.section_hooks import residual_alpha as residual_alpha_hook
 from factordesk.section_hooks import shrunk as shrunk_hook
+from factordesk.section_hooks import world_beta as world_beta_hook
 from factordesk.section_hooks.context import CoreSections, SectionContext, SectionInputs
 
 STALE_AFTER_DAYS = factor_data.STALE_AFTER_DAYS
@@ -115,8 +121,9 @@ NOTE_SURVIVORSHIP = (
 )
 NOTE_US_FACTORS = (
     "The factors are US Fama-French factors in USD. Applied to a non-US stock or a non-USD "
-    "price series, betas mix factor exposure with currency and local-market effects; this "
-    "version does not check the ticker's currency."
+    "price series, betas mix factor exposure with currency and local-market effects. A ticker "
+    "that Yahoo reports in another currency is refused; when Yahoo reports no currency, the "
+    "ticker is analysed without that check."
 )
 NOTE_DESC = "Every statistic is descriptive and in-sample, not predictive."
 
@@ -715,6 +722,21 @@ def _warnings(
     return out
 
 
+_QUOTE_TYPE_LABELS = {"ETF": "ETF", "EQUITY": "Equity"}
+"""Yahoo ``quoteType`` values shown as a badge; any other type is left out."""
+
+
+def _security_info(security: Security | None) -> SecurityInfo | None:
+    if security is None or (security.name, security.currency, security.exchange) == (None,) * 3:
+        return None
+    return SecurityInfo(
+        name=security.name,
+        currency=security.currency,
+        exchange=security.exchange,
+        quote_type=_QUOTE_TYPE_LABELS.get((security.quote_type or "").upper()),
+    )
+
+
 def _excluded_by_reason(sample: AnalysisSample) -> dict[str, int]:
     counts: dict[str, int] = {}
     for e in sample.excluded:
@@ -735,13 +757,17 @@ def assemble_report(
     start: date | None = None,
     end: date | None = None,
     section_inputs: SectionInputs | None = None,
+    security: Security | None = None,
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
     ``start`` and ``end`` are the requested range (M2); None means the first return date and
     the last price date. They are reported as given, so nothing is clipped silently.
-    ``section_inputs`` holds extra data for the optional sections (None: none).
+    ``section_inputs`` holds extra data for the optional sections (None: none). ``security`` is
+    the Yahoo metadata of the ticker (None: unknown); a known currency other than USD raises
+    ``UnsupportedCurrencyError`` (roadmap N1, an unknown currency does not).
     """
+    check_currency(ticker, security)
     history = unique_dates(history)
     audit = audit_prices(history.frame, duplicate_dates=history.duplicate_dates)
     sample = build_sample(history, factor_frame, start, end)
@@ -791,6 +817,7 @@ def assemble_report(
             factor_last_date=sample.factor_last_date,
             compounded_return=sample.uncovered.compounded_return,
         ),
+        security=_security_info(security),
         audit_status=_audit_status(audit),
         audit_findings=[
             AuditFinding(
@@ -836,15 +863,19 @@ def assemble_report(
         make_sample_info=lambda window: _sample_info(sample, vintage, window),
     )
     # Optional sections (schema v3 contract SC3.2), in panel order. Each hook sees only the core.
+    performance = performance_hook.build_performance(ctx)
     lead_lag = lead_lag_hook.build_lead_lag(ctx)
     shrunk_betas = shrunk_hook.build_shrunk_betas(ctx)
     fragility = fragility_hook.build_fragility(ctx)
+    world_beta = world_beta_hook.build_world_beta(ctx)
     residual = residual_alpha_hook.build_residual_analysis(ctx)
     kalman_betas = kalman_hook.build_kalman_betas(ctx)
     present: dict[str, object | None] = {
+        "performance": performance,
         "lead_lag": lead_lag,
         "shrunk_betas": shrunk_betas,
         "fragility": fragility,
+        "world_beta": world_beta,
         "residual": residual,
         "kalman_betas": kalman_betas,
     }
@@ -864,9 +895,11 @@ def assemble_report(
         warnings=_warnings(sample, reg, audit, days_behind, gate),
         notes=[NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS, NOTE_SURVIVORSHIP],
         label_text=report_label_text(present),
+        performance=performance,
         lead_lag=lead_lag,
         shrunk_betas=shrunk_betas,
         fragility=fragility,
+        world_beta=world_beta,
         residual=residual,
         kalman_betas=kalman_betas,
     )
@@ -890,9 +923,11 @@ def build_report(
     ``start`` and ``end`` limit the requested range (None: the whole price history).
     ``section_inputs`` is the extra data of the optional sections; None fetches it through
     ``section_hooks.load_section_inputs`` (nothing is fetched when ``factors`` is injected).
-    Raises ``PriceDataError`` (bad or unknown ticker), ``FactorError`` (factor data
-    unavailable), ``InsufficientHistoryError`` (fewer than 504 aligned rows) or
-    ``DegenerateInputError`` (price that does not move, singular factor design; D30).
+    Raises ``PriceDataError`` (bad or unknown ticker), ``UnsupportedCurrencyError`` (Yahoo
+    reports a currency other than USD; checked before the price history is downloaded),
+    ``FactorError`` (factor data unavailable), ``InsufficientHistoryError`` (fewer than 504
+    aligned rows) or ``DegenerateInputError`` (price that does not move, singular factor
+    design; D30).
     """
     if now is None:
         now = datetime.now(UTC)
@@ -912,6 +947,8 @@ def build_report(
     provider: PriceProvider = (
         price_provider if price_provider is not None else YFinanceProvider(now=lambda: now_utc)
     )
+    security = security_of(provider, symbol)
+    check_currency(symbol, security)
     history = provider.fetch(symbol)
     inputs = (
         section_inputs
@@ -920,6 +957,7 @@ def build_report(
             now_utc,
             offline=factors is not None,
             factor_last_date=pd.Timestamp(factor_frame.index[-1]).date(),
+            price_provider=provider,
         )
     )
     return assemble_report(
@@ -931,6 +969,7 @@ def build_report(
         start=start,
         end=end,
         section_inputs=inputs,
+        security=security,
     )
 
 

@@ -1,6 +1,6 @@
 # factordesk roadmap
 
-Last updated 2026-11-18 (update 3). Now / Next / Later format. A roadmap is a plan, not a promise: items move
+Last updated 2026-11-18 (update 4). Now / Next / Later format. A roadmap is a plan, not a promise: items move
 when evidence changes. Every statistical item follows `docs/research-protocol.md` (hypothesis and
 test written down first, logged, independently reviewed) before it ships.
 
@@ -19,7 +19,8 @@ test written down first, logged, independently reviewed) before it ships.
   hand with `workflow_dispatch` before relying on it.
 - **In progress:** the data-source comparison of Yahoo, Tiingo and Alpaca (blocks rank 11).
 - **Specified, not built:** report redesign (`docs/design/report-design.md`), regional datasets
-  (`docs/methodology-datasets.md`), fragility score, lead-lag betas.
+  (`docs/methodology-datasets.md`), fragility score, lead-lag betas, dashboard v2
+  (`docs/specs/dashboard-v2.md`, epic 17; the prototype needs the owner's approval first).
 - **Owner ranking (2026-11-18, re-scored in update 2):** 16 epics are ranked in the priority ranking
   below. Items 1 to 4, 8, 12 and 14 are Done (on `dev`). Item 5 is Next. Items 6, 9, 10, 11 and 15
   are Later, and items 7, 13 and 16 are Very later. Three new tickets are listed under the table
@@ -48,6 +49,8 @@ Ranks keep the owner order of 2026-11-18. Done rows show a dash for RICE; their 
 | 14 | Kalman betas | - | - | - | - | - | Could | next, before later items | Done: merged into dev in PR #2 on 2026-11-18; independently validated (conditions met); slow tests ran at 200 replications on 2026-11-18; not on prod | Schema contract (done) |
 | 15 | European mode | 3 | 2 | 0.5 | 20 | 0.15 | Won't (this round) | later | Not started; D16 covers RF source, ECB FX, regressor default, Canada | Owner decisions D16 and F13 (F13 decided on 2026-11-18: refuse non-USD until European factors exist) |
 | 16 | Alpaca adapter | 2 | 1 | 0.5 | 8 | 0.13 | Won't (this round) | very later | Not started | none |
+| 17 | Dashboard v2: sidebar, plain-language verdict, switches, company name, performance, world beta | 10 | 2 | 0.7 | 14 | 1.0 | Should | ok (plan approved 2026-11-18; dashboard first) | Stage 0 (spec) done on branch `feat/ui-v2-spec`: `docs/specs/dashboard-v2.md`, design rev 3, wiki page. Stage 1 (prototype) in progress; the owner must approve the look before Stage 2. Stage 2 (React port, tickets V1 to V9, V14, V16; backend V6, V13, V15) and Stage 3 (integration and review, V10 to V12) not started | Stage 1 owner approval of the look; N1 currency check folds into ticket V6; V13 (`feat/performance`) and V15 (`feat/world-beta`) for V14 and V16 |
+| 18 | Static report port of dashboard v2 | 5 | 1 | 0.6 | 6 | 0.5 | Could | later | Not started. Until then the static report keeps design rev 2 plus the company name line and the performance and world beta panels | Epic 17 merged |
 
 The RICE values are the chief of staff's estimates, not measured results. RICE is Reach x Impact x
 Confidence / Effort. Effort counts agent sessions of about 30 minutes each. Values for ranks 6, 7, 9,
@@ -59,7 +62,7 @@ precise.
 
 | Id | Ticket | Reach | Impact | Confidence | Effort | RICE | MoSCoW | Source |
 |---|---|---|---|---|---|---|---|---|
-| N1 | Currency check (F13): read the currency from Yahoo metadata and refuse a non-USD ticker with a clear message until European factors exist (owner decision, 2026-11-18). Then add the decision entry (D-entry) that M1.5 lacks | 4 | 1 | 0.8 | 1 | 3.2 | Should | `docs/validation/spy-hardening-closure-2026-11-18.md`, row F13 and deferral D-4; `docs/methodology.md` M1.5 |
+| N1 | Currency check (F13): read the currency from Yahoo metadata and refuse a non-USD ticker with a clear message until European factors exist (owner decision, 2026-11-18). Then add the decision entry (D-entry) that M1.5 lacks. Update 4: folded into ticket V6 of epic 17, which makes the same metadata read for the company name (`docs/specs/dashboard-v2.md`, DV2.3) | 4 | 1 | 0.8 | 1 | 3.2 | Should | `docs/validation/spy-hardening-closure-2026-11-18.md`, row F13 and deferral D-4; `docs/methodology.md` M1.5 |
 | N2 | Real-browser pass over the three new panels (shrunk, Kalman, residual), plus screen readers, Firefox, Safari and print for the React page. Needs the owner's devices for screen readers | 6 | 1 | 0.7 | 3 | 1.4 | Should | "What I could not check" in `docs/reviews/shrunk-betas-validation-2026-11-18.md`; "Not verified yet" in `docs/dashboard.md` |
 | N3 | Align the screen-reader strings of the Kalman panels (static and React) and move them into `kalman_text.json` | 2 | 0.25 | 0.8 | 1 | 0.4 | Could | F7 in `docs/reviews/kalman-betas-validation-2026-11-18.md` |
 
@@ -95,7 +98,8 @@ ranks them.
 | Item | Why it matters | Status | Depends on |
 |---|---|---|---|
 | First GitHub CI run (rank 5) | Runs the checks on GitHub for every pull request | Done except: the Playwright cache hit path needs a third run, and the nightly workflow needs one manual run (`workflow_dispatch`) | PR #1 (done), PR #3 (done) |
-| N1 Currency check, refuse non-USD (new, Should, RICE 3.2) | Stops a silent wrong result for a ticker quoted in another currency | Not started; owner decided to refuse on 2026-11-18 | Owner ranking |
+| Dashboard v2 (rank 17, Should, RICE 1.0) | The owner found the page too small, too dense and not saying the outcome; v2 puts a plain verdict first, a navy sidebar with controls and section links, a Show statistics switch, the company name, performance and a quick world beta | Stage 0 spec done (2026-11-18, `docs/specs/dashboard-v2.md`); Stage 1 prototype in progress; **Stage 2 starts only after the owner approves the look from the Stage 1 screenshots**; backend tickets V6, V13 and V15 may start at once | Owner approval at Stage 1 |
+| N1 Currency check, refuse non-USD (new, Should, RICE 3.2) | Stops a silent wrong result for a ticker quoted in another currency | Not started; owner decided to refuse on 2026-11-18. Folded into ticket V6 of dashboard v2 (update 4) | Owner ranking |
 | N2 Real-browser and accessibility pass (new, Should, RICE 1.4) | The three new panels and the React page have only been tested by code and by a fake backend | Not started | Owner devices for screen readers |
 | N3 Kalman screen-reader strings (new, Could, RICE 0.4) | Both panels should say the same thing to a screen reader | Not started | none |
 
@@ -105,6 +109,7 @@ Items 6, 9, 10, 11 and 15 of the priority ranking, in owner order.
 
 | Item | Why it matters | Status | Depends on |
 |---|---|---|---|
+| Static report port of dashboard v2 (rank 18, Could, RICE 0.5) | One look for the page and the offline file | Not started | Dashboard v2 merged |
 | Fragility score (rank 6) | "This alpha rests on N days": how many days must go before significance flips; leave-one-year-out | Not started; spec ready; the hardening deferral D-1 (influence diagnostic) folds in here | Schema contract (done): unblocked |
 | Lead-lag (Dimson / Scholes-Williams) betas (rank 9) | Fixes non-synchronous closes (old Yahoo SPY data, future European and Asian tickers); switched on by the quality gate | Not started; spec ready | Schema contract (done); hardening gate (done); gate threshold calibration (owner) |
 | Dead-code cleanup (rank 10) | Removes unused code | Not started | none |
@@ -239,6 +244,30 @@ What moved, and why:
 What was added: Progress and Depends on columns in the priority ranking; a "Done 2026-11-18" list
 with evidence pointers; the nightly workflow proposal (RICE 4.0); a "Risks and blockers (2026-11-18)"
 section.
+
+## Changes in update 4 (2026-11-18)
+
+What was added:
+
+- **Epic 17, dashboard v2** (Should). From the owner's review of the dashboard on `dev` and the
+  approved plan of 2026-11-18. RICE inputs, all estimates, not measurements: Reach 10 (every
+  dashboard user sees it), Impact 2 (high: it changes what a reader understands in the first
+  screen), Confidence 0.7 (the look still needs the owner's approval), Effort 14 agent sessions
+  (about 10 for the dashboard work of tickets V1 to V12, plus about 2 each for the performance and
+  world beta sections, V13 to V16). RICE = 10 x 2 x 0.7 / 14 = 1.0.
+- Progress by stage: Stage 0 (spec: `docs/specs/dashboard-v2.md`, `docs/design/report-design.md`
+  revision 3, `wiki/decision-dashboard-v2.md`) done on branch `feat/ui-v2-spec`, not merged.
+  Stage 1 (HTML prototype and screenshots) in progress in parallel; **the owner approves the look
+  before Stage 2 starts**. Stage 2 (React port by agents A to F, plus the performance and world beta
+  agents) and Stage 3 (integration, independent design and accessibility review, real-data run)
+  not started.
+- Dependencies: ticket N1 (currency check) folds into ticket V6, which makes the same Yahoo
+  metadata read for the company name. V14 needs V13 (`feat/performance`); V16 needs V15
+  (`feat/world-beta`).
+- **Epic 18, static report port of dashboard v2** (Could, later). RICE inputs, estimates: Reach 5
+  (people who use the offline file), Impact 1, Confidence 0.6, Effort 6. RICE = 0.5.
+
+Nothing moved and nothing was removed. Ranks 1 to 16 are unchanged.
 
 ## Changes in this update (update 3, 2026-11-18)
 

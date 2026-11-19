@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChartTokens } from "../charts/chartTokens";
 import { useEChart } from "../charts/useEChart";
+import { priceOutcome } from "../../text/outcome";
 import { Panel } from "./Panel";
 import { priceModel, priceOption, visibleLabels } from "./priceModel";
 import type { PriceModel } from "./priceModel";
@@ -99,6 +100,7 @@ export function PricePanel({ report }: ReportPanelProps) {
       id="price"
       title="Price"
       question={QUESTION}
+      outcome={priceOutcome(report)}
       legend={toggle}
       footnote={`Adjusted close from ${report.data.price_source}, for context only; no statistic uses the price line.`}
     >

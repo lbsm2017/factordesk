@@ -38,8 +38,18 @@ MOCK = FIXTURES / "mock_report.json"
 MOCK_V3 = FIXTURES / "mock_report_v3.json"
 NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
 
-SECTION_FIELDS = ("lead_lag", "shrunk_betas", "fragility", "residual", "kalman_betas")
-"""The five optional fields, in panel order (contract SC2, SC4)."""
+SECTION_FIELDS = (
+    "world_beta",
+    "performance",
+    "lead_lag",
+    "shrunk_betas",
+    "fragility",
+    "residual",
+    "kalman_betas",
+)
+"""The seven optional fields, in panel order (contract SC2, SC4; performance and world beta are
+additions to the five of the contract, see docs/validation/performance-contract-note-2026-11-18.md
+and docs/validation/world-beta-contract-note-2026-11-18.md)."""
 
 
 def _optional_parts(annotation: Any) -> tuple[Any, ...]:
@@ -51,7 +61,7 @@ def _optional_parts(annotation: Any) -> tuple[Any, ...]:
 
 
 # ----------------------------------------------------------------------------- fields and specs
-def test_sections_are_the_five_optional_fields() -> None:
+def test_sections_are_the_seven_optional_fields() -> None:
     assert tuple(spec.report_field for spec in SECTIONS) == SECTION_FIELDS
     for spec in SECTIONS:
         info = FactorReport.model_fields[spec.report_field]
@@ -135,11 +145,14 @@ def test_version_3_file_still_loads() -> None:
     for name in SECTION_FIELDS:
         assert getattr(old, name) is None
     # Apart from the version, the old file holds exactly the current mock report.
-    assert old.model_copy(update={"schema_version": SCHEMA_VERSION}) == load_report(MOCK)
+    current = load_report(MOCK)  # the mock also carries data.security
+    stripped = current.data.model_copy(update={"security": None})
+    expected = current.model_copy(update={"schema_version": "3", "data": stripped})
+    assert old == expected
     assert "schema v3," in render_report_html(old)
 
 
-@pytest.mark.parametrize("version", ["2", "5", "", "v4"])
+@pytest.mark.parametrize("version", ["2", "5", "6", "", "v4"])
 def test_unknown_versions_are_refused(version: str) -> None:
     text = MOCK.read_text(encoding="utf-8").replace(
         '"schema_version":"4"', f'"schema_version":"{version}"'
@@ -224,11 +237,13 @@ def _assemble(**kwargs: Any) -> FactorReport:
     )
 
 
-BUILT_SECTIONS: tuple[str, ...] = ("residual", "kalman_betas")
+BUILT_SECTIONS: tuple[str, ...] = ("performance", "residual", "kalman_betas")
 """Fields whose feature is built: the offline pipeline fills them. Each feature branch adds its
 field.
 
-Shrunk fills only online (from the portfolio files), so the offline pipeline leaves it absent.
+Shrunk fills only online (from the portfolio files) and world_beta only when the ACWI history
+is supplied (``SectionInputs.world_benchmark``, fetched online), so the offline pipeline leaves
+both absent. Performance needs only the price history, so the offline pipeline fills it.
 """
 
 

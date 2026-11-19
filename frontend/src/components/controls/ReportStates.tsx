@@ -27,8 +27,8 @@ const KPI_LABELS = ["Alpha a year", "R²", "Residual volatility", "Observations"
 const FRAMES: readonly (readonly [string, number])[] = [
   ["Price", 360],
   ["Factor exposures", 300],
-  ["Where the return came from", 300],
-  ["Where the risk comes from", 300],
+  ["Return sources", 300],
+  ["Risk sources", 300],
   ["Exposure over time", 340],
   ["Data and audit", 260],
   ["Regression detail", 300],

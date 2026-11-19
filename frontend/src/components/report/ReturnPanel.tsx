@@ -1,5 +1,6 @@
 /* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role --
    DB7 asks for explicit table roles: the narrow-screen CSS restyles rows as grids, which can drop table semantics. */
+import { returnsOutcome } from "../../text/outcome";
 import { PLAIN } from "../../text/plain";
 import { describe, factorOrder, finite, labelTexts, niceDomain, sci } from "../../report/derive";
 import { pct } from "../../format";
@@ -7,6 +8,7 @@ import { BarCell } from "../charts/BarCell";
 import { AxisRow, Legend, NameCell, pctN, SigHead, Swatch, TotalSwatch } from "./barParts";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
+import "./signColor.css";
 
 type Kind = "factor" | "alpha" | "resid";
 
@@ -24,13 +26,18 @@ export function returnTick(t: number): string {
   return pct(t, Math.abs(t * 100 - Math.round(t * 100)) < 1e-9 ? 0 : 1);
 }
 
+/** Sign colour of a return value (class names of the v4a sign colour); missing and shown-as-zero stay ink. */
+export function signClass(x: number | null): string {
+  return x === null || pctN(x) === "0.00%" ? "" : x > 0 ? " num-pos" : " num-neg";
+}
+
 const EMPTY_ACTION = "Widen the date range and run the report again.";
 
 /** Panel 6: where the return came from. Bars add up to the total; residual is hatched. */
 export function ReturnPanel({ report }: ReportPanelProps) {
   const rc = report.return_contribution;
   const reg = report.regression;
-  const title = "Where the return came from";
+  const title = "Return sources";
   const question = "How much of the average yearly return does each factor explain?";
 
   const tags = new Map(reg.factors.map((f) => [f.name, f.tag]));
@@ -75,16 +82,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
     );
   }
 
-  const { lo, hi, ticks } = niceDomain(Math.min(...values, 0, total ?? 0), Math.max(...values, 0, total ?? 0), 5);
-
-  const mkt = finite(rc.factors["Mkt-RF"]);
-  let reading: string | undefined;
-  if (total !== null && mkt !== null) {
-    const alphaNote = reg.alpha_tag !== "reliable" ? ", but it is not significant" : "";
-    reading =
-      `Of the ${pctN(total, 2, false)} average excess return a year, market exposure ` +
-      `accounts for ${pctN(mkt, 2, false)}. Alpha adds ${pctN(rc.alpha)}${alphaNote}.`;
-  }
+  const { lo, hi, ticks } = niceDomain(Math.min(...values, 0, total ?? 0), Math.max(...values, 0, total ?? 0), 3);
 
   const checks: string[] = [];
   const resid = finite(rc.residual);
@@ -133,7 +131,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
           ]}
         />
       }
-      reading={reading}
+      outcome={returnsOutcome(report)}
       footnote={`${desc} The rows add up exactly to the total.`}
       how={how}
     >
@@ -166,7 +164,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
                 key={id}
                 id={id}
                 role="row"
-                className={`${item.notSignificant ? "ns " : ""}${item.kind}`}
+                className={`${item.notSignificant ? "ns is-noise " : ""}${item.kind}`}
                 tabIndex={-1}
               >
                 <NameCell name={item.name} plain={item.plain} />
@@ -181,7 +179,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
                     title={`${item.name}: ${pctN(item.value)} a year`}
                   />
                 </td>
-                <td role="cell" className="num strong">
+                <td role="cell" className={`num strong${item.kind === "resid" ? "" : signClass(item.value)}`}>
                   {pctN(item.value)}
                 </td>
                 <td role="cell" className="num sig">
@@ -206,7 +204,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
                 title={`Total: ${pctN(total)} a year`}
               />
             </td>
-            <td role="cell" className="num strong">
+            <td role="cell" className={`num strong${signClass(total)}`}>
               {pctN(total)}
             </td>
             <td role="cell" className="num" />

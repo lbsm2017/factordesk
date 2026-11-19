@@ -234,7 +234,11 @@ describe("PricePanel", () => {
   it("renders the question, the side table and the footnote", () => {
     const { container } = render(<PricePanel report={mockReport} />);
     expect(screen.getByRole("heading", { level: 2, name: "Price" })).toBeTruthy();
-    expect(screen.getByText("How has the price moved over the window? Shaded days are not in the analysis.")).toBeTruthy();
+    const outcome = container.querySelector(".q");
+    expect(outcome?.textContent).toBe(
+      "With dividends reinvested, SPY rose 30.5% over the analysed range (8 Aug 2024 to 30 Sep 2026). The last 32 price days are charted but not analysed.",
+    );
+    expect(outcome?.getAttribute("title")).toBe("How has the price moved over the window? Shaded days are not in the analysis.");
     const rows = Array.from(container.querySelectorAll("table.side tbody tr")).map((tr) => tr.textContent);
     expect(rows[0]).toBe("First8 Aug 2024486.91");
     expect(rows[3]).toBe("After factor data32 days, raw, not analysed+1.23%");

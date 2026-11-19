@@ -37,12 +37,36 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await ticker.fill("SYN");
   await ticker.press("Enter");
   await expect(page).toHaveURL(/[?&]t=SYN\b/);
-  const kpis = page.locator("#kpis");
+  const bar = page.locator(".abar");
   // The first report of a run is computed from scratch and can take long on a busy machine.
-  await expect(kpis).toBeVisible({ timeout: FIRST_REPORT_MS });
-  await expect(kpis).toContainText("Alpha, a year");
-  await expect(kpis).toContainText("R²");
-  await expect(page.locator("#equation")).toBeVisible();
+  await expect(bar).toBeVisible({ timeout: FIRST_REPORT_MS });
+  await expect(bar).toContainText("Analysis period");
+  await expect(bar).toContainText("Observations");
+  // The formula is gone (owner, dashboard v2); the sidebar sits outside <main>.
+  const summary = page.locator("#summary");
+  await expect(summary).toContainText("Alpha (annual)");
+  await expect(summary).toContainText("R²");
+  await expect(page.locator("#equation")).toHaveCount(0);
+  await expect(page.locator("main aside, main #sidebar")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Price" })).toBeVisible();
+
+  // Show statistics: off by default; on adds the t column and stats=1 without a new history entry.
+  const exposures = page.locator("#exposures");
+  const stats = page.getByRole("switch", { name: "Show statistics" });
+  await expect(stats).toHaveAttribute("aria-checked", "false");
+  await expect(exposures.getByRole("columnheader", { name: "t", exact: true })).toHaveCount(0);
+  const entries = await page.evaluate(() => window.history.length);
+  await stats.focus();
+  await page.keyboard.press("Space");
+  await expect(stats).toHaveAttribute("aria-checked", "true");
+  await expect(page).toHaveURL(/[?&]stats=1\b/);
+  await expect(exposures.getByRole("columnheader", { name: "t", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.history.length)).toBe(entries);
+  await page.keyboard.press("Enter");
+  await expect(stats).toHaveAttribute("aria-checked", "false");
+  await expect(page).not.toHaveURL(/[?&]stats=/);
+  await stats.click();
+  await expect(page).toHaveURL(/[?&]stats=1\b/);
 
   // The residual panel loads as its own chunk and shows the table and the stability section.
   const residual = page.locator("#residual");
@@ -53,14 +77,17 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await page.getByRole("radio", { name: "3Y" }).check();
   await expect(page).toHaveURL(/[?&]range=3Y\b/);
   await expect(page.getByRole("radio", { name: "3Y" })).toBeChecked();
-  await expect(kpis).toBeVisible();
-  await expect(kpis).toContainText("Analysed range");
+  // The switch stays on across a range change.
+  await expect(page).toHaveURL(/[?&]stats=1\b/);
+  await expect(bar).toBeVisible();
+  await expect(page.getByRole("radio", { name: "10Y" })).toBeVisible();
+  await expect(page.locator("#summary")).toContainText("Past data, not a forecast");
 
   // A Details disclosure opens.
-  const details = page.locator("details", { has: page.locator("summary", { hasText: /^Details$/ }) }).first();
+  const details = page.locator("#summary").getByRole("button", { name: "Details" });
   await expect(details).toBeVisible();
-  await details.locator("summary").click();
-  await expect(details).toHaveJSProperty("open", true);
+  await details.click();
+  await expect(details).toHaveAttribute("aria-expanded", "true");
 
   // The "/" shortcut focuses the ticker field from outside a text field.
   await page.locator("body").click({ position: { x: 2, y: 2 } });
@@ -109,7 +136,8 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/[?&]start=2013-01-01(&|$)/);
   expect(await page.evaluate(() => window.history.length)).toBe(historyBefore + 1);
-  await expect(kpis).toContainText("Analysed range");
+  await expect(bar).toContainText("Analysis period");
+  await expect(page.locator("#summary")).toContainText("Past data, not a forecast");
   expect(new Set(apiStarts)).toEqual(new Set(["2013-01-01"]));
 
   // No sideways scroll at 1440 and at 390; screenshots of the synthetic report.
@@ -117,9 +145,20 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await noSideScroll(page);
   await page.screenshot({ path: `${SHOTS}smoke-1440.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(kpis).toBeVisible();
+  await expect(bar).toBeVisible();
   await noSideScroll(page);
   await page.screenshot({ path: `${SHOTS}smoke-390.png`, fullPage: true });
+
+  // Under 900 px the sidebar is a drawer: the menu button opens it, Escape closes it and focus returns.
+  const menu = page.getByRole("button", { name: "Menu", exact: true });
+  await expect(page.getByRole("combobox", { name: "Ticker" })).toBeHidden();
+  await menu.click();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("combobox", { name: "Ticker" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveAttribute("aria-expanded", "false");
+  await expect(menu).toBeFocused();
+  await noSideScroll(page);
 
   expect(foreign, "requests to a host other than 127.0.0.1").toEqual([]);
 });

@@ -222,9 +222,12 @@ def risk_sentences(
             pos = best[1]
             out.append(
                 f"{names[idx[pos]]} ranks #{rank_rc[pos]} by risk but only #{rank_beta[pos]} by "
-                "beta size: the factor is volatile or moves with your other exposures."
+                "beta size: the factor is volatile or moves with the other exposures."
             )
     for i in idx:
         if shares[i] < 0:
-            out.append(f"{names[i]} reduces total risk because it offsets your other exposures.")
+            out.append(
+                f"{names[i]} has a negative share: it offsets part of the other exposures "
+                "in the variance split."
+            )
     return out

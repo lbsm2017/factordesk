@@ -28,16 +28,19 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Return and risk attribution](decision-return-and-risk-attribution.md) [Decided]: pieces that add up exactly to the total and to 100%.
 - [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) [Decided-pending-implementation]: why SPY's R-squared was 0.967 and the pre-set gate that flags it.
 - [Residual alpha analysis](decision-residual-alpha-analysis.md) [Built and validated on 2026-11-18]: an in-sample and a point-in-time line, with the owner's four choices.
+- [Historical performance block](decision-performance-metrics.md) [Built, not yet validated]: the stock's own yearly growth, volatility, Sharpe ratio and worst fall over the analysed window, next to the factor numbers.
 - [Cointegration design](decision-cointegration-design.md) [Decided-pending-implementation]: an exploratory long-run link test that must hold on unseen data.
 - [Drift alerts and regime betas](decision-drift-alerts-and-regime-betas.md) [Decided-pending-implementation]: alerts when two of three conditions agree, and betas by market regime.
 - [Shrunk betas](decision-shrunk-betas.md) [Decided-pending-implementation]: a second beta pulled toward a typical stock by how noisy it is, plus power statements; the ordinary betas stay primary.
 - [Kalman-filter betas](decision-kalman-betas.md) [Decided-pending-implementation]: an extra time-varying beta line with a band, from a filter that learns its own drift rate; the rolling betas stay.
+- [World beta](decision-world-beta.md) [Decided-pending-implementation]: a quick beta against the iShares MSCI ACWI ETF as a stand-in for the MSCI ACWI index, next to the US market beta on the same days; ACWI is cached and refreshed incrementally.
 
 ### Product and design
 
 - [Report design: colour is evidence](decision-report-design-colour-is-evidence.md) [Decided]: colour only encodes data, every chart is also a table, and the equation is the one bold element.
 - [Report density, width cap and range controls](decision-report-density-and-range-controls.md) [Decided-pending-implementation]: a narrow, less dense report; range and ticker pickers belong to the dashboard.
 - [Dashboard server and interface](decision-dashboard-server-and-interface.md) [Decided-pending-implementation]: FastAPI server plus one scrolling React page with ticker search and range chips; plain CSS tokens; static report stays as export.
+- [Dashboard v2: outcome first with a sidebar](decision-dashboard-v2.md) [Decided-pending-implementation]: navy sidebar with controls and section links, a plain verdict sentence instead of the formula, a Show statistics switch, company name, performance and a quick world beta (specified 2026-11-18, not built).
 
 ### Engineering and process
 

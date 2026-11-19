@@ -109,7 +109,7 @@ describe("ResidualAlphaPanel: frame", () => {
     const { container } = mount();
     const panel = container.querySelector("section#residual");
     expect(panel?.getAttribute("aria-labelledby")).toBe("residual-title");
-    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Residual return");
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Beyond the factors");
     expect(container.querySelector(".q")?.textContent).toBe(
       "What did this stock return beyond its factor exposures, and does it hold up without hindsight?",
     );
