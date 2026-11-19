@@ -99,16 +99,16 @@ Score = R × I × C / E.
 E0 is pulled to the top despite its lower RICE score, because it is the enabling thin slice: E2, E3 and E5 all depend on its seam. E5 gets a strategic boost because it is the "heavy" headline feature.
 
 ## Roadmap: releases that each work end to end
-Each release ends the same way:
-1. Features merge to `dev`.
-2. The owner validates them on localhost, with screenshots against the current UI.
-3. A `dev` → `prod` pull request goes up.
+Each release ends the same way (owner, 2026-11-19):
+1. Each feature PR merges into `dev` after a review and green CI, without waiting for the owner.
+2. At the end of the release there is a localhost demo, with screenshots of every new panel next to the current UI.
+3. The owner reviews the demo and merges the `dev` → `prod` pull request.
 
 ```
 NOW   R1  E0 skeleton  ──►  E1 FF6 + alpha strip + E9a wording/model notes
 NEXT  R2  E2 upload hardening ║ E5 portfolio slice ║ E7a VaR/CVaR (ticker + upload)
-      R3  E3 diagnostics + E9c MinTRL ║ E6 attribution tree ║ E7b per-holding CVaR ║ E9b spec curve
-LATER R4  E4 macro sensitivities (all modes) ║ E8 joint tail (portfolios)
+      R3  E3 diagnostics + E9c MinTRL ║ E6 attribution tree ║ E4 macro (6 factors) → E7b per-holding CVaR
+LATER R4  E9b spec curve ║ E8 joint tail (portfolios)
       R5+ European mode / EUR base, Alternatives proxies, weekly, HTML export
 ```
 
@@ -119,16 +119,39 @@ LATER R4  E4 macro sensitivities (all modes) ║ E8 joint tail (portfolios)
 - `POST /api/report/upload` accepts CSV with date and decimal return, assumes USD, works in memory only, and caps files at 1 MB.
 - The sidebar mode switch and a drop zone render the existing report layout, with daily-only sections hidden.
 
-**Dependencies:**
-- E0 comes before E2, E3 and E5.
-- E1 can start once E0's regression and `periods` change merges.
-- E5 comes before E6.
-- E4 is independent after E0.
-- E7a needs only E0. E7b (per-holding CVaR) needs E5.
-- E8 needs E5 and reuses E7b's tail-day machinery.
-- The lanes run in parallel only on disjoint file sets:
-  - **E2:** `data/upload.py` and the upload UI.
-  - **E5:** `analytics/backtest.py` and the portfolio UI.
+### Epic list with dependencies (consolidated 2026-11-19)
+
+| Epic | Scope | Depends on | Unblocks | Main files (lane) | Release | MoSCoW |
+|---|---|---|---|---|---|---|
+| E0 | Walking skeleton: ReturnSubject seam, monthly path, CSV upload, mode switch | — | all | `analytics/subject.py`, `sample.py`, `pipeline.py`, `data/french.py` | R1 | Must |
+| E1 | FF6 (Mom loader), model toggle, alpha strip CAPM/FF3/FF5/FF6 | E0 (`periods`, French loader) | E9a, E9b | `analytics/models.py`, `model_comparison.py`, `ModelToggle.tsx` | R1 | Must |
+| E9a | Wording and model notes, alpha-strip caption | E1 | — | report text, panel captions | R1 | Must |
+| E2 | Upload hardening: XLSX, NAV, auto-detection, daily, refusals and flags, template | E0 | E3 | `data/upload.py`, `TrackRecordInput.tsx` | R2 | Must |
+| E5 | Portfolio slice: SAA tree builder, backtest, factor report | E0 | E6, E7b, E8 | `analytics/backtest.py`, `api/portfolio_models.py`, `PortfolioBuilder.tsx` | R2 | Must |
+| E7a | VaR/CVaR for tickers and uploads: three methods, bootstrap bands | E0 | E7b | `analytics/tail_risk.py`, `TailRiskPanel.tsx` | R2 | Should |
+| E3 | Track-record diagnostics: ACWI statistics, smoothing checks, Lo Sharpe, plus E9c MinTRL | E2 | — | `analytics/track_record.py` | R3 | Should |
+| E6 | Portfolio attribution tree: Frongello contributions, risk share, cost line, data checks | E5 | E7b | `analytics/portfolio_attribution.py`, `PortfolioPanel.tsx` | R3 | Should |
+| E7b | Per-holding CVaR rolled up through the tree | E5, E6, E7a | E8 | `analytics/tail_risk.py` (extend) | R3 | Should |
+| E9b | Specification curve: model × window × start | E1 | — | `analytics/spec_curve.py`, panel | R4 | Should |
+| E4 | Macro section: market, TERM, DEF, COMM, INFL, USD (Fed broad); 1-day lag; VIF | E0 | — | `data/fred.py`, `analytics/macro.py`, `MacroPanel.tsx` | R3 (owner moved it up, 2026-11-19) | Should |
+| E8 | Joint tail: crash-together heatmap, co-crash histogram, t-copula, worst-days table | E5, E7b | — | `analytics/joint_tail.py`, panel | R4 | Could |
+
+```mermaid
+graph LR
+  E0 --> E1 --> E9a
+  E1 --> E9b
+  E0 --> E2 --> E3
+  E0 --> E5 --> E6 --> E7b --> E8
+  E0 --> E7a --> E7b
+  E5 --> E8
+  E0 --> E4
+```
+
+- **Critical path:** E0 → E5 → E6 → E7b → E8.
+- **Parallel lanes:** at most 3 at once, on disjoint file sets.
+  - R2 runs E2, E5 and E7a in parallel.
+  - R3 runs E3, E6 and E4 in parallel; E7b follows E6.
+- **Shared files:** `pipeline.py`, the section-hook registry, `schema.py` and generated types change in almost every epic. Each lane rebases on `dev` before its PR. Generated types are regenerated after the merge, never hand-merged.
 
 ## Technical design
 - **Return subject.** `analytics/subject.py` defines `ReturnSubject`. `build_sample` (sample.py:182) becomes a wrapper over `align_returns`, and `assemble_report` (pipeline.py:748) becomes a wrapper over `assemble_subject_report`. `SectionContext` gains `subject` and `model`. performance.py:120 and world_beta.py:217 switch to `ctx.subject.calendar`.
