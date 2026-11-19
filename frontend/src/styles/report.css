@@ -241,7 +241,7 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .findings .dates { color: var(--ink-3); }
 .findings .sev-none { display: block; color: var(--ink-2); }
 .notes li { padding: 7px 0; border-bottom: 1px solid var(--grid); color: var(--ink); max-width: 76ch; }
-.scroll-x { overflow-x: auto; }
+.scroll-x { overflow-x: auto; overflow-y: hidden; }
 .reg { width: 100%; border-collapse: collapse; min-width: 760px; }
 .reg th, .reg td { padding: 7px 0 7px var(--s-3); border-bottom: 1px solid var(--grid); white-space: nowrap; }
 .reg th:first-child { padding-left: 0; text-align: left; font-weight: 500; }

@@ -12,7 +12,7 @@
 .dd-y span { right: calc(100% + 8px); transform: translateY(-50%); }
 .dd-x span { top: calc(100% + 8px); transform: translateX(-50%); }
 
-.dd-table-wrap { overflow-x: auto; }
+.dd-table-wrap { overflow-x: auto; overflow-y: hidden; }
 .dd-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .dd-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-3) 6px 0; border-bottom: 1px solid var(--border); }
 .dd-table td { padding: 8px var(--s-3) 8px 0; border-bottom: 1px solid var(--grid); white-space: nowrap; }

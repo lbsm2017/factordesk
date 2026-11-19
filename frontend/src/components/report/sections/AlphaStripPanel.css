@@ -1,5 +1,5 @@
 /* Alpha strip: a compact table in the style of the tail risk table, with one dot and approximate 95% range per row on a shared scale. Every row looks the same (no ranking). Tokens only. */
-.as-wrap { overflow-x: auto; }
+.as-wrap { overflow-x: auto; overflow-y: hidden; } /* sideways scroll only: a vertical scrollbar never shows */
 .as-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; margin-top: var(--s-2); }
 .as-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-2) 6px 0; border-bottom: 1px solid var(--border); vertical-align: bottom; }
 .as-table th.num, .as-table td.num { text-align: right; }
@@ -14,5 +14,5 @@
 .as-table .bar-svg { height: 28px; }
 .as-table .as-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 1; }
 .as-table tfoot td { padding: 0; border: 0; }
-.as-table .axis { height: 22px; }
+.as-table .axis { height: 26px; } /* tall enough for the tick labels, which sit 4px down */
 .as-table .axis span { top: 4px; }
