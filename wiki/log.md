@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-19 (world beta, after validation)
+
+- Updated [the world beta decision page](decision-world-beta.md) after the independent validation: names aligned with the dashboard spec, one short attempt when a cache exists, late dividends and a monthly full download, no alpha t on an exact fit, audit errors only inside the overlap fail the section. "Many non-US stocks" stays (MSCI ACWI factsheet, 30 October 2026: United States 64.63%).
+
 ## 2026-11-19 (world beta)
 
 - Added [the world beta decision page](decision-world-beta.md): a quick beta against the iShares MSCI ACWI ETF (a stand-in for the MSCI ACWI index, which has no free daily data), shown next to the US market beta on the same days. Rejected: MSCI index data, a global factor model, a Dimson correction. The ACWI price cache is refreshed incrementally on every report build (owner instruction, 2026-11-18). Built on `feat/world-beta`; not validated yet.

@@ -1,6 +1,6 @@
 # World beta: note on the schema v3 contract (a sixth optional section)
 
-Date: 2026-11-18. Branch `feat/world-beta`. Status: proposal for the owner. Nothing here edits `docs/specs/schema-v3-contract.md`; the branch carries on and follows the contract's rules where they apply.
+Date: 2026-11-18 (position and reason text updated 2026-11-19, after the independent validation: the panel position is 350, the failed reason is "The world fund's prices could not be fetched."). Branch `feat/world-beta`. Status: proposal for the owner. Nothing here edits `docs/specs/schema-v3-contract.md`; the branch carries on and follows the contract's rules where they apply.
 
 The contract (`docs/specs/schema-v3-contract.md`) lists five optional sections. The world beta is a sixth. The contract's rule SC7 says that a change in a "nobody" file stops the branch and goes through its own pull request. The owner's brief said to write this note and carry on, so the branch made the smallest edits it could. Each is listed below so that the owner can approve them, move them to their own pull request, or ask for a different shape.
 
@@ -8,7 +8,7 @@ The contract (`docs/specs/schema-v3-contract.md`) lists five optional sections. 
 
 - One optional field `world_beta: WorldBetaSection | None = None`, `None` meaning "did not run" (SC1 item 1).
 - One section module `report/sections/world_beta.py` with `WorldBetaSection(SectionModel)` and `WORLD_BETA_SECTION`; nested `BetaFit` in the same file (SC1 item 2).
-- `status`, `reason`, `sample` from `SectionModel`; status values are the M0.7 four only (`ok`, `insufficient_data`, `not_applicable`, `failed`); a section that is not `ok` carries no float (SC1 item 3). When ACWI cannot be fetched and no cache exists the section is `failed` with the reason "ACWI price data could not be fetched".
+- `status`, `reason`, `sample` from `SectionModel`; status values are the M0.7 four only (`ok`, `insufficient_data`, `not_applicable`, `failed`); a section that is not `ok` carries no float (SC1 item 3). When ACWI cannot be fetched and no cache exists the section is `failed` with the reason "The world fund's prices could not be fetched."
 - Footnote keys `L-WORLD-PROXY` and `L-WORLD-ASYNC` live in the section's `label_text`; `schema.LabelKey` and `LABEL_TEXT` are not edited (SC1 item 5).
 - Display names and `_annual` suffix in API fields (SC1 item 6): `alpha_annual`.
 - One hook `section_hooks/world_beta.py`, one analytics file `analytics/world_beta.py`, one static panel `report/panels/world_beta.py`, one React placeholder `WorldBetaPanel.tsx` (SC2 pattern).
@@ -29,15 +29,15 @@ The contract (`docs/specs/schema-v3-contract.md`) lists five optional sections. 
 | `tests/fixtures/mock_report.json` | Regenerated (one new key, `"world_beta": null`) | The mock fixture lists every optional field (SC9). |
 | `tests/fixtures/sections/__init__.py`, `label_text.json`, new `world_beta.json` | One entry in `SECTION_FILES`, one label block, one synthetic section | The fixture folder is keyed by section (SC9). |
 | `tests/test_schema_contract.py`, `tests/test_panel_registry.py` | "Five" becomes "six" (field tuple, test name), the panel order and the panel-follows table get the new entry | These tests pin SC2 and SC4. |
-| `frontend/src/api/types.ts`, `panelRegistry.ts`, `panelRegistry.test.tsx`, `test/sectionFixtures.ts` | A type alias, a registry entry at 540 pointing at the placeholder, the order test, the fixture map | SC3.4 lists these as the React extension points. |
+| `frontend/src/api/types.ts`, `panelRegistry.ts`, `panelRegistry.test.tsx`, `test/sectionFixtures.ts` | A type alias, a registry entry at 350 pointing at the placeholder, the order test, the fixture map | SC3.4 lists these as the React extension points. |
 
 The branch edits no `docs/specs`, `docs/methodology*` or test-oracle file.
 
 ## 3. Proposed amendments to the contract text (the owner's call)
 
-1. SC0 and SC2: "five" becomes "six"; add section SC2.6 with the table of this note's section 1 (field `world_beta`, module, hook `build_world_beta(ctx) -> WorldBetaSection | None`, panel name `world_beta`, position 540, element id `world-beta`, tests `test_world_beta.py` and `test_section_world_beta.py`, fixture `sections/world_beta.json`).
+1. SC0 and SC2: "five" becomes "six"; add section SC2.6 with the table of this note's section 1 (field `world_beta`, module, hook `build_world_beta(ctx) -> WorldBetaSection | None`, panel name `world_beta`, position 350, element id `world-beta`, tests `test_world_beta.py` and `test_section_world_beta.py`, fixture `sections/world_beta.json`).
 2. SC3.2: `SectionInputs` has a second field, `world_benchmark`, and `load_section_inputs` takes `price_provider`.
-3. SC4: add the row `540 | world_beta | world-beta | world beta` between fragility (530) and returns (600). Reason for the position: the section reads the market beta shown in Exposures against a second market, so it sits with the three panels that qualify the Exposures betas, after them (it is a secondary, quick view), and before Return contribution.
+3. SC4: add the row `350 | world_beta | world-beta | world beta` between the headline strip (300) and the price chart (400). Reason for the position: dashboard spec DV1 and DV2.6 place it there (it is the first reading after the headline betas, against a second market). Until 2026-11-19 the branch used 540, after fragility; the validation review (F1) asked for the spec's place.
 4. SC7: add the owner row `world beta`: `analytics/world_beta.py`, `report/sections/world_beta.py`, `section_hooks/world_beta.py`, `report/panels/world_beta.py`, `tests/test_world_beta.py`, `tests/test_section_world_beta.py`, `tests/test_prices_incremental.py`, `tests/fixtures/sections/world_beta.json`, `frontend/.../sections/WorldBetaPanel.*`; and extend the `api/deps.py`, `api/service.py` and `data/prices.py` permissions of the shrunk row to it.
 5. SC6, new item: "A hook may return a section with status `failed` when its extra data cannot be fetched; `None` is only for 'did not run'." (This is what the world beta does; it is the shrunk betas' rule too.)
 6. SC2.1 to SC2.5 say each feature owns its React component. The world beta ships only a placeholder (the frame and the reason of a section that is not `ok`); the real panel is built later by someone else.

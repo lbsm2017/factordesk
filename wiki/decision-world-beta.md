@@ -12,10 +12,10 @@ We will show, next to the US market beta, a quick beta against the world, measur
 - Owner request, 2026-11-18: "add a quick beta estimate against the MSCI All Country World index (or use ACWI)". We use the ETF.
 - The beta is the slope of a regression of the stock's daily excess return (return minus the US risk-free rate of the Fama-French file) on ACWI's daily excess return, with an intercept, on the days the analysed sample and ACWI share. The standard error is the report's existing Newey-West (HAC) error. We report the beta, its 95% interval, R squared, the correlation, the number of days, the dates, and (secondary) the alpha a year with its HAC t.
 - Beside it, the beta of the same days against the US market factor (Mkt-RF), so the reader compares two betas on identical days. A plain sentence says "about the same" when the two 95% intervals overlap, and otherwise "higher" or "lower against the world". It says nothing more.
-- ACWI prices follow the same rules as the stock's: Adj Close, the same normaliser, the same audit. If the audit finds errors in ACWI data the section is `failed` with a reason. If ACWI cannot be fetched and nothing is cached the section is `failed` with "ACWI price data could not be fetched" and the rest of the report is built as usual. If the refresh fails but a cache exists, the section is built from the cache and says "ACWI data ends <date>".
+- ACWI prices follow the same rules as the stock's: Adj Close, the same normaliser, the same audit. If the audit finds errors in ACWI data the section is `failed` with a reason. If ACWI cannot be fetched and nothing is cached the section is `failed` with "The world fund's prices could not be fetched." and the rest of the report is built as usual. If the refresh fails but a cache exists, the section is built from the cache and says "ACWI data ends <date>".
 - Owner instruction, 2026-11-18: ACWI is cached and brought up to date on every ticker load. The first load downloads the full history (it starts in March 2008). After that, each report build asks only for the days after the last cached date (with a few days of overlap to check that Yahoo did not rewrite the history), merges them, and makes no network call when the cache already holds the latest completed trading day.
 - A short history gives a wide interval, and fewer than 252 shared days gives no number (`insufficient_data`).
-- The section appears in the static report as "World beta (quick estimate)", after the panels that qualify the Exposures betas. The React panel is only a placeholder for now.
+- The section appears in the static report as "World beta (quick estimate)", after the headline strip and before the price chart (position 350, as the dashboard spec places it; first built at 540, after the panels that qualify the Exposures betas). The React panel is only a placeholder for now.
 
 ## Why
 
@@ -76,3 +76,15 @@ A free daily source for the MSCI ACWI index with a clear licence: then we use th
 ## Change log
 
 - [Change log](log.md): dated changes to this knowledge base, newest first.
+
+## Update 2026-11-19: after the independent validation
+
+The validator recomputed every number from the definitions and agreed (verdict: merge with conditions). What changed, in plain words:
+
+- **Names now follow the dashboard spec.** The proxy field is `proxy`; the fits use `se`, `ci_low`, `ci_high`; the comparison is `about_the_same`, `higher` or `lower`; the failed reason is "The world fund's prices could not be fetched."; the panel sits at position 350. The full list of renames is in section 9 of the hand-off. The nested shape (`world` and `us_market`) stays and is proposed to the owner as the amendment to the spec, because it carries R squared and correlation for both fits.
+- **A failing refresh no longer slows the report.** When an ACWI cache exists, the refresh tries once, with a short timeout, and uses the cache if that fails. It does not wait through retries or a `Retry-After` header. Only a first-ever download keeps the retry policy.
+- **Late dividends are caught.** The refresh starts at the last cached dividend date, the overlap check also compares the dividend columns, and the whole history is downloaded again when the last whole download is more than 30 days old. The date of the last whole download is stored in the cache file.
+- **An exact fit has no alpha t.** It was a ratio of two rounding errors; it is now `null`, as documented.
+- **One bad ACWI row far from the stock's days no longer removes the section.** Only audit errors dated inside the days the beta uses fail it; others become a note.
+- **The wording "many non-US stocks" stays.** The validator found the MSCI ACWI factsheet of 30 October 2026 (United States 64.63% of the index), which makes "mostly non-US" false today.
+- Still open for the owner: the amendment of the dashboard spec (nested shape, extra fields, how a non-fetch failure is shown), the caveat wording for the ETF's timing (F6), and the React placeholder body (F7).

@@ -4,6 +4,8 @@ Date: 2026-11-18 (live run 2026-11-19). Branch `feat/world-beta`, from `dev` at 
 Spec: none separate; the definition is section 2 of this page. Contract: `docs/specs/schema-v3-contract.md`; the sixth-section note is `docs/validation/world-beta-contract-note-2026-11-18.md`. Decision page: `wiki/decision-world-beta.md`.
 Audience: the independent validator (next step), and the owner for the open questions in section 7.
 
+**After validation (2026-11-19).** The independent validation (`docs/reviews/world-beta-validation-2026-11-19.md`, verdict merge with conditions) was answered on this branch the same day: section 9 below lists every rename, the proposals for the dashboard spec, and what changed. Where this page's earlier sections name a field, a value, a reason text or a position that section 9 renames, section 9 is current.
+
 The validator recomputes the numbers in section 6 from the definitions in section 2 and the cached prices **without reading the implementation**.
 
 **What the owner asked for, and what was used.** The owner asked for a quick beta against the MSCI All Country World index (or ACWI). The MSCI index has no free daily data source, so the proxy is the **iShares MSCI ACWI ETF** (Yahoo ticker `ACWI`, history from March 2008, US dollars, priced on a US exchange at the same close as US stocks). The panel, the schema and every caveat say so plainly: the number is a beta against an ETF used as a stand-in for the index.
@@ -137,3 +139,76 @@ From the worktree, 2026-11-19:
 | Generated files | `openapi.json` and `types.gen.ts` regenerate with no diff |
 
 Not run: the `live` and `slow` markers (the live Yahoo run of section 5 was done by script, not by a marked test).
+
+---
+
+## 9. After validation (2026-11-19)
+
+Review: `docs/reviews/world-beta-validation-2026-11-19.md` (commit `bbc766b`), merged with `--no-ff` so that it stays in the history. SCHEMA_VERSION stays `"4"`. The numbers were not in question; the conditions were about the interface (F1), the failure path (F2) and one documented value (F4). The recommended items for the cache (F3) and the audit scope (question b) were done too.
+
+### 9.1 F1: aligned with dashboard spec DV2.6 and DV4.8
+
+Every rename, in one table. Nothing else in the section changed name.
+
+| Before | After | Where |
+| --- | --- | --- |
+| `benchmark` (section field) | `proxy` | `WorldBetaSection` |
+| `se_hac` (in `world` and `us_market`) | `se` | `BetaFit` |
+| `ci95_low` | `ci_low` | `BetaFit` |
+| `ci95_high` | `ci_high` | `BetaFit` |
+| comparison `higher_against_the_world` | `higher` | `comparison` |
+| comparison `lower_against_the_world` | `lower` | `comparison` |
+| failed reason "ACWI price data could not be fetched" | "The world fund's prices could not be fetched." (with the full stop) | `UNAVAILABLE_REASON` |
+| static panel position 540 (after fragility, before returns) | 350 (after the headline strip, `kpis`, before the price chart), in the static and the React registry | `report/panels/world_beta.py`, `panelRegistry.ts` |
+
+`about_the_same` is unchanged. The comparison sentences (`comparison_text`) are unchanged. The Python dataclass `BetaEstimate.se_hac` in `analytics/world_beta.py` keeps its name (it is internal and is not in the schema). Regenerated: `tests/fixtures/sections/world_beta.json`, `frontend/src/api/openapi.json`, `frontend/src/api/types.gen.ts` (`mock_report.json` holds `world_beta: null` and did not change).
+
+**Proposals for DV2.6 and DV4.8 (the validated behaviour is kept; the owner decides).** These are differences of substance, not of naming, so the section was not bent to the spec.
+
+1. **Nested fits instead of flat fields.** DV2.6 has flat `beta, se, ci_low, ci_high, us_beta, us_se, us_ci_low, us_ci_high` and top-level `n, start, end`. The section has two objects, `world` and `us_market`, of the same type (`beta, se, ci_low, ci_high, r2, correlation, alpha_annual, alpha_t`), and `sample.n, sample.start, sample.end` (the shape every section already uses). It carries R squared and correlation for the US fit too, which the comparison needs to be read fairly, and one type is one component for V16. Proposal: amend DV2.6 to read `world.beta`, `world.se`, `world.ci_low`, `world.ci_high`, `world.r2`, `us_market.beta`, `us_market.se`, `us_market.ci_low`, `us_market.ci_high`, `sample.n`, `sample.start`, `sample.end`.
+2. **Fields the spec does not list**: `hac_lags`, `n_sample`, `n_not_in_benchmark`, `acwi_first_date`, `acwi_last_date`, `acwi_note`, `audit_warnings`, `comparison_text`, `labels`. DV2.6 says the stale note goes "in the section note"; it is `acwi_note` (and `acwi_last_date` gives the date for DV4.8's ". ACWI data ends {date}"). Proposal: add them to the DV2.6 table.
+3. **Why a section failed.** DV4.8 gives one fixed sentence for `failed` ("The world fund's prices could not be fetched; ..."). The section also fails when the ACWI audit finds errors inside the overlap or the benchmark does not vary, and then that sentence would misstate the cause. Rule for V16: show `reason` as given whenever `acwi_first_date` is not null (the prices came but cannot be used); the fixed fetch sentence only when `acwi_first_date` is null. The static panel already does this: "Run the report again later" only for a fetch failure, "The rest of the report is not affected." otherwise (F5).
+4. **ACWI audit errors.** DV4.8 shows "Unconfirmed: the price audit found errors." for the stock, as M1.4 says (the analysis goes on). For ACWI, an error dated inside the overlap makes the section `failed` (the only regressor would be wrong); an error outside it is a note in `audit_warnings`. Proposal: say so in DV4.8, or choose the "Unconfirmed" reading for ACWI too.
+
+### 9.2 F2: a failing refresh with a cache costs no waiting
+
+When a cached ACWI history exists, the refresh makes one attempt: the retry count is set to one for that call, so there is no back-off, no rate-limit pause and no `Retry-After` wait. The window request has a timeout of 15 seconds and a whole-history request made on a cache refresh one of 45 seconds (`REFRESH_TIMEOUT_SECONDS`, `REFRESH_FULL_TIMEOUT_SECONDS` in `data/prices.py`). On failure the cache is served with the "ACWI data ends <date>" note, as before. A cold cache (no file) keeps the normal retry policy of `fetch_many`. Tests (`test_prices_incremental.py`, fake clock that moves only when the code sleeps): connection error, timeout and a rate limit with `Retry-After: 90` each return `stale` with no sleep and one request; a failed forced full download is one attempt too; a cold cache still retries and sleeps; the real download functions pass the timeout to yfinance only on the refresh path.
+
+### 9.3 F3: late-posted dividends and a monthly full download (validator recommendation c)
+
+- The incremental request starts at the earlier of seven days before the last cached date and the last cached dividend or capital-gain date. A distribution that Yahoo records late has an ex-date after the last cached one, so it lies inside the window and changes the rows the window shares with the cache.
+- The overlap check now also compares the `dividends` and `capital_gains` columns (a new distribution in the overlap counts as a rewrite), in addition to `adj_close` and `close`. Any rewrite means a whole-history download.
+- The cache records when the history was last downloaded whole (`full_downloaded_at` in the parquet attributes, next to `fetched_at`). Incremental refreshes keep it. When a refresh is needed and the stamp is older than 30 days (`FULL_REFRESH_DAYS`), the whole history is downloaded. A cache without the stamp (written before it existed) gets one whole download, which sets it. An up-to-date cache still makes no call, whatever its age.
+- Tests: a dividend posted weeks late (outside the old seven days, inside the new window) is picked up by a whole download and the adjusted prices equal Yahoo's; with no late dividend the refresh stays incremental and starts at the last dividend date; the old window cannot see the rewrite; a changed distribution column counts as rebased; the start date rule; the stamp is stored and kept; exactly 30 days is still incremental and 31 forces a whole download that restarts the clock; an unstamped cache is downloaded whole once.
+
+### 9.4 F4: an exact fit has no alpha t
+
+`single_factor_beta` returns `alpha_t = None` when the residual sum of squares is at most `1e-20` times the total sum of squares (`EXACT_FIT_RELATIVE_SSR`), as the hand-off (WB1.8), the dataclass and the schema description say. Tests: `y = x`, `y = 2x`, `y = x + 0.001` and `y = 0.5x - 0.0003` all give `None`; TWB02 asserts `None`; a fit with a residual of one part in 1e6 of the signal keeps its t.
+
+### 9.5 Question (b): ACWI audit errors inside and outside the overlap
+
+Only an error dated from the ACWI row before the first overlap date to the last overlap date fails the section, with the reason "The ACWI price history has errors on days this section uses (<codes>), so its returns cannot be trusted and the world beta is not computed. The section is left out until the history is corrected." An error outside that window is carried in `audit_warnings` as one sentence ("... on dates outside the days used here (<first> to <last>), so they do not affect this beta."). An error with no date counts as inside (it cannot be placed). A calendar-year drift is dated at the last row of its year and counts as inside when that year meets the window. Tests: before the overlap, after the overlap, the edge row (inside) and two rows before it (outside), and the panel's own next step.
+
+### 9.6 Question (a): the caveat wording
+
+Kept as "many non-US stocks". The validator cites the MSCI ACWI Index factsheet of 30 October 2026 (msci.com): United States 64.63%, Japan 5.08%, Taiwan 3.23%, United Kingdom 3.12%, Canada 3.06%, other 20.88%. By weight the index is about two thirds US, so "mostly non-US" would be false today. We did not open the factsheet ourselves; the figure is the validator's. The panel states no percentage, because it goes stale.
+
+### 9.7 Not done (validator items outside the conditions)
+
+F6 (the timing caveat overstates the effect for the ETF: proposed wording is the owner's call), F7 (the React placeholder shows an empty frame for an `ok` section until V16) and F8 (the stale note repeats "ACWI data ends" in two date formats on the static panel) are unchanged. The F5 wording and next step are done (9.1 item 3, 9.5).
+
+### 9.8 Gates after validation (2026-11-19)
+
+| Gate | Result |
+| --- | --- |
+| `uv run pytest -q` | 932 passed, 227 deselected (`test_world_beta.py` 24, `test_section_world_beta.py` 35, `test_prices_incremental.py` 27 tests) |
+| `uv run ruff check backend` | All checks passed |
+| `uv run ruff format --check backend` | 110 files already formatted |
+| `uv run pyright` | 0 errors, 0 warnings |
+| `frontend`: `npm run typecheck`, `npm run lint` | no errors |
+| `frontend`: `npm test` | 34 files, 491 tests passed |
+| `frontend`: `npm run build`, `npm run size` | built; 396.1 kB raw, 121.3 kB gzip (budget 400 / 125) |
+| `frontend`: `npm run e2e` | 1 passed |
+| Generated files | `openapi.json` and `types.gen.ts` regenerate with no further diff |
+
+No test needed a rerun. The `live` and `slow` markers were not run.
