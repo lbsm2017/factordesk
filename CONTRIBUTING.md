@@ -50,6 +50,12 @@ uv run pytest -m live
 CI runs the offline suite on Windows, macOS and Linux, so avoid anything platform-specific:
 use `pathlib` for paths, open text files as UTF-8, and do not add shell scripts.
 
+## Tests
+
+- Compare floats with a tolerance, never with `==`: use `pytest.approx(expected, rel=1e-12)`.
+- Run `make build` after you pull frontend changes. `factordesk serve` warns when the built
+  dashboard page is older than its source.
+
 ## Code and statistics rules
 
 The full list is in [CODING_STANDARDS.md](CODING_STANDARDS.md). The ones that matter most:
