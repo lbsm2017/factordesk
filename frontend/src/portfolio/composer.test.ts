@@ -49,7 +49,18 @@ describe("weight text", () => {
   });
 
   it("refuses text that is not a number from 0 to 100", () => {
-    for (const bad of ["", " ", "abc", "-1", "100.5", "1e2", "12..5", ".", "5%%"]) expect(parsePercent(bad)).toBeNull();
+    for (const bad of [
+      "",
+      " ",
+      "abc",
+      "-1",
+      "100.5",
+      "1e2",
+      "12..5",
+      ".",
+      "5%%",
+    ])
+      expect(parsePercent(bad)).toBeNull();
   });
 
   it("formats with one decimal, or two when needed", () => {
@@ -100,7 +111,10 @@ describe("edits on top of tree.ts", () => {
     const t = sample();
     const id = instruments(t)[0]?.id ?? "";
     const swapped = swapInstrument(t, id, "SPY");
-    expect(instruments(swapped)[0]).toMatchObject({ ticker: "SPY", weight: 0.5 });
+    expect(instruments(swapped)[0]).toMatchObject({
+      ticker: "SPY",
+      weight: 0.5,
+    });
   });
 
   it("normalises, and puts the remainder in USD cash", () => {
@@ -109,7 +123,11 @@ describe("edits on top of tree.ts", () => {
     const cash = remainderToCash(t, LIBRARY);
     expect(totalWeight(cash)).toBeCloseTo(1, 12);
     expect(remainder(cash)).toBe(0);
-    expect(instruments(cash).some((i) => i.kind === "cash" && Math.abs(i.weight - 0.2) < 1e-12)).toBe(true);
+    expect(
+      instruments(cash).some(
+        (i) => i.kind === "cash" && Math.abs(i.weight - 0.2) < 1e-12,
+      ),
+    ).toBe(true);
   });
 
   it("removes the line with its last instrument, and only the instrument when more are left", () => {
@@ -144,13 +162,22 @@ describe("the live panel", () => {
 
   it("names the leaf that sets the earliest common start, and ignores 0% leaves", () => {
     let t = sample();
-    expect(earliestCommonStart(t, BY_ID)).toEqual({ date: "2002-07-30", by: "IEF" });
+    expect(earliestCommonStart(t, BY_ID)).toEqual({
+      date: "2002-07-30",
+      by: "IEF",
+    });
     t = addLineWithWeight(t, lib("fi_eur_gov"), 0);
     expect(earliestCommonStart(t, BY_ID).by).toBe("IEF");
     const igov = instruments(t).find((i) => i.ticker === "IGOV");
     t = setWeight(t, igov?.id ?? "", 0.1);
-    expect(earliestCommonStart(t, BY_ID)).toEqual({ date: "2009-01-30", by: "IGOV" });
-    expect(earliestCommonStart(emptyTree("E"), BY_ID)).toEqual({ date: null, by: null });
+    expect(earliestCommonStart(t, BY_ID)).toEqual({
+      date: "2009-01-30",
+      by: "IGOV",
+    });
+    expect(earliestCommonStart(emptyTree("E"), BY_ID)).toEqual({
+      date: null,
+      by: null,
+    });
   });
 
   it("does not use the start of a swapped ticker", () => {
@@ -168,9 +195,16 @@ describe("the live panel", () => {
     const ids = list.map((c) => c.id);
     expect(ids).toContain("unallocated");
     expect(list.find((c) => c.id === "unallocated")?.title).toContain("10.0%");
-    expect(list.find((c) => c.id.startsWith("late-"))?.title).toBe("IBIT starts 2024.");
-    expect(list.find((c) => c.id === "listed")?.title).toBe("IBIT, PSP: listed proxies.");
-    expect(list.find((c) => c.id === "usd")?.title).toBe("All 4 instruments are USD-listed.");
+    const crypto = lib("alt_crypto");
+    expect(list.find((c) => c.id.startsWith("late-"))?.title).toBe(
+      `${crypto.proxy} starts ${String(crypto.first_date).slice(0, 4)}.`,
+    );
+    expect(list.find((c) => c.id === "listed")?.title).toBe(
+      `${String(crypto.proxy)}, PSP: listed proxies.`,
+    );
+    expect(list.find((c) => c.id === "usd")?.title).toBe(
+      "All 4 instruments are USD-listed.",
+    );
   });
 
   it("shows the over-100% error once, and says swapped tickers are checked on the run", () => {
@@ -179,18 +213,27 @@ describe("the live panel", () => {
     t = swapInstrument(t, instruments(t)[1]?.id ?? "", "XYZ");
     const list = checks(t, BY_ID);
     expect(list.filter((c) => c.tone === "error")).toHaveLength(1);
-    expect(list.find((c) => c.id === "over")?.title).toBe("Weights add up to 120.0%.");
+    expect(list.find((c) => c.id === "over")?.title).toBe(
+      "Weights add up to 120.0%.",
+    );
     expect(list.find((c) => c.id === "usd-run")?.title).toContain("XYZ");
   });
 
   it("says so when the tree is empty or has no weight", () => {
     expect(checks(emptyTree("E"), BY_ID)[0]?.id).toBe("empty");
-    expect(checks(addLine(emptyTree("E"), lib("eq_na_large")), BY_ID)[0]?.id).toBe("no-weight");
+    expect(
+      checks(addLine(emptyTree("E"), lib("eq_na_large")), BY_ID)[0]?.id,
+    ).toBe("no-weight");
   });
 
   it("decides whether the tree can run", () => {
-    expect(runnable(emptyTree("E"))).toEqual({ ok: false, reason: "Add a sub-asset class first." });
-    expect(runnable(addLine(emptyTree("E"), lib("eq_na_large"))).ok).toBe(false);
+    expect(runnable(emptyTree("E"))).toEqual({
+      ok: false,
+      reason: "Add a sub-asset class first.",
+    });
+    expect(runnable(addLine(emptyTree("E"), lib("eq_na_large"))).ok).toBe(
+      false,
+    );
     expect(runnable(sample())).toEqual({ ok: true, reason: null });
     const over = setWeight(sample(), instruments(sample())[0]?.id ?? "", 0.9);
     expect(runnable(over).ok).toBe(false);
