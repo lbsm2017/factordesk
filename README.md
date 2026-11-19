@@ -90,6 +90,9 @@ uv run factordesk serve --open           # then open http://127.0.0.1:8000/?t=SP
 uv run factordesk report SPY --open      # writes SPY_report.html
 ```
 
+With the [shortcuts](#shortcuts) the same steps are `make setup` and `make serve`, or
+`uv run poe setup` and `uv run poe serve` without make.
+
 The first run downloads the factor file and the ticker's price history. Both are cached in
 `data/`, so later runs are fast.
 
@@ -334,6 +337,30 @@ only if you need to override settings; `.env` is gitignored.
 ## Usage
 
 Run all commands from the `factordesk` folder.
+
+### Shortcuts
+
+Common commands have short names. They run through uv, so they work the same on Windows, macOS and
+Linux; `uv run poe` with no task lists them all. If you have make, the same shortcuts work as
+`make <task>`.
+
+| uv (every system) | make | What it does |
+| --- | --- | --- |
+| `uv run poe setup` | `make setup` | Install the page's dependencies and build the page (run `uv sync` first; `make setup` does it for you) |
+| `uv run poe serve` | `make serve` | Start the dashboard on port 8000 and open it |
+| `uv run poe serve --port 8080` | `make serve PORT=8080` | Start it on another port |
+| `uv run poe stop` | `make stop` | Stop the dashboard on port 8000 (`--port` or `PORT=` for another port) |
+| `uv run poe report SPY` | `make report T=SPY` | Write an offline report and open it |
+| `uv run poe factors` | `make factors` | Show the cached factor file's range and age |
+| `uv run poe refresh-factors` | `make refresh-factors` | Download the latest factor file |
+| `uv run poe build` | `make build` | Rebuild the page after frontend changes |
+| `uv run poe dev` | `make dev` | API with reload, for frontend work (run `npm --prefix frontend run dev` beside it) |
+| `uv run poe test` | `make test` | Python and frontend unit tests |
+| `uv run poe check` | `make check` | Lint, format and type checks, as CI runs them |
+| `uv run poe ci` | `make ci` | Every CI gate: checks, tests, build, bundle size, browser tests |
+
+`stop` only stops a factordesk server: it first checks that the port answers like factordesk, so it
+never stops another program on that port.
 
 ### The dashboard
 

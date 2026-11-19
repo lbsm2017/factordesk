@@ -49,7 +49,75 @@ dev = [
     "ruff",
     "pyright",
     "pandas-stubs",
+    "poethepoet>=0.49.0",
 ]
+
+# Shortcuts: `uv run poe` lists them, `uv run poe <task>` runs one. The Makefile calls the same tasks.
+[tool.poe.tasks.setup]
+help = "Install the page's dependencies and build the dashboard page (run uv sync first)"
+sequence = [
+    "python scripts/tasks.py npm --prefix frontend ci",
+    "python scripts/tasks.py npm --prefix frontend run build",
+]
+default_item_type = "cmd"
+
+[tool.poe.tasks.build]
+help = "Rebuild the dashboard page (after frontend changes)"
+cmd = "python scripts/tasks.py npm --prefix frontend run build"
+
+[tool.poe.tasks.serve]
+help = "Start the dashboard and open it in the browser"
+cmd = "factordesk serve --port ${port} --open"
+args = [{ name = "port", default = "8000", help = "Port to listen on" }]
+
+[tool.poe.tasks.stop]
+help = "Stop the factordesk server on a port"
+cmd = "python scripts/tasks.py stop --port ${port}"
+args = [{ name = "port", default = "8000", help = "Port the server listens on" }]
+
+[tool.poe.tasks.dev]
+help = "Start the API with reload for frontend development (run 'npm --prefix frontend run dev' too)"
+cmd = "factordesk serve --dev"
+
+[tool.poe.tasks.report]
+help = "Write an offline HTML report for a ticker and open it"
+cmd = "factordesk report ${ticker} --open"
+args = [{ name = "ticker", positional = true, required = true, help = "Yahoo Finance symbol, for example SPY" }]
+
+[tool.poe.tasks.factors]
+help = "Show the date range, age and source of the cached factor file"
+cmd = "factordesk factors status"
+
+[tool.poe.tasks.refresh-factors]
+help = "Download the latest factor file now"
+cmd = "factordesk factors refresh"
+
+[tool.poe.tasks.test]
+help = "Run the Python and frontend unit tests"
+sequence = ["pytest -q", "python scripts/tasks.py npm --prefix frontend test"]
+default_item_type = "cmd"
+
+[tool.poe.tasks.check]
+help = "Lint, format check and type check (Python and frontend), as CI does"
+sequence = [
+    "ruff check",
+    "ruff format --check backend",
+    "pyright",
+    "python scripts/tasks.py npm --prefix frontend run typecheck",
+    "python scripts/tasks.py npm --prefix frontend run lint",
+]
+default_item_type = "cmd"
+
+[tool.poe.tasks.e2e]
+help = "Run the browser tests (Playwright, against a fake backend)"
+cmd = "python scripts/tasks.py npm --prefix frontend run e2e"
+
+[tool.poe.tasks.ci]
+help = "Every gate CI runs: check, test, build, bundle size, e2e"
+sequence = ["check", "test", "build", "_size", "e2e"]
+
+[tool.poe.tasks._size]
+cmd = "python scripts/tasks.py npm --prefix frontend run size"
 
 [tool.ruff]
 line-length = 100
