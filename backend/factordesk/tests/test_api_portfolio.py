@@ -583,3 +583,19 @@ def test_the_route_reports_skipped_days_as_a_data_note(client: ApiClient) -> Non
     clean = report_of(post(client, tree([holding(0, "AAA", 0.5)]))).portfolio_backtest
     assert clean is not None and clean.n_dates_dropped == 0 and clean.data_note is None
 
+
+# --------------------------------------------------------------------------- explicit cash
+def test_an_explicit_cash_line_and_the_remainder_add_up_to_one(client: ApiClient) -> None:
+    cash = {"id": "c0", "kind": "cash", "ticker": None, "label": "USD Cash", "weight": 0.15}
+    body = tree([holding(0, "AAA", 0.5), holding(1, "BBB", 0.2), cash])
+    section = report_of(post(client, body)).portfolio_backtest
+    assert section is not None
+    assert section.n_instruments == 3
+    assert [(w.label, w.ticker, w.weight) for w in section.weights] == [
+        ("AAA", "AAA", 0.5),
+        ("BBB", "BBB", 0.2),
+        ("USD Cash", None, 0.15),
+    ]
+    assert section.unallocated_weight == pytest.approx(0.15)
+    assert sum(w.weight for w in section.weights) + section.unallocated_weight == pytest.approx(1.0)
+    assert section.end_limited_by == ["USD cash (risk-free rate)"]
