@@ -3,8 +3,9 @@ import type { RangePreset } from "../api/types";
 
 /**
  * URL state contract (dashboard spec DB6.1). Shapes: `/?t=SPY&range=3Y`,
- * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126`, `stats=1` and `m=track` (the
- * track-record mode; no `m` means ticker mode, so every older URL keeps its meaning). Panels
+ * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126`, `stats=1`, `m=track` (the
+ * track-record mode; no `m` means ticker mode) and `model=ff6` (FF5 plus momentum; no `model` means
+ * FF5), so every older URL keeps its meaning. Panels
  * read `win` through props and `stats` through `useShowStats()`, never from `location`.
  */
 
@@ -13,6 +14,10 @@ export const PRESETS = ["3Y", "5Y", "10Y", "FULL"] as const satisfies readonly R
 export type Preset = (typeof PRESETS)[number];
 
 export type RollingWindowDays = 126 | 252;
+
+/** Factor models of the model toggle: FF5 (the default) and FF6 = FF5 + momentum. */
+export const MODELS = ["ff5", "ff6"] as const;
+export type FactorModel = (typeof MODELS)[number];
 
 export interface UrlState {
   /** Upper-case ticker, or null on the landing page. */
@@ -29,11 +34,13 @@ export interface UrlState {
   stats: boolean;
   /** The sidebar mode: a ticker report (no `m` in the URL) or an uploaded track record (`m=track`). */
   mode: Mode;
+  /** The factor model: FF5 (no `model` in the URL) or FF6 (`model=ff6`). */
+  model: FactorModel;
 }
 
 export type Mode = "ticker" | "track";
 
-export const EMPTY_URL_STATE: UrlState = { ticker: null, range: null, start: null, end: null, win: null, stats: false, mode: "ticker" };
+export const EMPTY_URL_STATE: UrlState = { ticker: null, range: null, start: null, end: null, win: null, stats: false, mode: "ticker", model: "ff5" };
 
 /** The server's ticker pattern (`validate_ticker`): 1 to 12 of letters, digits and . ^ = -, not starting with a dot. */
 const TICKER_PATTERN = /^[A-Za-z0-9.^=-]{1,12}$/;
@@ -90,6 +97,7 @@ export function parseUrl(search: string): UrlState {
     win: parseWin(params.get("win")),
     stats: params.get("stats") === "1",
     mode: params.get("m") === "track" ? "track" : "ticker",
+    model: params.get("model")?.trim().toLowerCase() === "ff6" ? "ff6" : "ff5",
   };
 }
 
@@ -106,6 +114,7 @@ export function toSearch(state: UrlState): string {
   if (state.win !== null) params.set("win", String(state.win));
   if (state.stats) params.set("stats", "1");
   if (state.mode === "track") params.set("m", "track");
+  if (state.model === "ff6") params.set("model", "ff6");
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
 }
