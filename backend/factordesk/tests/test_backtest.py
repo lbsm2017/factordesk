@@ -5,6 +5,7 @@ The 2-leaf, 2-month example is worked by hand in the comments with exact fractio
 
 from __future__ import annotations
 
+import math
 from datetime import date
 
 import numpy as np
@@ -195,6 +196,25 @@ def test_tb08b_fully_invested_ignores_short_risk_free() -> None:
     assert res.end_leaves == ("L0", "L1")
     assert (res.leaf_ret[CASH_ID] == 0.0).all()
     assert (res.applied_weights[CASH_ID] == 0.0).all()
+
+
+def test_tb08c_rounding_below_tolerance_gives_exactly_zero_cash() -> None:
+    base = _random(80, 3, seed=13)
+    idx = pd.DatetimeIndex(base.index)
+    short_rf = _rf(pd.DatetimeIndex(idx[:-20]), 0.0001)
+    for weights in (
+        {"L0": 0.1, "L1": 0.2, "L2": 0.7 - 5e-10},
+        {"L0": 1 / 3, "L1": 1 / 3, "L2": 1 / 3},
+        {"L0": 0.5, "L1": 0.3, "L2": 0.2 + 5e-10},
+    ):
+        res = run_backtest(base, weights, short_rf)
+        assert res.target_weights[CASH_ID] == 0.0
+        assert math.fsum(res.target_weights.values()) == pytest.approx(1.0, abs=1e-15)
+        assert res.n == 80  # cash at exactly 0 does not let the short rf cut the window
+    # Just above the tolerance, the remainder is a real cash holding.
+    res = run_backtest(base, {"L0": 0.5, "L1": 0.3, "L2": 0.2 - 2e-9}, short_rf)
+    assert res.target_weights[CASH_ID] == pytest.approx(2e-9, rel=1e-6)
+    assert res.end_leaves == (CASH_ID,)
 
 
 def test_tb09_gap_inside_window_is_an_error() -> None:

@@ -70,7 +70,9 @@ CASH_ID = "cash"
 BPS = 10_000.0
 """Basis points in one unit."""
 WEIGHT_TOLERANCE = 1e-9
-"""Target weights may sum to at most ``1 + WEIGHT_TOLERANCE`` (rounding in user input)."""
+"""Target weights may sum to at most ``1 + WEIGHT_TOLERANCE`` (rounding in user input). When
+``1 - sum(target) <= WEIGHT_TOLERANCE`` the cash weight is exactly 0 and the leaf targets are
+scaled to sum to 1."""
 SURVIVORSHIP_NOTE = (
     "Holdings are currently listed securities. Past delisted, merged or liquidated peers are "
     "excluded, which tends to overstate historical returns, more so for small caps, long "
@@ -140,9 +142,14 @@ def _targets(target_weights: Mapping[str, float], leaf_ids: list[str]) -> dict[s
     total = math.fsum(out.values())
     if total > 1.0 + WEIGHT_TOLERANCE:
         raise ValueError(f"target weights sum to {total}, more than 1")
-    out[CASH_ID] = max(0.0, 1.0 - total)
-    scale = math.fsum(out.values())
-    return {leaf: w / scale for leaf, w in out.items()}
+    cash = 1.0 - total
+    if cash <= WEIGHT_TOLERANCE:
+        # Fully invested up to rounding: cash is exactly 0 and the leaves are scaled to sum to 1.
+        out = {leaf: w / total for leaf, w in out.items()}
+        out[CASH_ID] = 0.0
+        return out
+    out[CASH_ID] = cash
+    return out
 
 
 def _window(frame: pd.DataFrame) -> tuple[pd.DataFrame, tuple[str, ...], tuple[str, ...]]:
