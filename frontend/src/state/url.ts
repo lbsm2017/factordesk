@@ -16,7 +16,7 @@ export type Preset = (typeof PRESETS)[number];
 
 export type RollingWindowDays = 126 | 252;
 
-/** Factor models of the model toggle: FF5 and FF6 = FF5 + momentum (the dashboard default; the API default stays FF5). */
+/** Factor models: FF5 and FF6 = FF5 + momentum (the dashboard default; the API default stays FF5). */
 export const MODELS = ["ff5", "ff6"] as const;
 export type FactorModel = (typeof MODELS)[number];
 

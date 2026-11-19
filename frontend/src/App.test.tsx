@@ -90,7 +90,7 @@ describe("first load", () => {
     expect(window.location.search).toBe("?t=SPY");
     expect(requests).toContain("/api/report/SPY?range=10Y&model=ff6");
     expect(screen.getByRole("radio", { name: "10Y" })).toHaveProperty("checked", true);
-    expect(within(screen.getByRole("group", { name: "Factor model" })).getByRole("radio", { name: "FF6" })).toHaveProperty("checked", true);
+    expect(screen.queryByRole("group", { name: "Factor model" })).toBeNull();
   });
 
   it("keeps an old URL with explicit params: its range and model are requested as written", async () => {
@@ -99,18 +99,7 @@ describe("first load", () => {
     expect(window.location.search).toBe("?t=SPY&range=FULL&win=126&stats=1&model=ff5");
     expect(requests).toContain("/api/report/SPY?range=FULL&model=ff5");
     expect(screen.getByRole("radio", { name: "Full history" })).toHaveProperty("checked", true);
-    expect(within(screen.getByRole("group", { name: "Factor model" })).getByRole("radio", { name: "FF5" })).toHaveProperty("checked", true);
-  });
-
-  it("writes model=ff5 to the URL when FF5 is chosen, and drops it again for FF6", async () => {
-    renderAt("/?t=SPY");
-    await screen.findByTestId("report-ticker");
-    const toggle = within(screen.getByRole("group", { name: "Factor model" }));
-    fireEvent.click(toggle.getByRole("radio", { name: "FF5" }));
-    expect(window.location.search).toBe("?t=SPY&model=ff5");
-    await waitFor(() => expect(requests).toContain("/api/report/SPY?range=10Y&model=ff5"));
-    fireEvent.click(toggle.getByRole("radio", { name: "FF6" }));
-    expect(window.location.search).toBe("?t=SPY");
+    expect(screen.queryByRole("group", { name: "Factor model" })).toBeNull();
   });
 
   it("passes custom dates through and points the download at the same range", async () => {

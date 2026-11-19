@@ -17,7 +17,6 @@ import type { FactorReport } from "./api/types";
 import { AnalysedRange } from "./components/controls/AnalysedRange";
 import { ControlsStrip } from "./components/controls/ControlsStrip";
 import { ModeSwitch } from "./components/controls/ModeSwitch";
-import { ModelToggle } from "./components/controls/ModelToggle";
 import { Landing, TrackLanding } from "./components/controls/ReportStates";
 import { TrackRecordInput } from "./components/controls/TrackRecordInput";
 import { ErrorFrame } from "./components/report/ErrorFrame";
@@ -136,9 +135,6 @@ function Dashboard() {
               }}
             />
           )}
-          <div className="side-group">
-            <ModelToggle selected={state.model} onSelect={(model) => commit({ model })} />
-          </div>
           <StatsSwitch />
         </>
       }
