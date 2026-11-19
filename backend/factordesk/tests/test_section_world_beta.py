@@ -27,6 +27,7 @@ from factordesk.pipeline import assemble_report, build_report
 from factordesk.report import FactorReport, load_report, render_report_html
 from factordesk.report.base import iter_floats
 from factordesk.report.panels.world_beta import render_world_beta_panel
+from factordesk.report.render_html import esc
 from factordesk.report.schema import LABEL_TEXT, SECTIONS, report_label_text
 from factordesk.report.sections.world_beta import (
     LABEL_TEXT as WORLD_LABELS,
@@ -66,11 +67,11 @@ def section_for(case: Case) -> WorldBetaSection:
 def test_twb20_ok_section_holds_both_fits_on_the_same_days() -> None:
     case = make_case(720)
     s = section_for(case)
-    assert s.status == "ok" and s.reason is None and s.benchmark == "ACWI"
+    assert s.status == "ok" and s.reason is None and s.proxy == "ACWI"
     assert s.world is not None and s.us_market is not None
     assert s.sample.n == s.n_sample  # the benchmark covers every day
     assert s.sample.start is not None and s.sample.end is not None
-    assert s.world.ci95_low < BENCH_BETA < s.world.ci95_high
+    assert s.world.ci_low < BENCH_BETA < s.world.ci_high
     # The US-market regression runs on the very same days: recompute it from the sample.
     report = report_for(case, WorldBenchmarkInput(history=case.bench))
     mkt = report.regression  # the five-factor fit is a different model; check the single factor
@@ -80,9 +81,9 @@ def test_twb20_ok_section_holds_both_fits_on_the_same_days() -> None:
     y = case.y[-sample_rows:]
     ref = single_factor_beta(y, mkt_rf)
     assert s.us_market.beta == pytest.approx(ref.beta, abs=1e-12)
-    assert s.us_market.se_hac == pytest.approx(ref.se_hac, abs=1e-12)
+    assert s.us_market.se == pytest.approx(ref.se_hac, abs=1e-12)
     assert s.hac_lags == ref.lags
-    assert s.comparison == "higher_against_the_world"  # world beta 1.3, independent US factor ~0
+    assert s.comparison == "higher"  # world beta 1.3, independent US factor ~0
     assert s.acwi_last_date == case.bench.frame.index[-1].date()
     assert s.acwi_note is None and s.n_not_in_benchmark == s.n_sample - s.sample.n
 
@@ -423,10 +424,10 @@ def test_twb43_ok_panel_shows_two_rows_the_sentence_and_the_footnotes() -> None:
     assert "<style" not in html and "color:" not in html  # existing classes only
 
 
-def test_twb44_panel_sits_after_the_exposure_qualifiers_and_before_returns() -> None:
+def test_twb44_panel_sits_after_the_headline_strip_and_before_the_price_chart() -> None:
     page = render_report_html(report_with_section(load_report(MOCK), "world_beta"))
     ids = [m for m in __import__("re").findall(r'<section class="panel[^"]*" id="([^"]+)"', page)]
-    assert ids.index("exposures") < ids.index("world-beta") < ids.index("returns")
+    assert ids.index("world-beta") + 1 == ids.index("price")
 
 
 def test_twb45_panel_shows_the_stale_note_and_the_reason_of_a_failed_section() -> None:
@@ -459,7 +460,7 @@ def test_twb45_panel_shows_the_stale_note_and_the_reason_of_a_failed_section() -
     report = base.model_copy(update={"world_beta": section})
     html = render_world_beta_panel(report)
     assert html is not None
-    assert UNAVAILABLE_REASON in html and "Could not reach Yahoo for ACWI." in html
+    assert esc(UNAVAILABLE_REASON) in html and "Could not reach Yahoo for ACWI." in html
     assert "<table" not in html and "ACWI data ends" not in html.replace("Could not", "")
 
 
@@ -468,7 +469,7 @@ def test_twb46_comparison_sentences_reach_the_panel_for_every_outcome() -> None:
     same = section_for(make_case(746, beta=1.0))  # US factor independent: world ~1.0 vs US ~0
     assert same.comparison is not None
     higher = section_for(make_case(747, beta=BENCH_BETA))
-    assert higher.comparison == "higher_against_the_world"
+    assert higher.comparison == "higher"
     assert higher.comparison_text is not None
     assert higher.comparison_text.startswith("Higher against the world")
     assert "do not overlap" in higher.comparison_text

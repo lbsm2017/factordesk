@@ -290,20 +290,20 @@ export interface components {
             /** Beta */
             beta: number;
             /**
-             * Se Hac
+             * Se
              * @description Newey-West standard error of the beta (M0.5).
              */
-            se_hac: number;
+            se: number;
             /**
-             * Ci95 Low
+             * Ci Low
              * @description Normal 95% interval of the beta, lower end.
              */
-            ci95_low: number;
+            ci_low: number;
             /**
-             * Ci95 High
+             * Ci High
              * @description Normal 95% interval of the beta, upper end.
              */
-            ci95_high: number;
+            ci_high: number;
             /**
              * R2
              * @description R squared of the regression.
@@ -2237,11 +2237,11 @@ export interface components {
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
             /**
-             * Benchmark
+             * Proxy
              * @description Yahoo ticker of the world proxy.
              * @constant
              */
-            benchmark: "ACWI";
+            proxy: "ACWI";
             /**
              * Hac Lags
              * @description Newey-West lags of both regressions; null if none.
@@ -2281,8 +2281,11 @@ export interface components {
             world: components["schemas"]["BetaFit"] | null;
             /** @description Against the US market, same days. */
             us_market: components["schemas"]["BetaFit"] | null;
-            /** Comparison */
-            comparison: ("about_the_same" | "higher_against_the_world" | "lower_against_the_world") | null;
+            /**
+             * Comparison
+             * @description World beta against the US market beta: about_the_same when the two 95% intervals overlap, otherwise higher or lower (a reading of the intervals, not a test).
+             */
+            comparison: ("about_the_same" | "higher" | "lower") | null;
             /**
              * Comparison Text
              * @description The plain reading of the comparison.

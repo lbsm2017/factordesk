@@ -35,7 +35,7 @@ BENCHMARK_TICKER = "ACWI"
 MIN_OVERLAP = 252
 """Fewest common days with a result (one trading year); fewer is ``insufficient_data``."""
 
-Comparison = Literal["about_the_same", "higher_against_the_world", "lower_against_the_world"]
+Comparison = Literal["about_the_same", "higher", "lower"]
 
 
 @dataclass(frozen=True)
@@ -157,11 +157,11 @@ WORDS: dict[Comparison, str] = {
         "About the same: the 95% intervals of the two betas overlap, so these days do not show "
         "a difference between the US market beta and the world beta."
     ),
-    "higher_against_the_world": (
+    "higher": (
         "Higher against the world: the beta against the world is above the beta against the US "
         "market, and the two 95% intervals do not overlap."
     ),
-    "lower_against_the_world": (
+    "lower": (
         "Lower against the world: the beta against the world is below the beta against the US "
         "market, and the two 95% intervals do not overlap."
     ),
@@ -174,9 +174,9 @@ def compare_betas(world: BetaEstimate, us: BetaEstimate) -> tuple[Comparison, st
     if intervals_overlap(world, us):
         key: Comparison = "about_the_same"
     elif world.beta > us.beta:
-        key = "higher_against_the_world"
+        key = "higher"
     else:
-        key = "lower_against_the_world"
+        key = "lower"
     return key, WORDS[key]
 
 

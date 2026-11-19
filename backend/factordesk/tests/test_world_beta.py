@@ -260,8 +260,8 @@ def test_twb15_touching_intervals_count_as_overlapping() -> None:
 def test_twb16_disjoint_intervals_name_the_higher_beta() -> None:
     higher_key, higher = compare_betas(_est(1.30, 0.05), _est(1.00, 0.05))
     lower_key, lower = compare_betas(_est(0.70, 0.05), _est(1.00, 0.05))
-    assert higher_key == "higher_against_the_world" and higher.startswith("Higher against")
-    assert lower_key == "lower_against_the_world" and lower.startswith("Lower against")
+    assert higher_key == "higher" and higher.startswith("Higher against")
+    assert lower_key == "lower" and lower.startswith("Lower against")
     for text in (higher, lower):
         assert "do not overlap" in text
         assert "will" not in text and "predict" not in text  # no claim about the future

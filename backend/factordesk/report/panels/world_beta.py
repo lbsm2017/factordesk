@@ -1,9 +1,8 @@
 """Static HTML panel of the ``world_beta`` section (docs/validation/world-beta-handoff WB3).
 
-Registered at position 540 as ``world_beta``, element id ``world-beta``. It follows the three
-panels that qualify the betas of Exposures (lead-lag 510, shrunk 520, fragility 530) and comes
-before Return contribution: it reads the market beta of Exposures against a second market, so it
-sits with them, after the panels that qualify the five-factor betas themselves.
+Registered at position 350 as ``world_beta``, element id ``world-beta``, between the factor
+strip (kpis 300) and the price chart (400), as dashboard spec DV1 and DV2.6 place it: it is the
+first thing read after the headline betas, against a second market.
 
 The panel is the plain comparison sentence, a two-row table (against the world, ACWI; against the
 US market on the same days), and a footnote about the proxy and the timing caveat, with the method
@@ -41,7 +40,7 @@ CSS = "table.reg.wb{min-width:0}"
 
 
 def _interval(fit: BetaFit) -> str:
-    return f"[{fmt_num(fit.ci95_low, 2)}, {fmt_num(fit.ci95_high, 2)}]"
+    return f"[{fmt_num(fit.ci_low, 2)}, {fmt_num(fit.ci_high, 2)}]"
 
 
 def _row(label: str, fit: BetaFit, days: str) -> str:
@@ -127,4 +126,4 @@ def render_world_beta_panel(report: FactorReport) -> str | None:
     return panel_section(PANEL_ID, head, body)
 
 
-register_panel("world_beta", 540, render_world_beta_panel, css=CSS)
+register_panel("world_beta", 350, render_world_beta_panel, css=CSS)

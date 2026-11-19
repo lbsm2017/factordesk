@@ -916,20 +916,20 @@
             "type": "number",
             "title": "Beta"
           },
-          "se_hac": {
+          "se": {
             "type": "number",
             "minimum": 0.0,
-            "title": "Se Hac",
+            "title": "Se",
             "description": "Newey-West standard error of the beta (M0.5)."
           },
-          "ci95_low": {
+          "ci_low": {
             "type": "number",
-            "title": "Ci95 Low",
+            "title": "Ci Low",
             "description": "Normal 95% interval of the beta, lower end."
           },
-          "ci95_high": {
+          "ci_high": {
             "type": "number",
-            "title": "Ci95 High",
+            "title": "Ci High",
             "description": "Normal 95% interval of the beta, upper end."
           },
           "r2": {
@@ -968,9 +968,9 @@
         "type": "object",
         "required": [
           "beta",
-          "se_hac",
-          "ci95_low",
-          "ci95_high",
+          "se",
+          "ci_low",
+          "ci_high",
           "r2",
           "correlation",
           "alpha_annual",
@@ -5918,10 +5918,10 @@
           "sample": {
             "$ref": "#/components/schemas/SampleInfo"
           },
-          "benchmark": {
+          "proxy": {
             "type": "string",
             "const": "ACWI",
-            "title": "Benchmark",
+            "title": "Proxy",
             "description": "Yahoo ticker of the world proxy."
           },
           "hac_lags": {
@@ -6022,15 +6022,16 @@
                 "type": "string",
                 "enum": [
                   "about_the_same",
-                  "higher_against_the_world",
-                  "lower_against_the_world"
+                  "higher",
+                  "lower"
                 ]
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Comparison"
+            "title": "Comparison",
+            "description": "World beta against the US market beta: about_the_same when the two 95% intervals overlap, otherwise higher or lower (a reading of the intervals, not a test)."
           },
           "comparison_text": {
             "anyOf": [
@@ -6063,7 +6064,7 @@
           "status",
           "reason",
           "sample",
-          "benchmark",
+          "proxy",
           "hac_lags",
           "n_sample",
           "n_not_in_benchmark",

@@ -44,7 +44,7 @@ from factordesk.section_hooks.context import SectionContext, WorldBenchmarkInput
 
 logger = logging.getLogger(__name__)
 
-UNAVAILABLE_REASON = "ACWI price data could not be fetched"
+UNAVAILABLE_REASON = "The world fund's prices could not be fetched."
 """Reason of the failed section when ACWI cannot be fetched and no cache exists."""
 
 _LABELS: list[WorldBetaLabel] = ["L-DESC", "L-WORLD-PROXY", "L-WORLD-ASYNC"]
@@ -72,9 +72,9 @@ def load_world_benchmark(provider: PriceProvider) -> WorldBenchmarkInput:
 def _fit(e: BetaEstimate) -> BetaFit:
     return BetaFit(
         beta=e.beta,
-        se_hac=e.se_hac,
-        ci95_low=e.ci_low,
-        ci95_high=e.ci_high,
+        se=e.se_hac,
+        ci_low=e.ci_low,
+        ci_high=e.ci_high,
         r2=e.r2,
         correlation=e.correlation,
         alpha_annual=e.alpha_annual,
@@ -127,7 +127,7 @@ def build_world_beta(ctx: SectionContext) -> WorldBetaSection | None:
                 "status": status,
                 "reason": reason,
                 "sample": _overlap_info(info, n, start, end),
-                "benchmark": BENCHMARK_TICKER,
+                "proxy": BENCHMARK_TICKER,
                 "hac_lags": lags,
                 "n_sample": ctx.sample.n,
                 "n_not_in_benchmark": ctx.sample.n if n_missing is None else n_missing,

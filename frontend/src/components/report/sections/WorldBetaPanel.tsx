@@ -4,7 +4,7 @@ import { Panel } from "../Panel";
 /**
  * Panel of the `world_beta` section (quick beta against the iShares MSCI ACWI ETF; backend
  * `report/sections/world_beta.py`, handoff `docs/validation/world-beta-handoff-2026-11-18.md`).
- * Registered in `panelRegistry.ts` at position 540. Placeholder: the panel frame, with the reason
+ * Registered in `panelRegistry.ts` at position 350. Placeholder: the panel frame, with the reason
  * when the section is not `ok`; the real body is built later. Renders nothing when the section is
  * absent (null).
  */

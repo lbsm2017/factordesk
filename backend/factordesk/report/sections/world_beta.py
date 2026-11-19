@@ -10,8 +10,8 @@ against the US market factor ``Mkt-RF``. ``comparison`` reads the two intervals 
 
 Statuses: ``ok``; ``insufficient_data`` (fewer than 252 common days); ``failed`` (the ACWI price
 audit found errors, the benchmark return does not vary, or another error), including the
-case where ACWI could not be fetched and no cache exists (reason "ACWI price data could not be
-fetched", the cause in ``acwi_note``, both ACWI dates ``None``). The report always builds. A
+case where ACWI could not be fetched and no cache exists (reason "The world fund's prices could not
+be fetched.", the cause in ``acwi_note``, both ACWI dates ``None``). The report always builds. A
 cached history that is stale because the refresh failed is still ``ok``; ``acwi_note`` says where
 it ends.
 A section that is not ``ok`` carries no float, so ``world`` and ``us_market`` are then ``None``.
@@ -30,7 +30,7 @@ from pydantic import Field, model_validator
 from factordesk.report.base import FrozenModel, SectionModel, SectionSpec
 
 WorldBetaLabel = Literal["L-DESC", "L-WORLD-PROXY", "L-WORLD-ASYNC"]
-ComparisonKey = Literal["about_the_same", "higher_against_the_world", "lower_against_the_world"]
+ComparisonKey = Literal["about_the_same", "higher", "lower"]
 
 LABEL_TEXT: dict[str, str] = {
     "L-WORLD-PROXY": (
@@ -52,9 +52,9 @@ class BetaFit(FrozenModel):
     """One single-factor regression of the stock's excess return, with Newey-West inference."""
 
     beta: float
-    se_hac: float = Field(ge=0.0, description="Newey-West standard error of the beta (M0.5).")
-    ci95_low: float = Field(description="Normal 95% interval of the beta, lower end.")
-    ci95_high: float = Field(description="Normal 95% interval of the beta, upper end.")
+    se: float = Field(ge=0.0, description="Newey-West standard error of the beta (M0.5).")
+    ci_low: float = Field(description="Normal 95% interval of the beta, lower end.")
+    ci_high: float = Field(description="Normal 95% interval of the beta, upper end.")
     r2: float = Field(ge=0.0, le=1.0 + 1e-12, description="R squared of the regression.")
     correlation: float = Field(
         ge=-1.0 - 1e-12, le=1.0 + 1e-12, description="Correlation of the two excess returns."
@@ -64,15 +64,15 @@ class BetaFit(FrozenModel):
 
     @model_validator(mode="after")
     def _interval_orders(self) -> BetaFit:
-        if self.ci95_low > self.ci95_high:
-            raise ValueError("ci95_low is above ci95_high")
+        if self.ci_low > self.ci_high:
+            raise ValueError("ci_low is above ci_high")
         return self
 
 
 class WorldBetaSection(SectionModel):
     """The quick beta against ACWI next to the beta against the US market, on the same days."""
 
-    benchmark: Literal["ACWI"] = Field(description="Yahoo ticker of the world proxy.")
+    proxy: Literal["ACWI"] = Field(description="Yahoo ticker of the world proxy.")
     hac_lags: int | None = Field(description="Newey-West lags of both regressions; null if none.")
     n_sample: int = Field(ge=0, description="Rows of the analysis sample.")
     n_not_in_benchmark: int = Field(
@@ -91,7 +91,10 @@ class WorldBetaSection(SectionModel):
     audit_warnings: list[str] = Field(description="Warnings of the ACWI price audit (M1.4).")
     world: BetaFit | None = Field(description="Against the world: ACWI, excess of RF.")
     us_market: BetaFit | None = Field(description="Against the US market, same days.")
-    comparison: ComparisonKey | None
+    comparison: ComparisonKey | None = Field(
+        description="World beta against the US market beta: about_the_same when the two 95% "
+        "intervals overlap, otherwise higher or lower (a reading of the intervals, not a test)."
+    )
     comparison_text: str | None = Field(description="The plain reading of the comparison.")
     labels: list[WorldBetaLabel]
 
