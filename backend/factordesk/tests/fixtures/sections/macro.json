@@ -114,7 +114,7 @@
       "name": "USD",
       "label": "US dollar",
       "definition": "Fed nominal broad dollar index (FRED DTWEXBGS), simple return",
-      "note": "a positive beta means the subject gains when the dollar strengthens",
+      "note": "positive beta: gains when the dollar strengthens",
       "beta": 0.5393172776448841,
       "se": 0.049181680389016,
       "t": 10.96581640519409,

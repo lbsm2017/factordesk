@@ -92,7 +92,7 @@ FACTORS: tuple[MacroFactor, ...] = (
         "USD",
         "US dollar",
         "Fed nominal broad dollar index (FRED DTWEXBGS), simple return",
-        "a positive beta means the subject gains when the dollar strengthens",
+        "positive beta: gains when the dollar strengthens",
     ),
 )
 BY_CODE: dict[str, MacroFactor] = {f.code: f for f in FACTORS}
