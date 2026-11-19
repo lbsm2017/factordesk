@@ -40,6 +40,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Report design: colour is evidence](decision-report-design-colour-is-evidence.md) [Decided]: colour only encodes data, every chart is also a table, and the equation is the one bold element.
 - [Report density, width cap and range controls](decision-report-density-and-range-controls.md) [Decided-pending-implementation]: a narrow, less dense report; range and ticker pickers belong to the dashboard.
 - [Dashboard server and interface](decision-dashboard-server-and-interface.md) [Decided-pending-implementation]: FastAPI server plus one scrolling React page with ticker search and range chips; plain CSS tokens; static report stays as export.
+- [Dashboard v2: outcome first with a sidebar](decision-dashboard-v2.md) [Decided-pending-implementation]: navy sidebar with controls and section links, a plain verdict sentence instead of the formula, a Show statistics switch, company name, performance and a quick world beta (specified 2026-11-18, not built).
 
 ### Engineering and process
 

@@ -17,6 +17,9 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 ## 2026-11-19 (world beta)
 
 - Added [the world beta decision page](decision-world-beta.md): a quick beta against the iShares MSCI ACWI ETF (a stand-in for the MSCI ACWI index, which has no free daily data), shown next to the US market beta on the same days. Rejected: MSCI index data, a global factor model, a Dimson correction. The ACWI price cache is refreshed incrementally on every report build (owner instruction, 2026-11-18). Built on `feat/world-beta`; not validated yet.
+## 2026-11-18 (dashboard v2 specification)
+
+- Added [Dashboard v2: outcome first with a sidebar](decision-dashboard-v2.md) from the owner's answers of 2026-11-18 (sidebar holds controls and section links, formula removed, dashboard first, company name, stack unchanged, performance and world beta sections, fintech-tool palette and IBM Plex Sans). Specified on branch `feat/ui-v2-spec` in `docs/specs/dashboard-v2.md` and `docs/design/report-design.md` revision 3 (commits `dabbff7`, `07d77a7`). Nothing is built; the look waits for the owner's approval of the prototype.
 
 ## 2026-11-18 (nightly slow tests)
 

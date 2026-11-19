@@ -117,7 +117,7 @@ Fixture builders for DGP-R0, DGP-R+, DGP-RB and DGP-RT live in `backend/factorde
   Severities: cases 7 and 8 `warning`, all others `info`.
 - **TR18 Verdict copy.** Exact strings (R4.8 table, percentages with sign and 1 decimal, ratios to the nearest 5 points with halves away from zero):
   - G5 with `a_c = 0.04`, `a_pit = 0.018` (`s = 0.45`): "In-sample alpha mostly disappears out-of-sample: point-in-time betas keep 45% of it (+1.8% a year against +4.0% on the same days)."
-  - G2 with `a_pit = -0.052`: "The point-in-time residual return is reliably negative (-5.2% a year), but the full-period alpha is not. This usually means the betas moved; check the Exposures tab."
+  - G2 with `a_pit = -0.052`: "The point-in-time residual return is reliably negative (-5.2% a year), but the full-period alpha is not. This usually means the betas moved; check the Exposures section."
   - G7 with `s = 2.5`: the ratio renders as "more than 200%".
   - G3 with `W = 252` on DGP-A dates: the message names "the first 252 trading days (2010-01-04 to 2010-12-21)".
 
