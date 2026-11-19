@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-19 (next stage: track records and portfolios)
+
+- The owner approved the next stage: track-record uploads, an SAA-tree portfolio backtest, a five/six-factor switch with an alpha strip, and a macro section. Added five decision pages, an index section and the research notes. The monthly-uploads page amends the daily-returns decision; it does not replace it.
+
 ## 2026-11-18 (performance metrics)
 
 - The owner asked for the stock's own annualised return, volatility, Sharpe ratio and maximum drawdown in the report. Added [the decision page](decision-performance-metrics.md) and an index entry. The section is built on `feat/performance` and not yet independently validated.

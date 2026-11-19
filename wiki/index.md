@@ -55,6 +55,16 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [One contract for the five new report sections](decision-schema-v3-contract.md) [Decided-pending-implementation]: optional sections, one file per feature and layer, panel registries, report format version 4.
 - [Nightly run of the slow and live tests](decision-nightly-slow-tests.md) [Decided-pending-implementation]: a daily workflow for the statistical tests CI skips; the live job may fail.
 
+### Next stage: track records and portfolios (2026-11-19)
+
+Spec: [next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md). Status for all five: Decided, not yet built.
+
+- [Factor models (FF5 and FF6) and a separate macro section](decision-factor-models-and-macro.md) [Decided]: a five/six-factor switch, alpha under four models side by side, and rates, credit and euro sensitivities in their own section.
+- [Monthly track-record uploads](decision-monthly-track-records.md) [Decided]: uploaded fund records, daily or monthly, checked and analysed in memory; monthly needs 36 months. Amends the daily-returns decision.
+- [Portfolio backtest rules](decision-portfolio-backtest-rules.md) [Decided]: month-end rebalancing with drift, a cost line, cash at the risk-free rate, common start and end dates, and contribution and risk per holding.
+- [SAA tree and default proxies](decision-saa-tree-and-proxies.md) [Decided]: a three-level tree (asset class, sub-asset class, ETF) prefilled with US-listed proxy ETFs; alternatives later.
+- [USD only in version 1](decision-usd-only-v1-portfolios.md) [Decided]: US dollars and US-listed proxies first; a euro base and UCITS funds wait for European mode.
+
 ### Open source
 
 - [Open source under the MIT license](decision-open-source-mit-license.md) [Decided]: a short permissive license.
@@ -69,6 +79,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [README research, 2026-11-18](readme-research-2026-11-18.md): a survey of how popular finance repositories write their READMEs, and the outline chosen for ours.
 - [Prior art review, 2026-11-18](prior-art-review-2026-11-18.md): what we learned from other open-source factor and portfolio tools, and the bugs we avoid.
 - [Independent validation of the SPY slice](../docs/validation/spy-slice-validation.md): the full review behind several decision pages.
+- [Next-stage research, 2026-11-19](../docs/research/next-stage-research.md): track-record statistics, backtest mechanics, momentum and macro factors, and prior art (Venn, Portfolio Visualizer, Morningstar), with citations.
 - [Dataset cards](../docs/datasets.md): verified facts about each Ken French file.
 
 ## Change log
