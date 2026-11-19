@@ -12,6 +12,7 @@ The only thing a person needs to install is uv, which then fetches the right Pyt
 - uv is the only prerequisite. `uv sync` creates a local environment, installs Python 3.12 if missing, and installs pinned versions from `uv.lock`.
 - The project requires Python 3.12 or newer. Checks run as `uv run pytest`, `uv run ruff check .` and `uv run pyright`.
 - No make files, no conda, no system Python requirement, and no shell scripts for development. The only scripts are the two user-facing bootstrap scripts in `scripts/` (see "As of commit ce931c7" below).
+- **Update 2026-11-19 (owner):** named shortcuts were added as poethepoet tasks in `pyproject.toml` (`uv run poe <task>`, the route planned below), plus a thin `Makefile` that only calls those tasks, for people who prefer `make`. make stays optional: every shortcut works without it. The tasks use one small standard-library helper, `scripts/tasks.py` (stop the server on a port; find npm on Windows). This supersedes "no make files" above; the reasons for not depending on make still hold.
 
 ## Why
 
