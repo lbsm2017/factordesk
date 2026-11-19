@@ -8,6 +8,7 @@ describe("parseUrl", () => {
   it("reads a ticker and a preset, ignoring case", () => {
     expect(parseUrl("?t=spy&range=3y")).toEqual(state({ ticker: "SPY", range: "3Y" }));
     expect(parseUrl("?t=SPY&range=full")).toEqual(state({ ticker: "SPY", range: "FULL" }));
+    expect(parseUrl("?t=SPY&range=10y")).toEqual(state({ ticker: "SPY", range: "10Y" }));
   });
 
   it("means Full history when only a ticker is given", () => {
@@ -67,6 +68,7 @@ describe("toSearch", () => {
       EMPTY_URL_STATE,
       state({ ticker: "SPY" }),
       state({ ticker: "BRK-B", range: "5Y", win: 252 }),
+      state({ ticker: "SPY", range: "10Y" }),
       state({ ticker: "^GSPC", start: "2023-01-01", end: "2026-09-30", win: 126 }),
       state({ ticker: "SPY", end: "2026-09-30" }),
       state({ range: "3Y" }),

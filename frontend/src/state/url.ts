@@ -7,8 +7,8 @@ import type { RangePreset } from "../api/types";
  * through props, never from `location`.
  */
 
-/** Presets shown as chips (owner decision 1): the API lists exactly these three. */
-export const PRESETS = ["3Y", "5Y", "FULL"] as const satisfies readonly RangePreset[];
+/** Presets of the range control (owner decisions of 2026-11-18 and 2026-11-19): the API lists exactly these four. */
+export const PRESETS = ["3Y", "5Y", "10Y", "FULL"] as const satisfies readonly RangePreset[];
 export type Preset = (typeof PRESETS)[number];
 
 export type RollingWindowDays = 126 | 252;

@@ -252,6 +252,7 @@
                   "enum": [
                     "3Y",
                     "5Y",
+                    "10Y",
                     "FULL"
                   ],
                   "type": "string"
@@ -403,6 +404,7 @@
                   "enum": [
                     "3Y",
                     "5Y",
+                    "10Y",
                     "FULL"
                   ],
                   "type": "string"
@@ -2689,6 +2691,7 @@
             "enum": [
               "3Y",
               "5Y",
+              "10Y",
               "FULL"
             ],
             "title": "Preset"
@@ -2781,7 +2784,7 @@
           "options"
         ],
         "title": "RangeOptions",
-        "description": "Availability of every preset for one ticker (always three, in preset order)."
+        "description": "Availability of every preset for one ticker (always four, in preset order)."
       },
       "Regression": {
         "properties": {

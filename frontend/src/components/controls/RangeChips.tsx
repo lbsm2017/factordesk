@@ -14,7 +14,7 @@ export interface RangeChipsProps {
   disabled?: boolean;
 }
 
-const LABELS: Record<Preset, string> = { "3Y": "3Y", "5Y": "5Y", FULL: "Full history" };
+const LABELS: Record<Preset, string> = { "3Y": "3Y", "5Y": "5Y", "10Y": "10Y", FULL: "Full history" };
 
 /**
  * Range chips (dashboard spec DB6.3): native radios in a fieldset with a hidden legend, so arrow

@@ -456,10 +456,10 @@ class FactorReport(FrozenModel):
 
 # ------------------------------------------------- API envelope (not part of FactorReport)
 
-RangePreset = Literal["3Y", "5Y", "FULL"]
-RANGE_PRESETS: tuple[RangePreset, ...] = ("3Y", "5Y", "FULL")
+RangePreset = Literal["3Y", "5Y", "10Y", "FULL"]
+RANGE_PRESETS: tuple[RangePreset, ...] = ("3Y", "5Y", "10Y", "FULL")
 """Range presets in display order (dashboard spec DB2.2; owner decision of 2026-11-18 dropped
-YTD and 1Y)."""
+YTD and 1Y; owner decision of 2026-11-19 added 10Y between 5Y and FULL)."""
 
 ErrorCode = Literal[
     "invalid_ticker",
@@ -524,7 +524,7 @@ class RangeOption(FrozenModel):
 
 
 class RangeOptions(FrozenModel):
-    """Availability of every preset for one ticker (always three, in preset order)."""
+    """Availability of every preset for one ticker (always four, in preset order)."""
 
     ticker: str
     first_return_date: date

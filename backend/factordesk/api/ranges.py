@@ -4,7 +4,8 @@ Pure: no I/O and no clock. The anchor is the earlier of the last factor date and
 date. ``NY`` starts N calendar years before the anchor plus one day (29 February maps to
 28 February first); FULL has no start. Every preset leaves the end open, so the requested range
 runs to the last price date and the days after the factor data are reported as not analysed,
-exactly like the static report.
+exactly like the static report. 10Y is unavailable when the history starts later than its first
+date, because it would then be Full history under another name.
 """
 
 from __future__ import annotations
@@ -26,6 +27,14 @@ from factordesk.data.prices import PriceHistory
 from factordesk.report.schema import RANGE_PRESETS, RangeOption, RangeOptions, RangePreset
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+_SPAN_CHECKED: frozenset[RangePreset] = frozenset({"10Y"})
+"""Presets that are unavailable when the history starts after their first date (owner decision
+of 2026-11-19). 3Y and 5Y keep the rule of 2026-11-18: on a shorter history they cover all of it."""
+
+_SPAN_SLACK = timedelta(days=7)
+"""A history whose first return falls within a week of the preset start covers the preset: the
+start can be a weekend or a holiday, and the first price is only the base of the first return."""
 
 _COUNT_ONLY = sys.maxsize
 """A minimum no sample can meet: ``build_sample`` then reports the aligned row count through
@@ -171,10 +180,10 @@ def _option(
     preset: RangePreset,
     history: PriceHistory,
     factor_frame: pd.DataFrame,
-    anchor: date,
+    cov: Coverage,
     min_obs: int,
 ) -> RangeOption:
-    start = preset_start(preset, anchor)
+    start = preset_start(preset, cov.anchor)
     label = preset_label(preset)
     try:
         n = build_sample(history, factor_frame, start, None, min_obs=min_obs).n
@@ -198,6 +207,18 @@ def _option(
                 f"cannot be analysed: {exc.reason}."
             ),
         )
+    late = start is not None and cov.first_return_date > start + _SPAN_SLACK
+    if preset in _SPAN_CHECKED and start is not None and late:
+        return RangeOption(
+            preset=preset,
+            start=start,
+            n_obs=n,
+            available=False,
+            reason=(
+                f"{label} needs prices from {long_date(start)}, but the history starts "
+                f"{long_date(cov.first_return_date)}. Full history covers all of it."
+            ),
+        )
     return RangeOption(preset=preset, start=start, n_obs=n, available=True, reason=None)
 
 
@@ -213,7 +234,5 @@ def range_options(
         last_price_date=cov.last_price_date,
         factors_last_date=cov.factors_last_date,
         min_obs=min_obs,
-        options=[
-            _option(preset, history, factor_frame, cov.anchor, min_obs) for preset in RANGE_PRESETS
-        ],
+        options=[_option(preset, history, factor_frame, cov, min_obs) for preset in RANGE_PRESETS],
     )
