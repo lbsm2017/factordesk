@@ -496,12 +496,33 @@ Researched on 2026-11-19. Each candidate was tested against the causal-disciplin
 | Commodities, DBC − RF | ETF via the existing price feed; from 2006-02 | **Adopted** in the macro section. Multi-asset portfolios hold this asset class, and it is nearly orthogonal to FF6. |
 | Inflation, TIP − IEI | ETFs; TIP from 2003-12 [unverified], IEI from about 2007-01 [unverified]. FRED T10YIE is a level, not a return. | **Adopted** in the macro section. The book names inflation as an ignored confounder. IEI is duration-matched, unlike IEF. |
 | High-yield credit, HYG − LQD | ETFs; HYG from 2007-04 | Not adopted. It is collinear with the market factor and with DEF. |
-| Broad USD, FRED DTWEXBGS | Public domain, citation requested | Not adopted. It is the same cause as EUR/USD and must never be entered alongside it. |
+| Broad USD, FRED DTWEXBGS | Public domain, citation requested | First not adopted. **Adopted later the same day, replacing EUR/USD** (see G3). It must never be used alongside EUR/USD. |
 | BAB, QMJ (AQR) | AQR terms forbid reproduction or distribution without written consent | Skipped for now; revisit if consent is obtained. They have the strongest confounding case for stocks and equity managers. QMJ would replace RMW, not be added to it. |
 | q-factor model (q5) | global-q.org daily CSVs; no stated terms; the URL changes every year | Deferred. It is a rival measurement of the same causes as RMW and CMA, so it would be an alternative model and never stacked on FF5. |
 | Short-term reversal, TSMOM, Fung-Hsieh PTFS, ΔVIX | Ken French (ST_Rev); AQR terms (TSMOM); academic-use-only terms (PTFS) | Deferred. These only make sense for managers who trade these strategies, so they would be unlocked by a declared strategy type on uploads. |
 | Regional FF5 + Mom (Ken French) | Daily, in USD | The factor set for the future European mode. |
 | Long-term reversal, HML Devil, Stambaugh-Yuan M4 | — | Skipped. They fit better but have no distinct mechanism, and M4 data ends in 2016. |
+
+### G3. Owner follow-up: dollar index and VIX (2026-11-19)
+
+**Dollar index: adopted, replacing EUR/USD in the v1 macro section.**
+
+- For a USD portfolio holding EEM, EWJ, EPP or IGOV, exposure is to the dollar against all its trading partners, not to the euro alone. So the broad index is the better proxy. This supersedes the EUR/USD choice in C3.
+- **Fed broad index (DTWEXBGS) chosen over ICE DXY:**
+  - DTWEXBGS covers 26 trade-weighted currencies and is in the public domain.
+  - DXY is proprietary. Its weights have been fixed since 1999 (EUR 57.6%, JPY 13.6%, GBP 11.9%, CAD 9.1%, SEK 4.2%, CHF 3.6%), and it has no CNY or MXN.
+- **Sign:** a rise means the dollar is strengthening, the opposite sign to EUR/USD.
+- **Timing:** it is a noon New York fixing, so the 1-day lag term stays.
+- **Collinearity:** it is strongly negatively correlated with EUR/USD (roughly −0.8 to −0.9, from memory). The two are never used in one regression. EUR/USD remains the European mode's conversion series.
+
+**VIX: skipped (owner: possibly much later).**
+
+- **Case for it:** sensitivity to volatility shocks. Aggregate-volatility risk is studied in Ang, Hodrick, Xing & Zhang (2006), "The cross-section of volatility and expected returns", *Journal of Finance* 61(1). FRED VIXCLS is daily from 1990.
+- **Problems:**
+  - ΔVIX is not a return.
+  - It correlates with the market at roughly −0.7 to −0.8 daily, from memory.
+  - For subjects that do not hold volatility, it is a common shock rather than a held exposure.
+- **If it is revisited:** use ΔVIX with the market move regressed out first, in a stated order, and probably only for uploaded option-selling or tail-hedge track records.
 
 ### G2. Sources
 

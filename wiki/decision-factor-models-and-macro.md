@@ -63,6 +63,16 @@ Every report can switch between the five-factor and six-factor (with momentum) m
   - q-factors, which are deferred.
   - Strategy-specific factors, which are deferred.
 
+## Update, 2026-11-19: broad dollar index replaces EUR/USD; no VIX
+
+- **The FX factor is now the Fed broad dollar index (FRED DTWEXBGS).**
+  - A USD portfolio of international funds is exposed to the dollar against all its trading partners, not just the euro.
+  - The Fed index is public and covers 26 currencies. ICE's DXY is proprietary and mostly euro.
+  - A positive beta means the subject gains when the dollar strengthens.
+  - The 1-day lag term stays, because the index uses the same noon fixing.
+  - EUR/USD moves to the future European mode and is never used alongside the dollar index.
+- **VIX was assessed and skipped for now.** It is not a return and largely repeats the market factor. For most subjects it is a common shock rather than something held. See [research notes, section G3](../docs/research/next-stage-research.md).
+
 ## Sources
 
 - [Next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md): owner decisions on factors and the macro section, and epics E1 and E4.
