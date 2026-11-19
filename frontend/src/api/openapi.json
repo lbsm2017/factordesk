@@ -1766,6 +1766,17 @@
               }
             ],
             "description": "Kalman-filter betas (docs/specs/kalman-betas.md)."
+          },
+          "tail_risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TailRiskSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Value at risk and expected shortfall (CVaR) by three methods, with bootstrap bands, at the series' own frequency (spec section E7)."
           }
         },
         "additionalProperties": false,
@@ -1793,7 +1804,8 @@
           "shrunk_betas",
           "fragility",
           "residual",
-          "kalman_betas"
+          "kalman_betas",
+          "tail_risk"
         ],
         "title": "FactorReport",
         "description": "Everything the UI or an exported file needs to describe one subject's factor exposures."
@@ -6701,6 +6713,330 @@
         ],
         "title": "SubjectInfo",
         "description": "What the report is about when it is not a daily ticker (written only for those subjects).\n\nCounts that the report names in days (``n_days``, ``days_peak_to_trough``) are counts of\nobservations at ``frequency``: months for a monthly subject."
+      },
+      "TailBand": {
+        "properties": {
+          "low": {
+            "type": "number",
+            "title": "Low",
+            "description": "Lower end of the band, as a fraction of value."
+          },
+          "high": {
+            "type": "number",
+            "title": "High",
+            "description": "Upper end of the band, as a fraction of value."
+          },
+          "resamples": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Resamples",
+            "description": "Bootstrap resamples behind the band (those inside the valid range)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "low",
+          "high",
+          "resamples"
+        ],
+        "title": "TailBand",
+        "description": "A percentile bootstrap band around one figure."
+      },
+      "TailFigureInfo": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "historical",
+              "gaussian",
+              "cornish_fisher"
+            ],
+            "title": "Method"
+          },
+          "measure": {
+            "type": "string",
+            "enum": [
+              "var",
+              "cvar"
+            ],
+            "title": "Measure"
+          },
+          "level": {
+            "type": "number",
+            "title": "Level",
+            "description": "Confidence level: 0.99 for VaR and 0.975 for CVaR; monthly series also 0.95."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Loss as a positive fraction of value; None when the figure is not available (then reason says why)."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why value is None; or, with indicative = true, the caveat on the value."
+          },
+          "indicative": {
+            "type": "boolean",
+            "title": "Indicative",
+            "description": "True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5]: the value is shown, as an indication only."
+          },
+          "band": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TailBand"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Bootstrap band; None when none is shown."
+          },
+          "band_quality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "validated",
+                  "approximate"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band Quality",
+            "description": "validated: the band covered about its nominal level on simulated normal data. approximate: it covered less (it tends to be narrow). None without a band."
+          },
+          "band_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band Reason",
+            "description": "Why band is None although value is not; None otherwise."
+          },
+          "tail_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tail Count",
+            "description": "Observations with a loss at or beyond this method's VaR at this level; None when the figure is not available."
+          },
+          "expected_tail_obs": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Expected Tail Obs",
+            "description": "Observations expected in the tail: n x (1 - level)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "method",
+          "measure",
+          "level",
+          "value",
+          "reason",
+          "indicative",
+          "band",
+          "band_quality",
+          "band_reason",
+          "tail_count",
+          "expected_tail_obs"
+        ],
+        "title": "TailFigureInfo",
+        "description": "One VaR or CVaR figure: one method, one measure, one confidence level."
+      },
+      "TailRiskSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "frequency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "daily",
+                  "monthly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency",
+            "description": "Frequency of the series; the figures are at this horizon."
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TailSeriesStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "figures": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TailFigureInfo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figures",
+            "description": "Every figure: levels in the order VaR 99%, CVaR 97.5%, then (monthly only) VaR 95% and CVaR 95%; within a level historical, Gaussian, Cornish-Fisher."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "frequency",
+          "series",
+          "figures"
+        ],
+        "title": "TailRiskSection",
+        "description": "VaR and CVaR by three methods, with bootstrap bands.\n\nStatuses: ``ok``; ``insufficient_data`` (fewer than 12 returns); ``failed`` (the series has no\nusable tail statistic, for example it is constant)."
+      },
+      "TailSeriesStats": {
+        "properties": {
+          "n_obs": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "N Obs",
+            "description": "Returns used (days or months)."
+          },
+          "mean": {
+            "type": "number",
+            "title": "Mean",
+            "description": "Sample mean of the periodic simple returns."
+          },
+          "std": {
+            "type": "number",
+            "title": "Std",
+            "description": "Sample standard deviation (ddof 1) of the returns."
+          },
+          "skewness": {
+            "type": "number",
+            "title": "Skewness",
+            "description": "Moment estimator of skewness."
+          },
+          "excess_kurtosis": {
+            "type": "number",
+            "title": "Excess Kurtosis",
+            "description": "Moment estimator of excess kurtosis."
+          },
+          "bootstrap": {
+            "type": "string",
+            "enum": [
+              "iid",
+              "stationary"
+            ],
+            "title": "Bootstrap",
+            "description": "iid for monthly series; stationary block bootstrap for daily series."
+          },
+          "mean_block_length": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Block Length",
+            "description": "Mean block length of the stationary bootstrap; None for the iid bootstrap."
+          },
+          "n_resamples": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "N Resamples",
+            "description": "Bootstrap resamples drawn."
+          },
+          "band_level": {
+            "type": "number",
+            "title": "Band Level",
+            "description": "Coverage of the bands (0.9 is a 90% band)."
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "description": "Random seed of the bootstrap."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "n_obs",
+          "mean",
+          "std",
+          "skewness",
+          "excess_kurtosis",
+          "bootstrap",
+          "mean_block_length",
+          "n_resamples",
+          "band_level",
+          "seed"
+        ],
+        "title": "TailSeriesStats",
+        "description": "The series behind the figures and the bootstrap settings."
       },
       "TickerSuggestion": {
         "properties": {

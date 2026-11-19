@@ -35,6 +35,9 @@ The optional section ``world_beta`` (the quick beta against the iShares MSCI ACW
 ``report/sections/world_beta.py``) is additive and ``None`` when not computed, so it does not bump
 the version (contract SC5).
 
+The optional section ``tail_risk`` (VaR and CVaR; ``report/sections/tail_risk.py``) is additive
+and ``None`` when not computed, so it does not bump the version either.
+
 The optional ``subject`` block (next-stage spec, return subject) says what a report is about when
 it is not a daily ticker: an uploaded track record or a portfolio, daily or monthly, and the
 ``periods`` its annualised figures use. It is written only for those subjects and left out of the
@@ -75,6 +78,7 @@ from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.performance import PERFORMANCE_SECTION, PerformanceSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
+from factordesk.report.sections.tail_risk import TAIL_RISK_SECTION, TailRiskSection
 from factordesk.report.sections.world_beta import WORLD_BETA_SECTION, WorldBetaSection
 
 SCHEMA_VERSION = "4"
@@ -95,6 +99,7 @@ SECTIONS: tuple[SectionSpec, ...] = (
     FRAGILITY_SECTION,
     RESIDUAL_ALPHA_SECTION,
     KALMAN_SECTION,
+    TAIL_RISK_SECTION,
 )
 """The optional sections of the schema v3 contract, in panel order (contract SC3.1, SC4)."""
 
@@ -546,6 +551,11 @@ class FactorReport(FrozenModel):
     )
     kalman_betas: KalmanBetaSeries | None = Field(
         default=None, description="Kalman-filter betas (docs/specs/kalman-betas.md)."
+    )
+    tail_risk: TailRiskSection | None = Field(
+        default=None,
+        description="Value at risk and expected shortfall (CVaR) by three methods, with bootstrap "
+        "bands, at the series' own frequency (spec section E7).",
     )
 
     @field_validator("schema_version")

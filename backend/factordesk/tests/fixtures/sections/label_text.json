@@ -22,5 +22,6 @@
     "L-KF": "Kalman-filter beta: each point uses only data up to that date. It follows gradual changes smoothly, but reacts slowly to sudden changes; compare with the 126-day line. The drift rate is re-estimated once a year from past data, so the line can jump at those dates (marked).",
     "L-KBAND": "Model-based 95% band. It assumes normal, independent daily errors with constant variance and treats the estimated drift rate as known. It is not a Newey-West (HAC) interval and is not comparable to the rolling-beta bands. After a sudden change it is too narrow.",
     "L-KTAIL": "Daily price changes for this ticker partly reverse the next day (see the data-quality check). The filter ignores that, so the band is too narrow for this ticker."
-  }
+  },
+  "tail_risk": {}
 }

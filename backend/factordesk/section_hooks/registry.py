@@ -10,6 +10,7 @@ Declarations:
 
 * performance: every subject, every frequency, every model.
 * world beta: daily only (ACWI and IEUR prices are daily), every model.
+* tail risk (VaR and CVaR): every subject, every frequency, every model.
 * lead-lag, shrunk betas, fragility, residual alpha analysis, Kalman betas: daily and FF5 only.
   Their methods are built on trading-day windows (252-row windows, 5-day blocks, a lag of one
   trading day, an FF5 prior) and are not defined for monthly data or another model yet.
@@ -30,6 +31,7 @@ from factordesk.section_hooks import lead_lag as lead_lag_hook
 from factordesk.section_hooks import performance as performance_hook
 from factordesk.section_hooks import residual_alpha as residual_alpha_hook
 from factordesk.section_hooks import shrunk as shrunk_hook
+from factordesk.section_hooks import tail_risk as tail_risk_hook
 from factordesk.section_hooks import world_beta as world_beta_hook
 from factordesk.section_hooks.context import FACTOR_MODELS, FactorModel, SectionContext
 
@@ -103,6 +105,13 @@ HOOKS: tuple[HookSpec, ...] = (
         ALL_SOURCES,
         DAILY,
         FF5_ONLY,
+    ),
+    HookSpec(
+        "tail_risk",
+        lambda ctx: tail_risk_hook.build_tail_risk(ctx),
+        ALL_SOURCES,
+        ALL_FREQUENCIES,
+        ALL_MODELS,
     ),
 )
 """Every optional section, in the order the hooks run (the order of the contract's pipeline)."""
