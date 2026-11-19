@@ -138,9 +138,9 @@ describe("design tokens (prototype v4a)", () => {
     expect(resolved["--sans"]).toMatch(/^"IBM Plex Sans"/);
   });
 
-  it("caps the canvas at 1680 px beside the 264 px rail", () => {
+  it("caps the canvas at 1680 px beside a rail of 300 to 320 px", () => {
     expect(resolved["--canvas-max"]).toBe("1680px");
-    expect(resolved["--side-w"]).toBe("264px");
+    expect(resolved["--side-w"]).toBe("clamp(300px, 22vw, 320px)");
   });
 });
 

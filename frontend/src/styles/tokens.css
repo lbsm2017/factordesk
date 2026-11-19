@@ -91,7 +91,7 @@
   --gap: 16px;
   --pad-x: 20px;
   --pad-y: 16px;
-  --side-w: 264px;
+  --side-w: clamp(300px, 22vw, 320px);
   --page-x: 24px;
   --canvas-max: 1680px;
   --row-h: 36px;
