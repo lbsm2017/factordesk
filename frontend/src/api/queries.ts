@@ -127,3 +127,31 @@ export function useRefreshFactors(onMessage: (message: string) => void) {
     },
   });
 }
+
+export type GrossNet = "gross" | "net" | "";
+
+export interface UploadInput {
+  file: File;
+  /** Display name of the record; empty lets the server use its default. */
+  name: string;
+  /** Whether the returns are before or after fees; empty means not stated. */
+  grossNet: GrossNet;
+}
+
+/** The multipart body of `POST /api/report/upload`: the file, then the optional name and fee basis. */
+export function uploadBody({ file, name, grossNet }: UploadInput): FormData {
+  const body = new FormData();
+  body.append("file", file);
+  if (name.trim() !== "") body.append("name", name.trim());
+  if (grossNet !== "") body.append("gross_net", grossNet);
+  return body;
+}
+
+/** Runs a monthly track record through the API. The result is held by the hook only: never cached, never stored. */
+export function useUploadReport() {
+  return useMutation({
+    mutationFn: (input: UploadInput) =>
+      apiRequest<FactorReport>("/api/report/upload", { method: "POST", body: uploadBody(input) }),
+    retry: false,
+  });
+}

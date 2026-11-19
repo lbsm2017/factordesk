@@ -32,6 +32,8 @@ const KNOWN_CODES: readonly ErrorCode[] = [
   "not_found",
   "internal",
   "bad_request",
+  "invalid_upload",
+  "upload_too_large",
 ];
 
 function isApiError(value: unknown): value is ApiError {
@@ -69,6 +71,8 @@ export interface RequestOptions {
   method?: "GET" | "POST";
   query?: Query;
   signal?: AbortSignal;
+  /** A multipart body (the track-record upload); the browser sets the content type and boundary. */
+  body?: FormData;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -77,6 +81,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     response = await fetch(apiUrl(path, options.query), {
       method: options.method ?? "GET",
       headers: { Accept: "application/json" },
+      ...(options.body ? { body: options.body } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     });
   } catch (error) {
