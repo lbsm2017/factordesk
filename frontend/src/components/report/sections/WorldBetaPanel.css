@@ -1,0 +1,11 @@
+/* World beta panel (prototype v4a): one row per index, beta as a neutral ink dot with its 95% interval. */
+.bars.wb thead th:first-child { width: 168px; }
+.bars.wb thead th.num.wide { width: 128px; }
+.bars.wb td.num.wide { white-space: nowrap; }
+.bars.wb .wb-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 1; }
+.bars.wb tbody th .fname { font-weight: 560; }
+
+@media screen and (max-width: 719px) {
+  .bars.wb tr { grid-template-columns: minmax(0, 1fr) repeat(var(--wb-cols, 2), auto); column-gap: var(--s-3); }
+  .bars.wb thead th.num.wide { width: auto; }
+}

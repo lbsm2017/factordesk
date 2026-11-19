@@ -54,10 +54,11 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "notice", position: 150, Component: Notice },
   { name: "equation", position: 200, Component: Equation },
   { name: "kpis", position: 300, Component: KpiStrip },
-  { name: "world_beta", position: 350, Component: WorldBetaPanel },
+  
   { name: "price", position: 400, Component: PricePanel },
   { name: "performance", position: 450, Component: PerformancePanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
+  { name: "world_beta", position: 505, Component: WorldBetaPanel },
   { name: "lead_lag", position: 510, Component: LeadLagPanel },
   { name: "shrunk", position: 520, Component: ShrunkBetasPanel },
   { name: "fragility", position: 530, Component: FragilityPanel },
