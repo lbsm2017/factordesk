@@ -146,3 +146,8 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - Company name and currency refusal, performance, world beta, the dashboard v2 specification and the design prototypes merged into `integrate/ui-v2`. Not merged to dev.
 - The schema version stays at 4: the `performance` and `world_beta` sections and `data.security` are additive optional fields (contract SC5). The "5" that the security branch wrote was reverted; a version 4 file written before `data.security` still loads.
 - `SECTIONS` and the section fields are listed in panel order: world beta (350), performance (450), then the five of the contract.
+
+## 2026-11-19 (Europe benchmark for the world beta)
+
+- The world beta section gets an optional `europe` block (IEUR, stand-in for MSCI Europe), computed by the same hook, cache and refresh as ACWI, with its own status. Schema version stays 4. `wiki/decision-world-beta.md` has the plain-English entry; the hand-off has the field names and live numbers (section 10).
+- The static world beta panel moved from position 350 to 505, and the static header company line is now a sentence.

@@ -212,3 +212,42 @@ F6 (the timing caveat overstates the effect for the ETF: proposed wording is the
 | Generated files | `openapi.json` and `types.gen.ts` regenerate with no further diff |
 
 No test needed a rerun. The `live` and `slow` markers were not run.
+
+## 10. Europe benchmark (2026-11-19)
+
+Owner decision of 2026-11-19: the world beta section gets a Europe row. The stand-in is IEUR (iShares Core MSCI Europe ETF, US dollars, US-listed, history from June 2014) for the MSCI Europe index, in the same way as ACWI stands in for MSCI ACWI. SCHEMA_VERSION stays `"4"`; the change is additive.
+
+### 10.1 What changed
+
+- One computation per proxy. `analytics.world_beta.PROXIES` lists `("world", "ACWI", "MSCI ACWI")` and `("europe", "IEUR", "MSCI Europe")`; the hook runs the same estimator, audit and overlap rules for each. `load_world_benchmark(provider, ticker)` takes the ticker and uses the same incremental refresh and cache as ACWI (one attempt when cached, last-dividend start, whole download after 30 days, statuses `ok`, `insufficient_data`, `failed`). `SectionInputs.europe_benchmark` carries the IEUR history; `AppDeps.load_europe_benchmark` does the same for the API.
+- The ACWI fields of `WorldBetaSection` are unchanged and still decide the status of the section. A new optional field `europe` holds a `ProxyBeta`: the same content as the ACWI fields (status, reason, days, dates, note, audit warnings, the fit, the US market fit on the same days, the comparison and its text), with its own status and reason, plus `label` ("MSCI Europe") and `proxy` ("IEUR"). It is `null` when it was not computed.
+- One proxy failing never changes the other. If IEUR cannot be fetched, has under 252 common days, or has audit errors on the days used, the ACWI section is as before and `europe.status` says why. If ACWI fails alone, the section is `failed` and `europe` can still be `ok`.
+- A fund that started after the analysis starts is fine: the Europe days are the days IEUR and the sample share (about 3,090 for SPY, from 13 June 2014). Its US-market fit is therefore on its own days and can differ from the ACWI one.
+
+### 10.2 TypeScript paths
+
+`report.world_beta.europe` is `ProxyBeta | null` with: `status`, `reason`, `label`, `proxy`, `n_days`, `start`, `end`, `hac_lags`, `n_not_in_benchmark`, `first_date`, `last_date`, `note`, `audit_warnings`, `benchmark` (a `BetaFit`: `beta`, `se`, `ci_low`, `ci_high`, `r2`, `correlation`, `alpha_annual`, `alpha_t`), `us_market` (a `BetaFit`), `comparison` and `comparison_text`. The Europe comparison text reads "against Europe" where the ACWI one reads "against the world".
+
+### 10.3 Static panel
+
+The panel table has three rows when both fits cover the same days: Against the world (ACWI), Europe (sub-label "IEUR, MSCI Europe stand-in"), and Against the US market, same days. When the Europe days differ from the ACWI days a fourth row, "Against the US market, same days as Europe", gives the other US fit. A sentence under the ACWI reading gives the Europe comparison, or says why there is no Europe row. The footnote names both stand-ins and says that IEUR history starts in June 2014. The panel also moved from position 350 to 505 (after Factor exposures); the React page uses the same position.
+
+### 10.4 Static header line
+
+The company line is now a sentence: "State Street SPDR S&P 500 ETF Trust. Listed on NYSE Arca, priced in US dollars." USD is written "US dollars"; other currency codes and exchange names are shown as given, except `NYSEArca`, which is written "NYSE Arca".
+
+### 10.5 Live numbers (real Yahoo prices, factor file to 2026-09-30)
+
+Europe beta against IEUR, excess of RF, Newey-West intervals. The plain numpy slope, computed from the same cached histories, agreed to three decimals in every row.
+
+| Ticker | Europe beta | 95% interval | R squared | Days | US market beta, same days | Comparison |
+| --- | --- | --- | --- | --- | --- | --- |
+| SPY | 0.764 | [0.697, 0.831] | 0.652 | 3,093 (2014-06-13 to 2026-09-30) | 0.964 | lower |
+| ZM | 0.458 | [0.177, 0.738] | 0.028 | 1,872 (2019-04-22 to 2026-09-30) | 0.776 | about the same |
+| EFA | 0.908 | [0.893, 0.924] | 0.952 | 3,093 (2014-06-13 to 2026-09-30) | 0.804 | higher |
+
+The ACWI betas on the same runs were SPY 0.945, ZM 0.761 and EFA 1.028 (4,656, 1,872 and 4,656 days). IEUR holds European stocks that close before the US, so the same-day timing caveat of the ACWI row applies, more strongly.
+
+### 10.6 Tests
+
+`test_europe_beta.py` (TEB01 to TEB20): the proxy list drives both blocks, the Europe block equals the ACWI path fed with the IEUR history, plain numpy cross-check, ACWI fields unchanged by the block, Europe failing alone (fetch failure, 251 common days, audit error), ACWI failing alone, the loader and cache for IEUR through the ACWI helpers, schema rules, old files without `europe`, and the panel (three rows, four rows, no Europe, failed Europe, ACWI failed alone). `test_section_world_beta.py` and the registry tests were updated for the two extra fetches, the three rows and the new position.
