@@ -14,6 +14,7 @@ import {
   useUploadReport,
 } from "./api/queries";
 import type { FactorReport } from "./api/types";
+import { AnalysedRange } from "./components/controls/AnalysedRange";
 import { ControlsStrip } from "./components/controls/ControlsStrip";
 import { ModeSwitch } from "./components/controls/ModeSwitch";
 import { ModelToggle } from "./components/controls/ModelToggle";
@@ -108,7 +109,14 @@ function Dashboard() {
         <>
           <ModeSwitch mode={state.mode} onSelect={(mode) => commit({ mode })} />
           {track ? (
-            <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate({ ...input, model: state.model })} />
+            <>
+              <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate({ ...input, model: state.model })} />
+              {shown !== undefined ? (
+                <div className="side-group">
+                  <AnalysedRange report={shown} label="Analysed period" />
+                </div>
+              ) : null}
+            </>
           ) : (
             <ControlsStrip
               state={state}

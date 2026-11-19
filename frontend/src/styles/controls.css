@@ -64,6 +64,36 @@
 .ctl-custom-wrap .ctl-err { margin-top: var(--s-2); }
 .ctl-why p + p { margin-top: var(--s-1); }
 
+/* analysed range: a thin timeline of the whole price history (muted before the window, solid cyan
+   for the analysed window, hatched after the factor data end), one line of text, a "Details"
+   disclosure. The parts differ by fill and by pattern, not by colour alone. */
+.cov { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.cov-bar { display: flex; gap: 2px; height: 8px; }
+.cov-seg { flex-basis: 0; flex-shrink: 1; min-width: 3px; border-radius: var(--r-mark); }
+.cov-seg.before { background: var(--rail-track); }
+.cov-seg.analysed { background: var(--rail-cyan); }
+.cov-seg.after {
+  background: repeating-linear-gradient(135deg, var(--rail-track) 0 2px, transparent 2px 4px);
+  box-shadow: inset 0 0 0 1px var(--rail-track);
+}
+.cov-line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--s-2); font-size: var(--fs-cap); line-height: 1.4; color: var(--rail-2); }
+.cov-span { color: var(--rail-text); font-weight: 600; white-space: nowrap; }
+.cov-size { white-space: nowrap; }
+.cov-size::before { content: "\00b7"; margin-right: var(--s-2); }
+.cov-more > summary {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; cursor: pointer; list-style: none;
+  color: var(--rail-cyan); font-size: var(--fs-cap); font-weight: 600;
+}
+.cov-more > summary::-webkit-details-marker { display: none; }
+.cov-more > summary::before {
+  content: ""; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); transition: transform 160ms var(--ease); margin-right: 2px;
+}
+.cov-more[open] > summary::before { transform: rotate(45deg); }
+.cov-more > summary:hover { color: var(--rail-cyan-hover); }
+.cov-more > summary:focus-visible { outline: 2px solid var(--rail-cyan); outline-offset: 2px; border-radius: var(--r-inner); }
+.cov-full { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-1); }
+
 /* factor data */
 .ctl-factors { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .linkbtn {

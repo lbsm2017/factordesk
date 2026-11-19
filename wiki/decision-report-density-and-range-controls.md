@@ -50,6 +50,8 @@ On 2026-11-19 the owner set the dashboard defaults to 10Y and FF6. The API defau
 
 A URL without `range` opens on 10Y and a URL without `model` opens on FF6. The URL writes a value only when it differs from the default: `model=ff5` for FF5 and `range=FULL` for full history. Old URLs with explicit parameters keep their meaning. The dashboard always sends `model` to the API, so a request without `model` (a script, the static report) still gives FF5.
 
+On 2026-11-19 the owner asked for a more compact range summary in the sidebar. The paragraph under the From and To fields is now a thin timeline of the whole price history: a muted part before the analysed window, a solid cyan part for the window, and a hatched part for the price days after the factor data end. One line below it gives the dates and the size of the window ("3 Oct 2016 → 30 Sep 2026 · 2,512 days"; months for a track record, which now shows the same summary). The full sentences, and the reasons a preset cannot be chosen, sit in a "Details" disclosure, and a one-line note names the presets that need more history. Nothing was removed and the backend is unchanged.
+
 ## Sources
 
 - [docs/design/report-design.md](../docs/design/report-design.md), sections C, D (panels 1, 3, 4, 5, 8), H.9 to H.12 and I.

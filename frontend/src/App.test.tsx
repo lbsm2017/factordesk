@@ -133,13 +133,17 @@ describe("first load", () => {
   it("fills the analysed-range label and the date fields from the report", async () => {
     renderAt("/?t=SPY&range=3Y");
     await screen.findByTestId("report-ticker");
-    expect(document.querySelector("#analysed-range")?.textContent).toContain("Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days.");
+    expect(document.querySelector("#analysed-range .cov-line")?.textContent).toContain("8 Aug 2024 → 30 Sep 2026");
+    expect(document.querySelector("#analysed-range details")?.textContent).toContain(
+      "Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days.",
+    );
     expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe("2024-08-08");
   });
 
-  it("disables a chip with a visible reason once the ranges arrive", async () => {
+  it("disables a chip, says so in one line and keeps the reason in the details, once the ranges arrive", async () => {
     renderAt("/?t=SPY");
-    expect(await screen.findByText("5Y has 400 trading days; a regression needs at least 504.")).toBeTruthy();
+    expect(await screen.findByText(/need more history\./)).toBeTruthy();
+    expect(screen.getByText("5Y has 400 trading days; a regression needs at least 504.")).toBeTruthy();
     expect((screen.getByRole("radio", { name: "5Y" }) as HTMLInputElement).disabled).toBe(true);
   });
 
