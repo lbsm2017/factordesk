@@ -354,3 +354,11 @@ def test_subject_block_rules() -> None:
     )
     with pytest.raises(ValueError, match="version 3 report cannot hold subject"):
         FactorReport.model_validate_json(json.dumps(v3))
+
+
+def test_a_36_month_record_gives_a_full_report() -> None:
+    report = monthly_report(36, 21)
+    assert report.regression.status == "ok" and report.regression.hac_lags == 3
+    assert report.residual_diagnostics.status == "ok"
+    assert report.performance is not None and report.performance.status == "ok"
+    assert [w.code for w in report.warnings].count("short_history") == 1
