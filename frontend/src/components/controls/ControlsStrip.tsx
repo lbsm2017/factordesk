@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FactorDataStatus, FactorReport, RangeOptions, TickerSuggestion } from "../../api/types";
-import { checkTicker } from "../../state/url";
+import { checkTicker, DEFAULT_RANGE } from "../../state/url";
 import type { Preset, UrlState } from "../../state/url";
 import { AnalysedRange } from "./AnalysedRange";
 import { CustomRange } from "./CustomRange";
@@ -36,10 +36,10 @@ export interface ControlsStripProps {
 const WHY_ID = "ctl-why";
 const LANDING_WHY = "Choose a ticker first. The date range applies to a loaded report.";
 
-/** The preset the chips show: custom dates clear it, and no range in the URL means Full history. */
+/** The preset the chips show: custom dates clear it, and no range in the URL means the default range (10Y). */
 export function selectedPreset(state: UrlState): Preset | null {
   if (state.start || state.end) return null;
-  return state.range ?? "FULL";
+  return state.range ?? DEFAULT_RANGE;
 }
 
 /**

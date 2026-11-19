@@ -415,9 +415,9 @@ describe("ControlsStrip", () => {
     expect(screen.queryByText(/Choose a ticker first/)).toBeNull();
   });
 
-  it("selects Full history when the URL has no range, and the preset when it has one", () => {
+  it("selects 10Y when the URL has no range, and the preset when it has one", () => {
     const { view, all } = strip();
-    expect(screen.getByRole("radio", { name: "Full history" })).toHaveProperty("checked", true);
+    expect(screen.getByRole("radio", { name: "10Y" })).toHaveProperty("checked", true);
     view.rerender(<ControlsStrip {...all} state={{ ...all.state, range: "3Y" }} />);
     expect(screen.getByRole("radio", { name: "3Y" })).toHaveProperty("checked", true);
   });

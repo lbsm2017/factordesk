@@ -11,15 +11,16 @@ describe("parseUrl", () => {
     expect(parseUrl("?t=SPY&range=10y")).toEqual(state({ ticker: "SPY", range: "10Y" }));
   });
 
-  it("means Full history when only a ticker is given", () => {
+  it("means 10Y and FF6 when only a ticker is given", () => {
     expect(parseUrl("?t=SPY")).toEqual(state({ ticker: "SPY" }));
+    expect(parseUrl("?t=SPY")).toMatchObject({ range: "10Y", model: "ff6" });
   });
 
   it("reads custom dates and lets them win over a preset", () => {
     expect(parseUrl("?t=SPY&start=2023-01-01&end=2026-09-30")).toEqual(
-      state({ ticker: "SPY", start: "2023-01-01", end: "2026-09-30" }),
+      state({ ticker: "SPY", range: null, start: "2023-01-01", end: "2026-09-30" }),
     );
-    expect(parseUrl("?t=SPY&range=3Y&start=2023-01-01")).toEqual(state({ ticker: "SPY", start: "2023-01-01" }));
+    expect(parseUrl("?t=SPY&range=3Y&start=2023-01-01")).toEqual(state({ ticker: "SPY", range: null, start: "2023-01-01" }));
   });
 
   it("reads the statistics switch only as stats=1", () => {
@@ -55,12 +56,18 @@ describe("parseUrl", () => {
 describe("toSearch", () => {
   it("writes the documented shapes", () => {
     expect(toSearch(state({ ticker: "SPY", range: "3Y" }))).toBe("?t=SPY&range=3Y");
-    expect(toSearch(state({ ticker: "SPY", start: "2023-01-01", end: "2026-09-30" }))).toBe(
+    expect(toSearch(state({ ticker: "SPY", range: null, start: "2023-01-01", end: "2026-09-30" }))).toBe(
       "?t=SPY&start=2023-01-01&end=2026-09-30",
     );
     expect(toSearch(state({ ticker: "SPY", range: "FULL", win: 126 }))).toBe("?t=SPY&range=FULL&win=126");
     expect(toSearch(state({ ticker: "ZM", range: "5Y", win: 126, stats: true }))).toBe("?t=ZM&range=5Y&win=126&stats=1");
     expect(toSearch(state({ ticker: "ZM", stats: false }))).toBe("?t=ZM");
+  });
+
+  it("never writes the default range, and writes Full history as range=FULL", () => {
+    expect(toSearch(state({ ticker: "SPY", range: "10Y" }))).toBe("?t=SPY");
+    expect(toSearch(state({ ticker: "SPY", range: "FULL" }))).toBe("?t=SPY&range=FULL");
+    expect(toSearch(state({ ticker: "SPY", range: "5Y" }))).toBe("?t=SPY&range=5Y");
   });
 
   it("is empty for the empty state and omits what is null", () => {
@@ -78,8 +85,11 @@ describe("toSearch", () => {
       state({ ticker: "SPY" }),
       state({ ticker: "BRK-B", range: "5Y", win: 252 }),
       state({ ticker: "SPY", range: "10Y" }),
-      state({ ticker: "^GSPC", start: "2023-01-01", end: "2026-09-30", win: 126 }),
-      state({ ticker: "SPY", end: "2026-09-30" }),
+      state({ ticker: "SPY", range: "FULL" }),
+      state({ ticker: "SPY", range: "FULL", model: "ff5" }),
+      state({ ticker: "SPY", model: "ff5" }),
+      state({ ticker: "^GSPC", range: null, start: "2023-01-01", end: "2026-09-30", win: 126 }),
+      state({ ticker: "SPY", range: null, end: "2026-09-30" }),
       state({ range: "3Y" }),
       state({ ticker: "SPY", range: "10Y", stats: true }),
       state({ stats: true }),
@@ -108,11 +118,16 @@ describe("applyPatch", () => {
   });
 
   it("clears the dates when a preset is chosen, and the preset when dates are entered", () => {
-    const dated = state({ ticker: "SPY", start: "2023-01-01", end: "2026-01-01" });
+    const dated = state({ ticker: "SPY", range: null, start: "2023-01-01", end: "2026-01-01" });
     expect(applyPatch(dated, { range: "5Y" })).toEqual(state({ ticker: "SPY", range: "5Y" }));
     expect(applyPatch(base, { start: "2023-01-01", end: "2026-01-01" })).toEqual(
-      state({ ticker: "SPY", start: "2023-01-01", end: "2026-01-01", win: 126 }),
+      state({ ticker: "SPY", range: null, start: "2023-01-01", end: "2026-01-01", win: 126 }),
     );
+  });
+
+  it("goes back to the default range when the custom dates are cleared", () => {
+    const dated = state({ ticker: "SPY", range: null, start: "2023-01-01", end: "2026-01-01" });
+    expect(applyPatch(dated, { start: null, end: null }).range).toBe("10Y");
   });
 });
 
@@ -159,28 +174,37 @@ describe("mode", () => {
 });
 
 describe("model", () => {
-  it("is FF5 unless the URL says model=ff6, so old URLs keep their meaning", () => {
-    expect(EMPTY_URL_STATE.model).toBe("ff5");
-    expect(parseUrl("").model).toBe("ff5");
-    expect(parseUrl("?t=SPY&range=3Y").model).toBe("ff5");
+  it("is FF6 unless the URL says otherwise, and an explicit model keeps its meaning", () => {
+    expect(EMPTY_URL_STATE.model).toBe("ff6");
+    expect(parseUrl("").model).toBe("ff6");
+    expect(parseUrl("?t=SPY&range=3Y").model).toBe("ff6");
     expect(parseUrl("?t=SPY&model=ff6").model).toBe("ff6");
     expect(parseUrl("?t=SPY&model=FF6").model).toBe("ff6");
     expect(parseUrl("?t=SPY&model=ff5").model).toBe("ff5");
-    expect(parseUrl("?t=SPY&model=ff7").model).toBe("ff5");
+    expect(parseUrl("?t=SPY&model=FF5").model).toBe("ff5");
+    expect(parseUrl("?t=SPY&model=ff7").model).toBe("ff6");
   });
 
-  it("writes model=ff6 only for FF6", () => {
-    expect(toSearch(state({ ticker: "SPY", range: "3Y", model: "ff6" }))).toBe("?t=SPY&range=3Y&model=ff6");
-    expect(toSearch(state({ ticker: "SPY", range: "3Y", model: "ff5" }))).toBe("?t=SPY&range=3Y");
-    expect(toSearch(state({ mode: "track", model: "ff6" }))).toBe("?m=track&model=ff6");
+  it("writes model=ff5 for FF5 and nothing for FF6", () => {
+    expect(toSearch(state({ ticker: "SPY", range: "3Y", model: "ff5" }))).toBe("?t=SPY&range=3Y&model=ff5");
+    expect(toSearch(state({ ticker: "SPY", range: "3Y", model: "ff6" }))).toBe("?t=SPY&range=3Y");
+    expect(toSearch(state({ mode: "track", model: "ff5" }))).toBe("?m=track&model=ff5");
+    expect(toSearch(state({ mode: "track" }))).toBe("?m=track");
   });
 
-  it("round-trips and patches", () => {
-    for (const text of ["?t=SPY&model=ff6", "?t=SPY&start=2023-01-02&end=2024-01-02&win=126&stats=1&model=ff6", "?t=SPY"]) {
+  it("round-trips model=ff5 and patches the model", () => {
+    for (const text of ["?t=SPY&model=ff5", "?t=SPY&range=FULL&model=ff5", "?t=SPY&start=2023-01-02&end=2024-01-02&win=126&stats=1&model=ff5", "?t=SPY", "?m=track&model=ff5"]) {
       expect(toSearch(parseUrl(text))).toBe(text);
     }
-    const ff6 = applyPatch(state({ ticker: "SPY", range: "5Y" }), { model: "ff6" });
-    expect(ff6).toEqual(state({ ticker: "SPY", range: "5Y", model: "ff6" }));
-    expect(applyPatch(ff6, { range: "3Y" }).model).toBe("ff6");
+    const ff5 = applyPatch(state({ ticker: "SPY", range: "5Y" }), { model: "ff5" });
+    expect(ff5).toEqual(state({ ticker: "SPY", range: "5Y", model: "ff5" }));
+    expect(applyPatch(ff5, { range: "3Y" }).model).toBe("ff5");
+  });
+
+  it("keeps an old URL with explicit params, and cleans it to the canonical form", () => {
+    const old = parseUrl("?t=spy&range=full&model=ff5&win=126&stats=1&junk=1");
+    expect(old).toEqual(state({ ticker: "SPY", range: "FULL", model: "ff5", win: 126, stats: true }));
+    expect(toSearch(old)).toBe("?t=SPY&range=FULL&win=126&stats=1&model=ff5");
+    expect(toSearch(parseUrl("?t=SPY&range=10Y&model=ff6"))).toBe("?t=SPY");
   });
 });

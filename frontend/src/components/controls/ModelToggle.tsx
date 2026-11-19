@@ -16,7 +16,7 @@ const TITLES: Record<FactorModel, string> = {
 
 /**
  * The factor model as a segmented control, with the markup and styles of `RangeChips`: native radios
- * in a fieldset with the visible legend "Factor model", so arrow keys work. FF5 is the default;
+ * in a fieldset with the visible legend "Factor model", so arrow keys work. FF6 is the dashboard default;
  * FF6 adds momentum. Neither option is marked as better.
  */
 export function ModelToggle({ selected, onSelect, disabled = false }: ModelToggleProps) {

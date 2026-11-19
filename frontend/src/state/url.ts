@@ -4,9 +4,10 @@ import type { RangePreset } from "../api/types";
 /**
  * URL state contract (dashboard spec DB6.1). Shapes: `/?t=SPY&range=3Y`,
  * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126`, `stats=1`, `m=track` (the
- * track-record mode; no `m` means ticker mode) and `model=ff6` (FF5 plus momentum; no `model` means
- * FF5), so every older URL keeps its meaning. Panels
- * read `win` through props and `stats` through `useShowStats()`, never from `location`.
+ * track-record mode; no `m` means ticker mode) and `model=ff5|ff6`. Owner decision of 2026-11-19: no
+ * `range` means 10Y and no `model` means FF6, and a default is never written. Full history is written
+ * `range=FULL`, FF5 is written `model=ff5`. Every explicit parameter of an older URL keeps its meaning.
+ * Panels read `win` through props and `stats` through `useShowStats()`, never from `location`.
  */
 
 /** Presets of the range control (owner decisions of 2026-11-18 and 2026-11-19): the API lists exactly these four. */
@@ -15,14 +16,18 @@ export type Preset = (typeof PRESETS)[number];
 
 export type RollingWindowDays = 126 | 252;
 
-/** Factor models of the model toggle: FF5 (the default) and FF6 = FF5 + momentum. */
+/** Factor models of the model toggle: FF5 and FF6 = FF5 + momentum (the dashboard default; the API default stays FF5). */
 export const MODELS = ["ff5", "ff6"] as const;
 export type FactorModel = (typeof MODELS)[number];
+
+/** What the dashboard shows when the URL says nothing (owner decision of 2026-11-19). */
+export const DEFAULT_RANGE: Preset = "10Y";
+export const DEFAULT_MODEL: FactorModel = "ff6";
 
 export interface UrlState {
   /** Upper-case ticker, or null on the landing page. */
   ticker: string | null;
-  /** Preset range. Null when custom dates are used, or when the URL has none (means FULL). */
+  /** Preset range; 10Y when the URL has none. Null only when custom dates are used. */
   range: Preset | null;
   /** Custom start, ISO date. */
   start: string | null;
@@ -34,13 +39,22 @@ export interface UrlState {
   stats: boolean;
   /** The sidebar mode: a ticker report (no `m` in the URL) or an uploaded track record (`m=track`). */
   mode: Mode;
-  /** The factor model: FF5 (no `model` in the URL) or FF6 (`model=ff6`). */
+  /** The factor model: FF6 when the URL has no `model`; `model=ff5` for FF5. */
   model: FactorModel;
 }
 
 export type Mode = "ticker" | "track";
 
-export const EMPTY_URL_STATE: UrlState = { ticker: null, range: null, start: null, end: null, win: null, stats: false, mode: "ticker", model: "ff5" };
+export const EMPTY_URL_STATE: UrlState = {
+  ticker: null,
+  range: DEFAULT_RANGE,
+  start: null,
+  end: null,
+  win: null,
+  stats: false,
+  mode: "ticker",
+  model: DEFAULT_MODEL,
+};
 
 /** The server's ticker pattern (`validate_ticker`): 1 to 12 of letters, digits and . ^ = -, not starting with a dot. */
 const TICKER_PATTERN = /^[A-Za-z0-9.^=-]{1,12}$/;
@@ -71,6 +85,12 @@ function parsePreset(value: string | null): Preset | null {
   return (PRESETS as readonly string[]).includes(upper) ? (upper as Preset) : null;
 }
 
+function parseModel(value: string | null): FactorModel {
+  if (value === null) return DEFAULT_MODEL;
+  const lower = value.trim().toLowerCase();
+  return (MODELS as readonly string[]).includes(lower) ? (lower as FactorModel) : DEFAULT_MODEL;
+}
+
 function parseDate(value: string | null): string | null {
   if (value === null) return null;
   const trimmed = value.trim();
@@ -91,13 +111,13 @@ export function parseUrl(search: string): UrlState {
   const custom = start !== null || end !== null;
   return {
     ticker: checked?.ok ? checked.ticker : null,
-    range: custom ? null : parsePreset(params.get("range")),
+    range: custom ? null : (parsePreset(params.get("range")) ?? DEFAULT_RANGE),
     start,
     end,
     win: parseWin(params.get("win")),
     stats: params.get("stats") === "1",
     mode: params.get("m") === "track" ? "track" : "ticker",
-    model: params.get("model")?.trim().toLowerCase() === "ff6" ? "ff6" : "ff5",
+    model: parseModel(params.get("model")),
   };
 }
 
@@ -108,13 +128,13 @@ export function toSearch(state: UrlState): string {
   if (state.start || state.end) {
     if (state.start) params.set("start", state.start);
     if (state.end) params.set("end", state.end);
-  } else if (state.range) {
+  } else if (state.range && state.range !== DEFAULT_RANGE) {
     params.set("range", state.range);
   }
   if (state.win !== null) params.set("win", String(state.win));
   if (state.stats) params.set("stats", "1");
   if (state.mode === "track") params.set("m", "track");
-  if (state.model === "ff6") params.set("model", "ff6");
+  if (state.model !== DEFAULT_MODEL) params.set("model", state.model);
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
 }
@@ -129,6 +149,7 @@ export function applyPatch(state: UrlState, patch: Partial<UrlState>): UrlState 
     next.start = null;
     next.end = null;
   }
+  if (next.range === null && !next.start && !next.end) next.range = DEFAULT_RANGE;
   if (next.ticker !== null) next.ticker = next.ticker.toUpperCase();
   return next;
 }

@@ -44,6 +44,12 @@ We rejected widening the shaded stretch after the factor data ends so that it is
 
 Readers who need to try other dates without a server would justify a lightweight local serve command. If users report missing the folded method detail, we would show one more sentence by default.
 
+## Update, 2026-11-19: dashboard defaults
+
+On 2026-11-19 the owner set the dashboard defaults to 10Y and FF6. The API default stays FF5. Under FF6 the five FF5-only sections are hidden.
+
+A URL without `range` opens on 10Y and a URL without `model` opens on FF6. The URL writes a value only when it differs from the default: `model=ff5` for FF5 and `range=FULL` for full history. Old URLs with explicit parameters keep their meaning. The dashboard always sends `model` to the API, so a request without `model` (a script, the static report) still gives FF5.
+
 ## Sources
 
 - [docs/design/report-design.md](../docs/design/report-design.md), sections C, D (panels 1, 3, 4, 5, 8), H.9 to H.12 and I.
