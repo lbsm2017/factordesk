@@ -204,7 +204,9 @@ def _fail_performance(monkeypatch: pytest.MonkeyPatch) -> FactorReport:
 
 
 def _fail_world_beta(monkeypatch: pytest.MonkeyPatch) -> FactorReport:
-    unavailable = WorldBenchmarkInput(history=None, unavailable_reason="The fund could not be read.")
+    unavailable = WorldBenchmarkInput(
+        history=None, unavailable_reason="The fund could not be read."
+    )
     return _pipeline_report(unavailable)
 
 
