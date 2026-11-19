@@ -93,11 +93,20 @@ describe("ExposuresPanel table", () => {
     expect(within(mkt).getAllByRole("cell")[3]?.textContent).toBe("Yes");
   });
 
-  it("draws every beta bar in neutral ink, never green or red, and bolds the Yes word", () => {
+  it("draws beta bars green above zero and red below, greys not-significant values, and bolds the Yes word", () => {
     const { container } = render(<ExposuresPanel report={report} />);
-    expect(container.querySelector("rect.pos, rect.neg, rect.bar-pos, rect.bar-neg")).toBeNull();
-    expect(container.querySelectorAll("tbody rect.ink").length).toBe(report.regression.factors.length);
-    expect(container.querySelectorAll("td.num-pos, td.num-neg")).toHaveLength(0);
+    expect(container.querySelector("tbody rect.ink")).toBeNull();
+    for (const f of report.regression.factors) {
+      if (f.beta === null) continue;
+      const beta = f.beta;
+      const row = rowOf(container, f.name);
+      const sign = beta >= 0 ? "pos" : "neg";
+      expect(row.querySelector(`rect.bar-${sign}`)).not.toBeNull();
+      const value = row.querySelector("td.num.strong");
+      const faded = row.classList.contains("ns");
+      expect(value?.classList.contains("num-pos")).toBe(!faded && beta > 0);
+      expect(value?.classList.contains("num-neg")).toBe(!faded && beta < 0);
+    }
     expect(rowOf(container, "Mkt-RF").querySelector("td.sig.yes")?.textContent).toBe("Yes");
     expect(rowOf(container, "HML").querySelector("td.sig.yes")).toBeNull();
   });
@@ -105,7 +114,7 @@ describe("ExposuresPanel table", () => {
   it("draws the bar 36% of the row, a 7 px diamond on the centre line, and a 3 px interval cap", () => {
     const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const row = rowOf(container, "SMB");
-    expect(row.querySelector("rect.ink")?.getAttribute("height")).toBe("36%");
+    expect(row.querySelector("rect.pos, rect.neg")?.getAttribute("height")).toBe("36%");
     const diamond = row.querySelector("svg.avgm");
     expect(diamond?.getAttribute("y")).toBe("50%");
     expect(diamond?.querySelector("path")?.getAttribute("d")).toBe("M0 -3.6 3.6 0 0 3.6-3.6 0z");
@@ -144,7 +153,8 @@ describe("ExposuresPanel table", () => {
       .getAllByRole("listitem")
       .map((li) => li.textContent);
     expect(items).toEqual([
-      "Beta",
+      "Positive beta",
+      "Negative beta",
       "Faded: not significant",
       "95% interval",
       `Average ${report.average_beta.window}d beta`,
