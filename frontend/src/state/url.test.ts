@@ -22,6 +22,13 @@ describe("parseUrl", () => {
     expect(parseUrl("?t=SPY&range=3Y&start=2023-01-01")).toEqual(state({ ticker: "SPY", start: "2023-01-01" }));
   });
 
+  it("reads the statistics switch only as stats=1", () => {
+    expect(parseUrl("?t=SPY&stats=1").stats).toBe(true);
+    expect(parseUrl("?t=SPY&stats=0").stats).toBe(false);
+    expect(parseUrl("?t=SPY&stats=yes").stats).toBe(false);
+    expect(parseUrl("?t=SPY").stats).toBe(false);
+  });
+
   it("reads the rolling window", () => {
     expect(parseUrl("?t=SPY&win=126").win).toBe(126);
     expect(parseUrl("?t=SPY&win=252").win).toBe(252);
@@ -52,6 +59,8 @@ describe("toSearch", () => {
       "?t=SPY&start=2023-01-01&end=2026-09-30",
     );
     expect(toSearch(state({ ticker: "SPY", range: "FULL", win: 126 }))).toBe("?t=SPY&range=FULL&win=126");
+    expect(toSearch(state({ ticker: "ZM", range: "5Y", win: 126, stats: true }))).toBe("?t=ZM&range=5Y&win=126&stats=1");
+    expect(toSearch(state({ ticker: "ZM", stats: false }))).toBe("?t=ZM");
   });
 
   it("is empty for the empty state and omits what is null", () => {
@@ -72,12 +81,16 @@ describe("toSearch", () => {
       state({ ticker: "^GSPC", start: "2023-01-01", end: "2026-09-30", win: 126 }),
       state({ ticker: "SPY", end: "2026-09-30" }),
       state({ range: "3Y" }),
+      state({ ticker: "SPY", range: "10Y", stats: true }),
+      state({ stats: true }),
     ];
     for (const s of cases) expect(parseUrl(toSearch(s))).toEqual(s);
   });
 
   it("cleans a dirty search to the canonical form", () => {
     expect(toSearch(parseUrl("?range=3y&t=spy&junk=1&win=7"))).toBe("?t=SPY&range=3Y");
+    expect(toSearch(parseUrl("?stats=on&t=spy"))).toBe("?t=SPY");
+    expect(toSearch(parseUrl("?stats=1&t=spy"))).toBe("?t=SPY&stats=1");
   });
 });
 
@@ -86,6 +99,12 @@ describe("applyPatch", () => {
 
   it("keeps range and window when the ticker changes", () => {
     expect(applyPatch(base, { ticker: "qqq" })).toEqual(state({ ticker: "QQQ", range: "3Y", win: 126 }));
+  });
+
+  it("keeps the statistics switch when the ticker or the range changes", () => {
+    const on = { ...base, stats: true };
+    expect(applyPatch(on, { ticker: "qqq" }).stats).toBe(true);
+    expect(applyPatch(on, { range: "10Y" }).stats).toBe(true);
   });
 
   it("clears the dates when a preset is chosen, and the preset when dates are entered", () => {
