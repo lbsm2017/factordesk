@@ -37,7 +37,7 @@
       "sub_asset_class": "European Government Bonds",
       "proxy": "IGOV",
       "proxy_kind": "etf",
-      "note": "international (ex-US) government bonds, not Europe only",
+      "note": "international (ex-US) government bonds, not Europe only; unhedged: returns include EUR/USD moves; hedged version comes with reference-currency support",
       "first_date": "2009-01-30",
       "currency": "USD"
     },
@@ -47,7 +47,7 @@
       "sub_asset_class": "European Corporate Investment Grade Bonds",
       "proxy": "PICB",
       "proxy_kind": "etf",
-      "note": "international (ex-US) corporate bonds, not Europe only",
+      "note": "international (ex-US) corporate bonds, not Europe only; unhedged: returns include EUR/USD moves; hedged version comes with reference-currency support",
       "first_date": "2010-06-03",
       "currency": "USD"
     },
@@ -57,7 +57,7 @@
       "sub_asset_class": "European High Yield Bonds",
       "proxy": "IHY",
       "proxy_kind": "etf",
-      "note": "international (ex-US) high yield, not Europe only; the first choice HYXU has no price data",
+      "note": "international (ex-US) high yield, not Europe only; the first choice HYXU has no price data; unhedged: returns include EUR/USD moves; hedged version comes with reference-currency support",
       "first_date": "2012-04-03",
       "currency": "USD"
     },
@@ -107,7 +107,7 @@
       "sub_asset_class": "Global High Yield Bonds",
       "proxy": "GHYG",
       "proxy_kind": "etf",
-      "note": "US and international high yield corporate bonds",
+      "note": "US and international high yield corporate bonds; partly unhedged: non-USD bonds include currency moves",
       "first_date": "2012-04-09",
       "currency": "USD"
     },
@@ -125,10 +125,10 @@
       "id": "fi_infl_linked",
       "asset_class": "Fixed Income",
       "sub_asset_class": "Inflation Linked Bonds",
-      "proxy": "WIP",
+      "proxy": "TIP",
       "proxy_kind": "etf",
-      "note": "international (ex-US) inflation-linked government bonds",
-      "first_date": "2008-03-19",
+      "note": "home-market linkers for a USD investor",
+      "first_date": "2003-12-05",
       "currency": "USD"
     },
     {
@@ -305,10 +305,10 @@
       "id": "alt_private_credit",
       "asset_class": "Alternatives",
       "sub_asset_class": "Private Credit",
-      "proxy": "BIZD",
+      "proxy": "BKLN",
       "proxy_kind": "listed_proxy",
-      "note": "listed proxy: smoother private returns not captured",
-      "first_date": "2013-02-12",
+      "note": "senior floating-rate bank loans; closer to direct lending than BDC equity; listed proxy: smoother private returns not captured",
+      "first_date": "2011-03-03",
       "currency": "USD"
     },
     {
@@ -355,10 +355,10 @@
       "id": "alt_crypto",
       "asset_class": "Alternatives",
       "sub_asset_class": "Crypto/Digital Assets",
-      "proxy": "IBIT",
+      "proxy": "BTC-USD",
       "proxy_kind": "listed_proxy",
-      "note": "listed proxy: smoother private returns not captured",
-      "first_date": "2024-01-11",
+      "note": "spot bitcoin price in USD; trades every day, weekend returns roll into the next common trading day",
+      "first_date": "2014-09-17",
       "currency": "USD"
     },
     {
@@ -425,11 +425,11 @@
       "id": "com_global_ex_precious",
       "asset_class": "Commodities",
       "sub_asset_class": "Global commodities (ex- precious metal)",
-      "proxy": null,
-      "proxy_kind": "none",
-      "note": "no clean US-listed proxy",
-      "first_date": null,
-      "currency": null
+      "proxy": "DBC",
+      "proxy_kind": "etf",
+      "note": "broad commodity futures index; includes a small precious-metal weight",
+      "first_date": "2006-02-06",
+      "currency": "USD"
     },
     {
       "id": "other_own_company",

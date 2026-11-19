@@ -224,7 +224,6 @@ def test_library_proxy_rules() -> None:
         "alt_real_estate_funds",
         "re_direct",
         "re_funds",
-        "com_global_ex_precious",
         "other_own_company",
     }
     listed = {line.id for line in by_id.values() if line.proxy_kind == "listed_proxy"}
@@ -237,8 +236,10 @@ def test_library_proxy_rules() -> None:
         "alt_crypto",
     }
     assert all(
-        by_id[i].note == "listed proxy: smoother private returns not captured" for i in listed
+        by_id[i].note.endswith("listed proxy: smoother private returns not captured")
+        for i in listed - {"alt_crypto"}
     )
+    assert by_id["alt_crypto"].proxy == "BTC-USD"
     assert all(line.currency == "USD" for line in by_id.values() if line.proxy is not None)
 
 
