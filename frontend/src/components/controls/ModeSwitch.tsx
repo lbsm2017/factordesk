@@ -8,11 +8,12 @@ export interface ModeSwitchProps {
 const MODES: readonly (readonly [Mode, string])[] = [
   ["ticker", "Ticker"],
   ["track", "Track record"],
+  ["portfolio", "Portfolio"],
 ];
 
 /**
  * The mode of the page as a segmented control, built like the date-range presets: native radios in a
- * fieldset with a visible legend, so arrow keys work. Ticker is the default; Track record is `m=track`.
+ * fieldset with a visible legend, so arrow keys work. Ticker is the default; Track record is `m=track` and Portfolio is `m=portfolio`.
  */
 export function ModeSwitch({ mode, onSelect }: ModeSwitchProps) {
   return (

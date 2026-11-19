@@ -4,7 +4,7 @@ import type { RangePreset } from "../api/types";
 /**
  * URL state contract (dashboard spec DB6.1). Shapes: `/?t=SPY&range=3Y`,
  * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126`, `stats=1`, `m=track` (the
- * track-record mode; no `m` means ticker mode) and `model=ff5|ff6`. Owner decision of 2026-11-19: no
+ * track-record mode) or `m=portfolio` (the portfolio composer); no `m` means ticker mode and `model=ff5|ff6`. Owner decision of 2026-11-19: no
  * `range` means 10Y and no `model` means FF6, and a default is never written. Full history is written
  * `range=FULL`, FF5 is written `model=ff5`. Every explicit parameter of an older URL keeps its meaning.
  * Panels read `win` through props and `stats` through `useShowStats()`, never from `location`.
@@ -37,13 +37,13 @@ export interface UrlState {
   win: RollingWindowDays | null;
   /** The "Show statistics" switch (dashboard spec DV6): `stats=1` when on, absent when off. */
   stats: boolean;
-  /** The sidebar mode: a ticker report (no `m` in the URL) or an uploaded track record (`m=track`). */
+  /** The sidebar mode: a ticker report (no `m`), an uploaded track record (`m=track`) or a portfolio (`m=portfolio`). */
   mode: Mode;
   /** The factor model: FF6 when the URL has no `model`; `model=ff5` for FF5. */
   model: FactorModel;
 }
 
-export type Mode = "ticker" | "track";
+export type Mode = "ticker" | "track" | "portfolio";
 
 export const EMPTY_URL_STATE: UrlState = {
   ticker: null,
@@ -91,6 +91,10 @@ function parseModel(value: string | null): FactorModel {
   return (MODELS as readonly string[]).includes(lower) ? (lower as FactorModel) : DEFAULT_MODEL;
 }
 
+function parseMode(value: string | null): Mode {
+  return value === "track" || value === "portfolio" ? value : "ticker";
+}
+
 function parseDate(value: string | null): string | null {
   if (value === null) return null;
   const trimmed = value.trim();
@@ -116,7 +120,7 @@ export function parseUrl(search: string): UrlState {
     end,
     win: parseWin(params.get("win")),
     stats: params.get("stats") === "1",
-    mode: params.get("m") === "track" ? "track" : "ticker",
+    mode: parseMode(params.get("m")),
     model: parseModel(params.get("model")),
   };
 }
@@ -133,7 +137,7 @@ export function toSearch(state: UrlState): string {
   }
   if (state.win !== null) params.set("win", String(state.win));
   if (state.stats) params.set("stats", "1");
-  if (state.mode === "track") params.set("m", "track");
+  if (state.mode !== "ticker") params.set("m", state.mode);
   if (state.model !== DEFAULT_MODEL) params.set("model", state.model);
   const text = params.toString();
   return text === "" ? "" : `?${text}`;

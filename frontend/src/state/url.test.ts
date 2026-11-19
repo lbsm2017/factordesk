@@ -152,12 +152,21 @@ describe("checkTicker", () => {
 });
 
 describe("mode", () => {
-  it("is the ticker mode unless the URL says m=track, so old URLs keep their meaning", () => {
+  it("is the ticker mode unless the URL says m=track or m=portfolio, so old URLs keep their meaning", () => {
     expect(parseUrl("").mode).toBe("ticker");
     expect(parseUrl("?t=SPY&range=3Y").mode).toBe("ticker");
     expect(parseUrl("?m=track").mode).toBe("track");
     expect(parseUrl("?m=TRACK").mode).toBe("ticker");
-    expect(parseUrl("?m=portfolio").mode).toBe("ticker");
+    expect(parseUrl("?m=portfolio").mode).toBe("portfolio");
+    expect(parseUrl("?m=Portfolio").mode).toBe("ticker");
+    expect(parseUrl("?m=nonsense").mode).toBe("ticker");
+  });
+
+  it("writes m=portfolio for the portfolio mode and nothing for the ticker mode", () => {
+    expect(toSearch(state({ mode: "portfolio" }))).toBe("?m=portfolio");
+    expect(toSearch(state({ mode: "portfolio", model: "ff5" }))).toBe("?m=portfolio&model=ff5");
+    expect(toSearch(parseUrl("?m=portfolio"))).toBe("?m=portfolio");
+    expect(applyPatch(state({}), { mode: "portfolio" }).mode).toBe("portfolio");
   });
 
   it("writes m=track only for the track-record mode", () => {
