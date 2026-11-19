@@ -613,6 +613,8 @@ export interface components {
             label_text: {
                 [key: string]: string;
             };
+            /** @description Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md). */
+            world_beta: components["schemas"]["WorldBetaSection"] | null;
             /** @description Historical return, volatility, Sharpe ratio and maximum drawdown. */
             performance: components["schemas"]["PerformanceSection"] | null;
             /** @description Lead-lag betas (docs/specs/lead-lag-betas.md). */
@@ -624,8 +626,6 @@ export interface components {
             shrunk_betas: components["schemas"]["ShrunkBetas"][] | null;
             /** @description Fragility score (docs/specs/fragility-score.md). */
             fragility: components["schemas"]["FragilitySection"] | null;
-            /** @description Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md). */
-            world_beta: components["schemas"]["WorldBetaSection"] | null;
             /** @description Residual alpha analysis (docs/methodology-residual-analysis.md). */
             residual: components["schemas"]["ResidualAnalysis"] | null;
             /** @description Kalman-filter betas (docs/specs/kalman-betas.md). */

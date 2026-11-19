@@ -114,8 +114,10 @@ def test_tp25_fixture_is_a_synthetic_section_of_the_real_shape() -> None:
 
 
 # ----------------------------------------------------------------------------- schema
-def test_tp26_the_section_is_registered_first_and_is_optional() -> None:
-    assert SECTIONS[0] is PERFORMANCE_SECTION
+def test_tp26_the_section_is_registered_in_panel_order_and_is_optional() -> None:
+    # Panel order: world beta (350) comes first, then performance (450), then the contract five.
+    assert SECTIONS[1] is PERFORMANCE_SECTION
+    assert SECTIONS[0].report_field == "world_beta"
     info = FactorReport.model_fields["performance"]
     assert info.default is None and not info.is_required()
     assert PERFORMANCE_SECTION.report_field == "performance"

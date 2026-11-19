@@ -1552,6 +1552,17 @@
             "title": "Label Text",
             "description": "Footnote texts by label key."
           },
+          "world_beta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorldBetaSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md)."
+          },
           "performance": {
             "anyOf": [
               {
@@ -1600,17 +1611,6 @@
             ],
             "description": "Fragility score (docs/specs/fragility-score.md)."
           },
-          "world_beta": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/WorldBetaSection"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md)."
-          },
           "residual": {
             "anyOf": [
               {
@@ -1653,11 +1653,11 @@
           "warnings",
           "notes",
           "label_text",
+          "world_beta",
           "performance",
           "lead_lag",
           "shrunk_betas",
           "fragility",
-          "world_beta",
           "residual",
           "kalman_betas"
         ],
