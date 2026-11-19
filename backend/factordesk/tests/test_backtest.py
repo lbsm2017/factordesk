@@ -79,9 +79,11 @@ def test_tb01_hand_worked_two_leaves_two_months() -> None:
 
 
 def test_tb02_hand_worked_with_cost() -> None:
-    # 10 bps on turnover 1/90 at the 2025-01-31 close: k = 1/90 * 0.001.
+    # 10 bps on the traded securities at the 2025-01-31 close: sell 1/90 of A, buy 1/90 of B,
+    # k = (1/90 + 1/90) * 0.001 = 2 * turnover * 10 bps (no cash leg).
     res = _hand(cost_bps=10.0)
-    k = (1 / 90) * 0.001
+    k = (2 / 90) * 0.001
+    assert res.turnover.iloc[1] == pytest.approx(1 / 90, abs=TOL)
     assert res.cost.to_numpy() == pytest.approx(np.array([0.0, k, 0.0, 0.0]), abs=TOL)
     assert res.ret.iloc[1] == pytest.approx((1.08 / 1.06) * (1.0 - k) - 1.0, abs=TOL)
     # Other days are untouched: the cost changes the value, not the next day's return.
@@ -224,17 +226,22 @@ def test_tb09_gap_inside_window_is_an_error() -> None:
         run_backtest(frame, {"A": 0.5, "B": 0.5}, _rf(idx))
 
 
-def test_tb10_cost_equals_bps_times_turnover() -> None:
+def test_tb10_cost_equals_bps_times_traded_securities() -> None:
     base = _random(400, 4, seed=11)
     weights = {"L0": 0.4, "L1": 0.3, "L2": 0.2, "L3": 0.05}
     rf = _rf(pd.DatetimeIndex(base.index), 0.00015)
     res = run_backtest(base, weights, rf, cost_bps=25.0)
     on = res.turnover.index.isin(pd.DatetimeIndex(res.rebalance_dates))
-    assert np.array_equal(res.cost.to_numpy(), res.turnover.to_numpy() * 25.0 / 10_000.0)
+    assert res.target_weights[CASH_ID] == pytest.approx(0.05, abs=TOL)
     assert (res.turnover[on] > 0).all()
     assert (res.turnover[~on] == 0.0).all()
+    assert (res.cost[~on] == 0.0).all()
     target = np.array([res.target_weights[c] for c in res.leaf_ids])
     drift = res.drifted_weights.to_numpy()[on]
+    traded = np.abs(drift[:, :-1] - target[:-1]).sum(axis=1)  # securities only, no cash leg
+    assert res.cost[on].to_numpy() == pytest.approx(traded * 25.0 / 10_000.0, abs=1e-18)
+    with_cash = np.abs(drift - target).sum(axis=1)
+    assert (traded < with_cash).all()
     assert res.turnover[on].to_numpy() == pytest.approx(
         0.5 * np.abs(drift - target).sum(axis=1), abs=TOL
     )
@@ -245,6 +252,17 @@ def test_tb10_cost_equals_bps_times_turnover() -> None:
     assert res.applied_weights.to_numpy()[nxt] == pytest.approx(
         np.tile(target, (len(nxt), 1)), abs=TOL
     )
+
+
+def test_tb10b_cash_leg_is_free() -> None:
+    # A 50% / cash 50%, rf 0. A gains 10% on 2024-01-31 (month end): drifted A = 0.55 / 1.05.
+    # Rebalance sells 0.55/1.05 - 0.5 = 1/42 of A into cash: turnover 1/2 (1/42 + 1/42) = 1/42.
+    # Only the sale of A pays: k = 1/42 * 30 bps (the cash leg is free).
+    idx = pd.DatetimeIndex(["2024-01-30", "2024-01-31", "2024-02-01"], name="date")
+    frame = pd.DataFrame({"A": [0.0, 0.10, 0.0]}, index=idx)
+    res = run_backtest(frame, {"A": 0.5}, _rf(idx), cost_bps=30.0)
+    assert res.turnover.iloc[1] == pytest.approx(1 / 42, abs=TOL)
+    assert res.cost.iloc[1] == pytest.approx((1 / 42) * 0.003, abs=TOL)
 
 
 def test_tb11_initial_purchase_is_free() -> None:
@@ -322,7 +340,7 @@ def test_tb16_drift_matches_independent_value_loop() -> None:
         end = values.sum()
         if t < 249 and month[t] != month[t + 1]:
             w = values / end
-            k = 0.5 * np.abs(target - w).sum() * 20.0 / 10_000.0
+            k = np.abs(target[:3] - w[:3]).sum() * 20.0 / 10_000.0
             end = end * (1.0 - k)
             values = target * end
         out.append(float(end / start - 1.0))

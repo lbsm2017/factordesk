@@ -76,11 +76,11 @@ def test_ta05_frongello_hand_worked() -> None:
     # Daily contributions c = w_{t-1} * r_t (rf 0, so cash adds nothing):
     #   A: 0.06, 0, (0.6)(0.10) = 0.06, (0.66/1.04)(-0.10)
     #   B: 0, (0.40/1.06)(0.05), (0.4)(-0.05) = -0.02, (0.38/1.04)(0.05)
-    # cost: -k (1 + g2) on 2025-01-31 with k = 1/90 * 10 bps.
+    # cost: -k (1 + g2) on 2025-01-31 with k = (1/90 sold + 1/90 bought) * 10 bps.
     # Link factors 1 + R_{t-1}: 1, 1.06, V2, V2 * 1.04, where V2 = 1.08 (1 - k).
     res = _hand()
     att = attribute(res)
-    k = (1 / 90) * 0.001
+    k = (2 / 90) * 0.001
     v2 = 1.08 * (1.0 - k)
     c_a = 0.06 * 1.0 + 0.0 * 1.06 + 0.06 * v2 + (0.66 / 1.04) * -0.10 * v2 * 1.04
     c_b = 0.0 + (0.40 / 1.06) * 0.05 * 1.06 - 0.02 * v2 + (0.38 / 1.04) * 0.05 * v2 * 1.04

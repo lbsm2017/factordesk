@@ -33,9 +33,14 @@ Rebalancing
     (it is partial, and a trade on the final close could not affect any return).
 
 Turnover and cost
-    One-way turnover on a rebalance day is ``tau_t = 1/2 * sum_i |w_target_i - w_{i,t}|`` (cash
-    included). The cost is ``k_t = tau_t * cost_bps / 10_000``, a fraction of the portfolio's
-    value at that close, charged on rebalance days only. The net return of that day is
+    One-way turnover on a rebalance day is ``tau_t = 1/2 * sum_i |w_target_i - w_{i,t}|`` over
+    all legs, cash included; it is reported as is. The cost is charged on the traded securities
+    only: ``k_t = sum_{i != cash} |w_target_i - w_{i,t}| * cost_bps / 10_000``. Every buy and
+    every sell of a holding pays ``cost_bps``; the cash leg pays nothing, because cash is where
+    the trades settle, not a trade. So a rebalance between two holdings costs
+    ``2 * tau_t * cost_bps / 10_000`` and one between a holding and cash costs
+    ``tau_t * cost_bps / 10_000``. ``k_t`` is a fraction of the portfolio's value at that close,
+    charged on rebalance days only. The net return of that day is
     ``r_t = (1 + g_t) * (1 - k_t) - 1``, so the cost's effect on the day's return is
     ``r_t - g_t = -k_t * (1 + g_t)``. **The initial purchase is free**: the portfolio starts at
     target weights at the close before the first common date, with no cost charged.
@@ -105,10 +110,11 @@ class BacktestResult:
     rebalance_dates: tuple[date, ...]
     """Closes at which the weights were reset to target."""
     turnover: pd.Series
-    """One-way turnover ``tau_t``; 0.0 on days without a rebalance."""
+    """One-way turnover ``tau_t`` over all legs, cash included; 0.0 on days without a
+    rebalance."""
     cost: pd.Series
-    """``k_t = tau_t * cost_bps / 10_000``, a fraction of the value at that close; 0.0 off
-    rebalance days."""
+    """``k_t = sum_{i != cash} |w_target_i - w_{i,t}| * cost_bps / 10_000``, a fraction of the
+    value at that close; 0.0 off rebalance days."""
     start: date
     end: date
     start_leaves: tuple[str, ...]
@@ -205,7 +211,8 @@ def run_backtest(
     NaN mark dates before a leaf's history starts or after it ends. ``rf`` is the daily
     risk-free rate in decimals; when cash has a target weight above 0 it is the return of the cash
     leaf and limits the window like any other leaf, otherwise it is not used. ``cost_bps`` is
-    charged on one-way turnover at each rebalance; the initial purchase is free.
+    charged on the traded value of the securities at each rebalance (the cash leg is free); the
+    initial purchase is free.
     """
     validate_date_index(leaf_ret.index, "leaf returns")
     validate_date_index(rf.index, "risk-free rate")
@@ -257,7 +264,8 @@ def run_backtest(
         gross[t] = g
         if rebalance[t]:
             turnover[t] = 0.5 * float(np.abs(target - w_drift).sum())
-            cost[t] = turnover[t] * cost_bps / BPS
+            traded = float(np.abs(target[:-1] - w_drift[:-1]).sum())  # cash is the last leg
+            cost[t] = traded * cost_bps / BPS
             w = target.copy()
         else:
             w = w_drift
