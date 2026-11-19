@@ -14,6 +14,8 @@ Declarations:
 * world beta: daily only (ACWI and IEUR prices are daily), every model.
 * tail risk (VaR and CVaR): every subject, every frequency, every model.
 * portfolio backtest: portfolio subjects only (it describes the backtest behind the series).
+* macro sensitivities (E4): every subject, every frequency, every model (a separate regression;
+  daily funds, compounded to month-ends for a monthly subject).
 * lead-lag, shrunk betas, fragility, residual alpha analysis, Kalman betas: daily and FF5 only.
   Their methods are built on trading-day windows (252-row windows, 5-day blocks, a lag of one
   trading day, an FF5 prior) and on the five factors, and are not defined for monthly data or
@@ -39,6 +41,7 @@ from factordesk.section_hooks import alpha_strip as alpha_strip_hook
 from factordesk.section_hooks import fragility as fragility_hook
 from factordesk.section_hooks import kalman as kalman_hook
 from factordesk.section_hooks import lead_lag as lead_lag_hook
+from factordesk.section_hooks import macro as macro_hook
 from factordesk.section_hooks import performance as performance_hook
 from factordesk.section_hooks import portfolio_backtest as portfolio_backtest_hook
 from factordesk.section_hooks import residual_alpha as residual_alpha_hook
@@ -143,6 +146,13 @@ HOOKS: tuple[HookSpec, ...] = (
         "portfolio_backtest",
         lambda ctx: portfolio_backtest_hook.build_portfolio_backtest(ctx),
         PORTFOLIO,
+        ALL_FREQUENCIES,
+        ALL_MODELS,
+    ),
+    HookSpec(
+        "macro",
+        lambda ctx: macro_hook.build_macro(ctx),
+        ALL_SOURCES,
         ALL_FREQUENCIES,
         ALL_MODELS,
     ),

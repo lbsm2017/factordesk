@@ -51,7 +51,8 @@ out of the JSON) for FF5, so FF5 reports are byte-identical to the ones written 
 optional section ``alpha_strip`` (alpha under CAPM, FF3, FF5 and FF6 on the same rows;
 ``report/sections/alpha_strip.py``) is also left out of the JSON when ``None``, and so is
 ``portfolio_backtest`` (the backtest behind a portfolio report;
-``report/sections/portfolio_backtest.py``).
+``report/sections/portfolio_backtest.py``), and so is ``macro`` (macro sensitivities;
+``report/sections/macro.py``).
 All are additive and do not bump the version (contract SC5).
 """
 
@@ -84,6 +85,7 @@ from factordesk.report.sections.alpha_strip import ALPHA_STRIP_SECTION, AlphaStr
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
+from factordesk.report.sections.macro import MACRO_SECTION, MacroSection
 from factordesk.report.sections.performance import PERFORMANCE_SECTION, PerformanceSection
 from factordesk.report.sections.portfolio_backtest import (
     PORTFOLIO_BACKTEST_SECTION,
@@ -118,6 +120,7 @@ SECTIONS: tuple[SectionSpec, ...] = (
     TAIL_RISK_SECTION,
     ALPHA_STRIP_SECTION,
     PORTFOLIO_BACKTEST_SECTION,
+    MACRO_SECTION,
 )
 """The optional sections of the schema v3 contract, in panel order (contract SC3.1, SC4)."""
 
@@ -505,13 +508,19 @@ class PriceSeries(FrozenModel):
         return self
 
 
-_OMITTED_WHEN_DEFAULT: tuple[str, ...] = ("subject", "model", "alpha_strip", "portfolio_backtest")
+_OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
+    "subject",
+    "model",
+    "alpha_strip",
+    "portfolio_backtest",
+    "macro",
+)
 """Fields left out of the JSON when ``None``, so never required."""
 
 
 def _subject_not_required(schema: JsonDict) -> None:
-    """``subject``, ``model``, ``alpha_strip`` and ``portfolio_backtest`` are left out of the JSON
-    when ``None``, so they are never required."""
+    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest`` and ``macro`` are left out
+    of the JSON when ``None``, so they are never required."""
     required = schema.get("required")
     if isinstance(required, list):
         schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
@@ -601,6 +610,12 @@ class FactorReport(FrozenModel):
         description="How a portfolio's return series was made: window, limiting instruments, "
         "rebalances, cost, survivorship note and target weights; absent (not null) for every "
         "subject except a portfolio.",
+    )
+    macro: MacroSection | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Macro sensitivities: a separate regression on market, rates, credit, "
+        "commodity, inflation and dollar factors; absent (not null) when not computed.",
     )
 
     @field_validator("schema_version")

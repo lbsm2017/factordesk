@@ -25,5 +25,6 @@
   },
   "tail_risk": {},
   "alpha_strip": {},
-  "portfolio_backtest": {}
+  "portfolio_backtest": {},
+  "macro": {}
 }

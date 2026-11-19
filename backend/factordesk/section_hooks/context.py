@@ -76,6 +76,32 @@ class PortfolioBacktestInput:
 
 
 @dataclass(frozen=True)
+class DollarInput:
+    """The Fed broad dollar index (FRED ``DTWEXBGS``) levels, or why there are none.
+
+    ``levels`` is ``None`` when the series could not be fetched and no cached copy exists
+    (``unavailable_reason`` says why); the macro section then runs without the dollar.
+    ``note`` is set when an older cached copy was used.
+    """
+
+    levels: pd.Series | None
+    unavailable_reason: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class MacroInput:
+    """The data of the macro section: five fund histories and the dollar index.
+
+    ``funds`` maps a Yahoo ticker (IEF, LQD, DBC, TIP, IEI) to its history or the reason it is
+    missing, as for the world beta proxies.
+    """
+
+    funds: Mapping[str, WorldBenchmarkInput]
+    dollar: DollarInput
+
+
+@dataclass(frozen=True)
 class SectionInputs:
     """Data a section needs that ``assemble_report`` does not already have.
 
@@ -93,6 +119,9 @@ class SectionInputs:
     null. Owned by the world-beta feature."""
     portfolio_backtest: PortfolioBacktestInput | None = None
     """The backtest summary of a portfolio subject; ``None`` for every other subject."""
+    macro: MacroInput | None = None
+    """Fund prices and the dollar index of the macro section; ``None``: not fetched, the section
+    does not run. Owned by the macro feature."""
 
 
 @dataclass(frozen=True)

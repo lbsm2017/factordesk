@@ -1,0 +1,224 @@
+{
+  "status": "ok",
+  "reason": null,
+  "sample": {
+    "n": 719,
+    "start": "2010-01-05",
+    "end": "2012-10-05",
+    "requested_start": "2010-01-04",
+    "requested_end": "2012-10-05",
+    "window": null,
+    "n_excluded": 0,
+    "excluded": [],
+    "factor_vintage": {
+      "last_date": "2012-10-05",
+      "downloaded_at": null
+    }
+  },
+  "model_note": "Separate regression. Raw betas: correlated factors share explanatory power. Not the headline alpha.",
+  "n_obs": 719,
+  "n_sample": 720,
+  "frequency": "daily",
+  "hac_lags": 6,
+  "t_reference": "normal",
+  "r2": 0.9065568003916673,
+  "adj_r2": 0.9056368251493911,
+  "rows": [
+    {
+      "code": "mkt_rf",
+      "name": "Mkt-RF",
+      "label": "Market",
+      "definition": "French market excess return",
+      "note": null,
+      "beta": 0.8959691635837939,
+      "se": 0.010217353134002793,
+      "t": 87.6909265866575,
+      "p": 0.0,
+      "ci_low": 0.875943519423821,
+      "ci_high": 0.9159948077437667,
+      "tag": "reliable",
+      "vif": 1.0140231205247165,
+      "beta_same_day": null,
+      "beta_lag": null
+    },
+    {
+      "code": "term",
+      "name": "TERM",
+      "label": "Rates",
+      "definition": "IEF minus RF",
+      "note": null,
+      "beta": 0.5317709217288018,
+      "se": 0.04181141301893753,
+      "t": 12.71831979196561,
+      "p": 4.67811409366648e-37,
+      "ci_low": 0.44982205806895514,
+      "ci_high": 0.6137197853886485,
+      "tag": "reliable",
+      "vif": 1.310711185947566,
+      "beta_same_day": null,
+      "beta_lag": null
+    },
+    {
+      "code": "def",
+      "name": "DEF",
+      "label": "Credit",
+      "definition": "LQD minus IEF",
+      "note": "credit minus rates, not duration-matched",
+      "beta": 0.12581392439994077,
+      "se": 0.06374619309104622,
+      "t": 1.973669615379943,
+      "p": 0.04841932227714568,
+      "ci_low": 0.0008736817899541865,
+      "ci_high": 0.25075416700992736,
+      "tag": "reliable",
+      "vif": 1.3117658409913824,
+      "beta_same_day": null,
+      "beta_lag": null
+    },
+    {
+      "code": "comm",
+      "name": "COMM",
+      "label": "Commodities",
+      "definition": "DBC minus RF",
+      "note": null,
+      "beta": 0.2799827041357372,
+      "se": 0.013795534106423223,
+      "t": 20.29516957994231,
+      "p": 1.4186444698819926e-91,
+      "ci_low": 0.25294395413965376,
+      "ci_high": 0.3070214541318207,
+      "tag": "reliable",
+      "vif": 1.004319606415237,
+      "beta_same_day": null,
+      "beta_lag": null
+    },
+    {
+      "code": "infl",
+      "name": "INFL",
+      "label": "Inflation",
+      "definition": "TIP minus IEI",
+      "note": "breakeven proxy",
+      "beta": -0.5245730811355186,
+      "se": 0.05938262186035506,
+      "t": -8.833781074353897,
+      "p": 1.0119561330518306e-18,
+      "ci_low": -0.6409608812893755,
+      "ci_high": -0.4081852809816618,
+      "tag": "reliable",
+      "vif": 1.165965545189317,
+      "beta_same_day": null,
+      "beta_lag": null
+    },
+    {
+      "code": "usd",
+      "name": "USD",
+      "label": "US dollar",
+      "definition": "Fed nominal broad dollar index (FRED DTWEXBGS), simple return",
+      "note": "a positive beta means the subject gains when the dollar strengthens",
+      "beta": 0.5393172776448841,
+      "se": 0.049181680389016,
+      "t": 10.96581640519409,
+      "p": 5.579470188377942e-28,
+      "ci_low": 0.44292295538325294,
+      "ci_high": 0.6357115999065154,
+      "tag": "reliable",
+      "vif": 1.1572748248428608,
+      "beta_same_day": 0.38264438193752737,
+      "beta_lag": 0.15667289570735676
+    }
+  ],
+  "correlation_codes": [
+    "mkt_rf",
+    "term",
+    "def",
+    "comm",
+    "infl",
+    "usd"
+  ],
+  "correlation": [
+    [
+      1.0,
+      -0.004012513053026348,
+      0.03710060999313479,
+      -0.057235572170369786,
+      0.0890040876947199,
+      -0.05887366008165549
+    ],
+    [
+      -0.004012513053026347,
+      1.0,
+      0.4852730336012413,
+      0.0012412168381962362,
+      -0.051287479460687076,
+      0.016974050748541494
+    ],
+    [
+      0.03710060999313479,
+      0.4852730336012413,
+      1.0,
+      0.015682496751199586,
+      -0.036913965342744194,
+      0.0013527004399062183
+    ],
+    [
+      -0.057235572170369786,
+      0.0012412168381962362,
+      0.015682496751199586,
+      1.0,
+      -0.029664672843091513,
+      0.018044257852475546
+    ],
+    [
+      0.0890040876947199,
+      -0.051287479460687076,
+      -0.03691396534274419,
+      -0.029664672843091513,
+      1.0,
+      -0.36747026275731814
+    ],
+    [
+      -0.058873660081655496,
+      0.016974050748541497,
+      0.0013527004399062183,
+      0.018044257852475546,
+      -0.3674702627573181,
+      1.0
+    ]
+  ],
+  "legs": [
+    {
+      "ticker": "IEF",
+      "role": "TERM = IEF minus RF; DEF = LQD minus IEF",
+      "first_date": "2009-12-31"
+    },
+    {
+      "ticker": "LQD",
+      "role": "DEF = LQD minus IEF",
+      "first_date": "2009-12-31"
+    },
+    {
+      "ticker": "DBC",
+      "role": "COMM = DBC minus RF",
+      "first_date": "2009-12-31"
+    },
+    {
+      "ticker": "TIP",
+      "role": "INFL = TIP minus IEI",
+      "first_date": "2009-12-31"
+    },
+    {
+      "ticker": "IEI",
+      "role": "INFL = TIP minus IEI",
+      "first_date": "2009-12-31"
+    },
+    {
+      "ticker": "DTWEXBGS",
+      "role": "USD = daily return of the Fed nominal broad dollar index",
+      "first_date": "2009-12-31"
+    }
+  ],
+  "window_limited_by": "IEF",
+  "usd_included": true,
+  "usd_note": null,
+  "usd_lag_note": "The index is a noon New York fixing, so a daily regression adds the previous day's return and reports the summed beta."
+}
