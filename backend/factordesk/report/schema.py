@@ -579,6 +579,8 @@ ErrorCode = Literal[
     "not_found",
     "internal",
     "bad_request",
+    "invalid_upload",
+    "upload_too_large",
 ]
 """Error codes of the local API (dashboard spec DB2.3). ``bad_request`` covers any other
 malformed request parameter."""
