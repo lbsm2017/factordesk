@@ -15,11 +15,14 @@ import pytest
 from scipy import integrate  # pyright: ignore[reportMissingTypeStubs]
 
 from factordesk.analytics.tail_risk import (
+    CF_INDICATIVE,
     CF_INVALID,
     LEVELS,
     Frequency,
+    cornish_fisher_globally_monotone,
     cornish_fisher_monotone,
     cornish_fisher_quantile,
+    cornish_fisher_range,
     historical_rank,
     modified_tail_mean,
     politis_white_block_length,
@@ -135,10 +138,53 @@ def test_guard_trips_on_heavy_skew_and_passes_on_mild_data() -> None:
         assert f.reason == CF_INVALID
     mild = _normal(3, 240)
     r = tail_risk(mild, "monthly", n_resamples=50)
-    assert abs(r.skewness) < 0.5 and abs(r.excess_kurtosis) < 1.0
+    assert abs(r.skewness) < 0.5 and 0.0 < r.excess_kurtosis < 1.0
     for measure, level in LEVELS["monthly"]:
         f = r.figure("cornish_fisher", measure, level)
-        assert f.value is not None and f.reason is None
+        assert f.value is not None and f.reason is None and not f.indicative
+
+
+def test_guard_ranges_per_measure() -> None:
+    z99 = N.inv_cdf(0.01)
+    assert cornish_fisher_range("var", 0.99) == (z99, 0.0)
+    assert cornish_fisher_range("cvar", 0.975) == (-4.0, N.inv_cdf(0.025))
+
+
+def test_global_domain_closed_form() -> None:
+    assert bool(cornish_fisher_globally_monotone(0.0, 0.0))  # a = b = 0 < c
+    assert bool(cornish_fisher_globally_monotone(0.0, 2.0))
+    assert not bool(cornish_fisher_globally_monotone(0.0, -0.1))  # a < 0
+    assert not bool(cornish_fisher_globally_monotone(0.0, 9.0))  # c < 0: g'(0) < 0
+    # Against a wide grid: the closed form agrees with min g'(z) > 0 on [-50, 50].
+    rng = np.random.default_rng(3)
+    s = rng.uniform(-2.0, 2.0, 2000)
+    k = rng.uniform(-1.0, 10.0, 2000)
+    grid = np.linspace(-50.0, 50.0, 20001)[:, None]
+    deriv = (k / 8 - s**2 / 6) * grid**2 + (s / 3) * grid + 1 - k / 8 + 5 * s**2 / 36
+    brute = deriv.min(axis=0) > 0
+    assert np.count_nonzero(cornish_fisher_globally_monotone(s, k) != brute) <= 3
+
+
+def test_negative_excess_kurtosis_keeps_99_var_as_indicative() -> None:
+    r = tail_risk(_normal(0, 240), "monthly", n_resamples=200)
+    assert r.excess_kurtosis < 0.0
+    f = r.figure("cornish_fisher", "var", 0.99)
+    assert f.value is not None
+    assert f.indicative and f.reason == CF_INDICATIVE
+    assert f.band is not None and f.tail_count is not None
+
+
+def test_high_kurtosis_daily_cvar_is_indicative() -> None:
+    x = np.random.default_rng(1).standard_t(4, size=2500) * 0.01
+    r = tail_risk(x, "daily", n_resamples=200)
+    assert r.excess_kurtosis == pytest.approx(22.2, abs=0.1)
+    cvar = r.figure("cornish_fisher", "cvar", 0.975)
+    assert cvar.value is not None
+    assert cvar.indicative and cvar.reason == CF_INDICATIVE
+    assert cvar.tail_count is not None and cvar.tail_count > 0
+    # g'(0) = 1 - K/8 + 5 S^2/36 < 0: the map from the centre to z_0.01 is not increasing.
+    var = r.figure("cornish_fisher", "var", 0.99)
+    assert var.value is None and var.reason == CF_INVALID and not var.indicative
 
 
 @pytest.mark.parametrize("seed", range(8))

@@ -35,10 +35,16 @@ Methods
 
   Validity guard (Maillard 2012, "A User's Guide to the Cornish Fisher Expansion", SSRN 1997178):
   the expansion is a quantile only where the map ``z -> g(z)`` is increasing. Its derivative is
-  the quadratic ``g'(z) = (K/8 - S^2/6) z^2 + (S/3) z + 1 - K/8 + 5 S^2/36``. A figure at a level
-  is reported only if ``g'(z) > 0`` on the whole interval ``[-4, z_p]`` (the tail the figure
-  reads); otherwise it is n/a with the reason :data:`CF_INVALID`. (Maillard's global domain is
-  ``g'(z) > 0`` for all ``z``; the local check is weaker and is what the spec asks for.)
+  the quadratic ``g'(z) = (K/8 - S^2/6) z^2 + (S/3) z + 1 - K/8 + 5 S^2/36``. Two checks:
+
+  * **Local** (decides n/a): ``g'(z) > 0`` on the range the figure uses, ``[z_p, 0]`` for VaR
+    (the map from the centre out to the quantile) and ``[-4, z_p]`` for CVaR (the tail it
+    averages). If it fails the figure is n/a with the reason :data:`CF_INVALID`.
+  * **Global** (Maillard's domain): ``g'(z) > 0`` for every real ``z``, which holds iff
+    ``a > 0`` and ``b^2 - 4 a c < 0`` (or ``a = b = 0 < c``). A figure that passes the local
+    check but not the global one keeps its value with ``indicative=True`` and the reason
+    :data:`CF_INDICATIVE`. Any negative excess kurtosis below ``4 S^2 / 3`` makes ``a < 0``,
+    so such samples are always indicative.
 
 Uncertainty
 -----------
@@ -90,6 +96,7 @@ MIN_EXPECTED_TAIL = 3.0
 CF_Z_LOW = -4.0
 """Lower end of the interval on which the Cornish-Fisher map must be increasing."""
 CF_INVALID = "outside the valid range of the expansion (Maillard 2012)"
+CF_INDICATIVE = "outside the global validity domain (Maillard 2012); indicative only"
 MIN_OBS = 12
 """Fewer observations are refused: the moments behind the parametric methods are meaningless."""
 
@@ -113,9 +120,11 @@ class TailFigure:
     """One VaR or CVaR figure: one method, one measure, one confidence level.
 
     ``value`` is a positive fraction of value for a loss, or None when the figure is n/a; then
-    ``reason`` says why. ``tail_count`` is the number of observations with a loss at or beyond
-    this method's VaR at ``level`` (for the historical method, the observations the figure is
-    computed from). ``expected_tail_obs`` is ``n (1 - level)``.
+    ``reason`` says why. A Cornish-Fisher figure outside Maillard's global domain keeps its value
+    with ``indicative=True`` and the caveat in ``reason``. ``tail_count`` is the number of
+    observations with a loss at or beyond this method's VaR at ``level`` (for the historical
+    method, the observations the figure is computed from). ``expected_tail_obs`` is
+    ``n (1 - level)``.
     """
 
     method: Method
@@ -126,6 +135,7 @@ class TailFigure:
     band: Band | None
     tail_count: int | None
     expected_tail_obs: float
+    indicative: bool = False
 
 
 @dataclass(frozen=True)
@@ -205,6 +215,28 @@ def cornish_fisher_monotone(
     return np.asarray(np.isfinite(lowest) & (lowest > 0.0))
 
 
+def cornish_fisher_globally_monotone(skew: ArrayLike, exkurt: ArrayLike) -> NDArray[np.bool_]:
+    """True where ``g'(z) > 0`` for every real ``z`` (Maillard's domain of validity).
+
+    With ``g'(z) = a z^2 + b z + c`` (see :func:`cornish_fisher_monotone`) this is ``a > 0`` and
+    ``b^2 - 4 a c < 0``, or the degenerate ``a = b = 0`` with ``c > 0``.
+    """
+    s = np.asarray(skew, dtype=np.float64)
+    k = np.asarray(exkurt, dtype=np.float64)
+    a = k / 8.0 - s**2 / 6.0
+    b = s / 3.0
+    c = 1.0 - k / 8.0 + 5.0 * s**2 / 36.0
+    proper: NDArray[np.bool_] = np.asarray((a > 0.0) & (b**2 - 4.0 * a * c < 0.0))
+    flat: NDArray[np.bool_] = np.asarray(np.equal(a, 0.0) & np.equal(b, 0.0) & (c > 0.0))
+    return proper | flat
+
+
+def cornish_fisher_range(measure: Measure, level: float) -> tuple[float, float]:
+    """The ``z`` range the local guard checks: ``[z_p, 0]`` for VaR, ``[-4, z_p]`` for CVaR."""
+    z = NormalDist().inv_cdf(tail_probability(level))
+    return (z, 0.0) if measure == "var" else (CF_Z_LOW, z)
+
+
 def _normal_partial_moments(h: FloatArray, top: int) -> list[FloatArray]:
     """``J_q(h) = int_{-inf}^h x^q phi(x) dx`` for ``q = 0..top``.
 
@@ -272,9 +304,10 @@ def _gaussian(m: _Moments, measure: Measure, p: float) -> FloatArray:
 def _cornish_fisher(
     m: _Moments, measure: Measure, p: float
 ) -> tuple[FloatArray, NDArray[np.bool_]]:
-    """(value, valid) per row; value is NaN where the guard trips."""
+    """(value, valid) per row; value is NaN where the local guard trips."""
     z = NormalDist().inv_cdf(p)
-    valid = cornish_fisher_monotone(m.skew, m.exkurt, z_high=z)
+    z_low, z_high = cornish_fisher_range(measure, 1.0 - p)
+    valid = cornish_fisher_monotone(m.skew, m.exkurt, z_high=z_high, z_low=z_low)
     g = cornish_fisher_quantile(z, m.skew, m.exkurt)
     if measure == "var":
         value = -(m.mean + g * m.std)
@@ -299,7 +332,9 @@ def _var_of(method: Method, x_sorted: FloatArray, m: _Moments, level: float) -> 
         return _historical(x_sorted, "var", level)
     if method == "gaussian":
         return _gaussian(m, "var", p)
-    return _cornish_fisher(m, "var", p)[0]
+    # Unguarded: the tail count of a CVaR figure needs the mVaR even where VaR itself is n/a.
+    g = cornish_fisher_quantile(NormalDist().inv_cdf(p), m.skew, m.exkurt)
+    return -(m.mean + g * m.std)
 
 
 def _evaluate(x: FloatArray, freq: Frequency) -> dict[tuple[Method, Measure, float], FloatArray]:
@@ -457,6 +492,7 @@ def tail_risk(
         for method in METHODS:
             value = float(point[(method, measure, level)][0])
             reason: str | None = None
+            indicative = False
             if method == "historical" and expected < MIN_EXPECTED_TAIL - 1e-9:
                 reason = f"{expected:.1f} expected tail observations"
             elif method == "cornish_fisher" and math.isnan(value):
@@ -466,6 +502,11 @@ def tail_risk(
                     TailFigure(method, measure, level, None, reason, None, None, expected)
                 )
                 continue
+            if method == "cornish_fisher" and not bool(
+                cornish_fisher_globally_monotone(m.skew[0], m.exkurt[0])
+            ):
+                indicative = True
+                reason = CF_INDICATIVE
             draws = boot[(method, measure, level)]
             draws = draws[np.isfinite(draws)]
             band = None
@@ -474,7 +515,9 @@ def tail_risk(
                 band = Band(float(low), float(high), int(draws.size))
             var = float(_var_of(method, x_sorted, m, level)[0])
             count = int(np.count_nonzero(x <= -var))
-            figures.append(TailFigure(method, measure, level, value, None, band, count, expected))
+            figures.append(
+                TailFigure(method, measure, level, value, reason, band, count, expected, indicative)
+            )
 
     return TailRisk(
         frequency=frequency,
