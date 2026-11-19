@@ -26,7 +26,7 @@ from factordesk.data.factors import (
 from factordesk.data.prices import PriceProvider, YFinanceProvider
 
 if TYPE_CHECKING:
-    from factordesk.section_hooks.context import SectionInputs
+    from factordesk.section_hooks.context import SectionInputs, WorldBenchmarkInput
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,10 @@ class AppDeps:
     load_section_inputs: Callable[[datetime], SectionInputs] | None = None
     """Extra data of the optional report sections (the portfolio files of the shrunk betas),
     loaded once per day and vintage. ``None``: none, so those sections are not computed."""
+    load_world_benchmark: Callable[[], WorldBenchmarkInput] | None = None
+    """The ACWI history of the world beta, refreshed by the new days on every report build (the
+    refresh makes no network call while the cache holds the latest completed trading day).
+    Never raises. ``None``: not wired, so the world beta is not computed."""
 
     def __post_init__(self) -> None:
         if self.max_workers < 1:
@@ -99,8 +103,15 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         except PortfolioError as exc:
             raise FactorDownloadError(str(exc)) from exc
 
+    price_provider = YFinanceProvider(cache_dir=data_dir / "prices", now=utc_now)
+
+    def world_benchmark() -> WorldBenchmarkInput:
+        from factordesk.section_hooks.world_beta import load_world_benchmark
+
+        return load_world_benchmark(price_provider)
+
     return AppDeps(
-        price_provider=YFinanceProvider(cache_dir=data_dir / "prices", now=utc_now),
+        price_provider=price_provider,
         load_factors=load_factors,
         factor_status=status,
         now=utc_now,
@@ -108,4 +119,5 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         static_dir=static_dir,
         refresh_portfolios=refresh_portfolios,
         load_section_inputs=section_inputs,
+        load_world_benchmark=world_benchmark,
     )

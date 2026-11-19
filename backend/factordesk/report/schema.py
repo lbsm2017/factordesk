@@ -29,6 +29,10 @@ are re-exported here.
 The optional ``performance`` section (historical return, volatility, Sharpe ratio and maximum
 drawdown; ``report/sections/performance.py``) is additive and does not change the version number
 (contract SC5): a file written before it has ``performance`` absent and loads with ``None``.
+
+The optional section ``world_beta`` (the quick beta against the iShares MSCI ACWI ETF;
+``report/sections/world_beta.py``) is additive and ``None`` when not computed, so it does not bump
+the version (contract SC5).
 """
 
 from __future__ import annotations
@@ -61,6 +65,7 @@ from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.performance import PERFORMANCE_SECTION, PerformanceSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
+from factordesk.report.sections.world_beta import WORLD_BETA_SECTION, WorldBetaSection
 
 SCHEMA_VERSION = "4"
 """Version written by this code (the schema v3 contract; contract SC5). Additive optional fields
@@ -73,6 +78,7 @@ version 4 file written before ``data.security`` existed loads with it absent (``
 AuditStatus = Literal["clean", "warnings", "errors"]
 
 SECTIONS: tuple[SectionSpec, ...] = (
+    WORLD_BETA_SECTION,
     PERFORMANCE_SECTION,
     LEAD_LAG_SECTION,
     SHRUNK_SECTION,
@@ -430,6 +436,11 @@ class FactorReport(FrozenModel):
     )
     # Optional sections of the schema v3 contract (docs/specs/schema-v3-contract.md), in panel
     # order. None: the feature did not run for this report (always None in version 3 files).
+    world_beta: WorldBetaSection | None = Field(
+        default=None,
+        description="Quick beta against the iShares MSCI ACWI ETF, as a stand-in for the "
+        "MSCI ACWI index (docs/validation/world-beta-handoff-2026-11-18.md).",
+    )
     performance: PerformanceSection | None = Field(
         default=None,
         description="Historical return, volatility, Sharpe ratio and maximum drawdown.",

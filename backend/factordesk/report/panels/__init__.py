@@ -11,3 +11,4 @@ from factordesk.report.panels import lead_lag as lead_lag
 from factordesk.report.panels import performance as performance
 from factordesk.report.panels import residual_alpha as residual_alpha
 from factordesk.report.panels import shrunk as shrunk
+from factordesk.report.panels import world_beta as world_beta

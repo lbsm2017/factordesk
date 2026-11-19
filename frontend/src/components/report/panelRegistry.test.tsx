@@ -12,6 +12,7 @@ const ORDER = [
   "notice",
   "equation",
   "kpis",
+  "world_beta",
   "price",
   "performance",
   "exposures",
@@ -34,6 +35,7 @@ const SECTION_PANELS = {
   lead_lag: { id: "lead-lag", after: "exposures" },
   shrunk_betas: { id: "shrunk", after: "lead-lag" },
   fragility: { id: "fragility", after: "shrunk" },
+  world_beta: { id: "world-beta", after: "kpis" },
   residual: { id: "residual", after: "risk" },
   kalman_betas: { id: "kalman", after: "rolling" },
 } as const;

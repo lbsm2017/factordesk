@@ -213,6 +213,7 @@ class ReportService:
 
         async def make() -> FactorReport:
             inputs = await self._section_inputs(loaded.vintage, now)
+            inputs = await self._with_world_benchmark(inputs)
 
             def build() -> FactorReport:
                 return assemble_report(
@@ -312,6 +313,18 @@ class ReportService:
             return None
         check_currency(ticker, security)
         return security
+
+    async def _with_world_benchmark(self, inputs: SectionInputs | None) -> SectionInputs | None:
+        """``inputs`` plus the ACWI history, refreshed now (None: the world beta is not wired)."""
+        loader = self.deps.load_world_benchmark
+        if loader is None:
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import SectionInputs
+
+        benchmark = await self.runtime.run(loader)
+        return dataclasses.replace(inputs or SectionInputs(), world_benchmark=benchmark)
 
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:

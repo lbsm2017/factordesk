@@ -37,6 +37,7 @@ export type ShrunkBetas = Schemas["ShrunkBetas"];
 export type FragilitySection = Schemas["FragilitySection"];
 export type ResidualAnalysis = Schemas["ResidualAnalysis"];
 export type KalmanBetaSeries = Schemas["KalmanBetaSeries"];
+export type WorldBetaSection = Schemas["WorldBetaSection"];
 
 /** Canonical factor names and order (backend FACTOR_NAMES). */
 export const FACTOR_NAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA"] as const;

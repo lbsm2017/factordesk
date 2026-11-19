@@ -39,6 +39,7 @@ MOCK_V3 = FIXTURES / "mock_report_v3.json"
 NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
 
 SECTION_FIELDS = (
+    "world_beta",
     "performance",
     "lead_lag",
     "shrunk_betas",
@@ -46,8 +47,9 @@ SECTION_FIELDS = (
     "residual",
     "kalman_betas",
 )
-"""The six optional fields, in panel order (contract SC2, SC4; performance is the sixth, see
-docs/validation/performance-contract-note-2026-11-18.md)."""
+"""The seven optional fields, in panel order (contract SC2, SC4; performance and world beta are
+additions to the five of the contract, see docs/validation/performance-contract-note-2026-11-18.md
+and docs/validation/world-beta-contract-note-2026-11-18.md)."""
 
 
 def _optional_parts(annotation: Any) -> tuple[Any, ...]:
@@ -59,7 +61,7 @@ def _optional_parts(annotation: Any) -> tuple[Any, ...]:
 
 
 # ----------------------------------------------------------------------------- fields and specs
-def test_sections_are_the_six_optional_fields() -> None:
+def test_sections_are_the_seven_optional_fields() -> None:
     assert tuple(spec.report_field for spec in SECTIONS) == SECTION_FIELDS
     for spec in SECTIONS:
         info = FactorReport.model_fields[spec.report_field]
@@ -239,7 +241,9 @@ BUILT_SECTIONS: tuple[str, ...] = ("performance", "residual", "kalman_betas")
 """Fields whose feature is built: the offline pipeline fills them. Each feature branch adds its
 field.
 
-Shrunk fills only online (from the portfolio files), so the offline pipeline leaves it absent.
+Shrunk fills only online (from the portfolio files) and world_beta only when the ACWI history
+is supplied (``SectionInputs.world_benchmark``, fetched online), so the offline pipeline leaves
+both absent. Performance needs only the price history, so the offline pipeline fills it.
 """
 
 
