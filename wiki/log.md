@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-20 (Sprint 2 closed)
+
+- Sprint 2 shipped the portfolio composer: the Asset Class Library, the portfolio backtest API and the macro sensitivities section. Added [docs/sprints/sprint-2.md](../docs/sprints/sprint-2.md), which records what shipped, the owner's decisions, the demo results and the retro.
+
 ## 2026-11-19 (Sprint 1 closed)
 
 - Sprint 1 shipped as v0.2.0, with hotfix v0.2.1. Added [docs/sprints/sprint-1.md](../docs/sprints/sprint-1.md), which records what shipped, the decisions and the retro.
