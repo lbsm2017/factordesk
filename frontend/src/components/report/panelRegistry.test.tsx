@@ -4,6 +4,7 @@ import { cloneReport } from "../../test/fixture";
 import { SECTION_FIELDS, withSection } from "../../test/sectionFixtures";
 import { orderedPanels, PANELS } from "./panelRegistry";
 import type { PanelEntry } from "./panelRegistry";
+import { NAV_ITEMS } from "../shell/SectionNav";
 import { ReportView } from "./ReportView";
 
 /** Panel order of the schema v3 contract (SC4), without `equation` and `kpis` (dashboard v2, DV1). */
@@ -14,14 +15,14 @@ const ORDER = [
   "performance",
   "exposures",
   "world_beta",
-  "lead_lag",
-  "shrunk",
-  "fragility",
   "returns",
   "risk",
-  "residual_alpha",
   "rolling",
+  "residual_alpha",
   "kalman",
+  "shrunk",
+  "lead_lag",
+  "fragility",
   "data",
   "regression_detail",
   "colophon",
@@ -30,12 +31,12 @@ const ORDER = [
 /** Element id each optional section's panel uses, and the core panel it follows. */
 const SECTION_PANELS = {
   performance: { id: "performance", after: "price" },
-  lead_lag: { id: "lead-lag", after: "world-beta" },
-  shrunk_betas: { id: "shrunk", after: "lead-lag" },
-  fragility: { id: "fragility", after: "shrunk" },
+  lead_lag: { id: "lead-lag", after: "shrunk" },
+  shrunk_betas: { id: "shrunk", after: "kalman" },
+  fragility: { id: "fragility", after: "lead-lag" },
   world_beta: { id: "world-beta", after: "exposures" },
-  residual: { id: "residual", after: "risk" },
-  kalman_betas: { id: "kalman", after: "rolling" },
+  residual: { id: "residual", after: "rolling" },
+  kalman_betas: { id: "kalman", after: "residual" },
 } as const;
 
 function ids(container: HTMLElement): string[] {
@@ -48,6 +49,14 @@ describe("panel registry", () => {
     expect(orderedPanels().map((p) => p.position)).toEqual(
       [...PANELS].map((p) => p.position).sort((a, b) => a - b),
     );
+  });
+
+  it("draws the panels in the same order as the sidebar items", () => {
+    const registryName = (navId: string) => (navId === "residual" ? "residual_alpha" : navId.replace(/-/g, "_"));
+    const names = orderedPanels().map((p) => p.name);
+    const navNames = NAV_ITEMS.map((item) => registryName(item.id));
+    for (const n of navNames) expect(names, n).toContain(n);
+    expect(names.filter((n) => navNames.includes(n))).toEqual(navNames);
   });
 
   it("no longer registers the equation or the KPI strip (owner, dashboard v2)", () => {
