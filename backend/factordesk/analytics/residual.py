@@ -496,7 +496,8 @@ def verdict_message(
         )
     return (
         f"In-sample alpha holds up out-of-sample with point-in-time betas ({s_text} kept) and is "
-        "distinguishable from zero. This rules out hindsight in the betas, not luck."
+        "distinguishable from zero. This rules out hindsight in the betas, not luck and not a "
+        "missing factor."
     )
 
 

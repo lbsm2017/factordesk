@@ -219,7 +219,7 @@ describe("ResidualAlphaPanel: gap and verdict", () => {
     expect(verdict.querySelector("svg.glyph")).not.toBeNull();
     expect(verdict.querySelector(".res-sev")?.textContent).toBe("Note");
     expect(verdict.querySelector("p")?.textContent).toBe(
-      "Note In-sample alpha holds up out-of-sample with point-in-time betas (100% kept) and is distinguishable from zero. This rules out hindsight in the betas, not luck.",
+      "Note In-sample alpha holds up out-of-sample with point-in-time betas (100% kept) and is distinguishable from zero. This rules out hindsight in the betas, not luck and not a missing factor.",
     );
   });
 
