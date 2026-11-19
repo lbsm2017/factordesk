@@ -978,7 +978,7 @@ def assemble_subject_report(
     diag = (
         None
         if exact_fit(first_fit.fit.rsquared)
-        else residual_diagnostics(first_fit.fit.resid, factor_values)
+        else residual_diagnostics(first_fit.fit.resid, factor_values, subject.frequency)
     )
     gate = None if diag is None or not is_daily else quality_gate(diag.lag1)
     five = multi_day_regression(sample) if gate is not None and gate.fired else None
