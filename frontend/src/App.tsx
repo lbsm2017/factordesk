@@ -11,10 +11,13 @@ import {
   useRefreshFactors,
   useReport,
   useTickerSuggestions,
+  useUploadReport,
 } from "./api/queries";
 import type { FactorReport } from "./api/types";
 import { ControlsStrip } from "./components/controls/ControlsStrip";
-import { Landing } from "./components/controls/ReportStates";
+import { ModeSwitch } from "./components/controls/ModeSwitch";
+import { Landing, TrackLanding } from "./components/controls/ReportStates";
+import { TrackRecordInput } from "./components/controls/TrackRecordInput";
 import { ErrorFrame } from "./components/report/ErrorFrame";
 import { LoadingFrame } from "./components/report/LoadingFrame";
 import { ReportView } from "./components/report/ReportView";
@@ -54,6 +57,8 @@ function StatsSwitch() {
   );
 }
 
+const TRACK_TITLE = "Track record";
+
 function Dashboard() {
   const [state, commit] = useUrlState();
   const [query, setQuery] = useState("");
@@ -61,15 +66,25 @@ function Dashboard() {
   const recent = useRecent();
   const factors = useFactorStatus();
   const suggestions = useTickerSuggestions(query);
-  const ranges = useRanges(state.ticker);
-  const report = useReport(state);
+  // In the track-record mode no ticker is requested, whatever `t` says.
+  const track = state.mode === "track";
+  const tickerState = track ? { ...state, ticker: null } : state;
+  const ranges = useRanges(tickerState.ticker);
+  const report = useReport(tickerState);
   const refresh = useRefreshFactors(setRefreshMessage);
+  const upload = useUploadReport();
 
   // A stale report is never shown under an error, and never on the landing page.
-  const shown = state.ticker === null || report.isError ? undefined : report.data;
-  const busy = state.ticker !== null && report.isFetching && shown !== undefined;
+  const shown = track
+    ? upload.isSuccess
+      ? upload.data
+      : undefined
+    : state.ticker === null || report.isError
+      ? undefined
+      : report.data;
+  const busy = !track && state.ticker !== null && report.isFetching && shown !== undefined;
 
-  const loadedTicker = report.isSuccess && !report.isPlaceholderData ? report.data.ticker : null;
+  const loadedTicker = !track && report.isSuccess && !report.isPlaceholderData ? report.data.ticker : null;
   useEffect(() => {
     if (loadedTicker !== null) addRecent(loadedTicker);
   }, [loadedTicker]);
@@ -77,31 +92,46 @@ function Dashboard() {
   return (
     <Shell
       report={shown}
-      ticker={state.ticker}
+      ticker={track ? (shown?.ticker ?? null) : state.ticker}
       sidebar={
         <>
-          <ControlsStrip
-        state={state}
-        recent={recent}
-        suggestions={suggestions.data?.items ?? []}
-        ranges={state.ticker === null ? undefined : ranges.data}
-        factorStatus={factors.data}
-        report={shown}
-        busy={busy}
-        refreshing={refresh.isPending}
-        refreshMessage={refreshMessage}
-        onQueryChange={setQuery}
-        onCommit={commit}
-        onRefreshFactors={() => {
-          setRefreshMessage(null);
-          refresh.mutate();
-        }}
-          />
+          <ModeSwitch mode={state.mode} onSelect={(mode) => commit({ mode })} />
+          {track ? (
+            <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate(input)} />
+          ) : (
+            <ControlsStrip
+              state={state}
+              recent={recent}
+              suggestions={suggestions.data?.items ?? []}
+              ranges={state.ticker === null ? undefined : ranges.data}
+              factorStatus={factors.data}
+              report={shown}
+              busy={busy}
+              refreshing={refresh.isPending}
+              refreshMessage={refreshMessage}
+              onQueryChange={setQuery}
+              onCommit={commit}
+              onRefreshFactors={() => {
+                setRefreshMessage(null);
+                refresh.mutate();
+              }}
+            />
+          )}
           <StatsSwitch />
         </>
       }
     >
-      {state.ticker === null ? (
+      {track ? (
+        upload.isPending ? (
+          <LoadingFrame ticker={upload.variables?.name.trim() || TRACK_TITLE} />
+        ) : upload.isError ? (
+          <ErrorFrame ticker={upload.variables?.name.trim() || TRACK_TITLE} error={toApiError(upload.error)} />
+        ) : shown === undefined ? (
+          <TrackLanding />
+        ) : (
+          <ReportView report={shown} downloadHref={null} win={state.win} onWinChange={(win) => commit({ win })} />
+        )
+      ) : state.ticker === null ? (
         <Landing recent={recent} onPick={(ticker) => commit({ ticker })} />
       ) : report.isError ? (
         <ErrorFrame ticker={state.ticker} error={toApiError(report.error)} />
