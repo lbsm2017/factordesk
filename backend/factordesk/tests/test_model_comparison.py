@@ -26,6 +26,7 @@ from factordesk.analytics.sample import (
     Frequency,
     align_returns,
 )
+from factordesk.data.french import join_momentum
 from factordesk.tests.fixtures import reference
 
 FloatArray = NDArray[np.float64]
@@ -278,6 +279,31 @@ def test_alpha_vanishes_once_momentum_is_added() -> None:
     d = float(ols_hac(f6[:, 5], f6[:, :5]).params[0])
     assert ff5.alpha == pytest.approx(ff6.alpha + b_mom * d, rel=1e-9)
     assert ff5.rsquared < ff6.rsquared
+
+
+def test_a_stale_mom_file_keeps_the_last_month_for_ff5_only() -> None:
+    """Mom ends one month before FF5: FF5 keeps that month, FF6 and the strip drop it."""
+    returns, calendar, frame = _ff6_case(120, 41, "monthly")
+    ff5_frame = frame.drop(columns="Mom")
+    mom_frame = frame.loc[: frame.index[-2], ["Mom"]]  # the Mom file is one month behind
+    ff6_frame = join_momentum(ff5_frame, mom_frame)
+    lo, warn = SAMPLE_FLOORS["monthly"]
+    s, plain = (
+        align_returns(returns, calendar, f, min_obs=lo, warn_obs=warn, frequency="monthly")
+        for f in (ff6_frame, ff5_frame)
+    )
+    last = pd.Timestamp(frame.index[-1]).date()
+    assert s.n == plain.n == 120 and s.end == plain.end == last
+    ff5, ff5_plain = run_regression(s), run_regression(plain)
+    np.testing.assert_array_equal(ff5.fit.params, ff5_plain.fit.params)
+    assert ff5.fit.nobs == 120 and ff5.end == last
+    ff6 = run_regression(s, codes=MODELS["ff6"])
+    assert ff6.fit.nobs == 119 and ff6.n_dropped == 1
+    assert ff6.end == pd.Timestamp(frame.index[-2]).date()
+    strip = compare_models(s)
+    assert strip.nobs == 119 and strip.n_dropped == 1
+    assert strip.end == pd.Timestamp(frame.index[-2]).date()
+    _check_strip(s, strip)
 
 
 def test_strip_needs_mom_for_ff6_and_validates_models() -> None:

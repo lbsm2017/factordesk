@@ -498,16 +498,20 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
 
     Pure. Both frames have one frequency (daily, or monthly stamped at calendar month-ends) and
     the library's column names. ``Mom`` is a long-short spread and is copied as published: RF is
-    never subtracted from it. The result covers the common window, from the later first date to
-    the earlier last date of the two files, on the dates of the five-factor file. A five-factor
-    date without a ``Mom`` value keeps ``Mom`` as NaN (never filled): the five-factor sample keeps
-    that row, and only fits that use ``Mom`` (FF6, the alpha strip) leave it out.
+    never subtracted from it. The result has every date of the five-factor file, so a five-factor
+    report on this frame loses no row, even when the ``Mom`` file is older (a stale cache) or
+    starts later. A five-factor date without a ``Mom`` value, inside or outside the ``Mom`` file's
+    range, keeps ``Mom`` as NaN (never filled): only fits that use ``Mom`` (FF6, the alpha strip)
+    leave that row out (``AnalysisSample.complete_rows``). So the FF6 sample ends at the earlier
+    last date of the two files.
 
-    ``attrs`` records both vintages (``"ff5"``, ``"mom"``: the input frames' ``attrs``), the window
-    (``"first_date"``, ``"last_date"``), which file ends it (``"ends_with"``: ``"ff5"``,
-    ``"mom"`` or ``"both"``), ``"mom_missing_rows"`` (window dates of the five-factor file with
-    no ``Mom`` value) and ``"mom_rows_without_ff5"`` (``Mom`` dates in the window that the
-    five-factor file does not have; they are dropped).
+    ``attrs`` records both vintages (``"ff5"``, ``"mom"``: the input frames' ``attrs``), the
+    frame's dates (``"first_date"``, ``"last_date"``: the five-factor file's), the FF6 window
+    where both files have data (``"ff6_first_date"``, ``"ff6_last_date"``; None when they do not
+    overlap), which file ends that window (``"ends_with"``: ``"ff5"``, ``"mom"`` or ``"both"``),
+    ``"mom_missing_rows"`` (five-factor dates with no ``Mom`` value, in total) and
+    ``"mom_rows_without_ff5"`` (``Mom`` dates inside the five-factor range that the five-factor
+    file does not have; they are dropped).
     """
     ff5_index = _check_index(ff5, "five-factor frame")
     mom_index = _check_index(mom, "momentum frame")
@@ -522,29 +526,32 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
     if len(ff5_index) > 2 and len(mom_index) > 2 and monthly != _month_end_dates(mom_index):
         raise ValueError("the five-factor and momentum frames have different frequencies")
 
-    first = max(ff5_index[0], mom_index[0])
-    ff5_last, mom_last = ff5_index[-1], mom_index[-1]
-    last = min(ff5_last, mom_last)
-    if first > last:
-        raise FactorDataError(
-            f"the five-factor ({ff5_index[0].date()} to {ff5_last.date()}) and momentum "
-            f"({mom_index[0].date()} to {mom_last.date()}) files do not overlap"
-        )
-    window = ff5.loc[(ff5_index >= first) & (ff5_index <= last), list(ALL_COLUMNS)]
-    window = window.astype("float64")
-    mom_values = mom[MOM].astype("float64")
-    out = window.copy()
-    out[MOM] = mom_values.reindex(window.index)
+    out = ff5.loc[:, list(ALL_COLUMNS)].astype("float64")
+    out[MOM] = mom[MOM].astype("float64").reindex(ff5_index)
     out.index = pd.DatetimeIndex(out.index, name="date")
 
-    in_window = mom_index[(mom_index >= first) & (mom_index <= last)]
-    mom_only = int(len(in_window.difference(pd.DatetimeIndex(window.index))))
+    ff5_last, mom_last = ff5_index[-1], mom_index[-1]
+    first, last = max(ff5_index[0], mom_index[0]), min(ff5_last, mom_last)
+    overlap = first <= last
+    in_range = mom_index[(mom_index >= ff5_index[0]) & (mom_index <= ff5_last)]
+    mom_only = int(len(in_range.difference(ff5_index)))
     n_missing = int(out[MOM].isna().sum())
-    if mom_only or n_missing:
+    if not overlap:
         logger.warning(
-            "FF6 join: %d five-factor dates without Mom (kept as NaN), %d Mom dates without "
-            "five-factor data (dropped)",
+            "FF6 join: the momentum file (%s to %s) does not overlap the five-factor file "
+            "(%s to %s); Mom is NaN on every row",
+            mom_index[0].date(),
+            mom_last.date(),
+            ff5_index[0].date(),
+            ff5_last.date(),
+        )
+    elif mom_only or n_missing:
+        logger.warning(
+            "FF6 join: %d five-factor dates without Mom (kept as NaN; the FF6 window is %s to "
+            "%s), %d Mom dates without five-factor data (dropped)",
             n_missing,
+            first.date(),
+            last.date(),
             mom_only,
         )
     ends_with = "both" if ff5_last == mom_last else ("ff5" if ff5_last < mom_last else "mom")
@@ -552,8 +559,10 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
         "key": "ff6_monthly" if monthly else "ff6_daily",
         "ff5": dict(ff5.attrs),
         "mom": dict(mom.attrs),
-        "first_date": pd.Timestamp(out.index[0]).date().isoformat(),
-        "last_date": pd.Timestamp(out.index[-1]).date().isoformat(),
+        "first_date": pd.Timestamp(ff5_index[0]).date().isoformat(),
+        "last_date": pd.Timestamp(ff5_last).date().isoformat(),
+        "ff6_first_date": first.date().isoformat() if overlap else None,
+        "ff6_last_date": last.date().isoformat() if overlap else None,
         "ends_with": ends_with,
         "mom_missing_rows": n_missing,
         "mom_rows_without_ff5": mom_only,
@@ -588,8 +597,9 @@ def load_ff6(
 
     Daily: the five factors come from ``data.factors.load_ff5_daily`` (its own download path;
     ``fetch`` is not used for it) and ``Mom`` from ``"mom_daily"``. Monthly: ``"ff5_monthly"`` and
-    ``"mom_monthly"``. Each file follows its own cache policy. The frame ends at the earlier last
-    date of the two files; both vintages are in ``attrs`` (see ``join_momentum``).
+    ``"mom_monthly"``. Each file follows its own cache policy. The frame keeps every five-factor
+    date, with ``Mom`` NaN where the momentum file has no value (so the FF6 window ends at the
+    earlier last date of the two files); both vintages are in ``attrs`` (see ``join_momentum``).
     """
     if frequency == "daily":
         ff5 = load_ff5_daily(refresh=refresh, data_dir=data_dir, now=now).copy(deep=False)

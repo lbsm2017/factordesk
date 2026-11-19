@@ -163,28 +163,40 @@ def test_monthly_join_keeps_both_files_as_published() -> None:
     assert ff6.attrs["key"] == "ff6_monthly"
 
 
+def _nan_mom_dates(ff6: pd.DataFrame) -> list[pd.Timestamp]:
+    return list(pd.DatetimeIndex(ff6.index)[ff6["Mom"].isna().to_numpy()])
+
+
 @pytest.mark.parametrize("shorter", ["mom", "ff5"])
-def test_join_ends_at_the_earlier_last_date(shorter: str) -> None:
+def test_join_keeps_every_ff5_date_and_the_ff6_window_ends_earlier(shorter: str) -> None:
     ff5 = _parse(FF5_MONTHLY_2020, FF5_MONTHLY)
     mom = _parse(MOM_MONTHLY_2020, MOM_MONTHLY)
     if shorter == "mom":
-        mom = mom.loc[:"2020-10-31"]
+        mom = mom.loc[:"2020-10-31"]  # a stale Mom cache
     else:
         ff5 = ff5.loc[:"2020-09-30"]
     ff6 = join_momentum(ff5, mom)
-    expected_last = "2020-10-31" if shorter == "mom" else "2020-09-30"
-    assert pd.Timestamp(ff6.index[-1]) == pd.Timestamp(expected_last)
-    assert ff6.attrs["last_date"] == expected_last
+    assert pd.DatetimeIndex(ff6.index).equals(pd.DatetimeIndex(ff5.index))  # no FF5 row lost
+    pd.testing.assert_frame_equal(ff6.drop(columns="Mom"), ff5, check_names=False)
+    ff6_last = "2020-10-31" if shorter == "mom" else "2020-09-30"
+    assert ff6.attrs["ff6_last_date"] == ff6_last
+    assert ff6.attrs["last_date"] == pd.Timestamp(ff5.index[-1]).date().isoformat()
     assert ff6.attrs["ends_with"] == shorter
-    assert not ff6.isna().any().any()
+    expected_nan = (
+        [pd.Timestamp("2020-11-30"), pd.Timestamp("2020-12-31")] if shorter == "mom" else []
+    )
+    assert _nan_mom_dates(ff6) == expected_nan
+    assert ff6.attrs["mom_missing_rows"] == len(expected_nan)
 
 
-def test_join_starts_at_the_later_first_date() -> None:
-    ff5 = _parse(FF5_MONTHLY_2020, FF5_MONTHLY).loc["2020-04-30":]
-    mom = _parse(MOM_MONTHLY_2020, MOM_MONTHLY)
+def test_join_before_the_first_mom_date_keeps_ff5_rows() -> None:
+    ff5 = _parse(FF5_MONTHLY_2020, FF5_MONTHLY)
+    mom = _parse(MOM_MONTHLY_2020, MOM_MONTHLY).loc["2020-04-30":]
     ff6 = join_momentum(ff5, mom)
-    assert pd.Timestamp(ff6.index[0]) == pd.Timestamp("2020-04-30")
-    assert len(ff6) == 9
+    assert len(ff6) == 12
+    assert _nan_mom_dates(ff6) == list(pd.date_range("2020-01-31", periods=3, freq="ME"))
+    assert ff6.attrs["ff6_first_date"] == "2020-04-30"
+    assert ff6.attrs["first_date"] == "2020-01-31"
 
 
 def test_daily_join_on_the_trading_calendar() -> None:
@@ -208,14 +220,15 @@ def test_a_missing_momentum_date_stays_nan_and_is_counted() -> None:
     assert ff6.attrs["mom_rows_without_ff5"] == 0
 
 
-def test_join_refuses_mixed_frequencies_and_no_overlap() -> None:
+def test_join_refuses_mixed_frequencies_and_keeps_ff5_without_overlap() -> None:
     ff5_m = _parse(FF5_MONTHLY_2020, FF5_MONTHLY)
     mom_d = _parse(MOM_DAILY_2020Q2, MOM_DAILY)
     with pytest.raises(ValueError, match="different frequencies"):
         join_momentum(ff5_m, mom_d)
     mom_m = _parse(MOM_MONTHLY_2020, MOM_MONTHLY)
-    with pytest.raises(FactorDataError, match="do not overlap"):
-        join_momentum(ff5_m.loc[:"2020-03-31"], mom_m.loc["2020-06-30":])
+    apart = join_momentum(ff5_m.loc[:"2020-03-31"], mom_m.loc["2020-06-30":])
+    assert len(apart) == 3 and bool(apart["Mom"].isna().all())  # FF5 still usable
+    assert apart.attrs["ff6_first_date"] is None and apart.attrs["ff6_last_date"] is None
 
 
 # ----------------------------------------------------------------------------- loader
@@ -243,8 +256,10 @@ def test_load_ff6_monthly_records_both_vintages(
     )
     ff6 = load_ff6("monthly", data_dir=tmp_path, now=NOW, fetch=fetch)
     assert sorted(fetch.calls) == sorted([FF5_MONTHLY.url, MOM_MONTHLY.url])
-    assert len(ff6) == 11  # Mom ends one month earlier
+    assert len(ff6) == 12  # every five-factor month is kept
+    assert _nan_mom_dates(ff6) == [pd.Timestamp("2020-12-31")]  # Mom ends one month earlier
     assert ff6.attrs["ends_with"] == "mom"
+    assert ff6.attrs["ff6_last_date"] == "2020-11-30"
     for part, url in (("ff5", FF5_MONTHLY.url), ("mom", MOM_MONTHLY.url)):
         vintage = ff6.attrs[part]
         assert vintage["source_url"] == url
