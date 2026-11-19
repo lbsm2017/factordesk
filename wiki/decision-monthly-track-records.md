@@ -55,6 +55,15 @@ A user can upload a monthly or daily return record for a fund or manager, we che
 - Weekly uploads are a deferred item and will be revisited later.
 - If the statistics fail to match the hand-worked or statsmodels values in the spec, the release waits until they do.
 
+## Update, 2026-11-19: small-sample correction for monthly regressions
+
+- On 2026-11-19 the owner decided that monthly regressions use a small-sample correction.
+- The robust (HAC) covariance is scaled by n/(n−k).
+- p-values, intervals and "reliable" tags use Student-t with n−k degrees of freedom instead of the normal distribution.
+- Why: with 36-60 months and six regressors, the large-sample method made standard errors about 9% too small. It also used 1.96 where about 2.04 is right.
+- Daily regressions are unchanged. They have at least 504 rows, so the difference is negligible, and ticker reports stay identical.
+- The change is built in the E0 upload skeleton.
+
 ## Sources
 
 - [Next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md): owner decisions on the track record, and epics E0 and E2.
