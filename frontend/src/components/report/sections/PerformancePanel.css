@@ -1,0 +1,25 @@
+/* Drawdown panel (prototype v4a). Colours come from tokens; the red is the drawdown red. */
+.panel .pm { margin-left: auto; font-size: var(--fs-1); color: var(--ink-2); align-self: baseline; }
+
+.dd-chart { position: relative; height: 220px; margin: var(--s-4) 0 30px 48px; }
+.dd-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.dd-svg line, .dd-svg path { vector-effect: non-scaling-stroke; }
+.dd-grid { stroke: var(--grid); stroke-width: 1; }
+.dd-zero { stroke: var(--axis); stroke-width: 1; }
+.dd-area { fill: var(--neg); fill-opacity: 0.12; }
+.dd-line { fill: none; stroke: var(--neg); stroke-width: 1.5; stroke-linejoin: round; }
+.dd-y span, .dd-x span { position: absolute; font-size: var(--fs-1); color: var(--ink-2); white-space: nowrap; line-height: 1; }
+.dd-y span { right: calc(100% + 8px); transform: translateY(-50%); }
+.dd-x span { top: calc(100% + 8px); transform: translateX(-50%); }
+
+.dd-table-wrap { overflow-x: auto; }
+.dd-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.dd-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-3) 6px 0; border-bottom: 1px solid var(--border); }
+.dd-table td { padding: 8px var(--s-3) 8px 0; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+.dd-table th.num, .dd-table td.num { text-align: right; }
+.dd-table td.strong { font-weight: 600; }
+
+@media screen and (max-width: 719px) {
+  .dd-chart { margin-left: 40px; height: 180px; }
+  .dd-table .hide-s { display: none; }
+}

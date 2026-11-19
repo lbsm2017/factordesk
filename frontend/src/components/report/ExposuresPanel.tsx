@@ -10,6 +10,7 @@ import type { ExposureModel } from "./exposureModel";
 import { SigHead } from "./barParts";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
+import "./signColor.css";
 
 const QUESTION = "What is this stock exposed to, and how sure are we?";
 const DEFAULT_DESC = "Descriptive, in-sample, not predictive.";
@@ -19,19 +20,13 @@ function Legend({ window, hasAverages }: { window: number; hasAverages: boolean 
     <ul className="legend" aria-label="Legend">
       <li>
         <svg className="sw" aria-hidden="true">
-          <rect className="pos" width="14" height="10" rx="2" />
+          <rect className="ink" width="14" height="10" rx="2" />
         </svg>
-        Positive
+        Beta
       </li>
       <li>
         <svg className="sw" aria-hidden="true">
-          <rect className="neg" width="14" height="10" rx="2" />
-        </svg>
-        Negative
-      </li>
-      <li>
-        <svg className="sw" aria-hidden="true">
-          <rect className="pos faded" x="0.5" y="0.5" width="13" height="9" rx="2" />
+          <rect className="ink faded" width="14" height="10" rx="2" />
         </svg>
         Faded: not significant
       </li>
@@ -98,7 +93,7 @@ function ExposureTable({ model, stats }: { model: ExposureModel; stats: boolean 
                 hi={domain.hi}
                 ticks={domain.ticks}
                 value={r.beta}
-                fill="sign"
+                fill="neutral"
                 faded={r.faded}
                 ci={r.ci}
                 marker={r.beta === null ? null : r.average}
@@ -113,7 +108,7 @@ function ExposureTable({ model, stats }: { model: ExposureModel; stats: boolean 
                 {r.tText}
               </td>
             ) : null}
-            <td role="cell" className="num sig">
+            <td role="cell" className={`num sig${r.significantText === "Yes" ? " yes" : ""}`}>
               {r.significantText}
             </td>
             {stats ? (

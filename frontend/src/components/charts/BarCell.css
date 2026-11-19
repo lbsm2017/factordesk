@@ -1,0 +1,4 @@
+/* Neutral beta bar (Factor exposures): ink, with a pale fill when the beta is not significant.
+   Betas are never green or red. */
+rect.ink { fill: var(--ink-2); }
+rect.ink.faded { fill: var(--axis); fill-opacity: 0.45; stroke: none; }

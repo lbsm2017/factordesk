@@ -93,10 +93,19 @@ describe("ExposuresPanel table", () => {
     expect(within(mkt).getAllByRole("cell")[3]?.textContent).toBe("Yes");
   });
 
+  it("draws every beta bar in neutral ink, never green or red, and bolds the Yes word", () => {
+    const { container } = render(<ExposuresPanel report={report} />);
+    expect(container.querySelector("rect.pos, rect.neg, rect.bar-pos, rect.bar-neg")).toBeNull();
+    expect(container.querySelectorAll("tbody rect.ink").length).toBe(report.regression.factors.length);
+    expect(container.querySelectorAll("td.num-pos, td.num-neg")).toHaveLength(0);
+    expect(rowOf(container, "Mkt-RF").querySelector("td.sig.yes")?.textContent).toBe("Yes");
+    expect(rowOf(container, "HML").querySelector("td.sig.yes")).toBeNull();
+  });
+
   it("draws the bar 36% of the row, a 7 px diamond on the centre line, and a 3 px interval cap", () => {
     const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const row = rowOf(container, "SMB");
-    expect(row.querySelector("rect.neg")?.getAttribute("height")).toBe("36%");
+    expect(row.querySelector("rect.ink")?.getAttribute("height")).toBe("36%");
     const diamond = row.querySelector("svg.avgm");
     expect(diamond?.getAttribute("y")).toBe("50%");
     expect(diamond?.querySelector("path")?.getAttribute("d")).toBe("M0 -3.6 3.6 0 0 3.6-3.6 0z");
@@ -135,8 +144,7 @@ describe("ExposuresPanel table", () => {
       .getAllByRole("listitem")
       .map((li) => li.textContent);
     expect(items).toEqual([
-      "Positive",
-      "Negative",
+      "Beta",
       "Faded: not significant",
       "95% interval",
       `Average ${report.average_beta.window}d beta`,

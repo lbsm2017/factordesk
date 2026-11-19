@@ -50,10 +50,10 @@ export interface PanelEntry {
 export const PANELS: readonly PanelEntry[] = [
   { name: "header", position: 100, Component: Header },
   { name: "notice", position: 150, Component: Notice },
-  { name: "world_beta", position: 350, Component: WorldBetaPanel },
   { name: "price", position: 400, Component: PricePanel },
   { name: "performance", position: 450, Component: PerformancePanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
+  { name: "world_beta", position: 505, Component: WorldBetaPanel },
   { name: "lead_lag", position: 510, Component: LeadLagPanel },
   { name: "shrunk", position: 520, Component: LazyShrunkBetasPanel },
   { name: "fragility", position: 530, Component: FragilityPanel },

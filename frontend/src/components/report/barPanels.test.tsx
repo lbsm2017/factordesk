@@ -72,6 +72,29 @@ describe("ReturnPanel", () => {
     );
   });
 
+  it("colours signed values green or red, leaves zero ink, and quiets rows that could be noise", () => {
+    const { container } = render(<ReturnPanel report={mockReport} />);
+    const value = (id: string) => container.querySelector(`#${id} td.num.strong`);
+    expect(value("ret-Mkt-RF")?.classList.contains("num-pos")).toBe(true);
+    expect(container.querySelector("#ret-Mkt-RF rect")?.getAttribute("class")).toBe("pos bar-pos");
+    expect(value("ret-alpha")?.classList.contains("num-pos")).toBe(true);
+    expect(container.querySelector("#ret-alpha")?.classList.contains("is-noise")).toBe(true);
+    expect(container.querySelector("#ret-Mkt-RF")?.classList.contains("is-noise")).toBe(false);
+    expect(value("ret-CMA")?.className).toBe("num strong");
+    expect(container.querySelector("tr.resid td.num.strong")?.className).toBe("num strong");
+    expect(container.querySelector("tr.total td.num.strong")?.classList.contains("num-pos")).toBe(true);
+  });
+
+  it("colours a negative contribution and a negative total red", () => {
+    const report = cloneReport();
+    report.return_contribution.factors["SMB"] = -0.0042;
+    report.return_contribution.total_annualised_mean_excess_return = -0.03;
+    const { container } = render(<ReturnPanel report={report} />);
+    expect(container.querySelector("#ret-SMB td.num.strong")?.classList.contains("num-neg")).toBe(true);
+    expect(container.querySelector("#ret-SMB rect")?.getAttribute("class")).toBe("neg bar-neg");
+    expect(container.querySelector("tr.total td.num.strong")?.classList.contains("num-neg")).toBe(true);
+  });
+
   it("keeps the footnote to one sentence plus a folded method note", () => {
     const { container } = render(<ReturnPanel report={mockReport} />);
     expect(container.querySelector(".foot > p")?.textContent).toMatch(/The rows add up exactly to the total\.$/);

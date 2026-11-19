@@ -1,23 +1,25 @@
-import type { ReportPanelProps } from "../types";
+import { lazy, Suspense } from "react";
 import { Panel } from "../Panel";
+import { PanelBoundary } from "../PanelBoundary";
+import type { ReportPanelProps } from "../types";
+
+const TITLE = "World beta";
+
+/** The panel body is its own chunk, as for the residual panel. */
+const Body = lazy(() => import("./WorldBetaBody").then((m) => ({ default: m.WorldBetaBody })));
 
 /**
  * Panel of the `world_beta` section (quick beta against the iShares MSCI ACWI ETF; backend
  * `report/sections/world_beta.py`, handoff `docs/validation/world-beta-handoff-2026-11-18.md`).
- * Registered in `panelRegistry.ts` at position 350. Placeholder: the panel frame, with the reason
- * when the section is not `ok`; the real body is built later. Renders nothing when the section is
- * absent (null).
+ * Registered in `panelRegistry.ts` at position 505, right after Factor exposures. Renders nothing when the section is absent (null).
  */
 export function WorldBetaPanel({ report }: ReportPanelProps) {
-  const section = report.world_beta;
-  if (section === null) return null;
-  const empty = section.status === "ok" ? {} : { empty: { reason: section.reason ?? "", action: "" } };
+  if (report.world_beta === null) return null;
   return (
-    <Panel
-      id="world-beta"
-      title="World beta (quick estimate)"
-      question="How much does this stock move with the world market, next to the US market?"
-      {...empty}
-    />
+    <PanelBoundary id="world-beta" title={TITLE} question="">
+      <Suspense fallback={<Panel id="world-beta" title={TITLE} />}>
+        <Body report={report} />
+      </Suspense>
+    </PanelBoundary>
   );
 }

@@ -5,6 +5,8 @@
  * width), and the average-beta diamond is 7 px on the row's centre line.
  */
 
+import "./BarCell.css";
+
 /** Position of `value` in the domain, as a percentage of the plot width (3 decimals). */
 export function position(value: number, lo: number, hi: number): number {
   return Math.round(((value - lo) / (hi - lo)) * 100 * 1000) / 1000;
@@ -13,7 +15,7 @@ export function position(value: number, lo: number, hi: number): number {
 /** Whisker caps are drawn only when the interval spans at least this share of the plot width. */
 export const MIN_CAP_SPAN_PCT = 1.2;
 
-export type BarFill = "sign" | "factor" | "hatch";
+export type BarFill = "sign" | "neutral" | "factor" | "hatch";
 
 export interface BarCellProps {
   /** Domain of the plot (data units). */
@@ -23,7 +25,7 @@ export interface BarCellProps {
   ticks: readonly number[];
   /** Bar from zero to `value`; null draws no bar. */
   value: number | null;
-  /** "sign": blue (positive) or copper (negative). "factor": factor hue `factorSlot`. "hatch": residual. */
+  /** "sign": green (positive) or red (negative), for returns only. "neutral": ink, for betas. "factor": factor hue `factorSlot`. "hatch": residual. */
   fill: BarFill;
   /** 1 to 5, the factor's categorical hue (fill "factor"). */
   factorSlot?: 1 | 2 | 3 | 4 | 5;
@@ -42,7 +44,9 @@ export interface BarCellProps {
 function barClass(fill: BarFill, value: number, faded: boolean, slot: number | undefined): string {
   if (fill === "hatch") return "hatch";
   if (fill === "factor") return `cat c${slot ?? 1}`;
-  return (value >= 0 ? "pos" : "neg") + (faded ? " faded" : "");
+  if (fill === "neutral") return "ink" + (faded ? " faded" : "");
+  const sign = value >= 0 ? "pos" : "neg";
+  return `${sign} bar-${sign}` + (faded ? " faded" : "");
 }
 
 export function BarCell({ lo, hi, ticks, value, fill, factorSlot, faded = false, ci, marker, total, title }: BarCellProps) {
