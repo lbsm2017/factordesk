@@ -379,6 +379,62 @@ Researched on 2026-11-19. Venues marked **[from memory]** were not re-checked.
   - Portfolio Visualizer: 95% historical and analytical VaR plus CVaR, one-month horizon; no intervals.
   - Showing bands goes beyond common practice, and it is the honest answer for short records.
 
+## E. Joint tail behaviour of portfolios (copulas and EVT)
+
+Researched on 2026-11-19 at the owner's request. The input was the owner's [summary of Labovitz (2009)](labovitz-2009-summary.md). Citations marked (nc) were not re-checked; check volume and pages before citing them elsewhere.
+
+### E1. Measuring tail dependence
+
+- **The coefficient of lower tail dependence λ_L is a limit, and it cannot be estimated reliably at our sample sizes.**
+  - Nonparametric estimators cannot separate true tail dependence from strong ordinary dependence. Frahm, Junker & Schmidt (2005), "Estimating the tail-dependence coefficient: properties and pitfalls", *Insurance: Mathematics and Economics* 37, 80-100. https://ideas.repec.org/a/eee/insuma/v37y2005i1p80-100.html
+  - Estimates depend on the threshold choice. Schmidt & Stadtmüller (2006), *Scandinavian Journal of Statistics* 33(2) (nc).
+- **Use the finite-threshold version: χ(u) = P(B in its worst u | A in its worst u).** Coles, Heffernan & Tawn (1999), *Extremes* 2(4) (nc).
+  - At u = 5% with about 4,500 daily observations, there are 225 tail days and the standard error is about 0.03. With about 900 weekly observations there are 45 tail weeks and the standard error is about 0.07. Both figures are back-of-envelope.
+  - Volatility clustering makes both figures optimistic, so use a block bootstrap.
+- **Many equity pairs look asymptotically independent**, so models that assume λ > 0 overstate joint crashes. Poon, Rockinger & Tawn (2004), "Extreme value dependence in financial markets", *Review of Financial Studies* 17(2), 581-610.
+- **Exceedance correlation is the weakest option.** It is noisy, and conditioning on large moves changes the correlation even under a constant-correlation normal.
+  - Longin & Solnik (2001), "Extreme correlation of international equity markets", *Journal of Finance* 56(2), 649-676.
+  - Ang & Chen (2002), *Journal of Financial Economics* 63(3) (nc).
+- **Co-exceedance counts are the most robust and the easiest to explain.** Bae, Karolyi & Stulz (2003), *Review of Financial Studies* 16(3) (nc).
+
+### E2. Copulas
+
+- **Gaussian copula:** no tail dependence. It serves as the baseline: "no extra crash clustering beyond correlation".
+- **Student-t copula:** adds one parameter ν to the correlation matrix, which sets symmetric tail dependence. Demarta & McNeil (2005), *International Statistical Review* 73(1) (nc).
+  - Fitting: ρ = sin(πτ/2) from Kendall's τ, then a one-dimensional profile likelihood for ν, on rank pseudo-observations. Genest, Ghoudi & Rivest (1995), *Biometrika* 82(3) (nc).
+  - It needs only scipy and is stable with 500 or more observations for up to 50 holdings.
+- **Grouped-t copula:** one ν per asset class, which maps onto the SAA tree. Daul, De Giorgi, Lindskog & McNeil (2003), *RISK* 16(11) (nc). It is the first upgrade to try if a single ν fits poorly.
+- **Clayton and Gumbel copulas:** asymmetric, but only bivariate in practice.
+- **Vine copulas:** flexible, but 50 holdings need 1,225 pair-copulas, which is opaque and noisy to select. The Python library is pyvinecopulib.
+  - Aas, Czado, Frigessi & Bakken (2009), *Insurance: Mathematics and Economics* 44(2) (nc).
+  - Brechmann, Czado & Aas (2012), *Canadian Journal of Statistics* 40(1) (nc).
+- **Critiques:** correlation does not pin down joint tails, copulas are static, and family choice is arbitrary. This supports Labovitz's complaint, but not his remedy.
+  - Embrechts, McNeil & Straumann (2002), "Correlation and dependence in risk management: properties and pitfalls" (nc).
+  - Mikosch (2006), "Copulas: tales and facts", *Extremes* 9(1) (nc).
+
+### E3. Extreme-value routes
+
+- **A tail model fitted to the portfolio's own returns already contains the dependence between holdings** for the current weights.
+  - Peaks-over-threshold (GPD) on daily losses gives about 225 exceedances.
+  - Weekly GEV blocks of 5 days are too small for the asymptotics. Monthly blocks give about 215 minima since 2008.
+  - Return levels should stop at about the sample length.
+  - Sources: McNeil & Frey (2000) (nc); Coles (2001), *An Introduction to Statistical Modeling of Extreme Values* (nc); Hosking, Wallis & Wood (1985), *Technometrics* 27(3) (nc).
+- **Multivariate max-stable models and extremal coefficients** impose asymptotic dependence and treat componentwise maxima as if they were simultaneous. Schlather & Tawn (2003), *Biometrika* 90(1) (nc). Not suited here.
+- **Spatial return-level models:** the published form of the latent-Gaussian-process idea is Cooley, Nychka & Naveau (2007), *JASA* 102(479) (nc). The thesis's "Smith et al. (2006)" could not be identified.
+
+### E4. Labovitz (2009) at our scale
+
+- The Gaussian process is a cross-sectional regression of return levels on exchange, sector and market cap, estimated from about 3,000 stocks.
+- A 10-50 ETF portfolio has no such cross-section, and the selected model's variance matrices are diagonal, so it delivers no joint structure.
+- No journal version, replication or refutation was found. The search was not exhaustive.
+
+### E5. Stress complements
+
+- **Down-market correlation** rises mechanically with volatility, so it needs a caveat. Forbes & Rigobon (2002), "No contagion, only interdependence", *Journal of Finance* 57(5), 2223-2261.
+- **A holding's mean return on the portfolio's worst days** is the Marginal Expected Shortfall (MES) idea, applied per holding. Weight-scaled, it equals the planned per-holding CVaR. Acharya, Pedersen, Philippon & Richardson (2017), *Review of Financial Studies* 30(1) (nc).
+- **Downside beta:** Ang, Chen & Xing (2006), *Review of Financial Studies* 19(4) (nc).
+- **CoVaR** conditions the wrong way for a holdings view. Adrian & Brunnermeier (2016), *American Economic Review* 106(7) (nc). Deferred.
+
 ## Verification results (2026-11-19)
 
 ### V1. Sharpe-ratio formulas, checked against the primary texts

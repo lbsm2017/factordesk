@@ -64,6 +64,8 @@ The owner's decisions from three question rounds are listed below.
 - European mode
 - Fung-Hsieh factors
 - VaR backtests and conditional (GARCH/EVT) VaR
+- EVT return levels, vine copulas and joint tail for uploads
+- Labovitz GEV + Gaussian-process method (possible future large-universe feature)
 
 ## Epics, RICE and MoSCoW
 RICE scale:
@@ -84,6 +86,7 @@ Score = R × I × C / E.
 | E6 | **Portfolio attribution tree**: contribution and risk share rolled up per group, plus cost line and data checks. | 7 | 2 | 0.8 | 3 | 3.7 | Should |
 | E4 | **Macro sensitivities**: TERM/DEF/EUR-USD in all modes. | 7 | 1 | 0.6 | 3 | 1.4 | Should |
 | E7 | **VaR and CVaR** (added 2026-11-19) for single names, track records and portfolios: historical, Gaussian and Cornish-Fisher side by side with bootstrap bands; per-holding CVaR for portfolios. | 10 | 2 | 0.8 | 3 | 5.3 | Should |
+| E8 | **Joint tail** (added 2026-11-19), portfolios only: 'crash together' heatmap, co-crash histogram, one t-copula, worst-days table. | 4 | 2 | 0.6 | 4 | 1.2 | Could |
 | — | Deferred list above | | | | | | Won't (now) |
 
 E0 is pulled to the top despite its lower RICE score, because it is the enabling thin slice: E2, E3 and E5 all depend on its seam. E5 gets a strategic boost because it is the "heavy" headline feature.
@@ -98,7 +101,7 @@ Each release ends the same way:
 NOW   R1  E0 skeleton  ──►  E1 FF6 + alpha strip      (ticker + upload modes)
 NEXT  R2  E2 upload hardening ║ E5 portfolio slice ║ E7a VaR/CVaR (ticker + upload)
       R3  E3 diagnostics     ║ E6 attribution tree ║ E7b per-holding CVaR
-LATER R4  E4 macro sensitivities (all modes)
+LATER R4  E4 macro sensitivities (all modes) ║ E8 joint tail (portfolios)
       R5+ European mode / EUR base, Alternatives proxies, weekly, HTML export
 ```
 
@@ -115,6 +118,7 @@ LATER R4  E4 macro sensitivities (all modes)
 - E5 comes before E6.
 - E4 is independent after E0.
 - E7a needs only E0. E7b (per-holding CVaR) needs E5.
+- E8 needs E5 and reuses E7b's tail-day machinery.
 - The lanes run in parallel only on disjoint file sets:
   - **E2:** `data/upload.py` and the upload UI.
   - **E5:** `analytics/backtest.py` and the portfolio UI.
@@ -165,6 +169,37 @@ Research: [research notes, section D](../research/next-stage-research.md).
   - Historical VaR and CVaR match hand-computed order statistics.
   - Per-holding CVaR sums to the portfolio CVaR within 1e-12.
   - On simulated normal data, bootstrap-band coverage is about nominal.
+
+## E8: Joint tail behaviour of portfolios (decided 2026-11-19)
+
+Research: [research notes, section E](../research/next-stage-research.md) and the [Labovitz (2009) summary](../research/labovitz-2009-summary.md). This applies to portfolios only.
+
+- **"Crash together" heatmap.** For each pair of holdings, χ(5%) = P(B in its worst 5% | A in its worst 5%), on daily data and ordered by the SAA tree. Each cell is shown against the Gaussian-copula expectation at the same rank correlations.
+- **Co-crash histogram.** On the portfolio's worst 5% of days, how many holdings were also in their own worst 5%, with an independence baseline.
+- **One Student-t copula.**
+  - Correlation from Kendall's τ, ρ = sin(πτ/2).
+  - Profile likelihood for ν on rank pseudo-observations, using scipy only.
+  - ν is shown as "joint crash odds versus normal".
+- **Worst-days table.** Each holding's mean return on the portfolio's worst 5% of days and on the benchmark's worst 5% of days.
+  - This reuses the E7b tail-day machinery.
+  - Down-market correlation carries the Forbes-Rigobon caveat.
+- **Data and display rules.**
+  - Daily data is primary; weekly is a robustness toggle.
+  - Stationary block-bootstrap 90% bands. Cells whose band includes the Gaussian value are greyed out.
+  - Needs at least about 1,000 common daily observations; below that, the section shows counts only.
+- **Not in this epic:**
+  - EVT (GPD/GEV return levels)
+  - vine, grouped-t, Clayton and Gumbel copulas
+  - max-stable models
+  - CoVaR
+  - λ_L reported as a number
+  - joint tail for uploaded track records
+  - The Labovitz GEV + Gaussian-process method is parked for a possible future large-universe (stock screener) feature.
+- **Verification.**
+  - χ on simulated Gaussian data matches the Gaussian-copula expectation.
+  - The t-copula fit recovers ν and ρ on simulated t data.
+  - The co-crash histogram matches hand counts.
+  - Bootstrap coverage is checked on simulated data.
 
 ## Draft default proxy template (to be validated in E5)
 
