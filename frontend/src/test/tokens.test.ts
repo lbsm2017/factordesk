@@ -13,7 +13,7 @@ function declarations(block: string): Tokens {
   return out;
 }
 
-/** Body of the first rule at or after `from` whose selector text contains `selector` (braces balanced). */
+/** Body of the first rule whose selector text contains `selector` (braces balanced). */
 function ruleBody(source: string, selector: string): string {
   const at = source.indexOf(selector);
   if (at < 0) throw new Error(`selector not found: ${selector}`);
@@ -39,61 +39,108 @@ function resolveAll(tokens: Tokens): Tokens {
 }
 
 const light = declarations(ruleBody(css, ":root {"));
-const darkOverrides = declarations(
-  ruleBody(ruleBody(css, "@media (prefers-color-scheme: dark)"), ':root:where(:not([data-theme="light"]))'),
-);
-const darkAttr = declarations(ruleBody(css, ':root[data-theme="dark"]'));
-const dark = { ...light, ...darkOverrides };
 
-/** docs/design/report-design.md section A: named palette and semantic tokens, [light, dark]. */
-const DESIGN: Record<string, [string, string]> = {
-  "--chalk": ["#edf0f3", "#0e1318"],
-  "--sheet": ["#ffffff", "#151b22"],
-  "--graphite": ["#16202b", "#e8edf2"],
-  "--slate": ["#465361", "#b0bbc6"],
-  "--cobalt": ["#2a5bc0", "#5f8ae6"],
-  "--copper": ["#b4560c", "#d27c2e"],
-  "--page": ["#edf0f3", "#0e1318"],
-  "--surface": ["#ffffff", "#151b22"],
-  "--sunk": ["#f5f7f9", "#1b232c"],
-  "--border": ["#d3d9e0", "#2c3743"],
-  "--grid": ["#e5e9ee", "#212a34"],
-  "--axis": ["#8a95a2", "#66727f"],
-  "--ink": ["#16202b", "#e8edf2"],
-  "--ink-2": ["#465361", "#b0bbc6"],
-  "--ink-3": ["#5f6b78", "#8f9ba8"],
-  "--ink-faded": ["#777e85", "#8a929b"],
-  "--accent": ["#16202b", "#e8edf2"],
-  "--focus": ["#16202b", "#e8edf2"],
-  "--pos": ["#2a5bc0", "#5f8ae6"],
-  "--neg": ["#b4560c", "#d27c2e"],
-  "--f1": ["#7559c5", "#7053be"],
-  "--f2": ["#066e33", "#19783c"],
-  "--f3": ["#c25078", "#cb587f"],
-  "--f4": ["#1995ba", "#1493b8"],
-  "--f5": ["#a18a21", "#aa932d"],
+function luminance(color: string): number {
+  const channels = [1, 3, 5].map((i) => {
+    const c = Number.parseInt(color.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * (channels[0] as number) + 0.7152 * (channels[1] as number) + 0.0722 * (channels[2] as number);
+}
+
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Prototype v4a (README-v4, token table), approved by the owner on 2026-11-19. Light only. */
+const DESIGN: Record<string, string> = {
+  "--page": "#F4F6FA",
+  "--surface": "#FFFFFF",
+  "--soft": "#F7F8FB",
+  "--line": "#DDE2EC",
+  "--grid": "#EBEEF4",
+  "--rule": "#0E1430",
+  "--mark-ns": "#C3CAD9",
+  "--axis": "#7A839E",
+  "--ink": "#0E1430",
+  "--ink-2": "#4A5470",
+  "--accent": "#0B7285",
+  "--accent-50": "#EDF6F8",
+  "--rail": "#141A33",
+  "--rail-cyan": "#3CC8E8",
+  "--pos": "#007862",
+  "--neg": "#C23345",
+  "--caution": "#8A5A00",
+  "--neg-50": "#FBE9EC",
+  "--pos-t": "#9ECCC3",
+  "--neg-t": "#E8B1B8",
+  "--border": "#DDE2EC",
+  "--focus": "#0B7285",
 };
 
-describe("design tokens (report-design.md section A)", () => {
-  const lightResolved = resolveAll(light);
-  const darkResolved = resolveAll(dark);
+/** Text pairs that must reach 4.5:1, and UI marks that must reach 3:1 (WCAG 2.2, 1.4.3 and 1.4.11). */
+const TEXT_PAIRS: [string, string][] = [
+  ["--ink", "--page"],
+  ["--ink", "--surface"],
+  ["--ink-2", "--page"],
+  ["--ink-2", "--surface"],
+  ["--ink-2", "--soft"],
+  ["--ink-3", "--surface"],
+  ["--accent", "--surface"],
+  ["--accent", "--page"],
+  ["--on-accent", "--accent"],
+  ["--pos", "--surface"],
+  ["--pos", "--page"],
+  ["--neg", "--surface"],
+  ["--neg", "--page"],
+  ["--caution", "--surface"],
+  ["--caution", "--page"],
+  ["--rail-text", "--rail"],
+  ["--rail-2", "--rail"],
+  ["--rail-2", "--rail-hover"],
+  ["--rail-cyan", "--rail"],
+  ["--rail-cyan", "--rail-hover"],
+  ["--rail", "--rail-cyan"],
+];
+const UI_PAIRS: [string, string][] = [
+  ["--control-line", "--surface"],
+  ["--axis", "--surface"],
+  ["--rail-track", "--rail"],
+  ["--accent", "--surface"],
+];
 
-  it.each(Object.entries(DESIGN))("%s matches the design in light and dark", (name, [l, d]) => {
-    expect(lightResolved[name]).toBe(l);
-    expect(darkResolved[name]).toBe(d);
+describe("design tokens (prototype v4a)", () => {
+  const resolved = resolveAll(light);
+
+  it.each(Object.entries(DESIGN))("%s is %s", (name, value) => {
+    expect(resolved[name]?.toUpperCase()).toBe(value);
   });
 
-  it("html[data-theme=dark] sets exactly the same dark values as the media query", () => {
-    expect(darkAttr).toEqual(darkOverrides);
+  it.each(TEXT_PAIRS)("text %s on %s reaches 4.5:1", (fg, bg) => {
+    expect(contrast(resolved[fg] as string, resolved[bg] as string)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("lets html[data-theme=light] stay light under a dark OS (the media rule excludes it)", () => {
-    expect(css).toContain(':root:where(:not([data-theme="light"]))');
+  it.each(UI_PAIRS)("mark %s on %s reaches 3:1", (fg, bg) => {
+    expect(contrast(resolved[fg] as string, resolved[bg] as string)).toBeGreaterThanOrEqual(3);
   });
 
-  it("uses the 1216 px column width in the report stylesheet", () => {
-    const report = readFileSync(join(SRC, "styles", "report.css"), "utf8");
-    expect(report).toMatch(/\.report\s*\{[^}]*max-width:\s*1216px/);
+  it("is light only: no dark set, no theme attribute, no OS colour-scheme query", () => {
+    expect(css).not.toMatch(/prefers-color-scheme/);
+    expect(css).not.toMatch(/data-theme/);
+    expect(css).toMatch(/color-scheme:\s*light/);
+  });
+
+  it("keeps every type size at 14 px or more", () => {
+    const sizes = [...css.matchAll(/--fs-[a-z0-9-]+:\s*(\d+)px/g)].map((m) => Number(m[1]));
+    expect(sizes.length).toBeGreaterThanOrEqual(6);
+    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(14);
+    expect(resolved["--sans"]).toMatch(/^"IBM Plex Sans"/);
+  });
+
+  it("caps the canvas at 1680 px beside the 264 px rail", () => {
+    expect(resolved["--canvas-max"]).toBe("1680px");
+    expect(resolved["--side-w"]).toBe("264px");
   });
 });
 
@@ -130,8 +177,10 @@ describe("fonts ship in the bundle", () => {
   const fonts = readFileSync(join(SRC, "styles", "fonts.css"), "utf8");
   const urls = [...fonts.matchAll(/url\("([^"]+)"\)/g)].map((m) => m[1] as string);
 
-  it("references four local WOFF2 files that exist", () => {
-    expect(urls).toHaveLength(4);
+  it("references the one local IBM Plex Sans WOFF2 file, weights 400 to 700", () => {
+    expect(urls).toHaveLength(1);
+    expect(fonts).toMatch(/font-family:\s*"IBM Plex Sans"/);
+    expect(fonts).toMatch(/font-weight:\s*400 700/);
     for (const url of urls) {
       expect(url.startsWith("../assets/fonts/")).toBe(true);
       expect(existsSync(resolve(SRC, "styles", url))).toBe(true);
@@ -140,12 +189,11 @@ describe("fonts ship in the bundle", () => {
 
   it("names no network host and uses font-display swap", () => {
     expect(fonts).not.toMatch(/https?:\/\//);
-    expect(fonts.match(/font-display:\s*swap/g)).toHaveLength(4);
+    expect(fonts.match(/font-display:\s*swap/g)).toHaveLength(1);
   });
 
   it("ships the licence texts beside the fonts", () => {
-    expect(existsSync(join(SRC, "assets", "fonts", "InstrumentSans-OFL.txt"))).toBe(true);
-    expect(existsSync(join(SRC, "assets", "fonts", "STIXTwo-OFL.txt"))).toBe(true);
+    expect(existsSync(join(SRC, "assets", "fonts", "IBMPlexSans-OFL.txt"))).toBe(true);
   });
 
   it("loads no external script, style or font in index.html", () => {

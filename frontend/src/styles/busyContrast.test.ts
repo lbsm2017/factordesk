@@ -33,14 +33,10 @@ describe("busy placeholder on the page background (review S4)", () => {
     expect(rule?.[1]).toMatch(/background:\s*var\(--border\)/);
   });
 
-  it.each([
-    ["light", ":root {"],
-    ["dark", "@media (prefers-color-scheme: dark)"],
-    ["dark override", ':root[data-theme="dark"]'],
-  ])("is more visible than --grid against the page in %s", (_name, marker) => {
-    const page = token(marker, "--chalk");
-    const border = contrast(token(marker, "--border"), page);
-    const grid = contrast(token(marker, "--grid"), page);
+  it.each([["--page"], ["--surface"]])("is more visible than --grid against %s", (ground) => {
+    const bg = token(":root {", ground);
+    const border = contrast(token(":root {", "--line"), bg);
+    const grid = contrast(token(":root {", "--grid"), bg);
     expect(border).toBeGreaterThan(grid);
     expect(border).toBeGreaterThanOrEqual(1.2);
   });
