@@ -500,8 +500,8 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
     the library's column names. ``Mom`` is a long-short spread and is copied as published: RF is
     never subtracted from it. The result covers the common window, from the later first date to
     the earlier last date of the two files, on the dates of the five-factor file. A five-factor
-    date without a ``Mom`` value keeps ``Mom`` as NaN (never filled), so the sample builder
-    excludes it with the reason "factor value missing".
+    date without a ``Mom`` value keeps ``Mom`` as NaN (never filled): the five-factor sample keeps
+    that row, and only fits that use ``Mom`` (FF6, the alpha strip) leave it out.
 
     ``attrs`` records both vintages (``"ff5"``, ``"mom"``: the input frames' ``attrs``), the window
     (``"first_date"``, ``"last_date"``), which file ends it (``"ends_with"``: ``"ff5"``,

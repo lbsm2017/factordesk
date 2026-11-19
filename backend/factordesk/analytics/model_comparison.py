@@ -76,8 +76,9 @@ class ModelComparison:
     start: date
     end: date
     n_dropped: int
-    """Sample rows left out because a model lacked a value on them (0 for a sample built on one
-    factor frame, whose rows already have every factor)."""
+    """Sample rows the strip leaves out because a model lacks a value there (a missing ``mom``
+    on the FF6 frame). The five-factor report keeps those rows; the strip drops them for every
+    model, so all four share one row set."""
 
     def by_model(self, model: str) -> ModelAlpha:
         """The row of ``model``; ``KeyError`` when it was not compared."""
@@ -119,10 +120,9 @@ def compare_models(
     union: list[str] = []
     for m in names:
         union.extend(c for c in model_codes(m) if c not in union)
-    factors = sample.factor_columns(union)
     y_all = sample.xret.to_numpy(dtype=np.float64)
-    f_all = factors.to_numpy(dtype=np.float64)
-    common = np.isfinite(y_all) & np.isfinite(f_all).all(axis=1)
+    f_all = sample.factor_columns(union).to_numpy(dtype=np.float64)
+    common = sample.complete_rows(union)
     n = int(common.sum())
     if n == 0:
         raise ValueError("no row has the excess return and every factor of every model")

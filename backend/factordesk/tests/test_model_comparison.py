@@ -119,12 +119,31 @@ def test_the_sample_carries_mom_apart_from_the_five_factors() -> None:
         no_mom.factor_columns(FF6_CODES)
 
 
-def test_a_missing_mom_value_excludes_the_row_from_the_sample() -> None:
+def test_a_missing_mom_row_keeps_the_ff5_fit_and_drops_one_strip_row() -> None:
+    """FF5 keeps every five-factor row; FF6 and the strip lose only the row without Mom."""
     returns, calendar, frame = _ff6_case(600, 2)
-    frame.loc[frame.index[10], "Mom"] = np.nan
-    s = align_returns(returns, calendar, frame)
-    assert s.n == 599
-    assert [(e.date, e.reason) for e in s.excluded] == [(frame.index[10].date(), "factor_missing")]
+    full = align_returns(returns, calendar, frame)
+    gap = frame.copy()
+    gap.loc[gap.index[10], "Mom"] = np.nan
+    s = align_returns(returns, calendar, gap)
+    assert s.n == full.n == 600 and s.excluded == ()
+    # The FF5 fit is unchanged, bit for bit.
+    ff5, ff5_full = run_regression(s), run_regression(full)
+    np.testing.assert_array_equal(ff5.fit.params, ff5_full.fit.params)
+    np.testing.assert_array_equal(ff5.fit.bse, ff5_full.fit.bse)
+    assert ff5.fit.nobs == 600 and ff5.n_dropped == 0
+    assert return_contribution_for(s, ff5) == return_contribution_for(full, ff5_full)
+    # FF6 and the strip use the 599 rows with Mom.
+    ff6 = run_regression(s, codes=MODELS["ff6"])
+    assert ff6.fit.nobs == 599 and ff6.n_dropped == 1
+    strip, strip_full = compare_models(s), compare_models(full)
+    assert strip_full.nobs == 600 and strip_full.n_dropped == 0
+    assert strip.nobs == 599 and strip.n_dropped == 1
+    assert {r.nobs for r in strip.models} == {599}
+    assert strip.by_model("ff6").alpha == ff6.alpha
+    _check_strip(s, strip)
+    ra6 = return_contribution_for(s, ff6)
+    assert abs(ra6.identity_residual) < 1e-14
 
 
 # ----------------------------------------------------------------------------- FF6 fit

@@ -24,6 +24,7 @@ from statistics import NormalDist
 from typing import Any, Literal, cast
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 from scipy.stats import t as student_t  # pyright: ignore[reportMissingTypeStubs]
 from statsmodels.stats.multitest import (  # pyright: ignore[reportMissingTypeStubs]
@@ -405,6 +406,9 @@ class FullSampleRegression:
     """Observations a year used for the annualised figures (252 daily, 12 monthly)."""
     codes: tuple[str, ...] = FACTOR_CODES
     """Factor codes of the fit, in the order of ``names`` and ``betas``."""
+    n_dropped: int = 0
+    """Sample rows left out because a factor of ``codes`` is missing there (only an extra
+    factor such as ``mom`` can be; 0 for the five factors)."""
 
     @property
     def betas(self) -> FloatArray:
@@ -464,11 +468,16 @@ def run_regression(
     by ``sqrt(periods)``. The fit itself does not depend on it. ``small_sample`` (monthly
     subjects) selects the corrected covariance and Student-t inference of ``ols_hac``; the tags
     follow from those p-values.
+
+    The fit uses ``sample.complete_rows(codes)``: every row for the five factors; for FF6 the
+    rows where ``mom`` also exists (``n_dropped`` counts the others).
     """
     periods = resolve_periods(sample, periods)
     codes = check_codes(codes)
-    y = sample.xret.to_numpy(dtype=np.float64)
-    f = sample.factor_columns(codes).to_numpy(dtype=np.float64)
+    rows = sample.complete_rows(codes)
+    y = sample.xret.to_numpy(dtype=np.float64)[rows]
+    f = sample.factor_columns(codes).to_numpy(dtype=np.float64)[rows]
+    last_row = int(np.flatnonzero(rows)[-1]) if rows.any() else len(rows) - 1
     names = tuple(DISPLAY_NAMES[c] for c in codes)
     fit = ols_hac(y, f, names=names, small_sample=small_sample)
 
@@ -497,7 +506,8 @@ def run_regression(
         ),
         sigma_e_ann=sigma_e_ann,
         collinearity=collinearity(f, names),
-        end=sample.end,
+        end=pd.Timestamp(sample.xret.index[last_row]).date(),
         periods=periods,
         codes=codes,
+        n_dropped=int(rows.size - rows.sum()),
     )

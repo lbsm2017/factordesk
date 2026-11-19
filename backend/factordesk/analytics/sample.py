@@ -140,7 +140,9 @@ class AnalysisSample:
     ``xret``, ``ret``, ``rf`` and ``factors`` share one ``date`` index (the rows of ``S``).
     ``factors`` has exactly the columns ``FACTOR_CODES``. ``extra_factors`` holds the optional
     factors the factor frame carried (``EXTRA_FACTOR_CODES`` present in it, e.g. ``mom``) on the
-    same index, or is None; ``factor_columns`` reads any of them by code.
+    same index, or is None; ``factor_columns`` reads any of them by code. The rows of ``S`` are
+    set by the five factors only: an extra factor may be NaN on some rows, and a fit that uses
+    it keeps the rows of ``complete_rows`` (the five-factor sample never loses a row to it).
     """
 
     xret: pd.Series
@@ -185,6 +187,15 @@ class AnalysisSample:
         """Every factor code the sample carries: ``FACTOR_CODES``, then the extra ones present."""
         extra = () if self.extra_factors is None else tuple(self.extra_factors.columns)
         return (*FACTOR_CODES, *extra)
+
+    def complete_rows(self, codes: Sequence[str]) -> NDArray[np.bool_]:
+        """Rows of ``S`` where the excess return and every factor of ``codes`` have a value.
+
+        All True for the five factors; False where an extra factor (``mom``) is missing.
+        """
+        y = self.xret.to_numpy(dtype=np.float64)
+        f = self.factor_columns(codes).to_numpy(dtype=np.float64)
+        return np.asarray(np.isfinite(y) & np.isfinite(f).all(axis=1), dtype=np.bool_)
 
     def factor_columns(self, codes: Sequence[str]) -> pd.DataFrame:
         """The factor columns ``codes`` (in that order) on the sample's rows.
@@ -413,7 +424,9 @@ def align_returns(
 
     in_range = (ret_dates >= lo) & (ret_dates <= hi)
     fac_on_ret = fac.reindex(ret_dates)  # rows absent from the French file become NaN here
-    factor_nan = fac_on_ret.isna().any(axis=1).to_numpy()
+    # Only the five factors and RF decide the rows of S; a missing extra factor (Mom) does not.
+    core = [c for c in fac.columns if c not in EXTRA_FACTOR_CODES]
+    factor_nan = fac_on_ret.loc[:, core].isna().any(axis=1).to_numpy()
     price_nan = ret.isna().to_numpy()
 
     reasons: list[ExclusionReason | None] = []

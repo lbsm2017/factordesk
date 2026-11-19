@@ -92,13 +92,14 @@ def _check_reg(sample: AnalysisSample, reg: FullSampleRegression) -> None:
 def return_contribution_for(sample: AnalysisSample, reg: FullSampleRegression) -> ReturnAttribution:
     """``return_contribution`` on the analysis sample and its full-sample regression.
 
-    Uses the regression's factors (``reg.codes``) and the sample's ``periods``; a regression
-    annualised with other ``periods`` raises ``ValueError``.
+    Uses the regression's factors (``reg.codes``) and rows (``complete_rows``) and the sample's
+    ``periods``; a regression annualised with other ``periods`` raises ``ValueError``.
     """
     _check_reg(sample, reg)
+    rows = sample.complete_rows(reg.codes)
     return return_contribution(
-        sample.xret.to_numpy(dtype=np.float64),
-        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64),
+        sample.xret.to_numpy(dtype=np.float64)[rows],
+        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64)[rows],
         reg.alpha,
         reg.betas,
         reg.fit.resid,
@@ -230,12 +231,13 @@ def euler_risk(
 def risk_contribution_for(sample: AnalysisSample, reg: FullSampleRegression) -> RiskAttribution:
     """``risk_contribution`` on the analysis sample and its full-sample regression.
 
-    Uses the regression's factors (``reg.codes``) and the sample's ``periods``; a regression
-    annualised with other ``periods`` raises ``ValueError``.
+    Uses the regression's factors (``reg.codes``) and rows (``complete_rows``) and the sample's
+    ``periods``; a regression annualised with other ``periods`` raises ``ValueError``.
     """
     _check_reg(sample, reg)
+    rows = sample.complete_rows(reg.codes)
     return risk_contribution(
-        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64),
+        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64)[rows],
         reg.betas,
         reg.fit.resid,
         reg.names,
