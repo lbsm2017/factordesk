@@ -9,7 +9,7 @@ import { ReportView } from "./ReportView";
 /** Panel order of the schema v3 contract (SC4), without `equation` and `kpis` (dashboard v2, DV1). */
 const ORDER = [
   "header",
-  "notice",
+  "summary",
   "price",
   "performance",
   "exposures",

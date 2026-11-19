@@ -1,9 +1,8 @@
 /**
  * Ordered panel registry of the report page (schema v3 contract, SC3.4 and SC4). `ReportView` draws
- * `orderedPanels()` in position order. Dashboard v2 removed `equation` (the owner removed the formula)
- * and `kpis` (replaced by the summary panel at 200). Names and positions match the static report's registry
- * (`backend/factordesk/report/panel_registry.py`); `notice` exists only here, because the static
- * page draws the notice inside its header.
+ * `orderedPanels()` in position order. Names and positions match the static report's registry
+ * (`backend/factordesk/report/panel_registry.py`) where they exist there; `summary` replaces the old
+ * notice, equation and KPI strip, and carries the data notes (anchor `#notice`).
  *
  * The optional sections are already listed, each pointing at its own component under
  * `sections/`; a feature fills its component in and never edits this file. Each of those
@@ -16,12 +15,12 @@ import { Colophon } from "./Colophon";
 import { DataAuditPanel } from "./DataAuditPanel";
 import { ExposuresPanel } from "./ExposuresPanel";
 import { Header } from "./Header";
-import { Notice } from "./Notice";
 import { PricePanel } from "./PricePanel";
 import { RegressionDetail } from "./RegressionDetail";
 import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
 import { RollingPanel } from "./RollingPanel";
+import { SummaryPanel } from "./SummaryPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
 import { LazyKalmanPanel, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
@@ -49,7 +48,7 @@ export interface PanelEntry {
 
 export const PANELS: readonly PanelEntry[] = [
   { name: "header", position: 100, Component: Header },
-  { name: "notice", position: 150, Component: Notice },
+  { name: "summary", position: 200, Component: SummaryPanel },
   { name: "price", position: 400, Component: PricePanel },
   { name: "performance", position: 450, Component: PerformancePanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },

@@ -1,0 +1,46 @@
+/* Summary panel (dashboard v2, prototype v4a). Tokens only; the sign colours come from --pos and
+   --neg, which the shell's token set defines as the v4a green and red. */
+
+.num-pos { color: var(--pos); }
+.num-neg { color: var(--neg); }
+
+#summary .pm { margin-left: auto; font-size: var(--fs-1); color: var(--ink-2); }
+#summary .verdict { font-size: 16px; line-height: 1.5; max-width: 96ch; }
+
+#summary .notes-block { scroll-margin-top: var(--s-4); }
+#summary .notes-line { display: flex; gap: var(--s-2); align-items: flex-start; margin-top: var(--s-2); font-size: var(--fs-1); color: var(--ink-2); }
+#summary .notes-line .icon { width: 16px; height: 16px; flex: none; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+#summary .notes-line b { font-weight: 600; }
+#summary .notes-link { display: inline; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+#summary .notes-details { margin: var(--s-2) 0 0 calc(16px + var(--s-2)); font-size: var(--fs-1); color: var(--ink-2); max-width: 76ch; line-height: 1.45; }
+#summary .notes-details[hidden] { display: none; }
+#summary .notes-details li { padding: 2px 0; }
+#summary .notes-details p { margin-top: var(--s-1); }
+
+#summary .sum-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5); margin-top: var(--s-4); }
+#summary h3 { font-size: var(--fs-2); font-weight: 600; line-height: 1.3; margin-bottom: 6px; }
+#summary .tw { overflow-x: auto; }
+#summary .tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
+#summary .tbl th, #summary .tbl td { height: 36px; padding: 0 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+#summary .tbl th:first-child, #summary .tbl td:first-child { padding-left: 0; }
+#summary .tbl th:last-child, #summary .tbl td:last-child { padding-right: 0; }
+#summary .tbl thead th { height: 32px; vertical-align: bottom; padding-bottom: 7px; font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--ink); }
+#summary .tbl tbody th { font-weight: 400; }
+#summary .tbl .num { text-align: right; }
+#summary .tbl .v { font-weight: 600; }
+#summary .tbl tr.is-noise .v { font-weight: 400; }
+#summary .tbl .na { color: var(--ink-2); }
+#summary .tbl .rd { min-width: 120px; }
+#summary .tbl .tip, #summary .tbl th[title] { text-decoration: underline dotted var(--axis); text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: help; }
+#summary .tbl tbody tr:hover > * { background: var(--sunk); }
+#summary .tbl tr:not(.is-noise) .rd:not(.na) { font-weight: 600; }
+#summary .sum-reason { margin-top: var(--s-2); font-size: var(--fs-1); color: var(--ink-2); }
+
+@media screen and (max-width: 1099px) {
+  #summary .sum-tables { grid-template-columns: minmax(0, 1fr); }
+}
+@media screen and (max-width: 719px) {
+  #summary .tbl th, #summary .tbl td { padding: 0 8px; }
+  #summary .tbl tbody th { white-space: normal; line-height: 1.3; padding-top: 6px; padding-bottom: 6px; }
+  #summary .tbl .rd { min-width: 0; }
+}

@@ -18,10 +18,10 @@ function busySelectors(): string[] {
 }
 
 describe("busy placeholders (review S3)", () => {
-  it("blank the ticker and the values of the analysis bar", () => {
+  it("blank the ticker, the analysis bar, the verdict and the summary table values", () => {
     const selectors = busySelectors();
     expect(selectors.map((s) => s.replace('[aria-busy="true"] ', ""))).toEqual(
-      expect.arrayContaining([".ticker", ".abar dd"]),
+      expect.arrayContaining([".ticker", ".abar dd", "#summary .verdict", "#summary .tbl td.v", "#summary .tbl td.rd"]),
     );
     const { container } = render(<ReportView report={mockReport} downloadHref="#" win={null} onWinChange={vi.fn()} busy />);
     for (const selector of selectors) {

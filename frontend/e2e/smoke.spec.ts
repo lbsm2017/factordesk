@@ -43,6 +43,9 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await expect(bar).toContainText("Analysis period");
   await expect(bar).toContainText("Observations");
   // The formula is gone (owner, dashboard v2); the sidebar sits outside <main>.
+  const summary = page.locator("#summary");
+  await expect(summary).toContainText("Alpha (annual)");
+  await expect(summary).toContainText("R²");
   await expect(page.locator("#equation")).toHaveCount(0);
   await expect(page.locator("main aside, main #sidebar")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Price" })).toBeVisible();
@@ -78,12 +81,13 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]stats=1\b/);
   await expect(bar).toBeVisible();
   await expect(page.getByRole("radio", { name: "10Y" })).toBeVisible();
+  await expect(page.locator("#summary")).toContainText("Past data, not a forecast");
 
   // A Details disclosure opens.
-  const details = page.locator("details", { has: page.locator("summary", { hasText: /^Details$/ }) }).first();
+  const details = page.locator("#summary").getByRole("button", { name: "Details" });
   await expect(details).toBeVisible();
-  await details.locator("summary").click();
-  await expect(details).toHaveJSProperty("open", true);
+  await details.click();
+  await expect(details).toHaveAttribute("aria-expanded", "true");
 
   // The "/" shortcut focuses the ticker field from outside a text field.
   await page.locator("body").click({ position: { x: 2, y: 2 } });
@@ -133,6 +137,7 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]start=2013-01-01(&|$)/);
   expect(await page.evaluate(() => window.history.length)).toBe(historyBefore + 1);
   await expect(bar).toContainText("Analysis period");
+  await expect(page.locator("#summary")).toContainText("Past data, not a forecast");
   expect(new Set(apiStarts)).toEqual(new Set(["2013-01-01"]));
 
   // No sideways scroll at 1440 and at 390; screenshots of the synthetic report.
