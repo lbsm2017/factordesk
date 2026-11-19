@@ -5,7 +5,15 @@ import { dateLong } from "../format";
 import { DEFAULT_MODEL, DEFAULT_RANGE, isSuggestQuery } from "../state/url";
 import type { FactorModel, UrlState } from "../state/url";
 import { ApiRequestError, apiRequest, NETWORK_ERROR } from "./client";
-import type { ApiError, FactorDataStatus, FactorReport, RangeOptions, TickerSuggestions } from "./types";
+import type {
+  ApiError,
+  AssetClassLibrary,
+  FactorDataStatus,
+  FactorReport,
+  RangeOptions,
+  TickerSuggestions,
+} from "./types";
+import type { PortfolioTree } from "../portfolio/tree";
 
 const SUGGEST_LIMIT = 8;
 export const SUGGEST_DEBOUNCE_MS = 150;
@@ -161,6 +169,45 @@ export function useUploadReport() {
   return useMutation({
     mutationFn: (input: UploadInput) =>
       apiRequest<FactorReport>("/api/report/upload", { method: "POST", body: uploadBody(input) }),
+    retry: false,
+  });
+}
+
+/** The Asset Class Library: 44 lines with their proxies. It never changes while the server runs. */
+export function useLibrary() {
+  return useQuery({
+    queryKey: ["portfolio", "library"],
+    queryFn: ({ signal }) => apiRequest<AssetClassLibrary>("/api/portfolio/library", { signal }),
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+export interface PortfolioRunInput {
+  tree: PortfolioTree;
+  /** The factor model; the dashboard always sends it. */
+  model: FactorModel;
+  /** The range of the page: a preset, or custom dates (which win over it). */
+  range: string | null;
+  start: string | null;
+  end: string | null;
+}
+
+/** The JSON body of `POST /api/report/portfolio`: the tree, its cost, the model and the range. */
+export function portfolioBody({ tree, model, range, start, end }: PortfolioRunInput): Record<string, unknown> {
+  return {
+    tree,
+    cost_bps: tree.cost_bps,
+    model,
+    ...(start || end ? { ...(start ? { start } : {}), ...(end ? { end } : {}) } : { range: range ?? DEFAULT_RANGE }),
+  };
+}
+
+/** Runs a portfolio through the API. Like the upload, the result is held by the hook only and never cached. */
+export function usePortfolioReport() {
+  return useMutation({
+    mutationFn: (input: PortfolioRunInput) =>
+      apiRequest<FactorReport>("/api/report/portfolio", { method: "POST", json: portfolioBody(input) }),
     retry: false,
   });
 }

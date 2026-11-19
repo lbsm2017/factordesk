@@ -1,0 +1,239 @@
+/**
+ * The portfolio mode (`m=portfolio`): saved portfolios in the sidebar, the composer in the main
+ * area, and after a run the composer folded into one line with the report below it. The library
+ * comes from the API; the saved portfolios live in this browser only.
+ */
+import { useEffect, useRef, useState } from "react";
+import { toApiError, useLibrary, usePortfolioReport } from "../../api/queries";
+import type { PortfolioRunInput } from "../../api/queries";
+import { lineCount } from "../../portfolio/composer";
+import { buildPreset, presetById } from "../../portfolio/presets";
+import type { PresetId } from "../../portfolio/presets";
+import { remainder, totalWeight } from "../../portfolio/tree";
+import type { PortfolioTree } from "../../portfolio/tree";
+import { usePortfolioStore } from "../../portfolio/usePortfolioStore";
+import type { UrlState } from "../../state/url";
+import { StatsSwitch } from "../controls/StatsSwitch";
+import { ModeSwitch } from "../controls/ModeSwitch";
+import { ReportView } from "../report/ReportView";
+import { Shell } from "../shell/Shell";
+import { Icon } from "../shell/icons";
+import "../../styles/portfolio.css";
+import { Composer } from "./Composer";
+import { PortfolioSidebar } from "./PortfolioSidebar";
+import { UndoToast } from "./UndoToast";
+
+export interface PortfolioModeProps {
+  state: UrlState;
+  onCommit: (patch: Partial<UrlState>) => void;
+}
+
+function lines(n: number): string {
+  return `${n} ${n === 1 ? "line" : "lines"}`;
+}
+
+/** "97% + 3% USD cash" or "100% allocated", for the folded summary. */
+function allocationText(tree: PortfolioTree): string {
+  const rest = remainder(tree);
+  const invested = totalWeight(tree);
+  const fmt = (x: number) => `${Number((x * 100).toFixed(1))}%`;
+  return rest > 0 ? `${fmt(invested)} + ${fmt(rest)} USD cash` : `${fmt(invested)} allocated`;
+}
+
+export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
+  const store = usePortfolioStore();
+  const library = useLibrary();
+  const run = usePortfolioReport();
+  const { active } = store;
+  /** The portfolio whose report is on screen, with the tree that was run. */
+  const [ran, setRan] = useState<{ id: string; tree: PortfolioTree } | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const foldRef = useRef<HTMLDivElement>(null);
+  const libraryLines = library.data?.lines ?? [];
+
+  const folded = ran !== null && active !== null && ran.id === active.id && run.data !== undefined;
+  const report = folded ? run.data : undefined;
+
+  const input = (tree: PortfolioTree): PortfolioRunInput => ({
+    tree,
+    model: state.model,
+    range: state.range,
+    start: state.start,
+    end: state.end,
+  });
+
+  const start = () => {
+    if (active === null) return;
+    const { id, tree } = active;
+    run.mutate(input(tree), { onSuccess: () => setRan({ id, tree }) });
+  };
+
+  // A model change re-runs the report on screen with the new model (the result is not cached).
+  const lastModel = useRef(state.model);
+  useEffect(() => {
+    if (lastModel.current === state.model) return;
+    lastModel.current = state.model;
+    if (ran !== null && !run.isPending) run.mutate(input(ran.tree));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.model]);
+
+  // Focus follows the view: the summary after a run, the heading after Edit.
+  const wasFolded = useRef(false);
+  useEffect(() => {
+    if (folded && !wasFolded.current) foldRef.current?.focus();
+    wasFolded.current = folded;
+  }, [folded]);
+
+  const select = (id: string) => {
+    store.select(id);
+    run.reset();
+  };
+
+  const create = (preset: PresetId, name: string) => {
+    const label = name.trim() === "" ? presetById(preset).label : name.trim();
+    store.create(buildPreset(preset, label, libraryLines));
+    run.reset();
+    setRan(null);
+  };
+
+  const sidebarStore = { ...store, select };
+  const error = run.isError && !folded ? toApiError(run.error) : null;
+
+  const sidebar = (
+    <>
+      <ModeSwitch mode={state.mode} onSelect={(mode) => onCommit({ mode })} />
+      <PortfolioSidebar store={sidebarStore} ready={library.isSuccess} onCreate={create} />
+      <StatsSwitch />
+    </>
+  );
+
+  let main;
+  if (active === null) {
+    main = (
+      <main className="pf-landing" data-testid="portfolio-landing" id="main">
+        <h1>
+          <span className="ticker">Portfolio</span>
+        </h1>
+        <p className="coverage">
+          Build a portfolio from the Asset Class Library, set the weights, then run a monthly-rebalanced backtest and read
+          its factor report. Portfolios are saved in this browser only. Start from a preset:
+        </p>
+        <div className="row">
+          {(["blank", "6040", "saa", "growth"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              className="btn-outline"
+              disabled={!library.isSuccess}
+              onClick={() => create(id, "")}
+            >
+              {presetById(id).label}
+            </button>
+          ))}
+        </div>
+        {library.isError ? (
+          <p className="coverage" role="alert">
+            {toApiError(library.error).message} {toApiError(library.error).action}
+          </p>
+        ) : null}
+      </main>
+    );
+  } else if (folded && report !== undefined && ran !== null) {
+    main = (
+      <>
+        <div className="pf-fold-wrap">
+          <div ref={foldRef} className="fold" role="group" aria-label="Portfolio summary" tabIndex={-1}>
+            <div>
+              <Icon name="check" className="icon ok-icon" />
+              <span className="fname-b">{ran.tree.name}</span>
+            </div>
+            <div>
+              <span>{lines(lineCount(ran.tree))}</span>
+            </div>
+            <div>
+              <span>{allocationText(ran.tree)}</span>
+            </div>
+            <div>
+              <span className="dim">Monthly, {ran.tree.cost_bps} bps</span>
+            </div>
+            <div className="go">
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => {
+                  setRan(null);
+                  window.setTimeout(() => headingRef.current?.focus(), 0);
+                }}
+              >
+                <Icon name="edit" />
+                Edit
+              </button>
+            </div>
+          </div>
+        </div>
+        <ReportView
+          report={report}
+          downloadHref={null}
+          win={state.win}
+          onWinChange={(win) => onCommit({ win })}
+          busy={run.isPending}
+        />
+      </>
+    );
+  } else {
+    main = (
+      <main className="pf-pad" id="main" data-testid="composer">
+        <header className="masthead edit-head">
+          <div className="page-head">
+            <h1>
+              <span className="ticker">{active.tree.name}</span>
+              <span className="nm">Portfolio</span>
+            </h1>
+            <span className="badge">Backtest</span>
+            <span className="listing">
+              Choose sub-asset classes from the library, set the weights, then run a monthly-rebalanced backtest. Saved in this
+              browser.
+            </span>
+          </div>
+        </header>
+        {library.isError ? (
+          <div className="pf-error" role="alert">
+            <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="3" y="3" width="10" height="10" />
+            </svg>
+            <div>
+              <b>{toApiError(library.error).message}</b>
+              <span className="do">{toApiError(library.error).action}</span>
+            </div>
+          </div>
+        ) : library.isPending ? (
+          <p className="coverage" role="status">
+            Loading the library.
+          </p>
+        ) : (
+          <Composer
+            tree={active.tree}
+            library={libraryLines}
+            running={run.isPending}
+            error={error}
+            onChange={(tree) => store.edit(active.id, tree)}
+            onRun={start}
+            headingRef={headingRef}
+          />
+        )}
+        <span className="vh" role="status">
+          {run.isPending ? "Running the backtest." : ""}
+        </span>
+      </main>
+    );
+  }
+
+  return (
+    <>
+      <Shell sidebar={sidebar} report={report} ticker={active?.tree.name ?? null}>
+        {main}
+      </Shell>
+      <UndoToast deleted={store.state.deleted} onUndo={store.undo} onDismiss={store.dismissUndo} />
+    </>
+  );
+}

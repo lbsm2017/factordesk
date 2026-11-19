@@ -16,6 +16,13 @@ export interface TickerSearchProps {
   onSubmit: (text: string) => void;
   /** Focus the field on mount (the landing page). */
   focusOnMount?: boolean;
+  /** Id of the field; each search on a page needs its own. */
+  inputId?: string;
+  /** The visible label and the text of the submit button. */
+  label?: string;
+  submitLabel?: string;
+  /** "/" focuses the field from anywhere outside a text field; only the page's main search turns it on. */
+  slashFocus?: boolean;
 }
 
 interface Row {
@@ -24,7 +31,6 @@ interface Row {
 }
 
 const INPUT_ID = "ticker-input";
-const ERROR_ID = "ticker-error";
 
 /** Input types that take no typed text: "/" from one of these still focuses the search field. */
 const NON_TEXT_INPUTS = new Set(["radio", "checkbox", "button", "submit", "reset", "image", "range", "color", "file"]);
@@ -51,7 +57,12 @@ export function TickerSearch({
   onQueryChange,
   onSubmit,
   focusOnMount = false,
+  inputId = INPUT_ID,
+  label = "Ticker",
+  submitLabel = "Factor it",
+  slashFocus = true,
 }: TickerSearchProps) {
+  const errorId = `${inputId}-error`;
   const [text, setText] = useState(value);
   const [seen, setSeen] = useState(value);
   if (seen !== value) {
@@ -73,7 +84,7 @@ export function TickerSearch({
     itemToString: (row) => row?.ticker ?? "",
     inputValue: text,
     selectedItem: null,
-    inputId: INPUT_ID,
+    inputId,
     onInputValueChange: ({ inputValue }) => {
       const next = (inputValue ?? "").toUpperCase();
       setText(next);
@@ -93,6 +104,7 @@ export function TickerSearch({
   }, [focusOnMount, input]);
 
   useEffect(() => {
+    if (!slashFocus) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
       if (isTextTarget(event.target)) return;
@@ -102,7 +114,7 @@ export function TickerSearch({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [input]);
+  }, [input, slashFocus]);
 
   const submit = (submitted: string) => {
     closeMenu();
@@ -122,7 +134,7 @@ export function TickerSearch({
     spellCheck: false,
     maxLength: 12,
     "aria-invalid": error !== null,
-    ...(error !== null ? { "aria-describedby": ERROR_ID } : {}),
+    ...(error !== null ? { "aria-describedby": errorId } : {}),
     onFocus: () => {
       if (!isOpen) openMenu();
     },
@@ -151,8 +163,8 @@ export function TickerSearch({
           submit(text);
         }}
       >
-        <label className="side-label" htmlFor={INPUT_ID}>
-          Ticker
+        <label className="side-label" htmlFor={inputId}>
+          {label}
         </label>
         <div className="ctl-combo">
           <input {...inputProps} />
@@ -183,11 +195,11 @@ export function TickerSearch({
           </ul>
         </div>
         <button type="submit" className="btn">
-          Factor it
+          {submitLabel}
         </button>
       </form>
       {error !== null ? (
-        <p className="ctl-err" id={ERROR_ID} role="alert">
+        <p className="ctl-err" id={errorId} role="alert">
           {error}
         </p>
       ) : null}

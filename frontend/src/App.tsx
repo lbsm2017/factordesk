@@ -17,18 +17,19 @@ import type { FactorReport } from "./api/types";
 import { AnalysedRange } from "./components/controls/AnalysedRange";
 import { ControlsStrip } from "./components/controls/ControlsStrip";
 import { ModeSwitch } from "./components/controls/ModeSwitch";
+import { StatsSwitch } from "./components/controls/StatsSwitch";
 import { Landing, TrackLanding } from "./components/controls/ReportStates";
 import { TrackRecordInput } from "./components/controls/TrackRecordInput";
+import { PortfolioMode } from "./components/portfolio/PortfolioMode";
 import { ErrorFrame } from "./components/report/ErrorFrame";
 import { LoadingFrame } from "./components/report/LoadingFrame";
 import { ReportView } from "./components/report/ReportView";
 import { Shell } from "./components/shell/Shell";
 import { addRecent, useRecent } from "./state/recent";
 import type { RollingWindowDays } from "./state/url";
-import { StatsProvider, useStatsSwitch } from "./state/stats";
+import { StatsProvider } from "./state/stats";
 import { useUrlState } from "./state/useUrlState";
 import "./styles/controls.css";
-import { Switch } from "./ui/Switch";
 
 /** Development only: `/?demo=1` renders the mock report so the panels can be seen without the API. */
 function demoRequested(): boolean {
@@ -48,16 +49,6 @@ function DemoPage() {
   );
 }
 
-/** "Show statistics" in the sidebar (design K.1), stored in the URL as `stats=1`. */
-function StatsSwitch() {
-  const [on, setOn] = useStatsSwitch();
-  return (
-    <div className="side-group">
-      <Switch label="Show statistics" hint="t, p-values, intervals" checked={on} onChange={setOn} />
-    </div>
-  );
-}
-
 const TRACK_TITLE = "Track record";
 
 function Dashboard() {
@@ -67,9 +58,10 @@ function Dashboard() {
   const recent = useRecent();
   const factors = useFactorStatus();
   const suggestions = useTickerSuggestions(query);
-  // In the track-record mode no ticker is requested, whatever `t` says.
+  // In the track-record and portfolio modes no ticker is requested, whatever `t` says.
   const track = state.mode === "track";
-  const tickerState = track ? { ...state, ticker: null } : state;
+  const portfolio = state.mode === "portfolio";
+  const tickerState = track || portfolio ? { ...state, ticker: null } : state;
   const ranges = useRanges(tickerState.ticker);
   const report = useReport(tickerState);
   const refresh = useRefreshFactors(setRefreshMessage);
@@ -99,6 +91,8 @@ function Dashboard() {
   useEffect(() => {
     if (loadedTicker !== null) addRecent(loadedTicker);
   }, [loadedTicker]);
+
+  if (portfolio) return <PortfolioMode state={state} onCommit={commit} />;
 
   return (
     <Shell
