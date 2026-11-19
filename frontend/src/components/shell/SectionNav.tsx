@@ -22,7 +22,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: "summary", label: "Summary", icon: "summary" },
   { id: "price", label: "Price", icon: "price" },
   { id: "performance", label: "Drawdown", icon: "drawdown" },
+  { id: "tail-risk", label: "Tail risk", icon: "risk" },
   { id: "exposures", label: "Factor exposures", icon: "exposures" },
+  { id: "alpha-strip", label: "Alpha across models", icon: "residual" },
   { id: "world-beta", label: "World beta", icon: "world" },
   { id: "returns", label: "Return sources", icon: "returns" },
   { id: "risk", label: "Risk sources", icon: "risk" },
@@ -39,6 +41,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
 /** Report field behind each optional section; its item is hidden while the field is null or absent. */
 const SECTION_FIELD: Readonly<Record<string, keyof FactorReport>> = {
   performance: "performance",
+  "tail-risk": "tail_risk",
+  "alpha-strip": "alpha_strip",
   "world-beta": "world_beta",
   residual: "residual",
   kalman: "kalman_betas",
@@ -46,6 +50,11 @@ const SECTION_FIELD: Readonly<Record<string, keyof FactorReport>> = {
   "lead-lag": "lead_lag",
   fragility: "fragility",
 };
+
+/** The label of an item: the price item reads "Growth of 100" for a report with a subject (an uploaded record). */
+export function navLabel(item: NavItem, report: FactorReport | undefined): string {
+  return item.id === "price" && report?.subject != null ? "Growth of 100" : item.label;
+}
 
 /** True when the item's section has data in `report` (always true for items with no optional field). */
 export function sectionHasData(report: FactorReport | undefined, id: string): boolean {
@@ -186,7 +195,7 @@ export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
               onClick={(event) => go(event, item.id)}
             >
               <Icon name={item.icon} />
-              <span className="nav-label">{item.label}</span>
+              <span className="nav-label">{navLabel(item, report)}</span>
               {item.id === "data" && badge.count > 0 ? (
                 <span className={badge.error ? "nav-badge error" : "nav-badge"}>
                   {badge.count}

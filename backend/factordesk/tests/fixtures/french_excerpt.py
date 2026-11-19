@@ -1,0 +1,243 @@
+# ruff: noqa: E501
+# (the preamble lines of the French files are longer than 100 characters; kept verbatim)
+"""Short verbatim excerpts of four Ken French factor files, for offline tests (E0-T2, E1).
+
+Copied line for line (trailing blanks stripped) from the files of the 202609 CRSP vintage,
+downloaded on 2026-11-19 from the Ken French data library
+(https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html):
+
+* ``FF5_DAILY_2020Q2``: ``F-F_Research_Data_5_Factors_2x3_daily_CSV.zip``, preamble and header, the
+  daily rows of April, May and June 2020, the copyright line.
+* ``FF5_MONTHLY_2020``: ``F-F_Research_Data_5_Factors_2x3_CSV.zip``, preamble and header, the
+  twelve monthly rows of 2020, then the start of the annual block (title, header, 2019 and 2020)
+  and the copyright line, so the parser's skipping of the annual block is exercised.
+* ``MOM_MONTHLY_2020``: ``F-F_Momentum_Factor_CSV.zip``, preamble and header, the twelve monthly
+  rows of 2020, the start of the annual block (title, header, 2019 and 2020) and the copyright
+  line.
+* ``MOM_DAILY_2020Q2``: ``F-F_Momentum_Factor_daily_CSV.zip``, preamble and header, the daily rows
+  of April, May and June 2020, the copyright line.
+
+Values are percent, as published. These few rows are test oracles only; the application never
+reads them.
+"""
+
+from __future__ import annotations
+
+FF5_DAILY_2020Q2 = """\
+This file was created by using the 202609 CRSP database.
+The Tbill return is the simple daily rate that, over the number of trading days
+compounds to 1-month TBill rate. The 1-month TBill rate data until 202405 are from Ibbotson Associates. Starting from 202406, the 1-month TBill rate is from ICE BofA US 1-Month Treasury Bill Index.
+
+,Mkt-RF,SMB,HML,RMW,CMA,RF
+20200401,   -4.50,   -2.02,   -1.31,    0.29,    0.27,    0.00
+20200402,    2.10,   -0.93,   -0.28,   -0.25,    0.94,    0.00
+20200403,   -1.64,   -1.37,   -1.15,   -0.24,    0.41,    0.00
+20200406,    7.10,    1.17,    0.28,    1.30,   -0.79,    0.00
+20200407,   -0.11,    0.11,    2.10,    0.90,   -0.37,    0.00
+20200408,    3.42,    0.86,    1.27,    0.43,   -0.26,    0.00
+20200409,    1.59,    2.47,    3.19,   -0.79,   -0.10,    0.00
+20200413,   -0.92,   -1.48,   -2.40,   -0.45,    0.00,    0.00
+20200414,    3.03,   -0.74,   -3.15,    0.23,   -0.30,    0.00
+20200415,   -2.15,   -1.99,   -2.55,   -0.40,   -0.30,    0.00
+20200416,    0.62,   -0.84,   -2.98,   -0.28,   -0.26,    0.00
+20200417,    2.73,    1.55,    2.77,   -0.18,   -0.03,    0.00
+20200420,   -1.57,    0.37,   -0.91,   -1.74,   -0.50,    0.00
+20200421,   -3.09,    0.94,    0.16,    0.29,    0.42,    0.00
+20200422,    2.31,   -0.87,   -1.66,    0.11,    0.04,    0.00
+20200423,    0.12,    1.25,    0.55,    0.53,   -0.35,    0.00
+20200424,    1.43,    0.25,   -0.12,   -0.19,    0.19,    0.00
+20200427,    1.73,    2.16,    2.68,   -0.14,    0.11,    0.00
+20200428,   -0.45,    1.75,    2.86,    1.36,    0.69,    0.00
+20200429,    2.92,    2.30,    1.98,    1.22,   -0.85,    0.00
+20200430,   -1.18,   -2.09,   -1.71,    0.62,   -0.08,    0.00
+20200501,   -2.91,   -0.89,   -0.96,   -0.31,    0.40,    0.00
+20200504,    0.54,   -0.13,   -1.29,   -0.74,   -0.39,    0.00
+20200505,    0.95,   -0.29,   -2.01,   -0.48,   -0.54,    0.00
+20200506,   -0.52,    0.08,   -2.72,    0.19,   -0.56,    0.00
+20200507,    1.33,    0.16,    0.41,   -0.10,   -0.71,    0.00
+20200508,    1.90,    1.90,    2.46,    0.83,    0.39,    0.00
+20200511,    0.06,   -0.25,   -3.79,   -0.86,   -0.10,    0.00
+20200512,   -2.07,   -1.12,   -1.36,   -0.63,   -0.01,    0.00
+20200513,   -1.89,   -1.43,   -2.08,   -0.05,   -0.23,    0.00
+20200514,    1.15,   -1.07,    0.92,    0.64,    0.12,    0.00
+20200515,    0.57,    1.33,   -1.15,    0.02,   -0.76,    0.00
+20200518,    3.24,    2.68,    4.61,    1.64,    0.29,    0.00
+20200519,   -1.01,   -0.78,   -1.51,    0.53,   -0.71,    0.00
+20200520,    1.80,    1.22,    1.31,   -0.28,   -0.33,    0.00
+20200521,   -0.71,    0.74,    0.42,    0.13,    0.03,    0.00
+20200522,    0.27,    0.25,   -0.85,   -0.56,   -0.38,    0.00
+20200526,    1.23,    1.27,    4.54,    0.99,    0.53,    0.00
+20200527,    1.54,    1.46,    3.59,    0.74,    0.44,    0.00
+20200528,   -0.41,   -2.09,   -2.41,   -0.25,    0.04,    0.00
+20200529,    0.59,   -0.81,   -1.98,   -0.32,   -0.47,    0.00
+20200601,    0.51,    0.26,    0.43,    0.01,   -0.22,    0.00
+20200602,    0.81,    0.06,    0.55,    0.11,    0.29,    0.00
+20200603,    1.41,    0.78,    2.62,    0.71,    0.22,    0.00
+20200604,   -0.34,    0.53,    2.90,    0.99,    0.63,    0.00
+20200605,    2.50,    1.08,    2.75,    0.70,    0.08,    0.00
+20200608,    1.35,    0.69,    2.07,   -0.48,    0.58,    0.00
+20200609,   -0.86,   -0.80,   -1.92,   -0.02,   -0.47,    0.00
+20200610,   -0.55,   -1.82,   -4.10,   -0.31,   -0.33,    0.00
+20200611,   -5.91,   -1.49,   -3.03,   -0.20,   -0.24,    0.00
+20200612,    1.29,    0.80,    1.82,    0.13,    0.02,    0.00
+20200615,    1.08,    1.43,   -0.38,   -0.77,   -0.29,    0.00
+20200616,    1.88,    0.61,    0.49,    0.63,    0.20,    0.00
+20200617,   -0.41,   -1.35,   -1.97,   -0.56,   -0.24,    0.00
+20200618,    0.18,    0.01,   -0.53,   -0.40,   -0.23,    0.00
+20200619,   -0.45,   -0.15,   -0.67,   -0.71,   -0.29,    0.00
+20200622,    0.71,    0.47,   -1.36,   -0.38,   -0.36,    0.00
+20200623,    0.41,    0.21,   -0.60,    0.59,   -0.12,    0.00
+20200624,   -2.62,   -0.70,   -1.36,   -0.06,    0.31,    0.00
+20200625,    1.13,    0.34,    0.50,   -0.82,    0.17,    0.00
+20200626,   -2.43,   -0.19,   -1.39,    0.02,    0.72,    0.00
+20200629,    1.50,    1.48,    1.86,    1.49,    0.39,    0.00
+20200630,    1.58,   -0.01,   -0.01,   -0.39,   -0.27,    0.00
+
+Copyright 2026 Eugene F. Fama and Kenneth R. French
+"""
+
+FF5_MONTHLY_2020 = """\
+This file was created using the 202609 CRSP database.
+The 1-month TBill rate data until 202405 are from Ibbotson Associates. Starting from 202406, the 1-month TBill rate is from ICE BofA US 1-Month Treasury Bill Index.
+The annual TBill return is compounded from the monthly T-bill rates from January to December.
+
+,Mkt-RF,SMB,HML,RMW,CMA,RF
+202001,   -0.09,   -4.37,   -6.22,   -1.19,   -2.19,    0.13
+202002,   -8.15,    0.08,   -3.82,   -1.43,   -2.53,    0.12
+202003,  -13.35,   -8.18,  -13.83,   -1.61,    1.19,    0.12
+202004,   13.58,    2.57,   -1.34,    2.76,   -1.02,    0.00
+202005,    5.59,    1.92,   -5.00,    0.96,   -3.16,    0.01
+202006,    2.44,    1.95,   -2.17,    0.14,    0.55,    0.01
+202007,    5.83,   -3.19,   -1.44,    0.38,    0.97,    0.01
+202008,    7.62,   -0.89,   -3.02,    4.27,   -1.51,    0.01
+202009,   -3.64,   -0.01,   -2.72,   -1.38,   -1.93,    0.01
+202010,   -2.08,    4.67,    4.25,   -0.77,   -0.57,    0.01
+202011,   12.44,    7.12,    2.09,   -2.25,    1.28,    0.01
+202012,    4.63,    4.93,   -1.68,   -1.97,   -0.06,    0.01
+
+ Annual Factors: January-December
+,Mkt-RF,SMB,HML,RMW,CMA,RF
+  2019,   28.40,   -6.53,  -10.36,    3.81,   -2.98,    2.14
+  2020,   23.65,    3.74,  -46.94,   -5.21,  -11.70,    0.44
+
+Copyright 2026 Eugene F. Fama and Kenneth R. French
+"""
+
+MOM_MONTHLY_2020 = """\
+This file was created using the 202609 CRSP database.  It
+contains a momentum factor, constructed from six value-weight portfolios formed
+using independent sorts on size and prior return of NYSE, AMEX, and NASDAQ stocks
+Mom    is the average of the returns on two (big and small) high prior return portfolios
+minus the average of the returns on two low prior return portfolios.  The portfolios
+are constructed monthly.  Big means a firm is above the median market cap on the NYSE
+at the end of the previous month; small firms are below the median NYSE market cap.
+Prior return is measured from month -12 to - 2.  Firms in the low prior return
+portfolio are below the 30th NYSE percentile.  Those in the high portfolio are above
+the 70th NYSE percentile.
+
+Missing data are indicated by -99.99 or -999.
+
+,Mom
+202001,   6.02
+202002,  -0.25
+202003,   8.20
+202004,  -5.61
+202005,   0.15
+202006,  -0.87
+202007,   7.70
+202008,   0.43
+202009,   3.18
+202010,  -3.10
+202011, -12.60
+202012,  -2.26
+
+Annual Factors:
+January-December
+,Mom
+  2019,  -2.09
+  2020,   7.34
+
+Copyright 2026 Eugene F. Fama and Kenneth R. French
+"""
+
+MOM_DAILY_2020Q2 = """\
+This file was created by using the 202609 CRSP database.  It
+contains a momentum factor, constructed from six value-weight portfolios formed
+using independent sorts on size and prior return of NYSE, AMEX, and NASDAQ stocks.
+MOM is the average of the returns on two (big and small) high prior return portfolios
+minus the average of the returns on two low prior return portfolios.  The portfolios
+are constructed daily.  Big means a firm is above the median market cap on the NYSE
+at the end of the previous day; small firms are below the median NYSE market cap.
+Prior return is measured from day - 250 to - 21.  Firms in the low prior return
+portfolio are below the 30th NYSE percentile.  Those in the high portfolio are above
+the 70th NYSE percentile.
+
+Missing data are indicated by -99.99 or -999.
+
+,Mom
+20200401,   0.18
+20200402,  -0.97
+20200403,  -0.26
+20200406,  -0.33
+20200407,  -1.77
+20200408,  -2.11
+20200409,  -0.67
+20200413,   0.83
+20200414,   2.12
+20200415,   2.35
+20200416,   3.90
+20200417,  -5.51
+20200420,   1.46
+20200421,  -0.38
+20200422,   0.37
+20200423,  -2.40
+20200424,   0.35
+20200427,  -2.34
+20200428,  -3.34
+20200429,  -4.76
+20200430,   0.80
+20200501,   2.83
+20200504,   0.11
+20200505,   2.23
+20200506,   2.21
+20200507,  -2.19
+20200508,  -3.47
+20200511,   2.51
+20200512,   0.93
+20200513,   3.16
+20200514,  -0.96
+20200515,   0.64
+20200518,  -6.28
+20200519,   1.11
+20200520,  -1.48
+20200521,  -1.24
+20200522,   0.82
+20200526,  -4.81
+20200527,  -2.54
+20200528,   2.21
+20200529,   2.38
+20200601,  -1.98
+20200602,  -1.33
+20200603,  -4.82
+20200604,  -3.43
+20200605,  -5.17
+20200608,  -5.04
+20200609,   4.30
+20200610,   5.98
+20200611,   5.11
+20200612,  -3.94
+20200615,   0.67
+20200616,  -0.91
+20200617,   2.89
+20200618,  -0.10
+20200619,   1.20
+20200622,   1.48
+20200623,   0.29
+20200624,   3.01
+20200625,  -0.51
+20200626,   1.28
+20200629,  -2.60
+20200630,   1.20
+
+Copyright 2026 Eugene F. Fama and Kenneth R. French
+"""

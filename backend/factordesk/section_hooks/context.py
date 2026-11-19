@@ -16,11 +16,13 @@ from factordesk.analytics.diagnostics import DiagnosticsResult, GateResult, Mult
 from factordesk.analytics.regression import FullSampleRegression
 from factordesk.analytics.rolling import RollingBetas
 from factordesk.analytics.sample import AnalysisSample
+from factordesk.analytics.subject import ReturnSubject
 from factordesk.data.audit import AuditReport
 from factordesk.data.prices import PriceHistory
 from factordesk.report.schema import (
     AverageBetaPanel,
     DataInfo,
+    FactorModel,
     FactorVintage,
     MultiDayRegression,
     PriceSeries,
@@ -32,6 +34,8 @@ from factordesk.report.schema import (
     RollingWindow,
     SampleInfo,
 )
+
+FACTOR_MODELS: tuple[FactorModel, ...] = ("ff5", "ff6")
 
 
 @dataclass(frozen=True)
@@ -83,12 +87,18 @@ class CoreSections:
 
 @dataclass(frozen=True)
 class SectionContext:
-    """Everything a section hook may use. Built by ``pipeline.assemble_report``."""
+    """Everything a section hook may use. Built by ``pipeline.assemble_subject_report``.
+
+    A hook runs only for the subjects, frequencies and models its ``HookSpec`` declares
+    (``section_hooks/registry.py``), so a daily-only hook never sees a monthly context.
+    """
 
     ticker: str
+    """The subject's label (the ticker symbol in ticker mode)."""
     now: datetime
-    history: PriceHistory
-    """Prices after repeated dates were collapsed (D29)."""
+    history: PriceHistory | None
+    """Prices after repeated dates were collapsed (D29); ``None`` unless the subject is a
+    ticker. Hooks that need dates use ``subject.calendar``."""
     factor_frame: pd.DataFrame
     """The whole French factor frame (for the French calendar of lead-lag LL2.2)."""
     sample: AnalysisSample
@@ -96,7 +106,7 @@ class SectionContext:
     vintage: FactorVintage
     audit: AuditReport
     daily: FullSampleRegression
-    """The M3.1 daily fit, before the quality gate."""
+    """The M3.1 fit at the subject's own frequency, before the quality gate (daily data only)."""
     regression: FullSampleRegression
     """The fit behind the reported tags (after the gate, M3.6)."""
     diagnostics: DiagnosticsResult | None
@@ -108,6 +118,9 @@ class SectionContext:
     core: CoreSections
     inputs: SectionInputs
     make_sample_info: Callable[[int | None], SampleInfo]
+    subject: ReturnSubject
+    """What the report is about: kind, frequency, returns, calendar, levels."""
+    model: FactorModel = "ff5"
 
     def sample_info(self, window: int | None = None) -> SampleInfo:
         """``SampleInfo`` of the analysis sample, with ``window`` as its trailing-window length."""

@@ -4,7 +4,7 @@
  */
 import type { FactorReport, PerformanceSection } from "../api/types";
 import { dateLong, num, pct } from "../format";
-import { finite, isoMs } from "../report/derive";
+import { countWord, factorCount, finite, isoMs } from "../report/derive";
 import { compareFits } from "../components/report/sections/worldBetaModel";
 import { plural } from "./outcome";
 
@@ -54,24 +54,37 @@ export function drawdownOutcome(report: FactorReport, section: PerformanceSectio
   return `${t} ${move} over the analysed range; ${fall}, ${back}.`;
 }
 
-/** World beta: the beta against ACWI and the US market beta on the same days, with the span note. */
-export function worldBetaOutcome(report: FactorReport): string | null {
+/** World beta, first sentence: the beta against ACWI and the US market beta on the same days. */
+export function worldBetaLead(report: FactorReport): string | null {
   const s = report.world_beta;
   if (!s || s.status !== "ok" || !s.world || !s.us_market || !s.sample.start || !s.sample.end) return null;
   const phrase = COMPARED[compareFits(s.world, s.us_market)];
   const days = plural(s.sample.n, "day", "days");
-  let text =
+  return (
     `Against world stocks, ${report.ticker}'s beta was ${num(s.world.beta, 2)} over ${dateLong(s.sample.start)} to ${dateLong(s.sample.end)} ` +
-    `(${days}), ${phrase} its beta against the US market on the same days (${num(s.us_market.beta, 2)}).`;
-  if (s.sample.start !== report.data.actual_start) {
-    // The first shared return falls on the fund's second price date, so "starts there" allows a week.
-    const first = s.acwi_first_date;
-    const gapDays = first === null ? Infinity : (isoMs(s.sample.start) - isoMs(first)) / 86_400_000;
-    const reason =
-      first !== null && gapDays >= 0 && gapDays <= 7
-        ? `the fund's history starts in ${monthYear(first)}`
-        : `the two price histories overlap only from ${dateLong(s.sample.start)}`;
-    text += ` This covers a shorter span than the five-factor model, because ${reason}.`;
-  }
-  return text;
+    `(${days}), ${phrase} its beta against the US market on the same days (${num(s.us_market.beta, 2)}).`
+  );
+}
+
+/** World beta, second sentence: why the span is shorter than the factor model's; null when it is not. */
+export function worldBetaSpanNote(report: FactorReport): string | null {
+  const s = report.world_beta;
+  if (!s || s.status !== "ok" || !s.world || !s.us_market || !s.sample.start || !s.sample.end) return null;
+  if (s.sample.start === report.data.actual_start) return null;
+  // The first shared return falls on the fund's second price date, so "starts there" allows a week.
+  const first = s.acwi_first_date;
+  const gapDays = first === null ? Infinity : (isoMs(s.sample.start) - isoMs(first)) / 86_400_000;
+  const reason =
+    first !== null && gapDays >= 0 && gapDays <= 7
+      ? `the fund's history starts in ${monthYear(first)}`
+      : `the two price histories overlap only from ${dateLong(s.sample.start)}`;
+  return `This covers a shorter span than the ${countWord(factorCount(report))}-factor model, because ${reason}.`;
+}
+
+/** World beta: the lead sentence and the span note. */
+export function worldBetaOutcome(report: FactorReport): string | null {
+  const lead = worldBetaLead(report);
+  if (lead === null) return null;
+  const note = worldBetaSpanNote(report);
+  return note === null ? lead : `${lead} ${note}`;
 }

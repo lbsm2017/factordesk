@@ -2,29 +2,35 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { dateLong } from "../format";
-import { isSuggestQuery } from "../state/url";
-import type { UrlState } from "../state/url";
+import { DEFAULT_MODEL, DEFAULT_RANGE, isSuggestQuery } from "../state/url";
+import type { FactorModel, UrlState } from "../state/url";
 import { ApiRequestError, apiRequest, NETWORK_ERROR } from "./client";
 import type { ApiError, FactorDataStatus, FactorReport, RangeOptions, TickerSuggestions } from "./types";
 
 const SUGGEST_LIMIT = 8;
 export const SUGGEST_DEBOUNCE_MS = 150;
 
-/** Query parameters of the report endpoints: custom dates win over a preset; neither means FULL. */
+/** The dashboard always names the model, because its default (FF6) differs from the API default (FF5). */
+function modelParam(model: FactorModel | undefined): Record<string, string> {
+  return { model: model ?? DEFAULT_MODEL };
+}
+
+/** Query parameters of the report endpoints: custom dates win over a preset; neither means the default range. The model is always sent. */
 export function reportParams(state: UrlState): Record<string, string> {
   if (state.start || state.end) {
     return {
       ...(state.start ? { start: state.start } : {}),
       ...(state.end ? { end: state.end } : {}),
+      ...modelParam(state.model),
     };
   }
-  return { range: state.range ?? "FULL" };
+  return { range: state.range ?? DEFAULT_RANGE, ...modelParam(state.model) };
 }
 
 /** The `rangeOrDates` part of the report query key. */
 export function reportRangeKey(state: UrlState): string {
   if (state.start || state.end) return `${state.start ?? ""}..${state.end ?? ""}`;
-  return state.range ?? "FULL";
+  return state.range ?? DEFAULT_RANGE;
 }
 
 /** `/api/report/{t}/html?{same range}` for the Download link (dashboard spec DB6.5). */
@@ -78,7 +84,7 @@ export function useRanges(ticker: string | null) {
 export function useReport(state: UrlState) {
   const { ticker } = state;
   return useQuery({
-    queryKey: ["report", ticker, reportRangeKey(state)],
+    queryKey: ["report", ticker, reportRangeKey(state), state.model ?? DEFAULT_MODEL],
     queryFn: ({ signal }) =>
       apiRequest<FactorReport>(`/api/report/${encodeURIComponent(ticker ?? "")}`, {
         signal,
@@ -125,5 +131,36 @@ export function useRefreshFactors(onMessage: (message: string) => void) {
       const { message, action } = toApiError(error);
       onMessage(`${message} ${action}`);
     },
+  });
+}
+
+export type GrossNet = "gross" | "net" | "";
+
+export interface UploadInput {
+  file: File;
+  /** Display name of the record; empty lets the server use its default. */
+  name: string;
+  /** Whether the returns are before or after fees; empty means not stated. */
+  grossNet: GrossNet;
+  /** The factor model; the dashboard always sends it. */
+  model?: FactorModel;
+}
+
+/** The multipart body of `POST /api/report/upload`: the file, then the optional name and fee basis, and the model (always sent). */
+export function uploadBody({ file, name, grossNet, model }: UploadInput): FormData {
+  const body = new FormData();
+  body.append("file", file);
+  if (name.trim() !== "") body.append("name", name.trim());
+  if (grossNet !== "") body.append("gross_net", grossNet);
+  body.append("model", model ?? DEFAULT_MODEL);
+  return body;
+}
+
+/** Runs a monthly track record through the API. The result is held by the hook only: never cached, never stored. */
+export function useUploadReport() {
+  return useMutation({
+    mutationFn: (input: UploadInput) =>
+      apiRequest<FactorReport>("/api/report/upload", { method: "POST", body: uploadBody(input) }),
+    retry: false,
   });
 }

@@ -5,6 +5,7 @@ One module per feature, each owned by its feature branch; this file does not cha
 feature fills its panel in.
 """
 
+from factordesk.report.panels import alpha_strip as alpha_strip
 from factordesk.report.panels import fragility as fragility
 from factordesk.report.panels import kalman as kalman
 from factordesk.report.panels import lead_lag as lead_lag

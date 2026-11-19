@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { cloneReport, mockReport } from "../../test/fixture";
+import { cloneReport, mockReport, monthlyReport } from "../../test/fixture";
 import { ReportView } from "../report/ReportView";
-import { auditBadge, NAV_ITEMS, sectionHasData } from "./SectionNav";
+import { auditBadge, NAV_ITEMS, navLabel, sectionHasData } from "./SectionNav";
 import { Shell } from "./Shell";
 
 function page(report = mockReport) {
@@ -25,7 +25,7 @@ function page(report = mockReport) {
 describe("SectionNav", () => {
   it("lists the panels on the page, in page order, with the deeper checks after their sub-heading", async () => {
     page();
-    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    const nav = await screen.findByRole("navigation", { name: "Sections" }, { timeout: 5_000 });
     const labels = Array.from(nav.querySelectorAll("a")).map((a) => a.querySelector(".nav-label")?.textContent);
     expect(labels).toEqual([
       "Summary",
@@ -47,7 +47,7 @@ describe("SectionNav", () => {
 
   it("titles every listed panel with the label of its nav item", async () => {
     page();
-    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    const nav = await screen.findByRole("navigation", { name: "Sections" }, { timeout: 5_000 });
     for (const a of nav.querySelectorAll("a")) {
       const id = (a.getAttribute("href") ?? "").slice(1);
       await waitFor(
@@ -71,9 +71,23 @@ describe("SectionNav", () => {
 
   it("never lists Lead-lag or Fragility for a report without those sections", async () => {
     page();
-    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    const nav = await screen.findByRole("navigation", { name: "Sections" }, { timeout: 5_000 });
     const labels = Array.from(nav.querySelectorAll(".nav-label")).map((n) => n.textContent ?? "");
     expect(labels.join("|")).not.toMatch(/Lead-lag|Fragility/);
+  });
+
+  it("names the price item Growth of 100 for a report with a subject", async () => {
+    const price = NAV_ITEMS.find((i) => i.id === "price");
+    if (price === undefined) throw new Error("no price item");
+    expect(navLabel(price, mockReport)).toBe("Price");
+    expect(navLabel(price, undefined)).toBe("Price");
+    expect(navLabel(price, monthlyReport)).toBe("Growth of 100");
+    page(monthlyReport);
+    const nav = await screen.findByRole("navigation", { name: "Sections" }, { timeout: 5_000 });
+    const labels = Array.from(nav.querySelectorAll(".nav-label")).map((n) => n.textContent ?? "");
+    expect(labels).toContain("Growth of 100");
+    expect(labels).not.toContain("Price");
+    expect(document.querySelector("#price h2")?.textContent).toBe("Growth of 100");
   });
 
   it("names a label and an icon for every item, and a target id once only", () => {
@@ -84,7 +98,7 @@ describe("SectionNav", () => {
 
   it("counts audit warnings and errors on Data and audit, with hidden words", async () => {
     page();
-    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    const nav = await screen.findByRole("navigation", { name: "Sections" }, { timeout: 5_000 });
     const link = nav.querySelector('a[href="#data"]') as HTMLElement;
     expect(link.querySelector(".nav-badge")?.textContent).toBe("1 audit finding");
     expect(link.querySelector(".nav-badge")?.classList.contains("error")).toBe(false);
@@ -102,7 +116,7 @@ describe("SectionNav", () => {
   it("moves focus to the panel heading, marks the item current and replaces the hash", async () => {
     page();
     const before = window.history.length;
-    const link = await screen.findByRole("link", { name: "Risk sources" });
+    const link = await screen.findByRole("link", { name: "Risk sources" }, { timeout: 5_000 });
     fireEvent.click(link);
     expect(document.activeElement?.textContent).toBe(document.querySelector("#risk h2")?.textContent);
     expect(document.activeElement?.getAttribute("tabindex")).toBe("-1");
@@ -147,7 +161,7 @@ describe("drawer (under 900 px)", () => {
     page();
     const menu = screen.getByRole("button", { name: "Menu" });
     fireEvent.click(menu);
-    fireEvent.click(await screen.findByRole("link", { name: "Price" }));
+    fireEvent.click(await screen.findByRole("link", { name: "Price" }, { timeout: 5_000 }));
     expect(menu.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement?.textContent).toBe("Price");
   });

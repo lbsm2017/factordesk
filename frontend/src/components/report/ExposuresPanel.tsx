@@ -4,6 +4,7 @@
 import type { FactorReport } from "../../api/types";
 import { useShowStats } from "../../state/stats";
 import { exposuresOutcome } from "../../text/outcome";
+import { isSubjectReport } from "../../report/subject";
 import { exposureReading, plainName } from "../../text/plain";
 import { BarCell } from "../charts/BarCell";
 import { axisLabels, exposureModel, exposuresUnavailable } from "./exposureModel";
@@ -14,6 +15,7 @@ import type { ReportPanelProps } from "./types";
 import "./signColor.css";
 
 const QUESTION = "What is this stock exposed to, and how sure are we?";
+const RECORD_QUESTION = "What is this track record exposed to, and how sure are we?";
 const DEFAULT_DESC = "Descriptive, in-sample, not predictive.";
 
 /** Sign colour on a beta (owner, 2026-11-19): green above zero, red below; not-significant betas stay grey. */
@@ -149,6 +151,10 @@ function ExposureTable({ model, stats }: { model: ExposureModel; stats: boolean 
   );
 }
 
+/** What the significance tag (the backend's "reliable") does and does not say (E9a). */
+export const NOISE_ONLY =
+  "The tag protects against reading noise as a pattern, and nothing more: it does not show that a factor caused the returns or that the model is the right one.";
+
 function footnotes(report: FactorReport, window: number): { footnote: string; how: string } {
   const g = report.regression;
   const texts = report.label_text;
@@ -159,7 +165,10 @@ function footnotes(report: FactorReport, window: number): { footnote: string; ho
     `The diamond and the Avg ${window}d column are the mean of the overlapping rolling estimates.`,
     ...g.labels.filter((k) => k !== "L-DESC").flatMap((k) => (texts[k] ? [texts[k]] : [])),
   ];
-  return { footnote: `${desc} Significant means the adjusted p is below 0.05.`, how: more.filter(Boolean).join(" ") };
+  return {
+    footnote: `${desc} Significant means the adjusted p is below 0.05. ${NOISE_ONLY}`,
+    how: more.filter(Boolean).join(" "),
+  };
 }
 
 /** Panel 5 (design D5): betas as an SVG-in-table bar chart. Every number is also a text column. */
@@ -171,7 +180,7 @@ export function ExposuresPanel({ report }: ReportPanelProps) {
       <Panel
         id="exposures"
         title="Factor exposures"
-        question={QUESTION}
+        question={isSubjectReport(report) ? RECORD_QUESTION : QUESTION}
         empty={{
           reason: g.reason ?? "Insufficient data: no factor betas available.",
           action: "Widen the date range and run the report again.",
@@ -181,12 +190,13 @@ export function ExposuresPanel({ report }: ReportPanelProps) {
   }
   const model = exposureModel(report);
   const { footnote, how } = footnotes(report, model.window);
-  const reading = exposureReading(g.factors);
+  const record = isSubjectReport(report);
+  const reading = exposureReading(g.factors, record ? "the record" : undefined);
   return (
     <Panel
       id="exposures"
       title="Factor exposures"
-      question={QUESTION}
+      question={record ? RECORD_QUESTION : QUESTION}
       outcome={exposuresOutcome(report)}
       legend={<Legend window={model.window} hasAverages={model.hasAverages} />}
       reading={reading || undefined}

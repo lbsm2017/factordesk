@@ -6,10 +6,11 @@
  */
 import type { FactorReport, FactorStat } from "../api/types";
 import { count, dateLong, num, pct } from "../format";
-import { factorOrder, finite, IDIO, windowStats } from "../report/derive";
+import { countWord, factorOrder, finite, IDIO, windowStats } from "../report/derive";
+import { auditWord, isMonthly, isSubjectReport, observations, stepWord } from "../report/subject";
 import { PLAIN } from "./plain";
 
-const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five"] as const;
+const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five", "Six"] as const;
 
 function pct1(x: number): string {
   return pct(Math.abs(x), 1, false);
@@ -48,10 +49,12 @@ export function priceOutcome(report: FactorReport): string | null {
   if (a === null || b === null || a === 0) return null;
   const ch = b / a - 1;
   const move = pct1(ch) === "0.0%" ? "ended where it started" : `${ch > 0 ? "rose" : "fell"} ${pct1(ch)}`;
-  let text = `With dividends reinvested, ${report.ticker} ${move} over the analysed range (${dateLong(d.actual_start)} to ${dateLong(d.actual_end)}).`;
+  const lead = isSubjectReport(report) ? "" : "With dividends reinvested, ";
+  let text = `${lead}${report.ticker} ${move} over the analysed range (${dateLong(d.actual_start)} to ${dateLong(d.actual_end)}).`;
   if (d.uncovered.n > 0) {
     const n = d.uncovered.n;
-    text += ` The last ${n} price ${n === 1 ? "day is" : "days are"} charted but not analysed.`;
+    const noun = isMonthly(report) ? "month" : "price day";
+    text += ` The last ${n} ${noun}${n === 1 ? " is" : "s are"} charted but not analysed.`;
   }
   return text;
 }
@@ -60,15 +63,16 @@ function isClear(f: FactorStat): boolean {
   return f.tag === "reliable";
 }
 
-/** Factor exposures: how many of the five betas are clear, and which. */
+/** Factor exposures: how many of the betas (five, or six under FF6) are clear, and which. */
 export function exposuresOutcome(report: FactorReport): string | null {
   const fs = report.regression.factors;
   if (report.regression.status !== "ok" || fs.length === 0) return null;
   const clear = fs.filter(isClear).map((f) => plain(f.name).toLowerCase());
   const rest = fs.filter((f) => !isClear(f)).map((f) => plain(f.name).toLowerCase());
-  if (clear.length === 0) return "None of the five exposures is distinguishable from zero over this range.";
+  const all = countWord(fs.length);
+  if (clear.length === 0) return `None of the ${all} exposures is distinguishable from zero over this range.`;
   const k = clear.length;
-  let text = `${NUMBER_WORDS[k] ?? String(k)} of the five exposures ${k === 1 ? "is" : "are"} clear (${list(clear)})`;
+  let text = `${NUMBER_WORDS[k] ?? String(k)} of the ${all} exposures ${k === 1 ? "is" : "are"} clear (${list(clear)})`;
   text += rest.length > 0 ? `; ${list(rest)} ${rest.length === 1 ? "is" : "are"} not distinguishable from zero.` : ".";
   return text;
 }
@@ -110,11 +114,11 @@ export function riskOutcome(report: FactorReport): string | null {
   const t = report.ticker;
   const top = rk.order[0];
   if (top === undefined || top === IDIO) {
-    return `Most of ${t}'s day-to-day risk is specific to ${t} (${pct1(idio)}).`;
+    return `Most of ${t}'s ${stepWord(report)} risk is specific to ${t} (${pct1(idio)}).`;
   }
   const share = finite(rk.factors[top]);
   if (share === null) return null;
-  return `${plain(top)} exposure drives ${pct1(share)} of ${t}'s day-to-day risk; ${pct1(idio)} is specific to ${t}.`;
+  return `${plain(top)} exposure drives ${pct1(share)} of ${t}'s ${stepWord(report)} risk; ${pct1(idio)} is specific to ${t}.`;
 }
 
 /** Exposure over time: the middle 80% of the market beta, and the style factors that crossed zero. */
@@ -144,14 +148,14 @@ export function dataOutcome(report: FactorReport): string {
   const w = d.audit_findings.filter((f) => f.severity === "warning").length;
   let audit: string;
   if (d.audit_status === "errors" || e > 0) {
-    audit = `The price audit found ${plural(e, "error", "errors")}; the results above are not interpretable until ${e === 1 ? "it is" : "they are"} explained.`;
+    audit = `The ${auditWord(report)} audit found ${plural(e, "error", "errors")}; the results above are not interpretable until ${e === 1 ? "it is" : "they are"} explained.`;
   } else if (d.audit_status === "warnings" || w > 0) {
-    audit = `The price audit flagged ${plural(w, "unusual item", "unusual items")}; none stops the analysis.`;
+    audit = `The ${auditWord(report)} audit flagged ${plural(w, "unusual item", "unusual items")}; none stops the analysis.`;
   } else {
-    audit = "The price audit found no problems.";
+    audit = `The ${auditWord(report)} audit found no problems.`;
   }
   const excluded = d.n_excluded > 0 ? count(d.n_excluded) : "none";
-  return `${audit} ${count(d.n_obs)} trading days analysed, ${excluded} excluded.`;
+  return `${audit} ${observations(report, d.n_obs)} analysed, ${excluded} excluded.`;
 }
 
 /** Regression detail: betas significant after the multiple-test correction, and the alpha tag. */
@@ -160,8 +164,9 @@ export function regressionOutcome(report: FactorReport): string | null {
   if (reg.status !== "ok") return null;
   const k = reg.factors.filter(isClear).length;
   const kText = NUMBER_WORDS[k] ?? String(k);
+  const all = countWord(reg.factors.length);
   const alpha = reg.alpha_tag === "reliable" ? "distinguishable" : "not distinguishable";
-  let text = `${kText} of the five betas ${k === 1 ? "is" : "are"} significant after allowing for testing five at once; the return beyond the exposures is ${alpha} from zero.`;
+  let text = `${kText} of the ${all} betas ${k === 1 ? "is" : "are"} significant after allowing for testing ${all} at once; the return beyond the exposures is ${alpha} from zero.`;
   if (report.quality_gate.fired) {
     text += " Because the quality gate fired, a term counts as significant only when the 5-day estimate agrees.";
   }

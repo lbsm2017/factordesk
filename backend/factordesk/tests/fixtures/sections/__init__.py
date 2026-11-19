@@ -29,6 +29,8 @@ SECTION_FILES: dict[str, str] = {
     "world_beta": "world_beta.json",
     "residual": "residual_alpha.json",
     "kalman_betas": "kalman.json",
+    "tail_risk": "tail_risk.json",
+    "alpha_strip": "alpha_strip.json",
 }
 """``FactorReport`` field name -> fixture file in this folder."""
 

@@ -21,18 +21,20 @@ import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
 import { RollingPanel } from "./RollingPanel";
 import { SummaryPanel } from "./SummaryPanel";
+import { AlphaStripPanel } from "./sections/AlphaStripPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
 import { LazyKalmanPanel, LazyRegressionDetail, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
 import { PerformancePanel } from "./sections/PerformancePanel";
 import { ResidualAlphaPanel } from "./sections/ResidualAlphaPanel";
+import { TailRiskPanel } from "./sections/TailRiskPanel";
 import { WorldBetaPanel } from "./sections/WorldBetaPanel";
 
 /** What `ReportView` hands to every panel; each panel reads the props it needs. */
 export interface PanelHostProps {
   report: FactorReport;
-  /** `/api/report/{t}/html?{same range}`, for the Download link in the header. */
-  downloadHref: string;
+  /** `/api/report/{t}/html?{same range}`, for the Download link in the header; null for an uploaded record. */
+  downloadHref: string | null;
   /** Rolling window shown (the URL's `win`, or the report's primary window). */
   win: RollingWindowDays;
   onWinChange: (win: RollingWindowDays) => void;
@@ -51,7 +53,9 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "summary", position: 200, Component: SummaryPanel },
   { name: "price", position: 400, Component: PricePanel },
   { name: "performance", position: 450, Component: PerformancePanel },
+  { name: "tail_risk", position: 460, Component: TailRiskPanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
+  { name: "alpha_strip", position: 502, Component: AlphaStripPanel },
   { name: "world_beta", position: 505, Component: WorldBetaPanel },
   { name: "returns", position: 600, Component: ReturnPanel },
   { name: "risk", position: 700, Component: RiskPanel },

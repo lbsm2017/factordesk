@@ -13,7 +13,9 @@ const ORDER = [
   "summary",
   "price",
   "performance",
+  "tail_risk",
   "exposures",
+  "alpha_strip",
   "world_beta",
   "returns",
   "risk",
@@ -31,10 +33,12 @@ const ORDER = [
 /** Element id each optional section's panel uses, and the core panel it follows. */
 const SECTION_PANELS = {
   performance: { id: "performance", after: "price" },
+  tail_risk: { id: "tail-risk", after: "performance" },
   lead_lag: { id: "lead-lag", after: "shrunk" },
   shrunk_betas: { id: "shrunk", after: "kalman" },
   fragility: { id: "fragility", after: "lead-lag" },
-  world_beta: { id: "world-beta", after: "exposures" },
+  world_beta: { id: "world-beta", after: "alpha-strip" },
+  alpha_strip: { id: "alpha-strip", after: "exposures" },
   residual: { id: "residual", after: "rolling" },
   kalman_betas: { id: "kalman", after: "residual" },
 } as const;

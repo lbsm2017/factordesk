@@ -22,6 +22,22 @@ export function Landing({ recent, onPick }: { recent: string[]; onPick: (ticker:
   );
 }
 
+/** Landing of the track-record mode: nothing uploaded yet. The controls are in the sidebar. */
+export function TrackLanding() {
+  return (
+    <main className="landing" data-testid="track-landing">
+      <h1>
+        <span className="ticker">Track record</span>
+      </h1>
+      <p className="coverage">
+        Drop a CSV file with a date and a return column in the sidebar and press Factor it. Each row is one calendar
+        month and the return is a decimal, for example 2021-01-31,0.012. At least 36 months are needed. The file is
+        analysed in memory and is not stored.
+      </p>
+    </main>
+  );
+}
+
 const KPI_LABELS = ["Alpha a year", "R²", "Residual volatility", "Observations", "Analysed range"] as const;
 
 const FRAMES: readonly (readonly [string, number])[] = [

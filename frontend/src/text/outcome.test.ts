@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { FactorStat } from "../api/types";
 import { cloneReport, mockReport } from "../test/fixture";
 import { withSection } from "../test/sectionFixtures";
 import {
@@ -167,6 +168,18 @@ describe("outcome lines of DV4.9 on the mock report", () => {
     expect(regressionOutcome(r)).toBe(
       "Three of the five betas are significant after allowing for testing five at once; the return beyond the exposures is distinguishable from zero.",
     );
+  });
+
+  it("Regression detail: counts the real number of betas under FF6", () => {
+    const r = cloneReport();
+    r.model = "ff6";
+    const mom = { ...(r.regression.factors[0] as FactorStat), name: "Mom", beta: -0.2, tag: "reliable" as const };
+    r.regression.factors = [...r.regression.factors, mom];
+    const k = r.regression.factors.filter((f) => f.tag === "reliable").length;
+    const text = regressionOutcome(r) as string;
+    expect(text.startsWith(`${["None", "One", "Two", "Three", "Four", "Five", "Six"][k]} of the six betas`)).toBe(true);
+    expect(text).toContain("after allowing for testing six at once");
+    expect(text).not.toContain("five");
   });
 
   it("uses no forecast, causal or second-person words and never says no alpha", () => {

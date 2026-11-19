@@ -4,6 +4,7 @@
  */
 import type { FactorReport } from "../../api/types";
 import { dateLong, num, pct } from "../../format";
+import { isMonthly } from "../../report/subject";
 import { CHART_FONT_PX } from "../charts/chartTokens";
 import type { ChartTokens } from "../charts/chartTokens";
 import type { EChartsCoreOption } from "../charts/echartsCore";
@@ -85,7 +86,7 @@ export function priceModel(report: FactorReport): PriceModel | null {
   if (u.n > 0 && typeof u.compounded_return === "number" && Number.isFinite(u.compounded_return)) {
     rows.push({
       label: "After factor data",
-      sub: `${u.n} ${u.n === 1 ? "day" : "days"}, raw, not analysed`,
+      sub: `${u.n} ${isMonthly(report) ? (u.n === 1 ? "month" : "months") : u.n === 1 ? "day" : "days"}, raw, not analysed`,
       value: pct(u.compounded_return),
       muted: true,
     });

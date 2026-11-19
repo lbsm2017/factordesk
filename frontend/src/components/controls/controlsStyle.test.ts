@@ -75,3 +75,20 @@ describe("control boundaries on the rail and on light surfaces (WCAG 1.4.11)", (
     expect(contrast(t("--line"), t("--surface"))).toBeLessThan(3);
   });
 });
+
+describe("analysed-range bar on the rail", () => {
+  const t = (name: string) => hex(name, ruleBody(tokens, ":root {"));
+
+  it("draws the three parts from tokens: muted before, cyan analysed, hatched after", () => {
+    expect(ruleBody(controls, ".cov-seg.before")).toMatch(/background:\s*var\(--rail-track\)/);
+    expect(ruleBody(controls, ".cov-seg.analysed")).toMatch(/background:\s*var\(--rail-cyan\)/);
+    const after = ruleBody(controls, ".cov-seg.after");
+    expect(after).toMatch(/repeating-linear-gradient\(.*var\(--rail-track\)/);
+    expect(after).not.toMatch(/#[0-9a-fA-F]{3,8}b/);
+  });
+
+  it("keeps every mark at least 3:1 against the rail (WCAG 1.4.11)", () => {
+    expect(contrast(t("--rail-track"), t("--rail"))).toBeGreaterThanOrEqual(3);
+    expect(contrast(t("--rail-cyan"), t("--rail"))).toBeGreaterThanOrEqual(3);
+  });
+});

@@ -106,7 +106,7 @@ describe("readChartTokens", () => {
       const tokens = readChartTokens(root);
       expect(tokens.ink).toBe("rgb(1, 2, 3)");
       expect(tokens.factors[2]).toBe("rgb(4, 5, 6)");
-      expect(tokens.factors).toHaveLength(5);
+      expect(tokens.factors).toHaveLength(6);
     } finally {
       root.style.removeProperty("--ink");
       root.style.removeProperty("--f3");

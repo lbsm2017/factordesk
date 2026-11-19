@@ -64,6 +64,11 @@ class AppDeps:
     load_europe_benchmark: Callable[[], WorldBenchmarkInput] | None = None
     """The IEUR history of the Europe block of the world beta, refreshed like the ACWI one.
     Never raises. ``None``: not wired, so the Europe block is null."""
+    load_ff6: Callable[[datetime], pd.DataFrame] | None = None
+    """The daily FF6 frame (FF5 + RF + ``Mom``, ``data.french.load_ff6("daily")``). It feeds the
+    FF6 model and the alpha strip of every report. May raise ``FactorError``: an FF6 report then
+    fails, an FF5 report falls back to ``load_factors`` without the strip. ``None``: not wired, so
+    FF6 is refused and FF5 reports have no alpha strip."""
 
     def __post_init__(self) -> None:
         if self.max_workers < 1:
@@ -79,6 +84,11 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
 
     def load_factors(refresh: bool, now: datetime) -> pd.DataFrame:
         return load_ff5_daily(refresh=refresh, data_dir=data_dir, now=now)
+
+    def load_ff6_daily(now: datetime) -> pd.DataFrame:
+        from factordesk.data.french import load_ff6
+
+        return load_ff6("daily", data_dir=data_dir, now=now)
 
     def status(now: datetime) -> FactorStatus | None:
         return factor_status(data_dir=data_dir, now=now)
@@ -130,4 +140,5 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         load_section_inputs=section_inputs,
         load_world_benchmark=world_benchmark,
         load_europe_benchmark=europe_benchmark,
+        load_ff6=load_ff6_daily,
     )

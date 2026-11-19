@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FactorDataStatus, FactorReport, RangeOptions, TickerSuggestion } from "../../api/types";
-import { checkTicker } from "../../state/url";
+import { checkTicker, DEFAULT_RANGE } from "../../state/url";
 import type { Preset, UrlState } from "../../state/url";
 import { AnalysedRange } from "./AnalysedRange";
 import { CustomRange } from "./CustomRange";
@@ -36,16 +36,16 @@ export interface ControlsStripProps {
 const WHY_ID = "ctl-why";
 const LANDING_WHY = "Choose a ticker first. The date range applies to a loaded report.";
 
-/** The preset the chips show: custom dates clear it, and no range in the URL means Full history. */
+/** The preset the chips show: custom dates clear it, and no range in the URL means the default range (10Y). */
 export function selectedPreset(state: UrlState): Preset | null {
   if (state.start || state.end) return null;
-  return state.range ?? "FULL";
+  return state.range ?? DEFAULT_RANGE;
 }
 
 /**
  * The controls in the sidebar (prototype v4a, design J.2; dashboard spec DB6.3): ticker search and
- * "Factor it"; the date range (presets, From and To, the analysed-range line and the reason for any
- * disabled preset as visible text); the factor-data line.
+ * "Factor it"; the date range (presets, From and To, the analysed-range summary, with a one-line note
+ * for any disabled preset and its reason in the details); the factor-data line.
  */
 export function ControlsStrip({
   state,
@@ -106,18 +106,20 @@ export function ControlsStrip({
           disabled={noTicker}
           onCommit={(start, end) => onCommit({ range: null, start, end })}
         />
-        <AnalysedRange report={report} />
         {noTicker ? (
-          <div className="ctl-why side-note" id={WHY_ID}>
-            <p>{LANDING_WHY}</p>
-          </div>
-        ) : unavailable.length > 0 ? (
-          <div className="ctl-why side-note" id={WHY_ID}>
-            {unavailable.map((option) => (
-              <p key={option.preset}>{option.reason}</p>
-            ))}
-          </div>
-        ) : null}
+          <>
+            <AnalysedRange report={report} />
+            <div className="ctl-why side-note" id={WHY_ID}>
+              <p>{LANDING_WHY}</p>
+            </div>
+          </>
+        ) : (
+          <AnalysedRange
+            report={report}
+            noteId={WHY_ID}
+            unavailable={unavailable.map((o) => ({ preset: o.preset, reason: o.reason ?? "" }))}
+          />
+        )}
       </div>
       <div className="side-group">
         <FactorDataLine status={factorStatus} refreshing={refreshing} message={refreshMessage} onRefresh={onRefreshFactors} />

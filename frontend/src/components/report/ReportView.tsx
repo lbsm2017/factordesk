@@ -2,13 +2,14 @@ import type { FactorReport } from "../../api/types";
 import type { RollingWindowDays } from "../../state/url";
 import "../../styles/frame.css";
 import { Hatch } from "../charts/Hatch";
+import { hiddenPanels } from "../../report/applicability";
 import { orderedPanels } from "./panelRegistry";
 import type { PanelHostProps } from "./panelRegistry";
 
 export interface ReportViewProps {
   report: FactorReport;
-  /** `/api/report/{t}/html?{same range}`, for the Download link in the header. */
-  downloadHref: string;
+  /** `/api/report/{t}/html?{same range}`, for the Download link in the header; null hides it. */
+  downloadHref: string | null;
   /** Rolling window from the URL (`win`); null means the report's primary window. */
   win: RollingWindowDays | null;
   onWinChange: (win: RollingWindowDays) => void;
@@ -26,10 +27,11 @@ const PANELS_IN_ORDER = orderedPanels();
 export function ReportView({ report, downloadHref, win, onWinChange, busy = false }: ReportViewProps) {
   const primary: RollingWindowDays = report.average_beta.window === 126 ? 126 : 252;
   const host: PanelHostProps = { report, downloadHref, win: win ?? primary, onWinChange };
+  const hidden = hiddenPanels(report);
   return (
     <main className="report-region" aria-busy={busy} data-testid="report-region">
       <Hatch />
-      {PANELS_IN_ORDER.map(({ name, Component }) => (
+      {PANELS_IN_ORDER.filter(({ name }) => !hidden.has(name)).map(({ name, Component }) => (
         <Component key={name} {...host} />
       ))}
     </main>

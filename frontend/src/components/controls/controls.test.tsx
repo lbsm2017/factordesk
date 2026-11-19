@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { FactorDataStatus } from "../../api/types";
 import { EMPTY_URL_STATE } from "../../state/url";
 import type { UrlState } from "../../state/url";
-import { cloneReport, mockReport } from "../../test/fixture";
+import { cloneReport, mockReport, monthlyReport } from "../../test/fixture";
 import { mockRanges, mockStatus, mockTickers } from "../../test/mockApi";
-import { AnalysedRange, rangeLine } from "./AnalysedRange";
+import { AnalysedRange, noteLine, rangeLine } from "./AnalysedRange";
 import { ControlsStrip } from "./ControlsStrip";
 import type { ControlsStripProps } from "./ControlsStrip";
 import { CustomRange } from "./CustomRange";
@@ -297,20 +297,101 @@ describe("CustomRange", () => {
   });
 });
 
+/** A report whose price history has 4,421 days before the window, then `n_obs` analysed days, then `after` more. */
+function longReport(nObs: number, after: number) {
+  const report = cloneReport();
+  const total = 4421 + nObs + after;
+  report.price_series.dates = Array.from({ length: total }, (_, i) => new Date(Date.UTC(2000, 0, 1 + i)).toISOString().slice(0, 10));
+  report.data.actual_start = report.price_series.dates[4421] as string;
+  report.data.n_obs = nObs;
+  report.data.uncovered.n = after;
+  return report;
+}
+
 describe("AnalysedRange", () => {
   it("is a polite live region that is present before any report", () => {
     render(<AnalysedRange report={undefined} />);
     const label = screen.getByText("No range analysed yet.");
     expect(label.getAttribute("aria-live")).toBe("polite");
+    expect(document.querySelector(".cov-bar")).toBeNull();
+    expect(screen.queryByText("Details")).toBeNull();
   });
 
-  it("uses the static report's range-line wording", () => {
+  it("shows a one-line summary: start, end and the days analysed", () => {
     render(<AnalysedRange report={mockReport} />);
-    const label = document.querySelector("[aria-live='polite']");
-    expect(label?.textContent).toBe(
+    const line = document.querySelector(".cov-line");
+    expect(line?.getAttribute("aria-live")).toBe("polite");
+    expect(line?.querySelector(".cov-span")?.textContent).toBe("8 Aug 2024 → 30 Sep 2026");
+    expect(line?.querySelector(".cov-size")?.textContent).toBe("559 days");
+  });
+
+  it("draws the bar in three parts: muted before, solid analysed, hatched after", () => {
+    render(<AnalysedRange report={longReport(2512, 35)} />);
+    const parts = [...document.querySelectorAll<HTMLElement>(".cov-seg")];
+    expect(parts.map((p) => p.dataset["part"])).toEqual(["before", "analysed", "after"]);
+    expect(parts.map((p) => p.style.flexGrow)).toEqual(["4421", "2512", "35"]);
+  });
+
+  it("leaves out a part that is empty", () => {
+    const report = cloneReport();
+    report.data.uncovered.n = 0;
+    report.data.actual_start = report.price_series.dates[0] as string;
+    render(<AnalysedRange report={report} />);
+    expect([...document.querySelectorAll<HTMLElement>(".cov-seg")].map((p) => p.dataset["part"])).toEqual(["analysed"]);
+  });
+
+  it("gives the bar a text alternative with every part in words", () => {
+    render(<AnalysedRange report={longReport(2512, 35)} />);
+    const bar = screen.getByRole("img", { name: /Price history/ });
+    expect(bar.getAttribute("aria-label")).toBe(
+      "Price history: 2,512 trading days analysed; 4,420 price days before the window, not analysed; 35 price days after the factor data end, not analysed.",
+    );
+  });
+
+  it("keeps the full text in a details disclosure that opens from the keyboard", () => {
+    render(<AnalysedRange report={mockReport} />);
+    const summary = screen.getByText("Details");
+    expect(summary.tagName).toBe("SUMMARY");
+    const details = summary.closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain(
       "Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days. The last 32 price days are charted but not analysed.",
     );
-    expect(label?.querySelector("b")?.textContent).toBe("Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days.");
+    expect(details.querySelector("b")?.textContent).toBe("Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days.");
+    expect(summary.getAttribute("aria-controls")).toBe(details.querySelector(".cov-full")?.id);
+  });
+
+  it("puts one short note under the line and the full reasons in the details", () => {
+    render(
+      <AnalysedRange
+        report={mockReport}
+        noteId="why"
+        unavailable={[
+          { preset: "5Y", reason: "5Y has 400 trading days; a regression needs at least 504." },
+          { preset: "10Y", reason: "10Y needs prices from 1 Oct 2016, but the history starts 8 Aug 2024." },
+        ]}
+      />,
+    );
+    const note = document.getElementById("why");
+    expect(note?.textContent).toBe("5Y and 10Y need more history.");
+    expect(note?.closest("details")).toBeNull();
+    const details = document.querySelector("details.cov-more") as HTMLElement;
+    expect(details.textContent).toContain("5Y has 400 trading days; a regression needs at least 504.");
+    expect(details.textContent).toContain("10Y needs prices from 1 Oct 2016, but the history starts 8 Aug 2024.");
+  });
+
+  it("words one preset in the singular", () => {
+    expect(noteLine([{ preset: "10Y", reason: "x" }])).toBe("10Y needs more history.");
+    expect(noteLine([{ preset: "FULL", reason: "x" }])).toBe("Full history needs more history.");
+  });
+
+  it("counts months in a track record", () => {
+    render(<AnalysedRange report={monthlyReport} label="Analysed period" />);
+    expect(screen.getByText("Analysed period")).toBeTruthy();
+    expect(screen.getByText("84 months")).toBeTruthy();
+    expect(screen.getByRole("img", { name: /84 months analysed/ })).toBeTruthy();
+    expect(document.querySelector("details.cov-more")?.textContent).toContain("84 months.");
+    expect(document.body.textContent).not.toContain("trading day");
   });
 
   it("groups thousands in the range line (real Full-history SPY run)", () => {
@@ -380,10 +461,11 @@ function strip(props: Partial<ControlsStripProps> = {}) {
 }
 
 describe("ControlsStrip", () => {
-  it("shows the reason for a disabled chip as visible text, not only a tooltip", () => {
+  it("says in one visible line which chips are disabled, and keeps the reason in the details", () => {
     strip();
+    expect(screen.getByText("5Y and 10Y need more history.").id).toBe("ctl-why");
     const reason = screen.getByText("5Y has 400 trading days; a regression needs at least 504.");
-    expect(reason.closest("[id]")?.id).toBe("ctl-why");
+    expect(reason.closest("details")).toBe(document.querySelector("details.cov-more"));
     expect(screen.getByRole("group", { name: "Date range" }).getAttribute("aria-describedby")).toBe("ctl-why");
     expect((screen.getByRole("radio", { name: "5Y" }) as HTMLInputElement).disabled).toBe(true);
   });
@@ -415,9 +497,9 @@ describe("ControlsStrip", () => {
     expect(screen.queryByText(/Choose a ticker first/)).toBeNull();
   });
 
-  it("selects Full history when the URL has no range, and the preset when it has one", () => {
+  it("selects 10Y when the URL has no range, and the preset when it has one", () => {
     const { view, all } = strip();
-    expect(screen.getByRole("radio", { name: "Full history" })).toHaveProperty("checked", true);
+    expect(screen.getByRole("radio", { name: "10Y" })).toHaveProperty("checked", true);
     view.rerender(<ControlsStrip {...all} state={{ ...all.state, range: "3Y" }} />);
     expect(screen.getByRole("radio", { name: "3Y" })).toHaveProperty("checked", true);
   });
@@ -479,7 +561,7 @@ describe("ControlsStrip", () => {
 
   it("puts the analysed-range label and the factor-data line in the strip", () => {
     const { onRefreshFactors } = strip();
-    expect(document.querySelector("[aria-live='polite']")?.textContent).toContain("Analysed 8 Aug 2024 to 30 Sep 2026");
+    expect(document.querySelector("#analysed-range .cov-line")?.textContent).toContain("8 Aug 2024 → 30 Sep 2026");
     fireEvent.click(screen.getByRole("button", { name: "Check for newer factor data" }));
     expect(onRefreshFactors).toHaveBeenCalledTimes(1);
   });

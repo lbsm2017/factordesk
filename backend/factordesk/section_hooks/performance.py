@@ -1,7 +1,7 @@
 """Pipeline hook of the PerformanceSection section (schema v3 contract; sixth optional section).
 
 The statistics are in ``analytics/performance.py``; this hook turns the analysis sample into the
-section model. It reads only the context (``ctx.sample``, ``ctx.history``, ``ctx.sample_info``),
+section model. It reads only the context (``ctx.sample``, ``ctx.subject``, ``ctx.sample_info``),
 never changes a core section and never raises for data reasons: a sample the statistics cannot use
 gives a section with ``status = "failed"`` and a reason; a very short sample gives
 ``insufficient_data``.
@@ -20,6 +20,7 @@ from factordesk.analytics.performance import (
     PerformanceResult,
     performance_stats,
 )
+from factordesk.analytics.sample import MIN_OBS_MONTHLY
 from factordesk.report.sections.performance import (
     DrawdownEpisodeInfo,
     DrawdownSeries,
@@ -34,8 +35,8 @@ from factordesk.section_hooks.context import SectionContext
 logger = logging.getLogger(__name__)
 
 INSUFFICIENT = (
-    "Insufficient data: performance needs at least {min_obs} daily observations; this sample "
-    "has {n}."
+    "Insufficient data: performance needs at least {min_obs} {frequency} observations; this "
+    "sample has {n}."
 )
 FAILED = "Performance could not be computed because of a problem in the return data."
 
@@ -116,8 +117,8 @@ def _not_ok(ctx: SectionContext, status: str, reason: str) -> PerformanceSection
 
 
 def _origin(ctx: SectionContext) -> pd.Timestamp | None:
-    """The price date before the first analysed return: where the return path starts at 1.0."""
-    index = pd.DatetimeIndex(ctx.history.frame.index)
+    """The observation date before the first analysed return: where the path starts at 1.0."""
+    index = ctx.subject.calendar
     first = pd.Timestamp(ctx.sample.ret.index[0])
     pos = int(index.searchsorted(first))
     return pd.Timestamp(index[pos - 1]) if pos > 0 else None
@@ -126,11 +127,23 @@ def _origin(ctx: SectionContext) -> pd.Timestamp | None:
 def build_performance(ctx: SectionContext) -> PerformanceSection | None:
     """The performance section of the analysis sample (never ``None`` once built)."""
     sample = ctx.sample
+    frequency = ctx.subject.frequency
+    min_obs = MIN_OBS if frequency == "daily" else MIN_OBS_MONTHLY
     try:
-        result = performance_stats(sample.ret, sample.rf, origin=_origin(ctx))
+        result = performance_stats(
+            sample.ret,
+            sample.rf,
+            origin=_origin(ctx),
+            periods=ctx.subject.periods,
+            min_obs=min_obs,
+        )
         return _section(result, ctx)
     except InsufficientObservations as exc:
-        return _not_ok(ctx, "insufficient_data", INSUFFICIENT.format(min_obs=MIN_OBS, n=exc.n))
+        return _not_ok(
+            ctx,
+            "insufficient_data",
+            INSUFFICIENT.format(min_obs=exc.required, frequency=frequency, n=exc.n),
+        )
     except Exception:  # a statistic must never block the report
         logger.exception("performance raised; the performance section is marked failed")
         return _not_ok(ctx, "failed", FAILED)

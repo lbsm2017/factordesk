@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -80,23 +80,45 @@ describe("first load", () => {
 
     expect(await screen.findByTestId("report-ticker")).toHaveProperty("textContent", "SPY");
     expect(screen.queryByTestId("loading-frame")).toBeNull();
-    expect(requests).toContain("/api/report/SPY?range=3Y");
+    expect(requests).toContain("/api/report/SPY?range=3Y&model=ff6");
     expect(requests).toContain("/api/report/SPY/ranges");
   });
 
-  it("treats a ticker without a range as Full history", async () => {
+  it("opens a ticker without range and model on 10Y and FF6, and always sends the model", async () => {
     renderAt("/?t=SPY");
     await screen.findByTestId("report-ticker");
-    expect(requests).toContain("/api/report/SPY?range=FULL");
+    expect(window.location.search).toBe("?t=SPY");
+    expect(requests).toContain("/api/report/SPY?range=10Y&model=ff6");
+    expect(screen.getByRole("radio", { name: "10Y" })).toHaveProperty("checked", true);
+    expect(within(screen.getByRole("group", { name: "Factor model" })).getByRole("radio", { name: "FF6" })).toHaveProperty("checked", true);
+  });
+
+  it("keeps an old URL with explicit params: its range and model are requested as written", async () => {
+    renderAt("/?t=SPY&range=FULL&model=ff5&win=126&stats=1");
+    await screen.findByTestId("report-ticker");
+    expect(window.location.search).toBe("?t=SPY&range=FULL&win=126&stats=1&model=ff5");
+    expect(requests).toContain("/api/report/SPY?range=FULL&model=ff5");
     expect(screen.getByRole("radio", { name: "Full history" })).toHaveProperty("checked", true);
+    expect(within(screen.getByRole("group", { name: "Factor model" })).getByRole("radio", { name: "FF5" })).toHaveProperty("checked", true);
+  });
+
+  it("writes model=ff5 to the URL when FF5 is chosen, and drops it again for FF6", async () => {
+    renderAt("/?t=SPY");
+    await screen.findByTestId("report-ticker");
+    const toggle = within(screen.getByRole("group", { name: "Factor model" }));
+    fireEvent.click(toggle.getByRole("radio", { name: "FF5" }));
+    expect(window.location.search).toBe("?t=SPY&model=ff5");
+    await waitFor(() => expect(requests).toContain("/api/report/SPY?range=10Y&model=ff5"));
+    fireEvent.click(toggle.getByRole("radio", { name: "FF6" }));
+    expect(window.location.search).toBe("?t=SPY");
   });
 
   it("passes custom dates through and points the download at the same range", async () => {
     renderAt("/?t=SPY&start=2023-01-01&end=2026-09-30");
     await screen.findByTestId("report-ticker");
-    expect(requests).toContain("/api/report/SPY?start=2023-01-01&end=2026-09-30");
+    expect(requests).toContain("/api/report/SPY?start=2023-01-01&end=2026-09-30&model=ff6");
     expect(screen.getByRole("link", { name: "Download report" }).getAttribute("href")).toBe(
-      "/api/report/SPY/html?start=2023-01-01&end=2026-09-30",
+      "/api/report/SPY/html?start=2023-01-01&end=2026-09-30&model=ff6",
     );
   });
 
@@ -111,13 +133,17 @@ describe("first load", () => {
   it("fills the analysed-range label and the date fields from the report", async () => {
     renderAt("/?t=SPY&range=3Y");
     await screen.findByTestId("report-ticker");
-    expect(document.querySelector("#analysed-range")?.textContent).toContain("Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days.");
+    expect(document.querySelector("#analysed-range .cov-line")?.textContent).toContain("8 Aug 2024 → 30 Sep 2026");
+    expect(document.querySelector("#analysed-range details")?.textContent).toContain(
+      "Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days.",
+    );
     expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe("2024-08-08");
   });
 
-  it("disables a chip with a visible reason once the ranges arrive", async () => {
+  it("disables a chip, says so in one line and keeps the reason in the details, once the ranges arrive", async () => {
     renderAt("/?t=SPY");
-    expect(await screen.findByText("5Y has 400 trading days; a regression needs at least 504.")).toBeTruthy();
+    expect(await screen.findByText(/need more history\./)).toBeTruthy();
+    expect(screen.getByText("5Y has 400 trading days; a regression needs at least 504.")).toBeTruthy();
     expect((screen.getByRole("radio", { name: "5Y" }) as HTMLInputElement).disabled).toBe(true);
   });
 
@@ -207,7 +233,7 @@ describe("committing changes", () => {
     await screen.findByTestId("report-ticker");
     fireEvent.click(screen.getByRole("radio", { name: "Full history" }));
     expect(window.location.search).toBe("?t=SPY&range=FULL");
-    await waitFor(() => expect(requests).toContain("/api/report/SPY?range=FULL"));
+    await waitFor(() => expect(requests).toContain("/api/report/SPY?range=FULL&model=ff6"));
   });
 
   it("commits custom dates, which clears the chip", async () => {
@@ -217,8 +243,10 @@ describe("committing changes", () => {
     expect(window.location.search).toBe("?t=SPY&range=3Y");
     fireEvent.blur(screen.getByLabelText("From"));
     expect(window.location.search).toBe("?t=SPY&start=2025-01-02&end=2026-09-30");
-    for (const radio of screen.getAllByRole("radio")) expect((radio as HTMLInputElement).checked).toBe(false);
-    await waitFor(() => expect(requests).toContain("/api/report/SPY?start=2025-01-02&end=2026-09-30"));
+    for (const radio of within(screen.getByRole("group", { name: "Date range" })).getAllByRole("radio")) {
+      expect((radio as HTMLInputElement).checked).toBe(false);
+    }
+    await waitFor(() => expect(requests).toContain("/api/report/SPY?start=2025-01-02&end=2026-09-30&model=ff6"));
   });
 
   it("writes the rolling window to the URL", async () => {

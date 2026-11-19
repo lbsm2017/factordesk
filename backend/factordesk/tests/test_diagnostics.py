@@ -15,6 +15,7 @@ from factordesk.analytics.diagnostics import (
     apply_gate,
     block_sums,
     combine_tags,
+    diagnostic_lags,
     gate_fires,
     lag1_autocorrelation,
     multi_day_regression,
@@ -37,6 +38,7 @@ from factordesk.tests.fixtures.dgp import (
     rng_for,
 )
 from factordesk.tests.fixtures.reference import hac_fit, residual_reference
+from factordesk.tests.test_subject_report import monthly_report
 
 
 def _sample(d: Synthetic, min_obs: int = 504) -> AnalysisSample:
@@ -295,3 +297,48 @@ def test_t126_exact_fit_has_no_diagnostics_and_no_warning() -> None:
     assert rep.quality_gate.fired is None
     assert "residual_reversal" not in {w.code for w in rep.warnings}
     assert "Residual diagnostics" in render_report_html(rep)
+
+
+# ----------------------------------------------------------------------------- monthly data
+def test_monthly_diagnostic_lags() -> None:
+    assert diagnostic_lags(800) == (10, 10, 5)
+    assert diagnostic_lags(800, "daily") == (10, 10, 5)
+    assert diagnostic_lags(36, "monthly") == (7, 7, 3)
+    assert diagnostic_lags(48, "monthly") == (9, 9, 4)
+    assert diagnostic_lags(60, "monthly") == (12, 12, 6)
+    assert diagnostic_lags(240, "monthly") == (12, 12, 6)
+
+
+def test_monthly_readings_speak_in_months() -> None:
+    rng = np.random.default_rng(4701)
+    n = 48
+    f = rng.normal(0.0, 0.04, size=(n, 5))
+    u = rng.normal(0.0, 0.02, size=n + 1)
+    reversing = u[1:] - 0.9 * u[:-1]  # MA(1) with a strong negative lag-1 autocorrelation
+    diag = residual_diagnostics(reversing, f, "monthly")
+    assert diag.ljung_box.df == 9 and diag.robust_bg.df == 9 and diag.arch_lm.df == 4
+    readings = diag.readings
+    assert "reverses the next month" in readings["lag1_autocorrelation"]
+    assert "rejects too often on monthly returns" in readings["ljung_box"]
+    assert "(9 lags)" in readings["ljung_box"]
+    persistent = np.cumsum(u)[1:] * 0.3 + u[1:]
+    reading = residual_diagnostics(persistent, f, "monthly").readings["lag1_autocorrelation"]
+    assert "persist into the next month" in reading
+    quiet = residual_diagnostics(u[1:], f, "monthly").readings["lag1_autocorrelation"]
+    if lag1_autocorrelation(u[1:]).p >= 0.05:
+        assert "No clear month-to-month pattern" in quiet
+    for diagnostics in (diag, residual_diagnostics(persistent, f, "monthly")):
+        for text in diagnostics.readings.values():
+            assert "day" not in text and "daily" not in text, text
+
+
+def test_monthly_report_diagnostics_use_monthly_lags_and_wording() -> None:
+    report = monthly_report(72, 11)
+    rd = report.residual_diagnostics
+    assert rd.status == "ok" and rd.lag1_reading is not None
+    by_code = {t.code: t for t in rd.tests}
+    assert by_code["ljung_box"].df == 12
+    assert by_code["robust_breusch_godfrey"].df == 12
+    assert by_code["arch_lm"].df == 6
+    for text in [rd.lag1_reading, *(t.reading for t in rd.tests)]:
+        assert "day" not in text and "daily" not in text, text

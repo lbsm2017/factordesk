@@ -43,6 +43,8 @@ _STATUS: dict[ErrorCode, int] = {
     "not_found": 404,
     "internal": 500,
     "bad_request": 400,
+    "invalid_upload": 422,
+    "upload_too_large": 413,
 }
 
 _MAX_ECHO = 120
@@ -103,6 +105,14 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
     if isinstance(exc, ApiException):
         return exc
     who = ticker or "this ticker"
+    if isinstance(exc, InsufficientHistoryError) and exc.frequency == "monthly":
+        return ApiException(
+            "insufficient_history",
+            f"{who} has {exc.n} months that line up with the factor data; at least "
+            f"{exc.required} (three years) are needed"
+            + (f": {exc.detail}." if exc.detail else "."),
+            "Upload a longer track record: monthly returns that overlap the factor data.",
+        )
     if isinstance(exc, InsufficientHistoryError):
         return ApiException(
             "insufficient_history",

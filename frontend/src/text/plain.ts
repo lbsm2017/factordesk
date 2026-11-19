@@ -9,6 +9,7 @@ export const PLAIN: Record<string, string> = {
   HML: "Value",
   RMW: "Profitability",
   CMA: "Investment",
+  Mom: "Momentum",
 };
 
 /** Plain one-sentence warning summaries by code (H.9). Unknown codes fall back to `message`. */
@@ -30,6 +31,7 @@ export const TILT: Record<string, readonly [string, string]> = {
   HML: ["value stocks", "growth stocks"],
   RMW: ["highly profitable firms", "weakly profitable firms"],
   CMA: ["firms that invest conservatively", "firms that invest aggressively"],
+  Mom: ["recent winners", "recent losers"],
 };
 
 /** Reader-facing word for an estimate tag: "significant" or "not significant" (never "reliable" or "noise"). */
@@ -43,22 +45,36 @@ export function plainName(name: string): string {
   return PLAIN[name] ?? name;
 }
 
-export function warningText(warning: ReportWarning): string {
-  return WARN_PLAIN[warning.code] ?? warning.message;
+/** Summaries reworded for a monthly report (an uploaded record counts months, not days). */
+export const WARN_PLAIN_MONTHLY: Record<string, string> = {
+  factor_data_lag:
+    "The factor data stops before the latest returns, so the newest months are charted but not analysed.",
+};
+
+export function warningText(warning: ReportWarning, monthly = false): string {
+  return (monthly ? WARN_PLAIN_MONTHLY[warning.code] : undefined) ?? WARN_PLAIN[warning.code] ?? warning.message;
 }
 
 /** Summary of up to the first two warnings, joined by a space. */
 export function warningSummary(warnings: readonly ReportWarning[]): string {
-  return warnings.slice(0, 2).map(warningText).join(" ");
+  return warnings.slice(0, 2).map((w) => warningText(w)).join(" ");
+}
+
+/** Smallest style beta (absolute) that counts as a lean; a smaller significant beta is too small to describe. */
+export const MIN_LEAN = 0.05;
+
+/** The one rule for mentioning a style lean, the same for every factor including Mom: significant and not negligible. */
+export function isLean(f: FactorStat): boolean {
+  return f.tag === "reliable" && f.beta !== null && Math.abs(f.beta) >= MIN_LEAN;
 }
 
 /** The reading line of the exposures panel (H.2). */
-export function exposureReading(factors: readonly FactorStat[]): string {
+export function exposureReading(factors: readonly FactorStat[], subject = "the stock"): string {
   const parts: string[] = [];
   const quiet: string[] = [];
   for (const f of factors) {
     const { name, beta } = f;
-    if (f.tag !== "reliable" || beta === null) {
+    if (beta === null || (name === "Mkt-RF" ? f.tag !== "reliable" : !isLean(f))) {
       quiet.push(`${plainName(name).toLowerCase()} (${name})`);
       continue;
     }
@@ -74,7 +90,7 @@ export function exposureReading(factors: readonly FactorStat[]): string {
   let s = "";
   if (parts.length) {
     const body = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
-    s = `Over this window the stock ${body}.`;
+    s = `Over this window ${subject} ${body}.`;
   }
   if (quiet.length) {
     const q = quiet.length > 1 ? `${quiet.slice(0, -1).join(", ")} or ${quiet[quiet.length - 1]}` : quiet[0];

@@ -3,7 +3,8 @@
 Conventions (apply to every model in this module; see ``docs/methodology.md`` M0 and M14):
 
 * Returns, betas, contributions and shares are **decimals** (0.05 means 5%), never percents.
-* ``*_annual`` values are annualised with ``A = 252`` (arithmetic, M0.4) and stated per year.
+* ``*_annual`` values are annualised with ``A = 252`` (arithmetic, M0.4) and stated per year;
+  a report with a ``subject`` block uses ``subject.periods`` instead (12 for monthly data).
 * Dates are ISO ``YYYY-MM-DD`` in JSON; ``generated_at`` is a timezone-aware UTC timestamp.
 * Any statistic that could not be computed is ``None`` (JSON ``null``) with a ``status`` other
   than ``"ok"`` and a ``reason``. NaN and infinity are rejected on construction, so they can
@@ -33,6 +34,23 @@ drawdown; ``report/sections/performance.py``) is additive and does not change th
 The optional section ``world_beta`` (the quick beta against the iShares MSCI ACWI ETF;
 ``report/sections/world_beta.py``) is additive and ``None`` when not computed, so it does not bump
 the version (contract SC5).
+
+The optional section ``tail_risk`` (VaR and CVaR; ``report/sections/tail_risk.py``) is additive
+and ``None`` when not computed, so it does not bump the version either.
+
+The optional ``subject`` block (next-stage spec, return subject) says what a report is about when
+it is not a daily ticker: an uploaded track record or a portfolio, daily or monthly, and the
+``periods`` its annualised figures use. It is written only for those subjects and left out of the
+JSON otherwise (not ``null``), so ticker reports are byte-identical to the ones written before it.
+A report without it is a daily ticker report annualised with 252. It is additive and does not bump
+the version (contract SC5): no field is removed, renamed or retyped, nothing becomes required, and
+no field changes meaning for a reader that knows the block.
+
+The optional ``model`` field (E1) is ``"ff6"`` for a report on FF5 plus momentum and ``None`` (left
+out of the JSON) for FF5, so FF5 reports are byte-identical to the ones written before it. The
+optional section ``alpha_strip`` (alpha under CAPM, FF3, FF5 and FF6 on the same rows;
+``report/sections/alpha_strip.py``) is also left out of the JSON when ``None``.
+Both are additive and do not bump the version (contract SC5).
 """
 
 from __future__ import annotations
@@ -42,7 +60,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic.config import JsonDict
 
 from factordesk.report.base import FACTOR_NAMES as FACTOR_NAMES
 from factordesk.report.base import LABEL_TEXT as LABEL_TEXT
@@ -59,13 +78,18 @@ from factordesk.report.base import Severity as Severity
 from factordesk.report.base import StatisticModel as StatisticModel
 from factordesk.report.base import Status as Status
 from factordesk.report.base import Tag as Tag
+from factordesk.report.sections.alpha_strip import ALPHA_STRIP_SECTION, AlphaStrip
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.performance import PERFORMANCE_SECTION, PerformanceSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
+from factordesk.report.sections.tail_risk import TAIL_RISK_SECTION, TailRiskSection
 from factordesk.report.sections.world_beta import WORLD_BETA_SECTION, WorldBetaSection
+
+FactorModel = Literal["ff5", "ff6"]
+"""Factor model of a report: FF5, or FF6 = FF5 + momentum (Mom)."""
 
 SCHEMA_VERSION = "4"
 """Version written by this code (the schema v3 contract; contract SC5). Additive optional fields
@@ -85,6 +109,8 @@ SECTIONS: tuple[SectionSpec, ...] = (
     FRAGILITY_SECTION,
     RESIDUAL_ALPHA_SECTION,
     KALMAN_SECTION,
+    TAIL_RISK_SECTION,
+    ALPHA_STRIP_SECTION,
 )
 """The optional sections of the schema v3 contract, in panel order (contract SC3.1, SC4)."""
 
@@ -128,6 +154,42 @@ class SecurityInfo(FrozenModel):
     )
 
 
+SubjectKind = Literal["ticker", "upload", "portfolio"]
+SubjectFrequency = Literal["daily", "monthly"]
+_PERIODS: dict[str, int] = {"daily": 252, "monthly": 12}
+
+
+class SubjectInfo(FrozenModel):
+    """What the report is about when it is not a daily ticker (written only for those subjects).
+
+    Counts that the report names in days (``n_days``, ``days_peak_to_trough``) are counts of
+    observations at ``frequency``: months for a monthly subject.
+    """
+
+    kind: SubjectKind = Field(description="ticker, upload (track record) or portfolio.")
+    label: str = Field(description="Display name: the fund or portfolio name, or the ticker.")
+    frequency: SubjectFrequency
+    periods: int = Field(
+        description="Observations a year used to annualise: 252 for daily data, 12 for monthly."
+    )
+    source: str = Field(description="Where the returns come from, e.g. 'upload'.")
+    gross_net: Literal["gross", "net"] | None = Field(
+        default=None, description="Whether the returns are before or after fees; None: unknown."
+    )
+    currency: str | None = Field(
+        default=None, description="Currency of the returns (USD only for now); None: unknown."
+    )
+
+    @model_validator(mode="after")
+    def _periods_match_frequency(self) -> SubjectInfo:
+        """``periods`` is fixed by ``frequency``."""
+        if self.periods != _PERIODS[self.frequency]:
+            raise ValueError(
+                f"periods must be {_PERIODS[self.frequency]} for {self.frequency} data"
+            )
+        return self
+
+
 class DataInfo(FrozenModel):
     """Provenance and coverage of the data behind the report."""
 
@@ -168,9 +230,17 @@ class FactorStat(FrozenModel):
     name: str
     beta: float | None
     se: float | None = Field(description="Newey-West HAC standard error of beta.")
-    z: float | None = Field(description="HAC z-statistic (normal reference distribution).")
+    z: float | None = Field(
+        description=(
+            "HAC test statistic: a z-statistic (normal reference) for daily subjects, a "
+            "t-statistic (Student-t, n - k degrees of freedom, k = factors + 1) for monthly "
+            "subjects."
+        )
+    )
     p: float | None = Field(description="Two-sided p-value, unadjusted.")
-    p_adj_bh: float | None = Field(description="Benjamini-Hochberg adjusted p (family of 5).")
+    p_adj_bh: float | None = Field(
+        description="Benjamini-Hochberg adjusted p (family: the model's betas)."
+    )
     ci_low: float | None = Field(description="Lower bound of the unadjusted 95% HAC interval.")
     ci_high: float | None = Field(description="Upper bound of the unadjusted 95% HAC interval.")
     tag: Tag | None = Field(description="'reliable' when BH rejects at q = 0.05, else 'noise'.")
@@ -190,7 +260,10 @@ class CorrPair(FrozenModel):
 class Regression(StatisticModel):
     """Full-sample excess-return regression ``y = alpha + sum(b_i f_i) + e`` (M3)."""
 
-    alpha_annual: float | None = Field(description="Annualised alpha, decimal per year (x252).")
+    alpha_annual: float | None = Field(
+        description="Annualised alpha, decimal per year: P x intercept, with P the observations "
+        "a year (252, or subject.periods)."
+    )
     alpha_se_annual: float | None
     alpha_z: float | None
     alpha_p: float | None
@@ -205,7 +278,9 @@ class Regression(StatisticModel):
     )
     r2: float | None
     adj_r2: float | None
-    sigma_e_annual: float | None = Field(description="Residual volatility, sqrt(252) x sd.")
+    sigma_e_annual: float | None = Field(
+        description="Residual volatility, sqrt(P) x sd, P = 252 or subject.periods."
+    )
     hac_lags: int = Field(ge=0, description="Newey-West lag length L(n).")
     bh_family_size: int = Field(ge=0, description="Number of betas in the BH family (F1).")
     factors: list[FactorStat]
@@ -358,9 +433,15 @@ class ReturnContribution(StatisticModel):
     ``identity_residual``. Memo rows are outside every sum.
     """
 
-    factors: dict[str, float | None] = Field(description="252 x beta_i x mean(f_i) per factor.")
-    alpha: float | None = Field(description="252 x alpha (daily intercept).")
-    residual: float | None = Field(description="252 x mean(residual); 0 by construction.")
+    factors: dict[str, float | None] = Field(
+        description="P x beta_i x mean(f_i) per factor, with P the observations a year (252, or "
+        "subject.periods)."
+    )
+    alpha: float | None = Field(
+        description="P x alpha (the intercept per period: trading day, or month when "
+        "subject.periods = 12)."
+    )
+    residual: float | None = Field(description="P x mean(residual); 0 by construction.")
     total_annualised_mean_excess_return: float | None
     identity_residual: float | None = Field(
         description="total - (sum(factors) + alpha + residual); float error only (~1e-17)."
@@ -374,7 +455,10 @@ class RiskFactorDetail(FrozenModel):
     name: str
     share: float | None = Field(description="Euler share of variance RC_i (may be negative).")
     beta: float | None
-    sigma_annual: float | None = Field(description="Factor volatility, sqrt(252) x sd.")
+    sigma_annual: float | None = Field(
+        description="Factor volatility, sqrt(P) x sd, with P the observations a year (252, or "
+        "subject.periods)."
+    )
     rho_sys: float | None = Field(
         description="Correlation of the factor with the systematic return beta'f."
     )
@@ -388,7 +472,7 @@ class RiskContribution(StatisticModel):
     sums_to_one_residual: float | None = Field(
         description="1 - (sum(factors) + idiosyncratic); float error only."
     )
-    total_vol_annual: float | None = Field(description="sqrt(252 x V).")
+    total_vol_annual: float | None = Field(description="sqrt(P x V), P = 252 or subject.periods.")
     order: list[str] = Field(
         description="Display order: factors by share descending, then 'Idiosyncratic'."
     )
@@ -414,11 +498,37 @@ class PriceSeries(FrozenModel):
         return self
 
 
+_OMITTED_WHEN_DEFAULT: tuple[str, ...] = ("subject", "model", "alpha_strip")
+"""Fields left out of the JSON when ``None``, so never required."""
+
+
+def _subject_not_required(schema: JsonDict) -> None:
+    """``subject``, ``model`` and ``alpha_strip`` are left out of the JSON when ``None``, so they
+    are never required."""
+    required = schema.get("required")
+    if isinstance(required, list):
+        schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
+
+
 class FactorReport(FrozenModel):
-    """Everything the UI or an exported file needs to describe one ticker's factor exposures."""
+    """Everything the UI or an exported file needs to describe one subject's factor exposures."""
+
+    model_config = ConfigDict(json_schema_extra=_subject_not_required)
 
     schema_version: str = SCHEMA_VERSION
-    ticker: str
+    ticker: str = Field(description="The ticker symbol, or the subject's label (subject.label).")
+    subject: SubjectInfo | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="What the report is about when it is not a daily ticker; absent (not null) "
+        "for a ticker report, which is daily and annualised with 252.",
+    )
+    model: Literal["ff6"] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Factor model of the regression when it is not FF5: ff6 = FF5 + momentum "
+        "(Mom). Absent (not null) for an FF5 report.",
+    )
     generated_at: datetime = Field(description="Timezone-aware UTC timestamp.")
     data: DataInfo
     regression: Regression
@@ -467,6 +577,17 @@ class FactorReport(FrozenModel):
     kalman_betas: KalmanBetaSeries | None = Field(
         default=None, description="Kalman-filter betas (docs/specs/kalman-betas.md)."
     )
+    tail_risk: TailRiskSection | None = Field(
+        default=None,
+        description="Value at risk and expected shortfall (CVaR) by three methods, with bootstrap "
+        "bands, at the series' own frequency (spec section E7).",
+    )
+    alpha_strip: AlphaStrip | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Alpha under CAPM, FF3, FF5 and FF6 on the same rows, not ranked; absent "
+        "(not null) when not computed.",
+    )
 
     @field_validator("schema_version")
     @classmethod
@@ -481,9 +602,13 @@ class FactorReport(FrozenModel):
 
     @model_validator(mode="after")
     def _sections_need_version_4(self) -> FactorReport:
-        """A version 3 file has no optional sections."""
+        """A version 3 file has no optional sections and no subject block."""
         if self.schema_version == "3":
             present = [s.report_field for s in SECTIONS if getattr(self, s.report_field)]
+            if self.subject is not None:
+                present.append("subject")
+            if self.model is not None:
+                present.append("model")
             if present:
                 raise ValueError(f"a version 3 report cannot hold {', '.join(present)}")
         return self
@@ -516,6 +641,8 @@ ErrorCode = Literal[
     "not_found",
     "internal",
     "bad_request",
+    "invalid_upload",
+    "upload_too_large",
 ]
 """Error codes of the local API (dashboard spec DB2.3). ``bad_request`` covers any other
 malformed request parameter."""

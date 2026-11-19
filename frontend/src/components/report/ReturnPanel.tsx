@@ -91,7 +91,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
   if (ident !== null) checks.push(`Identity check ${sci(ident)}.`);
   const how = [
     rc.caption,
-    "Each factor's share is its full-sample beta times the factor's average return, times 252. Arithmetic, not compounded.",
+    `Each factor's share is its full-sample beta times the factor's average return, times ${report.subject?.periods ?? 252}. Arithmetic, not compounded.`,
     ...labelTexts(report, rc.labels),
     checks.join(" "),
   ]

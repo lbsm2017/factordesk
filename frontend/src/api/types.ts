@@ -32,13 +32,16 @@ export type SampleInfo = Schemas["SampleInfo"];
 
 /** Optional sections of the schema v3 contract (docs/specs/schema-v3-contract.md); null when not computed. */
 export type PerformanceSection = Schemas["PerformanceSection"];
+export type TailRiskSection = Schemas["TailRiskSection"];
 export type LeadLagSection = Schemas["LeadLagSection"];
 export type ShrunkBetas = Schemas["ShrunkBetas"];
 export type FragilitySection = Schemas["FragilitySection"];
 export type ResidualAnalysis = Schemas["ResidualAnalysis"];
 export type KalmanBetaSeries = Schemas["KalmanBetaSeries"];
 export type WorldBetaSection = Schemas["WorldBetaSection"];
+export type AlphaStrip = Schemas["AlphaStrip"];
+export type AlphaStripRow = Schemas["AlphaStripRow"];
 
-/** Canonical factor names and order (backend FACTOR_NAMES). */
-export const FACTOR_NAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA"] as const;
+/** Canonical factor names and order: the five of FF5 (backend FACTOR_NAMES), then Mom, the sixth factor of FF6. */
+export const FACTOR_NAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"] as const;
 export type FactorName = (typeof FACTOR_NAMES)[number];

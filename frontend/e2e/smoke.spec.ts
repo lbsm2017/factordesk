@@ -68,6 +68,14 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await stats.click();
   await expect(page).toHaveURL(/[?&]stats=1\b/);
 
+  // The dashboard opens on FF6 and 10Y, and the URL carries neither. The residual panel supports FF5
+  // only, so the test switches to FF5 (the URL then carries model=ff5) before it looks at that panel.
+  await expect(page.getByRole("radio", { name: "FF6" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "10Y" })).toBeChecked();
+  await expect(page.locator("#residual")).toHaveCount(0);
+  await page.getByRole("group", { name: "Factor model" }).getByRole("radio", { name: "FF5" }).check();
+  await expect(page).toHaveURL(/[?&]model=ff5\b/);
+
   // The residual panel loads as its own chunk and shows the table and the stability section.
   const residual = page.locator("#residual");
   await expect(residual.getByRole("heading", { name: "In-sample against point-in-time", exact: true })).toBeVisible();

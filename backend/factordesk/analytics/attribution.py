@@ -3,8 +3,9 @@
 Both use the full-sample OLS fit (M3) on the analysis sample ``S``:
 
 * Return (M6.1): because OLS with an intercept has residuals summing to zero,
-  ``mean(y) = alpha + sum_i beta_i mean(f_i)`` exactly. Every row is ``x 252`` (arithmetic,
-  never compounded); the residual row is reported, not zeroed.
+  ``mean(y) = alpha + sum_i beta_i mean(f_i)`` exactly. Every row is ``x periods`` (arithmetic,
+  never compounded; ``periods`` = 252 for daily data, 12 for monthly); the residual row is
+  reported, not zeroed.
 * Risk (M7): ``V = beta' Sigma_f beta + sigma2_e`` with ``Sigma_f`` (ddof = 1) and
   ``sigma2_e = SSR / (n - 1)`` (D5), so ``V`` equals the sample variance of ``y`` exactly and
   the Euler shares plus the idiosyncratic share sum to one.
@@ -22,7 +23,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from factordesk.analytics.regression import A, FullSampleRegression, Tag
-from factordesk.analytics.sample import FACTOR_CODES, AnalysisSample, Exclusion, UncoveredTail
+from factordesk.analytics.sample import AnalysisSample, Exclusion, UncoveredTail
 
 FloatArray = NDArray[np.float64]
 
@@ -41,7 +42,7 @@ class ReturnAttribution:
     """Annualised arithmetic contributions; ``identity_residual`` is float error only."""
 
     contributions: dict[str, float]
-    """Display name -> 252 x beta_i x mean(f_i)."""
+    """Display name -> periods x beta_i x mean(f_i)."""
     alpha_ann: float
     residual_ann: float
     total_ann: float
@@ -55,14 +56,21 @@ def return_contribution(
     betas: FloatArray,
     resid: FloatArray,
     names: Sequence[str],
+    periods: int,
 ) -> ReturnAttribution:
-    """Static full-sample return contribution (M6.1). Arrays are the rows of ``S``."""
+    """Static full-sample return contribution (M6.1). Arrays are the rows of ``S``.
+
+    ``periods`` is the number of rows a year (252 daily, 12 monthly). It has no default: the
+    arrays do not carry their frequency, so the caller passes the sample's (``sample.periods``).
+    """
+    if periods <= 0:
+        raise ValueError("periods must be positive")
     f = np.asarray(factors, dtype=np.float64)
     b = np.asarray(betas, dtype=np.float64)
-    contrib = A * b * f.mean(axis=0)
-    alpha_ann = A * alpha
-    residual = A * float(np.mean(resid))
-    total = A * float(np.mean(xret))
+    contrib = periods * b * f.mean(axis=0)
+    alpha_ann = periods * alpha
+    residual = periods * float(np.mean(resid))
+    total = periods * float(np.mean(xret))
     identity = total - (float(contrib.sum()) + alpha_ann + residual)
     return ReturnAttribution(
         contributions={n: float(c) for n, c in zip(names, contrib, strict=True)},
@@ -73,22 +81,46 @@ def return_contribution(
     )
 
 
+def _check_reg(sample: AnalysisSample, reg: FullSampleRegression) -> None:
+    if reg.periods != sample.periods:
+        raise ValueError(
+            f"the regression is annualised with periods={reg.periods} but the "
+            f"{sample.frequency} sample has {sample.periods} a year"
+        )
+
+
 def return_contribution_for(sample: AnalysisSample, reg: FullSampleRegression) -> ReturnAttribution:
-    """``return_contribution`` on the analysis sample and its full-sample regression."""
+    """``return_contribution`` on the analysis sample and its full-sample regression.
+
+    Uses the regression's factors (``reg.codes``) and rows (``complete_rows``) and the sample's
+    ``periods``; a regression annualised with other ``periods`` raises ``ValueError``.
+    """
+    _check_reg(sample, reg)
+    rows = sample.complete_rows(reg.codes)
     return return_contribution(
-        sample.xret.to_numpy(dtype=np.float64),
-        sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64),
+        sample.xret.to_numpy(dtype=np.float64)[rows],
+        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64)[rows],
         reg.alpha,
         reg.betas,
         reg.fit.resid,
         reg.names,
+        reg.periods,
     )
 
 
 def memo_rows(
-    uncovered: UncoveredTail, excluded: Sequence[Exclusion], factor_last_date: object
+    uncovered: UncoveredTail,
+    excluded: Sequence[Exclusion],
+    factor_last_date: object,
+    *,
+    unit: str = "trading days",
+    subject: str = "stock",
 ) -> list[str]:
-    """Memo rows below the identity (M6.4, D8). They are not part of any sum."""
+    """Memo rows below the identity (M6.4, D8). They are not part of any sum.
+
+    ``unit`` names the observations ("trading days", "months"); ``subject`` what earned the
+    return ("stock", "track record").
+    """
     rows: list[str] = []
     if uncovered.n:
         ret = (
@@ -97,8 +129,8 @@ def memo_rows(
             else "not available (a price is missing)"
         )
         rows.append(
-            f"Not covered by factor data: {uncovered.n} trading days after {factor_last_date}; "
-            f"stock return {ret} (compounded, raw, not excess). Not attributed."
+            f"Not covered by factor data: {uncovered.n} {unit} after {factor_last_date}; "
+            f"{subject} return {ret} (compounded, raw, not excess). Not attributed."
         )
     else:
         rows.append("Not covered by factor data: none (every analysed date has factor data).")
@@ -121,21 +153,33 @@ class RiskAttribution:
     shares: FloatArray
     idio_share: float
     variance: float
-    """``V`` (daily); equals ``var(y, ddof=1)``."""
+    """``V`` (per period of the data); equals ``var(y, ddof=1)``."""
     sums_to_one_residual: float
     sigma: FloatArray
-    """Daily factor standard deviations ``sqrt(Sigma_f[i, i])``."""
+    """Per-period factor standard deviations ``sqrt(Sigma_f[i, i])``."""
     sigma_sys: float
     rho_sys: tuple[float | None, ...]
     betas: FloatArray
+    periods: int = A
+    """Rows a year (252 daily, 12 monthly), for the annualised volatilities."""
 
     @property
     def vol_ann(self) -> float:
-        return math.sqrt(A * self.variance)
+        """``sqrt(periods x V)``."""
+        return math.sqrt(self.periods * self.variance)
+
+    @property
+    def sigma_ann(self) -> FloatArray:
+        """Annualised factor volatilities ``sqrt(periods) x sigma``."""
+        return np.asarray(math.sqrt(self.periods) * self.sigma, dtype=np.float64)
 
 
 def risk_contribution(
-    factors: FloatArray, betas: FloatArray, resid: FloatArray, names: Sequence[str]
+    factors: FloatArray,
+    betas: FloatArray,
+    resid: FloatArray,
+    names: Sequence[str],
+    periods: int = A,
 ) -> RiskAttribution:
     """Euler risk decomposition with the D5 variance convention (M7).
 
@@ -145,12 +189,16 @@ def risk_contribution(
     f = np.asarray(factors, dtype=np.float64)
     e = np.asarray(resid, dtype=np.float64)
     n = f.shape[0]
-    sigma_f = np.cov(f, rowvar=False, ddof=1)
-    return euler_risk(sigma_f, betas, float(e @ e) / (n - 1), names)
+    sigma_f = np.atleast_2d(np.cov(f, rowvar=False, ddof=1))  # 1 x 1 for a one-factor model
+    return euler_risk(sigma_f, betas, float(e @ e) / (n - 1), names, periods)
 
 
 def euler_risk(
-    sigma_f: FloatArray, betas: FloatArray, sigma2_e: float, names: Sequence[str]
+    sigma_f: FloatArray,
+    betas: FloatArray,
+    sigma2_e: float,
+    names: Sequence[str],
+    periods: int = A,
 ) -> RiskAttribution:
     """Euler shares ``RC_i = beta_i (Sigma_f beta)_i / V``, ``RC_idio = sigma2_e / V`` (M7)."""
     b = np.asarray(betas, dtype=np.float64)
@@ -176,16 +224,24 @@ def euler_risk(
         sigma_sys=sigma_sys,
         rho_sys=rho,
         betas=b,
+        periods=periods,
     )
 
 
 def risk_contribution_for(sample: AnalysisSample, reg: FullSampleRegression) -> RiskAttribution:
-    """``risk_contribution`` on the analysis sample and its full-sample regression."""
+    """``risk_contribution`` on the analysis sample and its full-sample regression.
+
+    Uses the regression's factors (``reg.codes``) and rows (``complete_rows``) and the sample's
+    ``periods``; a regression annualised with other ``periods`` raises ``ValueError``.
+    """
+    _check_reg(sample, reg)
+    rows = sample.complete_rows(reg.codes)
     return risk_contribution(
-        sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64),
+        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64)[rows],
         reg.betas,
         reg.fit.resid,
         reg.names,
+        reg.periods,
     )
 
 

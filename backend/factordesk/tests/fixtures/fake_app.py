@@ -6,7 +6,9 @@
 
 It builds the real application (``create_app``) with fake collaborators: a price provider that
 serves one synthetic history (``dgp_a``) for any ticker except ``XYZ``, a factor frame cut 30
-rows before the price end, a fixed clock and an empty temporary data directory. It serves the
+rows before the price end (with a synthetic momentum column for FF6 and the alpha strip), a monthly
+factor frame for the upload route (also with momentum), a fixed clock and an
+empty temporary data directory. It serves the
 built page from ``frontend/dist``. Nothing here reads the real data directory or the network, and
 the output is the same on every run.
 """
@@ -18,15 +20,18 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI
 
+from factordesk.api import routes_upload
 from factordesk.api.deps import AppDeps
 from factordesk.api.main import create_app
 from factordesk.data import factors as factors_module
 from factordesk.data.factors import FactorStatus
 from factordesk.data.prices import PriceDataError, PriceHistory
 from factordesk.tests.fixtures.dgp import dgp_a, rng_for
+from factordesk.tests.test_subject import monthly_case
 
 UNKNOWN_TICKER = "XYZ"
 """The one ticker the fake provider refuses, as Yahoo does for an unknown symbol."""
@@ -35,6 +40,10 @@ N_PRICES = 2520
 FACTOR_CUT = 30
 TEST_NUMBER = 1000
 DOWNLOADED = datetime(2020, 1, 20, 8, 30, tzinfo=UTC)
+MONTHLY_START = "2015-01-31"
+MONTHLY_MONTHS = 96
+"""The fake monthly factor file covers January 2015 to December 2022; the upload e2e test sends
+84 months from January 2015."""
 FRONTEND_DIST = Path(__file__).resolve().parents[4] / "frontend" / "dist"
 
 
@@ -71,6 +80,21 @@ def create() -> FastAPI:
         stale=behind > factors_module.STALE_AFTER_DAYS,
     )
     data_dir = Path(tempfile.mkdtemp(prefix="factordesk-fake-"))
+    _, monthly, _ = monthly_case(MONTHLY_MONTHS, 21, start=MONTHLY_START)
+    monthly.attrs = {"downloaded_at": DOWNLOADED.isoformat()}
+
+    monthly_ff6 = _with_mom(monthly, 0.03)
+    daily_ff6 = _with_mom(factors, 0.007)
+
+    def load_monthly(**_kwargs: object) -> pd.DataFrame:
+        return monthly
+
+    def load_monthly_ff6(frequency: str, **_kwargs: object) -> pd.DataFrame:
+        return monthly_ff6
+
+    # The upload route never reaches the network.
+    routes_upload.load_ff5_monthly = load_monthly
+    routes_upload.load_ff6 = load_monthly_ff6
     deps = AppDeps(
         price_provider=FakeProvider(d.history),
         load_factors=lambda refresh, at: factors,
@@ -78,5 +102,14 @@ def create() -> FastAPI:
         now=lambda: now,
         data_dir=data_dir,
         static_dir=FRONTEND_DIST,
+        load_ff6=lambda at: daily_ff6,
     )
     return create_app(deps)
+
+
+def _with_mom(frame: pd.DataFrame, sd: float) -> pd.DataFrame:
+    """``frame`` plus a synthetic momentum column ``Mom`` (fixed seed), attrs kept."""
+    out = frame.copy()
+    out["Mom"] = np.random.default_rng(TEST_NUMBER + 1).normal(0.0, sd, size=len(frame))
+    out.attrs = dict(frame.attrs)
+    return out

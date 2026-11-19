@@ -77,7 +77,7 @@ export function thinIndices(series: readonly (readonly number[])[], maxPoints = 
 export interface KalmanRowData {
   name: string;
   plain: string;
-  slot: 1 | 2 | 3 | 4 | 5;
+  slot: 1 | 2 | 3 | 4 | 5 | 6;
   /** The section's `latest` entry; null when the report has none for this factor. */
   latest: KalmanLatest | null;
   /** Number of dated values (after warm-up) and of points drawn after thinning. */

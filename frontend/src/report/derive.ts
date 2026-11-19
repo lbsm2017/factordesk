@@ -29,11 +29,27 @@ export function factorOrder(report: FactorReport): string[] {
   return names.length ? names : Object.keys(report.return_contribution.factors);
 }
 
-/** Colour slot 1 to 5: canonical position, else order of appearance. */
-export function slotOf(name: string, order: readonly string[]): 1 | 2 | 3 | 4 | 5 {
+/** Colour slot of a factor: 1 to 6, one per hue token f1 to f6. */
+export type FactorSlot = 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Colour slot 1 to 6: canonical position (Mom is 6), else order of appearance. */
+export function slotOf(name: string, order: readonly string[]): FactorSlot {
   const canonical = (FACTOR_NAMES as readonly string[]).indexOf(name);
-  const k = canonical >= 0 ? canonical : Math.max(order.indexOf(name), 0) % 5;
-  return (k + 1) as 1 | 2 | 3 | 4 | 5;
+  const k = canonical >= 0 ? canonical : Math.max(order.indexOf(name), 0) % FACTOR_NAMES.length;
+  return (k + 1) as FactorSlot;
+}
+
+const COUNT_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven"] as const;
+
+/** A small count in words ("five"); larger numbers as digits. */
+export function countWord(n: number): string {
+  return COUNT_WORDS[n] ?? String(n);
+}
+
+/** The number of factors of the report's model: 5 for FF5, 6 for FF6 (from the fit, else the model). */
+export function factorCount(report: FactorReport): number {
+  const n = report.regression.factors.length;
+  return n > 0 ? n : report.model === "ff6" ? 6 : 5;
 }
 
 /** Standard footnote texts for `keys`, without the one shown in the open (default L-DESC). */

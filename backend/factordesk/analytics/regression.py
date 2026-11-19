@@ -7,6 +7,10 @@ implementation is plain linear algebra and is cross-checked against the statsmod
 call ``OLS(y, X).fit(cov_type="HAC", cov_kwds={"maxlags": L, "use_correction": False},
 use_t=False)`` in the tests.
 
+Monthly subjects (owner decision) use the small-sample variant: the HAC covariance is scaled
+by ``m / (m - k)`` and p-values, intervals and tags use Student-t with ``m - k`` degrees of
+freedom, as statsmodels does with ``use_correction=True, use_t=True``. Daily output is unchanged.
+
 Pure: no I/O, no clock, no randomness. Inputs are not mutated.
 """
 
@@ -20,13 +24,16 @@ from statistics import NormalDist
 from typing import Any, Literal, cast
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
+from scipy.stats import t as student_t  # pyright: ignore[reportMissingTypeStubs]
 from statsmodels.stats.multitest import (  # pyright: ignore[reportMissingTypeStubs]
     multipletests,  # pyright: ignore[reportUnknownVariableType]
 )
 
 from factordesk.analytics.sample import (
     DISPLAY_NAMES,
+    EXTRA_FACTOR_CODES,
     FACTOR_CODES,
     AnalysisSample,
     DegenerateInputError,
@@ -36,7 +43,11 @@ FloatArray = NDArray[np.float64]
 Tag = Literal["reliable", "noise"]
 
 A = 252
-"""Annualisation constant, trading days per year (M0.4)."""
+"""Annualisation constant, trading days per year (M0.4): the ``periods`` (observations per
+year) of a daily series; a monthly one uses 12. Functions that take a sample read its own
+``periods`` (``resolve_periods``)."""
+KNOWN_CODES: tuple[str, ...] = (*FACTOR_CODES, *EXTRA_FACTOR_CODES)
+"""Every factor code a regression can use, canonical order."""
 BH_Q = 0.05
 """Benjamini-Hochberg level, fixed (M0.6)."""
 ALPHA_LEVEL = 0.05
@@ -45,12 +56,23 @@ Z_975: float = NormalDist().inv_cdf(0.975)
 """Two-sided 95% normal quantile (1.959964...)."""
 
 _multipletests = cast(Callable[..., tuple[Any, Any, Any, Any]], multipletests)
+_student_t = cast(Any, student_t)
 _erfc = np.frompyfunc(math.erfc, 1, 1)
 
 
 def two_sided_p(z: FloatArray) -> FloatArray:
     """``p = 2 (1 - Phi(|z|)) = erfc(|z| / sqrt 2)``, accurate in the far tail (M0.5)."""
     return np.asarray(_erfc(np.abs(z) / math.sqrt(2.0)), dtype=np.float64)
+
+
+def two_sided_t_p(t: FloatArray, df: int) -> FloatArray:
+    """Two-sided Student-t p-value ``2 (1 - F_df(|t|))``, from the survival function."""
+    return np.asarray(2.0 * _student_t.sf(np.abs(t), df), dtype=np.float64)
+
+
+def t_975(df: int) -> float:
+    """Two-sided 95% Student-t quantile with ``df`` degrees of freedom."""
+    return float(_student_t.ppf(0.975, df))
 
 
 LARGE_ALPHA = 0.03
@@ -157,6 +179,9 @@ class OLSHACFit:
     rsquared_adj: float
     nobs: int
     lags: int
+    t_df: int | None = None
+    """Student-t degrees of freedom of the small-sample variant; None for the normal reference.
+    ``zvalues`` then holds t-statistics."""
 
 
 def ols_hac(
@@ -164,6 +189,8 @@ def ols_hac(
     factors: FloatArray,
     lags: int | None = None,
     names: Sequence[str] = _DEFAULT_NAMES,
+    *,
+    small_sample: bool = False,
 ) -> OLSHACFit:
     """Fit ``y = alpha + beta' f + e`` by OLS with Newey-West HAC covariance (M0.5).
 
@@ -171,6 +198,9 @@ def ols_hac(
     matrix (no normal equations), so precision does not depend on the scale of the columns.
     Raises ``DegenerateInputError`` when the design is singular or nearly so, or ``y`` is
     constant (M3.1, D30); ``names`` label the factors in that message.
+
+    ``small_sample`` (monthly subjects) scales the covariance by ``m / (m - k)`` and uses
+    Student-t with ``m - k`` degrees of freedom for the p-values and the 95% intervals.
     """
     yv = np.asarray(y, dtype=np.float64)
     x = with_intercept(factors)
@@ -197,9 +227,13 @@ def ols_hac(
     bread = r_inv @ r_inv.T  # (X'X)^-1
     resid: FloatArray = yv - x @ params
     cov: FloatArray = bread @ hac_meat(x * resid[:, None], n_lags) @ bread
+    t_df = m - k if small_sample else None
+    if t_df is not None:
+        cov = cov * (m / t_df)
     bse: FloatArray = np.sqrt(np.diag(cov))
     z = params / bse
-    pvalues = two_sided_p(z)
+    pvalues = two_sided_p(z) if t_df is None else two_sided_t_p(z, t_df)
+    q975 = Z_975 if t_df is None else t_975(t_df)
 
     ssr = float(resid @ resid)
     centred = yv - yv.mean()
@@ -212,13 +246,14 @@ def ols_hac(
         bse=bse,
         zvalues=z,
         pvalues=pvalues,
-        ci_low=params - Z_975 * bse,
-        ci_high=params + Z_975 * bse,
+        ci_low=params - q975 * bse,
+        ci_high=params + q975 * bse,
         resid=resid,
         rsquared=r2,
         rsquared_adj=r2_adj,
         nobs=m,
         lags=n_lags,
+        t_df=t_df,
     )
 
 
@@ -250,14 +285,18 @@ def _pct(x: float) -> str:
 
 
 def alpha_sentence(
-    alpha_ann: float, p: float, sigma_e_ann: float, n: int, se_ann: float
+    alpha_ann: float, p: float, sigma_e_ann: float, n: int, se_ann: float, periods: int = A
 ) -> str | None:
-    """Explain a large but insignificant alpha (M3.2); None when it does not apply."""
+    """Explain a large but insignificant alpha (M3.2); None when it does not apply.
+
+    ``n`` observations at ``periods`` a year span ``n / periods`` years.
+    """
     if abs(alpha_ann) < LARGE_ALPHA or p < ALPHA_LEVEL:
         return None
+    years = n / periods
     return (
         f"Alpha of {_pct(alpha_ann)} a year cannot be told apart from zero: residual volatility "
-        f"is {sigma_e_ann * 100:.2f}% a year over {n / A:.1f} years, so the standard error of "
+        f"is {sigma_e_ann * 100:.2f}% a year over {years:.1f} years, so the standard error of "
         f"annual alpha is {se_ann * 100:.2f}%."
     )
 
@@ -289,7 +328,9 @@ def vif(factors: FloatArray) -> FloatArray:
 
 
 def condition_number(factors: FloatArray) -> float:
-    """``sqrt(lambda_max / lambda_min)`` of the factor correlation matrix (M3.4)."""
+    """``sqrt(lambda_max / lambda_min)`` of the factor correlation matrix (M3.4); 1 for one."""
+    if np.asarray(factors).shape[1] == 1:
+        return 1.0
     eig = np.linalg.eigvalsh(np.corrcoef(np.asarray(factors, dtype=np.float64), rowvar=False))
     return float(math.sqrt(eig[-1] / eig[0]))
 
@@ -361,6 +402,13 @@ class FullSampleRegression:
     sigma_e_ann: float
     collinearity: Collinearity
     end: date
+    periods: int = A
+    """Observations a year used for the annualised figures (252 daily, 12 monthly)."""
+    codes: tuple[str, ...] = FACTOR_CODES
+    """Factor codes of the fit, in the order of ``names`` and ``betas``."""
+    n_dropped: int = 0
+    """Sample rows left out because a factor of ``codes`` is missing there (only an extra
+    factor such as ``mom`` can be; 0 for the five factors)."""
 
     @property
     def betas(self) -> FloatArray:
@@ -371,29 +419,84 @@ class FullSampleRegression:
         return float(self.fit.params[0])
 
 
-def run_regression(sample: AnalysisSample) -> FullSampleRegression:
-    """Full-sample OLS of ``y`` on the five factors with HAC ``L(n)`` (M3.1-M3.4)."""
-    y = sample.xret.to_numpy(dtype=np.float64)
-    f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
-    names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
-    fit = ols_hac(y, f, names=names)
+def resolve_periods(sample: AnalysisSample, periods: int | None) -> int:
+    """The sample's ``periods`` (252 daily, 12 monthly); a given value must equal it.
+
+    ``None`` means the sample's own. Any other value raises ``ValueError``: annualising monthly
+    data by 252, or daily data by 12, is always an error.
+    """
+    own = sample.periods
+    if periods is None:
+        return own
+    if periods <= 0:
+        raise ValueError("periods must be positive")
+    if periods != own:
+        raise ValueError(
+            f"periods={periods} does not match the {sample.frequency} sample ({own} a year); "
+            "leave periods unset to use the sample's own"
+        )
+    return periods
+
+
+def check_codes(codes: Sequence[str]) -> tuple[str, ...]:
+    """``codes`` as a tuple after checking it is non-empty, known and without repeats."""
+    out = tuple(codes)
+    if not out:
+        raise ValueError("a regression needs at least one factor")
+    unknown = [c for c in out if c not in KNOWN_CODES]
+    if unknown:
+        raise ValueError(f"unknown factor codes {unknown}; known: {list(KNOWN_CODES)}")
+    if len(set(out)) != len(out):
+        raise ValueError(f"factor codes repeat: {list(out)}")
+    return out
+
+
+def run_regression(
+    sample: AnalysisSample,
+    periods: int | None = None,
+    *,
+    codes: Sequence[str] = FACTOR_CODES,
+    small_sample: bool = False,
+) -> FullSampleRegression:
+    """Full-sample OLS of ``y`` on the factors ``codes`` with HAC ``L(n)`` (M3.1-M3.4).
+
+    ``codes`` defaults to the five factors; ``analytics.models.MODELS`` holds the CAPM, FF3, FF5
+    and FF6 sets (``mom`` needs a sample built on the FF6 frame). ``periods`` is the number of
+    observations a year; ``None`` uses the sample's own (252 daily, 12 monthly) and any other
+    value must equal it (``resolve_periods``). It scales the annualised figures only: alpha and
+    its standard error and interval by ``periods`` (arithmetic, M0.4) and the residual volatility
+    by ``sqrt(periods)``. The fit itself does not depend on it. ``small_sample`` (monthly
+    subjects) selects the corrected covariance and Student-t inference of ``ols_hac``; the tags
+    follow from those p-values.
+
+    The fit uses ``sample.complete_rows(codes)``: every row for the five factors; for FF6 the
+    rows where ``mom`` also exists (``n_dropped`` counts the others).
+    """
+    periods = resolve_periods(sample, periods)
+    codes = check_codes(codes)
+    rows = sample.complete_rows(codes)
+    y = sample.xret.to_numpy(dtype=np.float64)[rows]
+    f = sample.factor_columns(codes).to_numpy(dtype=np.float64)[rows]
+    last_row = int(np.flatnonzero(rows)[-1]) if rows.any() else len(rows) - 1
+    names = tuple(DISPLAY_NAMES[c] for c in codes)
+    fit = ols_hac(y, f, names=names, small_sample=small_sample)
 
     beta_p = [float(p) for p in fit.pvalues[1:]]
     _, p_adj = bh_adjust(beta_p)
     tags = significance_tags(beta_p)
-    alpha_ann = A * float(fit.params[0])
-    alpha_se_ann = A * float(fit.bse[0])
-    sigma_e_ann = math.sqrt(A) * float(np.std(fit.resid, ddof=1))
+    alpha_ann = periods * float(fit.params[0])
+    alpha_se_ann = periods * float(fit.bse[0])
+    sigma_e_ann = math.sqrt(periods) * float(np.std(fit.resid, ddof=1))
     a_tag = alpha_tag(float(fit.pvalues[0]))
     return FullSampleRegression(
         fit=fit,
         names=names,
         alpha_ann=alpha_ann,
         alpha_se_ann=alpha_se_ann,
-        alpha_ci_ann=(A * float(fit.ci_low[0]), A * float(fit.ci_high[0])),
+        alpha_ci_ann=(periods * float(fit.ci_low[0]), periods * float(fit.ci_high[0])),
         alpha_tag=a_tag,
         alpha_sentence=alpha_sentence(
-            alpha_ann, float(fit.pvalues[0]), sigma_e_ann, fit.nobs, alpha_se_ann
+            alpha_ann, float(fit.pvalues[0]), sigma_e_ann, fit.nobs, alpha_se_ann, periods
         ),
         beta_p_adj=tuple(p_adj),
         beta_tags=tuple(tags),
@@ -403,5 +506,8 @@ def run_regression(sample: AnalysisSample) -> FullSampleRegression:
         ),
         sigma_e_ann=sigma_e_ann,
         collinearity=collinearity(f, names),
-        end=sample.end,
+        end=pd.Timestamp(sample.xret.index[last_row]).date(),
+        periods=periods,
+        codes=codes,
+        n_dropped=int(rows.size - rows.sum()),
     )

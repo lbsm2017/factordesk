@@ -11,6 +11,7 @@ Pure: no I/O, no clock. Inputs are not mutated.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -43,7 +44,8 @@ class RollingBetas:
     """Per-stamp estimates of one window length on the analysis sample.
 
     All frames/series share the sample's ``date`` index; rows before the first stamp are NaN
-    (``window_start`` is NaT there). Columns of ``betas`` and ``se`` are ``FACTOR_CODES``.
+    (``window_start`` is NaT there). Columns of ``betas`` and ``se`` are the model's factor
+    codes (``FACTOR_CODES`` for FF5).
     """
 
     window: int
@@ -274,16 +276,24 @@ def rolling_ols_hac(
     return params, bse, r2
 
 
-def rolling_betas(sample: AnalysisSample, window: int) -> RollingBetas:
-    """Trailing ``window``-row betas on the analysis sample (M4)."""
+def rolling_betas(
+    sample: AnalysisSample, window: int, codes: Sequence[str] = FACTOR_CODES
+) -> RollingBetas:
+    """Trailing ``window``-row betas on the analysis sample (M4).
+
+    ``codes`` are the factors of the model (default the five; FF6 adds ``mom``). Every row of the
+    sample must have them (the FF6 report builds its sample on the rows where ``mom`` exists).
+    """
     index = pd.DatetimeIndex(sample.xret.index)
     y = sample.xret.to_numpy(dtype=np.float64)
-    f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
+    f = sample.factor_columns(codes).to_numpy(dtype=np.float64)
+    if not bool(np.isfinite(f).all()):
+        raise ValueError("rolling betas need every factor of the model on every sample row")
     params, bse, r2 = rolling_ols_hac(y, f, window)
     start = pd.Series(pd.NaT, index=index, dtype="datetime64[ns]", name="window_start")
     if len(index) >= window:
         start.iloc[window - 1 :] = index[: len(index) - window + 1]
-    cols = list(FACTOR_CODES)
+    cols = list(codes)
     return RollingBetas(
         window=window,
         lags=hac_lags(window),
@@ -323,7 +333,7 @@ class AverageBetaStats:
 def average_beta(rolling: RollingBetas) -> tuple[AverageBetaStats, ...]:
     """Mean, sd (ddof=1), 10th/90th percentiles (linear), min, max and share > 0 (M5)."""
     out: list[AverageBetaStats] = []
-    for code in FACTOR_CODES:
+    for code in rolling.betas.columns:
         column = rolling.betas[code].to_numpy(dtype=np.float64)
         values: FloatArray = column[~np.isnan(column)]  # warm-up rows carry no estimate
         if values.size < 2:

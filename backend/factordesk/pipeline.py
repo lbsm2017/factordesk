@@ -6,6 +6,16 @@ residual diagnostics and quality gate with the 5-day estimate when the gate fire
 rolling betas (M4) and average beta (M5), return and risk contribution (M6.1, M6.4, M7), and
 last the optional sections of the schema v3 contract, one hook each (``section_hooks/``,
 ``docs/specs/schema-v3-contract.md`` SC3.2).
+
+Every report runs on a ``ReturnSubject`` (``analytics/subject.py``): ``assemble_subject_report``
+is the engine and ``assemble_report`` (a ticker's price history) wraps it. A monthly subject is
+regressed on the French monthly factors with ``periods = 12``; the sections built on trading
+days do not apply to it: the rolling windows, the average beta and the residual quality gate
+(with its 5-day estimate) report ``not_applicable`` with a reason, and the daily-only optional
+sections are hidden by the hook registry (``section_hooks/registry.py``).
+The factor model is FF5 (default) or FF6 (FF5 plus momentum, E1). Under FF6 every core section
+uses the six factors, the sample is built on the dates where momentum exists, and the sections
+defined for the five factors only are hidden by the hook registry; the FF5 report is unchanged.
 Providers, the factor frame and the clock are injectable so the whole path runs offline in
 tests. Inputs that cannot support a regression raise ``DegenerateInputError`` (D30).
 """
@@ -45,6 +55,7 @@ from factordesk.analytics.diagnostics import (
 from factordesk.analytics.diagnostics import (
     NOTE as DIAGNOSTICS_NOTE,
 )
+from factordesk.analytics.models import model_codes
 from factordesk.analytics.regression import Z_975, FullSampleRegression, run_regression
 from factordesk.analytics.rolling import (
     PRIMARY_WINDOW,
@@ -55,16 +66,19 @@ from factordesk.analytics.rolling import (
 )
 from factordesk.analytics.sample import (
     DISPLAY_NAMES,
-    FACTOR_CODES,
     AnalysisSample,
-    build_sample,
+    build_subject_sample,
 )
+from factordesk.analytics.subject import ReturnSubject, subject_from_history
 from factordesk.data import factors as factor_data
-from factordesk.data.audit import AuditReport, audit_prices
+from factordesk.data import french
+from factordesk.data.audit import AuditReport, audit_levels, audit_prices
 from factordesk.data.prices import (
+    SUPPORTED_CURRENCY,
     PriceHistory,
     PriceProvider,
     Security,
+    UnsupportedCurrencyError,
     YFinanceProvider,
     check_currency,
     collapse_duplicate_dates,
@@ -99,18 +113,19 @@ from factordesk.report.schema import (
     SecurityInfo,
     Severity,
     Status,
+    SubjectInfo,
     UncoveredTail,
     report_label_text,
 )
-from factordesk.section_hooks import fragility as fragility_hook
-from factordesk.section_hooks import kalman as kalman_hook
-from factordesk.section_hooks import lead_lag as lead_lag_hook
 from factordesk.section_hooks import load_section_inputs
-from factordesk.section_hooks import performance as performance_hook
-from factordesk.section_hooks import residual_alpha as residual_alpha_hook
-from factordesk.section_hooks import shrunk as shrunk_hook
-from factordesk.section_hooks import world_beta as world_beta_hook
-from factordesk.section_hooks.context import CoreSections, SectionContext, SectionInputs
+from factordesk.section_hooks.context import (
+    FACTOR_MODELS,
+    CoreSections,
+    FactorModel,
+    SectionContext,
+    SectionInputs,
+)
+from factordesk.section_hooks.registry import run_hooks
 
 STALE_AFTER_DAYS = factor_data.STALE_AFTER_DAYS
 
@@ -126,6 +141,55 @@ NOTE_US_FACTORS = (
     "ticker is analysed without that check."
 )
 NOTE_DESC = "Every statistic is descriptive and in-sample, not predictive."
+NOTE_US_FACTORS_SERIES = (
+    "The factors are US Fama-French factors in USD, and the returns are taken to be in US "
+    "dollars. Returns in another currency would mix factor exposure with currency effects."
+)
+NOTE_MONTHLY_TEMPLATE = (
+    "Monthly data: the regression uses the Fama-French monthly factors and annualises with 12 "
+    "periods a year. The Newey-West HAC covariance is scaled by n / (n - {k}), and p-values, "
+    "intervals and tags use Student-t with n - {k} degrees of freedom; they remain approximate "
+    "for records of 36 to 60 months."
+)
+"""Note of a monthly report; ``k`` is the number of parameters (6 for FF5, 7 for FF6)."""
+NOTE_MONTHLY = NOTE_MONTHLY_TEMPLATE.format(k=6)
+"""The monthly note of an FF5 report."""
+NOTE_FF6 = (
+    "Model: FF6, the five Fama-French factors plus momentum (Mom). The sample ends on the last "
+    "date both factor files cover. Sections defined for the five-factor model only are not shown."
+)
+MOM_COLUMN = french.MOM
+"""Column of the momentum factor in the French frame (``data.french.load_ff6``)."""
+
+FACTOR_SOURCE_URL: dict[str, str] = {
+    "daily": factor_data.SOURCE_URL,
+    "monthly": french.DATASETS["ff5_monthly"].url,
+}
+"""The French file behind each frequency (the FF5 model)."""
+
+_UNIT: dict[str, str] = {"daily": "trading days", "monthly": "months"}
+_SUBJECT_NOUN: dict[str, str] = {
+    "ticker": "stock",
+    "upload": "track record",
+    "portfolio": "portfolio",
+}
+
+NOT_DAILY_ROLLING = (
+    "rolling betas use windows of {window} trading days and are computed for daily returns "
+    "only; this report is on monthly returns"
+)
+NOT_DAILY_AVERAGE = (
+    "the average beta summarises the {window}-day rolling betas, which are computed for daily "
+    "returns only; this report is on monthly returns"
+)
+NOT_DAILY_GATE = (
+    "the residual quality gate looks for daily closing prices that are not synchronous with the "
+    "factor data; it does not apply to monthly returns"
+)
+NOT_DAILY_FIVE_DAY = (
+    "the 5-day estimate is computed only when the residual quality gate fires, and the gate "
+    "does not apply to monthly returns"
+)
 
 _SEVERITY: dict[str, Severity] = {"info": "info", "warn": "warning", "error": "error"}
 
@@ -205,6 +269,7 @@ def _regression_section(
     reg: FullSampleRegression, info: SampleInfo, gate_fired: bool = False
 ) -> Regression:
     fit = reg.fit
+    n_betas = len(reg.names)
     factors = [
         FactorStat(
             name=reg.names[i],
@@ -223,9 +288,15 @@ def _regression_section(
     col = reg.collinearity
     caption = (
         f"In-sample: uses the whole window ({info.start} to {info.end}, n = {info.n}). "
-        f"Newey-West HAC standard errors with {fit.lags} lags, normal reference distribution. "
-        "Betas are tagged reliable when significant after a Benjamini-Hochberg correction "
-        "across the 5 betas (q = 0.05); alpha is a single test at 5%. Bars show the 95% "
+        f"Newey-West HAC standard errors with {fit.lags} lags, "
+        + (
+            "normal reference distribution. "
+            if fit.t_df is None
+            else f"scaled by n / (n - {n_betas + 1}), Student-t reference with {fit.t_df} "
+            "degrees of freedom. "
+        )
+        + "Betas are tagged reliable when significant after a Benjamini-Hochberg correction "
+        f"across the {n_betas} betas (q = 0.05); alpha is a single test at 5%. Bars show the 95% "
         "interval for each beta on its own (not adjusted for multiple testing)."
     )
     if gate_fired:
@@ -304,8 +375,39 @@ def _rolling_section(rb: RollingBetas, info: SampleInfo) -> RollingWindow:
         ci_z=Z_975,
         dates=_dates(rb.betas.index),
         window_start=window_start,
-        betas={DISPLAY_NAMES[c]: _series(rb.betas[c], warm) for c in FACTOR_CODES},
-        se={DISPLAY_NAMES[c]: _series(rb.se[c], warm) for c in FACTOR_CODES},
+        betas={DISPLAY_NAMES[c]: _series(rb.betas[c], warm) for c in rb.betas.columns},
+        se={DISPLAY_NAMES[c]: _series(rb.se[c], warm) for c in rb.se.columns},
+    )
+
+
+def _not_applicable_rolling(window: int, info: SampleInfo, reason: str) -> RollingWindow:
+    return RollingWindow(
+        status="not_applicable",
+        reason=reason,
+        sample=info,
+        labels=_labels("L-DESC", "L-BAND", "L-OVERLAP"),
+        caption=f"Each point uses the previous {window} trading days, ending on that date.",
+        window=window,
+        n_stamps=0,
+        hac_lags=0,
+        ci_z=None,
+        dates=[],
+        window_start=[],
+        betas={},
+        se={},
+    )
+
+
+def _not_applicable_average(window: int, info: SampleInfo, reason: str) -> AverageBetaPanel:
+    return AverageBetaPanel(
+        status="not_applicable",
+        reason=reason,
+        sample=info,
+        labels=_labels("L-DESC", "L-OVERLAP"),
+        caption=f"Average of overlapping {window}-day estimates.",
+        window=window,
+        n_stamps=0,
+        factors=[],
     )
 
 
@@ -378,7 +480,11 @@ def _average_section(
 
 
 def _return_section(
-    sample: AnalysisSample, reg: FullSampleRegression, info: SampleInfo
+    sample: AnalysisSample,
+    reg: FullSampleRegression,
+    info: SampleInfo,
+    *,
+    subject_noun: str = "stock",
 ) -> ReturnContribution:
     ra = return_contribution_for(sample, reg)
     return ReturnContribution(
@@ -387,15 +493,21 @@ def _return_section(
         sample=info,
         labels=_labels("L-DESC", "L-ARITH"),
         caption=(
-            "Annualised (x252) means over the sample, using full-sample betas. Alpha, the "
-            "residual and the memo rows are shown separately; nothing is folded into alpha."
+            f"Annualised (x{reg.periods}) means over the sample, using full-sample betas. Alpha, "
+            "the residual and the memo rows are shown separately; nothing is folded into alpha."
         ),
         factors={k: _finite(v) for k, v in ra.contributions.items()},
         alpha=_finite(ra.alpha_ann),
         residual=_finite(ra.residual_ann),
         total_annualised_mean_excess_return=_finite(ra.total_ann),
         identity_residual=_finite(ra.identity_residual),
-        memo=memo_rows(sample.uncovered, sample.excluded, sample.factor_last_date),
+        memo=memo_rows(
+            sample.uncovered,
+            sample.excluded,
+            sample.factor_last_date,
+            unit=_UNIT[sample.frequency],
+            subject=subject_noun,
+        ),
     )
 
 
@@ -404,13 +516,13 @@ def _risk_section(
 ) -> RiskContribution:
     rk = risk_contribution_for(sample, reg)
     shares = [float(s) for s in rk.shares]
-    sqrt_a = math.sqrt(252)
+    sigma_ann = rk.sigma_ann
     details = [
         RiskFactorDetail(
             name=rk.names[i],
             share=_finite(shares[i]),
             beta=_finite(rk.betas[i]),
-            sigma_annual=_finite(sqrt_a * rk.sigma[i]),
+            sigma_annual=_finite(sigma_ann[i]),
             rho_sys=_optional_finite(rk.rho_sys[i]),
         )
         for i in range(len(rk.names))
@@ -433,10 +545,11 @@ def _risk_section(
     )
 
 
-def _price_section(history: PriceHistory, coverage_end: date) -> PriceSeries:
-    adj = history.frame["adj_close"].to_numpy(dtype=np.float64)
+def _price_section(subject: ReturnSubject, coverage_end: date) -> PriceSeries:
+    """The subject's levels for the chart: adjusted close of a ticker, NAV or growth index else."""
+    adj = subject.levels.to_numpy(dtype=np.float64)
     return PriceSeries(
-        dates=_dates(history.frame.index),
+        dates=_dates(subject.calendar),
         adj_close=[float(v) if math.isfinite(v) else None for v in adj],
         factor_coverage_end=coverage_end,
     )
@@ -457,12 +570,15 @@ _EXACT_FIT_REASON = (
 )
 
 
-def _diagnostics_section(diag: DiagnosticsResult | None, info: SampleInfo) -> ResidualDiagnostics:
+def _diagnostics_section(
+    diag: DiagnosticsResult | None, info: SampleInfo, *, gate_applies: bool = True
+) -> ResidualDiagnostics:
     caption = (
         "Diagnostics of the full-sample regression residuals, each at a nominal 5% and not "
-        "corrected for multiple testing. Only the lag-1 autocorrelation feeds the residual "
-        "quality gate."
+        "corrected for multiple testing."
     )
+    if gate_applies:
+        caption += " Only the lag-1 autocorrelation feeds the residual quality gate."
     if diag is None:
         return ResidualDiagnostics(
             status="not_applicable",
@@ -521,7 +637,9 @@ def _diagnostics_section(diag: DiagnosticsResult | None, info: SampleInfo) -> Re
     )
 
 
-def _gate_section(gate: GateResult | None, info: SampleInfo) -> QualityGate:
+def _gate_section(
+    gate: GateResult | None, info: SampleInfo, not_applicable: str = _EXACT_FIT_REASON
+) -> QualityGate:
     caption = (
         f"Fires when the lag-1 autocorrelation of the residuals is below {RHO_GATE} and its "
         f"robust z is below {Z_GATE:.0f}: part of each day's residual then reverses the next "
@@ -531,7 +649,7 @@ def _gate_section(gate: GateResult | None, info: SampleInfo) -> QualityGate:
     if gate is None:
         return QualityGate(
             status="not_applicable",
-            reason=_EXACT_FIT_REASON,
+            reason=not_applicable,
             sample=info,
             labels=_labels("L-DESC"),
             caption=caption,
@@ -590,7 +708,11 @@ def _five_day_empty(
 
 
 def _five_day_section(
-    five: MultiDayFit | None, gate: GateResult | None, n: int, info: SampleInfo
+    five: MultiDayFit | None,
+    gate: GateResult | None,
+    n: int,
+    info: SampleInfo,
+    not_applicable: str | None = None,
 ) -> MultiDayRegression:
     caption = (
         f"Sums of daily returns over non-overlapping blocks of {HORIZON} trading days, starting "
@@ -599,6 +721,8 @@ def _five_day_section(
         "residual quality gate "
         "fired: summing over 5 days lets most of a reversing price error cancel."
     )
+    if not_applicable is not None:
+        return _five_day_empty("not_applicable", not_applicable, info, caption)
     if gate is None:
         return _five_day_empty(
             "not_applicable",
@@ -618,7 +742,7 @@ def _five_day_section(
             caption,
         )
     fit = five.fit
-    names = [DISPLAY_NAMES[c] for c in FACTOR_CODES]
+    names = list(five.names)
     factors = [
         FactorStat(
             name=names[i],
@@ -674,13 +798,24 @@ def _warnings(
     out: list[ReportWarning] = []
     if gate is not None and gate.fired and gate.message:
         out.append(ReportWarning(code="residual_reversal", message=gate.message))
-    if sample.short_history:
+    if sample.short_history and sample.frequency == "daily":
         out.append(
             ReportWarning(
                 code="short_history",
                 message=(
                     f"Only {sample.n} daily observations (fewer than 750, about 3 years): "
                     "estimates are imprecise."
+                ),
+            )
+        )
+    elif sample.short_history:
+        out.append(
+            ReportWarning(
+                code="short_history",
+                message=(
+                    f"Only {sample.n} monthly observations (fewer than {sample.warn_obs}, "
+                    f"{sample.warn_obs // 12} years): estimates are imprecise, and the "
+                    "Newey-West z-statistics are only approximate at this length."
                 ),
             )
         )
@@ -708,14 +843,18 @@ def _warnings(
                 ),
             )
         )
-    if days_behind > STALE_AFTER_DAYS:
+    # A monthly record says so only when months are cut off; daily reports keep their rule.
+    cut_off = sample.uncovered.n > 0 or sample.frequency == "daily"
+    if days_behind > STALE_AFTER_DAYS and cut_off:
         out.append(
             ReportWarning(
                 code="factor_data_lag",
                 message=(
                     f"Factor data ends {sample.factor_last_date}, {days_behind} days before the "
                     "report date (the French library publishes with a lag of about a month). "
-                    f"{sample.uncovered.n} later price days are not analysed."
+                    f"{sample.uncovered.n} later "
+                    f"{'price days' if sample.frequency == 'daily' else 'months'} are not "
+                    "analysed."
                 ),
             )
         )
@@ -758,6 +897,7 @@ def assemble_report(
     end: date | None = None,
     section_inputs: SectionInputs | None = None,
     security: Security | None = None,
+    model: FactorModel = "ff5",
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
@@ -765,36 +905,171 @@ def assemble_report(
     the last price date. They are reported as given, so nothing is clipped silently.
     ``section_inputs`` holds extra data for the optional sections (None: none). ``security`` is
     the Yahoo metadata of the ticker (None: unknown); a known currency other than USD raises
-    ``UnsupportedCurrencyError`` (roadmap N1, an unknown currency does not).
+    ``UnsupportedCurrencyError`` (roadmap N1, an unknown currency does not). A wrapper over
+    ``assemble_subject_report`` with the daily ticker subject of ``history``; ``model`` is FF5
+    (default) or FF6, which needs the ``Mom`` column of ``data.french.load_ff6``.
     """
     check_currency(ticker, security)
     history = unique_dates(history)
-    audit = audit_prices(history.frame, duplicate_dates=history.duplicate_dates)
-    sample = build_sample(history, factor_frame, start, end)
+    subject = subject_from_history(
+        history, label=ticker, currency=None if security is None else security.currency
+    )
+    return assemble_subject_report(
+        subject,
+        factor_frame,
+        model,
+        now=now,
+        factors_downloaded_at=factors_downloaded_at,
+        windows=windows,
+        primary_window=primary_window,
+        start=start,
+        end=end,
+        section_inputs=section_inputs,
+        security=security,
+    )
+
+
+def _subject_audit(subject: ReturnSubject) -> AuditReport:
+    """The price audit of a ticker, the level audit otherwise, plus the subject's own findings."""
+    if subject.history is not None:
+        audit = audit_prices(subject.history.frame, duplicate_dates=subject.history.duplicate_dates)
+    else:
+        audit = audit_levels(subject.levels, subject.frequency)
+    if not subject.findings:
+        return audit
+    findings = audit.findings + subject.findings
+    return dataclasses.replace(
+        audit, findings=findings, ok=not any(f.severity == "error" for f in findings)
+    )
+
+
+def _subject_info(subject: ReturnSubject) -> SubjectInfo | None:
+    """The report's ``subject`` block: ``None`` (left out of the JSON) for a ticker."""
+    if subject.kind == "ticker":
+        return None
+    gross_net = subject.meta.get("gross_net")
+    return SubjectInfo(
+        kind=subject.kind,
+        label=subject.label,
+        frequency=subject.frequency,
+        periods=subject.periods,
+        source=subject.source,
+        gross_net=gross_net if gross_net == "gross" or gross_net == "net" else None,
+        currency=subject.currency,
+    )
+
+
+def _check_subject_currency(subject: ReturnSubject) -> None:
+    """Only US-dollar returns are analysed (owner decision); an unknown currency passes."""
+    currency = subject.currency
+    if currency is not None and currency.strip().upper() != SUPPORTED_CURRENCY:
+        raise UnsupportedCurrencyError(subject.label, currency.strip())
+
+
+def _model_frame(factor_frame: pd.DataFrame, model: FactorModel) -> pd.DataFrame:
+    """The factor frame the report's sample is built on.
+
+    FF5: the frame as given (a ``Mom`` column, when present, rides along for the alpha strip and
+    never removes a row). FF6: the rows where ``Mom`` exists, so every sample row has all six
+    factors; dates after the last momentum value become the uncovered tail. ``ValueError`` when
+    the frame has no ``Mom`` column.
+    """
+    if model == "ff5":
+        return factor_frame
+    if MOM_COLUMN not in factor_frame.columns:
+        raise ValueError(
+            "the FF6 model needs the momentum factor (column 'Mom' of data.french.load_ff6)"
+        )
+    keep = factor_frame[MOM_COLUMN].notna().to_numpy(dtype=bool)
+    if bool(keep.all()):
+        return factor_frame
+    out = factor_frame.loc[keep]
+    out.attrs = dict(factor_frame.attrs)
+    return out
+
+
+def assemble_subject_report(
+    subject: ReturnSubject,
+    factor_frame: pd.DataFrame,
+    model: FactorModel = "ff5",
+    *,
+    now: datetime,
+    factors_downloaded_at: datetime | None,
+    windows: Sequence[int] = WINDOWS,
+    primary_window: int = PRIMARY_WINDOW,
+    start: date | None = None,
+    end: date | None = None,
+    section_inputs: SectionInputs | None = None,
+    security: Security | None = None,
+) -> FactorReport:
+    """The report of any return subject: the engine behind every mode.
+
+    ``factor_frame`` is the French frame of the subject's frequency (``load_ff5_daily`` or
+    ``data.french.load_ff5_monthly``, or ``data.french.load_ff6`` with the ``Mom`` column; French
+    column names, decimals). ``model`` is the factor model: ``"ff5"`` or ``"ff6"`` (FF5 plus
+    momentum, which needs the ``Mom`` column; its sample keeps the dates where ``Mom`` exists).
+    A frame with ``Mom`` also gives the alpha strip under FF5; the FF5 sections do not change.
+    Annualised figures use ``subject.periods``.
+    A ticker subject's report is exactly ``assemble_report``'s. A subject in a known currency
+    other than USD raises ``UnsupportedCurrencyError``; fewer aligned rows than the frequency's
+    floor raise ``InsufficientHistoryError`` (daily 504, monthly 36).
+    """
+    if model not in FACTOR_MODELS:
+        raise ValueError(f"unknown factor model {model!r}; use 'ff5' or 'ff6'")
+    codes = model_codes(model)
+    _check_subject_currency(subject)
+    is_daily = subject.frequency == "daily"
+    periods = subject.periods
+    audit = _subject_audit(subject)
+    model_frame = _model_frame(factor_frame, model)
+    sample = build_subject_sample(subject, model_frame, start, end)
     vintage = FactorVintage(last_date=sample.factor_last_date, downloaded_at=factors_downloaded_at)
     info = _sample_info(sample, vintage)
-    daily = run_regression(sample)
-    factor_values = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
+    first_fit = run_regression(sample, periods=periods, codes=codes, small_sample=not is_daily)
+    factor_values = sample.factor_columns(codes).to_numpy(dtype=np.float64)
     diag = (
         None
-        if exact_fit(daily.fit.rsquared)
-        else residual_diagnostics(daily.fit.resid, factor_values)
+        if exact_fit(first_fit.fit.rsquared)
+        else residual_diagnostics(first_fit.fit.resid, factor_values, subject.frequency)
     )
-    gate = None if diag is None else quality_gate(diag.lag1)
-    five = multi_day_regression(sample) if gate is not None and gate.fired else None
-    reg = apply_gate(daily, five) if five is not None else daily
+    gate = None if diag is None or not is_daily else quality_gate(diag.lag1)
+    five = multi_day_regression(sample, codes=codes) if gate is not None and gate.fired else None
+    reg = apply_gate(first_fit, five) if five is not None else first_fit
 
-    rolling_by_w = {w: rolling_betas(sample, w) for w in sorted(set(windows) | {primary_window})}
-    rolling_sections = [
-        _rolling_section(rb, _sample_info(sample, vintage, w))
-        if sample.n >= w
-        else _insufficient_rolling(w, sample.n, _sample_info(sample, vintage, w))
-        for w, rb in rolling_by_w.items()
-    ]
-    primary = rolling_by_w[primary_window]
-    primary_ok = next(s.status == "ok" for s in rolling_sections if s.window == primary_window)
+    all_windows = sorted(set(windows) | {primary_window})
+    if is_daily:
+        rolling_by_w = {w: rolling_betas(sample, w, codes) for w in all_windows}
+        rolling_sections = [
+            _rolling_section(rb, _sample_info(sample, vintage, w))
+            if sample.n >= w
+            else _insufficient_rolling(w, sample.n, _sample_info(sample, vintage, w))
+            for w, rb in rolling_by_w.items()
+        ]
+        primary = rolling_by_w[primary_window]
+        primary_ok = next(s.status == "ok" for s in rolling_sections if s.window == primary_window)
+        average = _average_section(
+            primary, reg, _sample_info(sample, vintage, primary_window), primary_ok
+        )
+    else:
+        rolling_by_w = {}
+        rolling_sections = [
+            _not_applicable_rolling(
+                w, _sample_info(sample, vintage, w), NOT_DAILY_ROLLING.format(window=w)
+            )
+            for w in all_windows
+        ]
+        average = _not_applicable_average(
+            primary_window,
+            _sample_info(sample, vintage, primary_window),
+            NOT_DAILY_AVERAGE.format(window=primary_window),
+        )
     days_behind = (now.date() - sample.factor_last_date).days
 
+    price_source = (
+        f"{subject.history.source} (Adj Close)"
+        if subject.history is not None
+        else f"{subject.source} ({subject.frequency} returns)"
+    )
     data = DataInfo(
         requested_start=sample.requested_start,
         requested_end=sample.requested_end,
@@ -804,8 +1079,8 @@ def assemble_report(
         factors_last_date=sample.factor_last_date,
         factors_downloaded_at=factors_downloaded_at,
         factors_days_behind=days_behind,
-        factors_source_url=factor_data.SOURCE_URL,
-        price_source=f"{history.source} (Adj Close)",
+        factors_source_url=FACTOR_SOURCE_URL[subject.frequency],
+        price_source=price_source,
         dropped_price_dates_after_factors=sample.uncovered.n,
         dropped_price_dates_before_factors=sample.n_before_factors,
         n_excluded=len(sample.excluded),
@@ -833,25 +1108,29 @@ def assemble_report(
         data=data,
         regression=_regression_section(reg, info, gate is not None and gate.fired),
         rolling=rolling_sections,
-        average_beta=_average_section(
-            primary, reg, _sample_info(sample, vintage, primary_window), primary_ok
+        average_beta=average,
+        return_contribution=_return_section(
+            sample, reg, info, subject_noun=_SUBJECT_NOUN[subject.kind]
         ),
-        return_contribution=_return_section(sample, reg, info),
         risk_contribution=_risk_section(sample, reg, info),
-        residual_diagnostics=_diagnostics_section(diag, info),
-        quality_gate=_gate_section(gate, info),
-        five_day_regression=_five_day_section(five, gate, sample.n, info),
-        price_series=_price_section(history, sample.factor_last_date),
+        residual_diagnostics=_diagnostics_section(diag, info, gate_applies=is_daily),
+        quality_gate=(
+            _gate_section(gate, info) if is_daily else _gate_section(None, info, NOT_DAILY_GATE)
+        ),
+        five_day_regression=_five_day_section(
+            five, gate, sample.n, info, None if is_daily else NOT_DAILY_FIVE_DAY
+        ),
+        price_series=_price_section(subject, sample.factor_last_date),
     )
     ctx = SectionContext(
-        ticker=ticker,
+        ticker=subject.label,
         now=now,
-        history=history,
-        factor_frame=factor_frame,
+        history=subject.history,
+        factor_frame=model_frame,
         sample=sample,
         vintage=vintage,
         audit=audit,
-        daily=daily,
+        daily=first_fit,
         regression=reg,
         diagnostics=diag,
         gate=gate,
@@ -861,47 +1140,41 @@ def assemble_report(
         core=core,
         inputs=section_inputs if section_inputs is not None else SectionInputs(),
         make_sample_info=lambda window: _sample_info(sample, vintage, window),
+        subject=subject,
+        model=model,
     )
-    # Optional sections (schema v3 contract SC3.2), in panel order. Each hook sees only the core.
-    performance = performance_hook.build_performance(ctx)
-    lead_lag = lead_lag_hook.build_lead_lag(ctx)
-    shrunk_betas = shrunk_hook.build_shrunk_betas(ctx)
-    fragility = fragility_hook.build_fragility(ctx)
-    world_beta = world_beta_hook.build_world_beta(ctx)
-    residual = residual_alpha_hook.build_residual_analysis(ctx)
-    kalman_betas = kalman_hook.build_kalman_betas(ctx)
-    present: dict[str, object | None] = {
-        "performance": performance,
-        "lead_lag": lead_lag,
-        "shrunk_betas": shrunk_betas,
-        "fragility": fragility,
-        "world_beta": world_beta,
-        "residual": residual,
-        "kalman_betas": kalman_betas,
-    }
-    return FactorReport(
-        ticker=ticker,
-        generated_at=now,
-        data=core.data,
-        regression=core.regression,
-        rolling=list(core.rolling),
-        average_beta=core.average_beta,
-        return_contribution=core.return_contribution,
-        risk_contribution=core.risk_contribution,
-        residual_diagnostics=core.residual_diagnostics,
-        quality_gate=core.quality_gate,
-        five_day_regression=core.five_day_regression,
-        price_series=core.price_series,
-        warnings=_warnings(sample, reg, audit, days_behind, gate),
-        notes=[NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS, NOTE_SURVIVORSHIP],
-        label_text=report_label_text(present),
-        performance=performance,
-        lead_lag=lead_lag,
-        shrunk_betas=shrunk_betas,
-        fragility=fragility,
-        world_beta=world_beta,
-        residual=residual,
-        kalman_betas=kalman_betas,
+    # Optional sections (schema v3 contract SC3.2), in panel-call order. Each hook sees only the
+    # core; a hook outside its HookSpec (subject kind, frequency, model) leaves its field None.
+    present = run_hooks(ctx)
+    if subject.kind == "ticker":
+        notes = [NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS, NOTE_SURVIVORSHIP]
+    else:
+        notes = [NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS_SERIES]
+    if not is_daily:
+        notes.append(NOTE_MONTHLY_TEMPLATE.format(k=len(codes) + 1))
+    if model == "ff6":
+        notes.append(NOTE_FF6)
+    return FactorReport.model_validate(
+        {
+            "ticker": subject.label,
+            "subject": _subject_info(subject),
+            "model": "ff6" if model == "ff6" else None,
+            "generated_at": now,
+            "data": core.data,
+            "regression": core.regression,
+            "rolling": list(core.rolling),
+            "average_beta": core.average_beta,
+            "return_contribution": core.return_contribution,
+            "risk_contribution": core.risk_contribution,
+            "residual_diagnostics": core.residual_diagnostics,
+            "quality_gate": core.quality_gate,
+            "five_day_regression": core.five_day_regression,
+            "price_series": core.price_series,
+            "warnings": _warnings(sample, reg, audit, days_behind, gate),
+            "notes": notes,
+            "label_text": report_label_text(present),
+            **present,
+        }
     )
 
 

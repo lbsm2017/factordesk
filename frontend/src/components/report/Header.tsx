@@ -1,12 +1,13 @@
-import { count, dateLong } from "../../format";
+import { dateLong } from "../../format";
+import { isSubjectReport, observations, subjectLine } from "../../report/subject";
 import { Icon } from "../shell/icons";
 import { noticeItems, plural } from "./leadHelpers";
 import type { ReportPanelProps } from "./types";
 import "./lead.css";
 
 export interface HeaderProps extends ReportPanelProps {
-  /** `/api/report/{t}/html?{same range}` for the "Download report" link (DB6.5). */
-  downloadHref: string;
+  /** `/api/report/{t}/html?{same range}` for the "Download report" link (DB6.5); null hides the link (an uploaded record has no HTML export). */
+  downloadHref: string | null;
 }
 
 /**
@@ -49,7 +50,7 @@ export function Header({ report, downloadHref }: HeaderProps) {
   const security = securityOf(report);
   const name = security.name?.trim() || null;
   const badge = security.quote_type ? (TYPE_BADGE[security.quote_type.toUpperCase()] ?? null) : null;
-  const listing = listingLine(security);
+  const listing = subjectLine(report) ?? listingLine(security);
   const warnings = noticeItems(report).length;
   return (
     <header className="masthead" id="header">
@@ -69,12 +70,14 @@ export function Header({ report, downloadHref }: HeaderProps) {
             {badge}
           </span>
         ) : null}
-        <div className="head-actions">
-          <a className="btn-outline" href={downloadHref} download>
-            <Icon name="download" />
-            Download report
-          </a>
-        </div>
+        {downloadHref !== null ? (
+          <div className="head-actions">
+            <a className="btn-outline" href={downloadHref} download>
+              <Icon name="download" />
+              Download report
+            </a>
+          </div>
+        ) : null}
         {listing ? <p className="listing">{listing}</p> : null}
         {warnings > 0 ? (
           <p className="warn-link">
@@ -91,18 +94,20 @@ export function Header({ report, downloadHref }: HeaderProps) {
         </div>
         <div>
           <dt>Observations</dt>
-          <dd>{`${count(d.n_obs)} ${d.n_obs === 1 ? "trading day" : "trading days"}`}</dd>
+          <dd>{observations(report, d.n_obs)}</dd>
         </div>
         <div>
           <dt>Factor data</dt>
           <dd title={`${plural(d.factors_days_behind, "day", "days")} old`}>To {dateLong(d.factors_last_date)}</dd>
         </div>
-        <div>
-          <dt>Benchmark</dt>
-          <dd className="tip" title="ACWI ETF, a stand-in for the MSCI ACWI index">
-            ACWI
-          </dd>
-        </div>
+        {isSubjectReport(report) ? null : (
+          <div>
+            <dt>Benchmark</dt>
+            <dd className="tip" title="ACWI ETF, a stand-in for the MSCI ACWI index">
+              ACWI
+            </dd>
+          </div>
+        )}
       </dl>
     </header>
   );

@@ -28,7 +28,7 @@ export interface BarCellProps {
   /** "sign": green (positive) or red (negative), for returns only. "neutral": ink, for betas. "factor": factor hue `factorSlot`. "hatch": residual. */
   fill: BarFill;
   /** 1 to 5, the factor's categorical hue (fill "factor"). */
-  factorSlot?: 1 | 2 | 3 | 4 | 5;
+  factorSlot?: 1 | 2 | 3 | 4 | 5 | 6;
   /** Not significant: faded fill plus full-colour outline (fill "sign" only). */
   faded?: boolean;
   /** 95% interval whisker. */

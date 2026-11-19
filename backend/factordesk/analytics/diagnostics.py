@@ -45,7 +45,7 @@ from factordesk.analytics.regression import (
     significance_tags,
     two_sided_p,
 )
-from factordesk.analytics.sample import DISPLAY_NAMES, FACTOR_CODES, AnalysisSample
+from factordesk.analytics.sample import DISPLAY_NAMES, FACTOR_CODES, AnalysisSample, Frequency
 
 FloatArray = NDArray[np.float64]
 
@@ -55,6 +55,10 @@ BG_LAGS = 10
 """Robust Breusch-Godfrey: 10 lagged residuals in the auxiliary regression (M3.5)."""
 ARCH_LAGS = 5
 """ARCH-LM: 5 lags (M3.5)."""
+MONTHLY_LB_LAGS = 12
+"""Monthly data: Ljung-Box and robust Breusch-Godfrey use ``min(12, n // 5)`` lags."""
+MONTHLY_ARCH_LAGS = 6
+"""Monthly data: ARCH-LM uses ``min(6, n // 10)`` lags."""
 RHO_GATE = -0.2
 """Quality gate: lag-1 residual autocorrelation strictly below this (M3.6)."""
 Z_GATE = -4.0
@@ -164,6 +168,18 @@ class DiagnosticsResult:
     note: str
 
 
+def diagnostic_lags(n: int, frequency: Frequency = "daily") -> tuple[int, int, int]:
+    """Lags of (Ljung-Box, robust Breusch-Godfrey, ARCH-LM) for ``n`` residuals.
+
+    Daily data use the fixed M3.5 lags (10, 10, 5). Monthly data use ``min(12, n // 5)`` for
+    Ljung-Box and Breusch-Godfrey and ``min(6, n // 10)`` for ARCH-LM, at least 1 each.
+    """
+    if frequency == "daily":
+        return LB_LAGS, BG_LAGS, ARCH_LAGS
+    lb = max(1, min(MONTHLY_LB_LAGS, n // 5))
+    return lb, lb, max(1, min(MONTHLY_ARCH_LAGS, n // 10))
+
+
 def _readings(
     lag: Lag1,
     lb: ChiSquareTest,
@@ -173,21 +189,30 @@ def _readings(
     skew: float,
     kurt: float,
     dw: float,
+    frequency: Frequency = "daily",
 ) -> dict[str, str]:
+    day = frequency == "daily"
     lag_text = f"Lag-1 autocorrelation of the residuals is {lag.rho:+.2f} (robust z {lag.z:+.1f}). "
     if lag.p < ALPHA_LEVEL and lag.rho < 0:
-        lag_text += "Part of each day's unexplained return reverses the next day."
+        lag_text += (
+            "Part of each day's unexplained return reverses the next day."
+            if day
+            else "Part of each month's unexplained return reverses the next month."
+        )
     elif lag.p < ALPHA_LEVEL:
-        lag_text += "Unexplained returns tend to persist into the next day."
+        lag_text += (
+            f"Unexplained returns tend to persist into the next {'day' if day else 'month'}."
+        )
     else:
-        lag_text += "No clear day-to-day pattern."
+        lag_text += f"No clear {'day-to-day' if day else 'month-to-month'} pattern."
     fat = jb.p < ALPHA_LEVEL
     return {
         "lag1_autocorrelation": lag_text,
         "ljung_box": (
             f"Ljung-Box ({lb.df} lags) {'rejects' if lb.p < ALPHA_LEVEL else 'does not reject'} "
             f"no autocorrelation (p {_p_text(lb.p)}). It assumes constant variance, so it "
-            "rejects too often on daily returns; read the robust test below."
+            f"rejects too often on {'daily' if day else 'monthly'} returns; read the robust test "
+            "below."
         ),
         "robust_breusch_godfrey": (
             f"Autocorrelation test robust to changing volatility ({bg.df} lags): "
@@ -211,19 +236,26 @@ def _readings(
     }
 
 
-def residual_diagnostics(resid: FloatArray, factors: FloatArray) -> DiagnosticsResult:
-    """All M3.5 diagnostics of the full-sample residuals ``resid`` (regressors ``factors``)."""
+def residual_diagnostics(
+    resid: FloatArray, factors: FloatArray, frequency: Frequency = "daily"
+) -> DiagnosticsResult:
+    """All M3.5 diagnostics of the full-sample residuals ``resid`` (regressors ``factors``).
+
+    ``frequency`` sets the lags (``diagnostic_lags``) and the wording of the readings
+    (days or months).
+    """
     e = np.asarray(resid, dtype=np.float64)
+    lb_lags, bg_lags, arch_lags = diagnostic_lags(e.shape[0], frequency)
     lag = lag1_autocorrelation(e)
-    lb_frame: Any = _ljungbox(e, lags=[LB_LAGS], model_df=0)
+    lb_frame: Any = _ljungbox(e, lags=[lb_lags], model_df=0)
     lb = ChiSquareTest(
         statistic=float(lb_frame["lb_stat"].iloc[0]),
-        df=LB_LAGS,
+        df=lb_lags,
         p=float(lb_frame["lb_pvalue"].iloc[0]),
     )
-    bg = robust_breusch_godfrey(e, factors, BG_LAGS)
-    arch_res: Any = _het_arch(e, nlags=ARCH_LAGS, result_object=True)
-    arch = ChiSquareTest(statistic=float(arch_res.lm), df=ARCH_LAGS, p=float(arch_res.lmpval))
+    bg = robust_breusch_godfrey(e, factors, bg_lags)
+    arch_res: Any = _het_arch(e, nlags=arch_lags, result_object=True)
+    arch = ChiSquareTest(statistic=float(arch_res.lm), df=arch_lags, p=float(arch_res.lmpval))
     jb_res: Any = _jarque_bera(e)
     jb = ChiSquareTest(statistic=float(jb_res[0]), df=2, p=float(jb_res[1]))
     skew, kurt = float(jb_res[2]), float(jb_res[3])
@@ -237,7 +269,7 @@ def residual_diagnostics(resid: FloatArray, factors: FloatArray) -> DiagnosticsR
         skew=skew,
         kurtosis=kurt,
         durbin_watson=dw,
-        readings=_readings(lag, lb, bg, arch, jb, skew, kurt, dw),
+        readings=_readings(lag, lb, bg, arch, jb, skew, kurt, dw, frequency),
         note=NOTE,
     )
 
@@ -315,16 +347,23 @@ class MultiDayFit:
     beta_p_adj: tuple[float, ...]
     beta_tags: tuple[Tag, ...]
     sigma_e_ann: float
+    names: tuple[str, ...] = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
+    """Display names of the factors, in the order of the betas."""
 
 
-def multi_day_regression(sample: AnalysisSample, horizon: int = HORIZON) -> MultiDayFit | None:
-    """The 5-day estimate of M3.6, or None when fewer than ``MIN_BLOCKS`` blocks exist."""
+def multi_day_regression(
+    sample: AnalysisSample, horizon: int = HORIZON, codes: Sequence[str] = FACTOR_CODES
+) -> MultiDayFit | None:
+    """The 5-day estimate of M3.6, or None when fewer than ``MIN_BLOCKS`` blocks exist.
+
+    ``codes`` are the factors of the model (default the five).
+    """
     y = sample.xret.to_numpy(dtype=np.float64)
-    f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
+    f = sample.factor_columns(codes).to_numpy(dtype=np.float64)
     if len(y) // horizon < MIN_BLOCKS:
         return None
     yb, fb, unused = block_sums(y, f, horizon)
-    names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
+    names = tuple(DISPLAY_NAMES[c] for c in codes)
     fit = ols_hac(yb, fb, names=names)
     scale = A / horizon
     beta_p = [float(p) for p in fit.pvalues[1:]]
@@ -344,6 +383,7 @@ def multi_day_regression(sample: AnalysisSample, horizon: int = HORIZON) -> Mult
         beta_p_adj=tuple(p_adj),
         beta_tags=tuple(significance_tags(beta_p)),
         sigma_e_ann=math.sqrt(scale) * float(np.std(fit.resid, ddof=1)),
+        names=names,
     )
 
 
