@@ -141,10 +141,18 @@ def test_monthly_subject_stamps_month_ends_and_builds_levels() -> None:
     ("dates", "values", "message"),
     [
         (["2020-02-29", "2020-01-31"], [0.01, 0.01], "increasing"),
-        (["2020-01-15", "2020-01-31"], [0.01, 0.01], "more than one return in 2020-01"),
+        (["2020-01-25", "2020-01-31"], [0.01, 0.01], "more than one return in 2020-01"),
         (["2020-01-31", "2020-03-31"], [0.01, 0.01], "no return for 2020-02"),
         (["2020-01-31", "2020-02-29"], [0.01, float("nan")], "2020-02 is not a number"),
         (["2020-01-31", "2020-02-29"], [-1.0, 0.01], "2020-01 is not a number above -100%"),
+        (["2020-01-31", "2020-02-29"], [0.01, float("inf")], "2020-02 is not a number"),
+        (["2020-01-31", "2020-02-29"], [0.01, -1.5], "2020-02 is not a number above -100%"),
+        (["2020-01-31", "2020-02-22"], [0.01, 0.01], "2020-02-22 is not in the last 7 days"),
+        (
+            ["2020-01-15", "2020-02-14", "2020-03-31"],
+            [0.01, 0.01, 0.01],
+            r"the date 2020-01-15 is not in the last 7 days of its month.*2020-01-31",
+        ),
     ],
 )
 def test_monthly_subject_refuses_bad_series(
@@ -293,3 +301,40 @@ def test_monthly_regression_at_the_36_month_floor() -> None:
     reg = run_regression(sample, periods=12)
     assert reg.fit.nobs == 36 and reg.fit.lags == 3
     assert np.isfinite(reg.fit.bse).all()
+
+
+@pytest.mark.parametrize(
+    ("day", "month_end"),
+    [
+        ("2020-02-23", "2020-02-29"),
+        ("2020-02-29", "2020-02-29"),
+        ("2021-02-22", "2021-02-28"),
+        ("2020-04-24", "2020-04-30"),
+        ("2020-01-25", "2020-01-31"),
+    ],
+)
+def test_monthly_subject_accepts_the_last_seven_days(day: str, month_end: str) -> None:
+    subject = subject_from_monthly_returns(
+        pd.Series([0.01], index=pd.DatetimeIndex([day])), label="Fund A"
+    )
+    assert list(subject.returns.index) == [pd.Timestamp(month_end)]
+
+
+def test_monthly_subject_refuses_the_eighth_day_from_the_end() -> None:
+    for day in ("2020-02-22", "2021-02-21", "2020-04-23"):
+        with pytest.raises(ValueError, match=f"the date {day} is not in the last 7 days"):
+            subject_from_monthly_returns(
+                pd.Series([0.01], index=pd.DatetimeIndex([day])), label="Fund A"
+            )
+
+
+def test_monthly_subject_refuses_an_empty_series() -> None:
+    empty = pd.Series([], index=pd.DatetimeIndex([]), dtype="float64")
+    with pytest.raises(ValueError, match="no returns given"):
+        subject_from_monthly_returns(empty, label="Fund A")
+
+
+def test_monthly_subject_refuses_a_tz_aware_index() -> None:
+    dates = pd.DatetimeIndex(["2020-01-31", "2020-02-29"], tz="UTC")
+    with pytest.raises(ValueError, match="tz-naive"):
+        subject_from_monthly_returns(pd.Series([0.01, 0.02], index=dates), label="Fund A")

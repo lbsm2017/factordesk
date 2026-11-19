@@ -197,6 +197,17 @@ def test_refuses_a_return_at_or_below_minus_100_percent(
     assert "-100%" in error.message
 
 
+def test_refuses_a_mid_month_date(client: ApiClient, returns: pd.Series) -> None:
+    lines = csv_of(returns).decode().splitlines()
+    day = returns.index[4]
+    lines[5] = f"{day:%Y-%m}-15," + lines[5].split(",")[1]
+    lines[9] = f"{returns.index[8]:%Y-%m}-10," + lines[9].split(",")[1]
+    error = refused(post(client, ("\n".join(lines) + "\n").encode()), 422, "invalid_upload")
+    assert f"{day:%Y-%m}-15 is not in the last 7 days of its month" in error.message
+    assert f"{day:%Y-%m-%d}" in error.message  # the month-end to use instead
+    assert f"{returns.index[8]:%Y-%m}-10" not in error.message
+
+
 @pytest.mark.parametrize(
     "body",
     [

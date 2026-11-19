@@ -67,8 +67,12 @@ def _rows(text: str) -> list[list[str]]:
 
 
 def _date(text: str, line: int) -> pd.Timestamp:
+    """A ``YYYY-MM-DD`` date as written, or the month-end of a ``YYYY-MM`` month."""
     try:
-        stamp = datetime.fromisoformat(text) if len(text) > 7 else datetime.strptime(text, "%Y-%m")
+        if len(text) <= 7:
+            month = pd.Timestamp(datetime.strptime(text, "%Y-%m"))
+            return pd.Timestamp(month + pd.offsets.MonthEnd(0))
+        stamp = datetime.fromisoformat(text)
     except ValueError:
         raise UploadError(
             f"line {line}: {text!r} is not a date; write dates as YYYY-MM-DD or YYYY-MM"
@@ -97,7 +101,8 @@ def _number(text: str, line: int) -> float:
 
 
 def parse_monthly_csv(raw: bytes) -> pd.Series:
-    """The returns of a ``date,return`` CSV, indexed by the dates as written (tz-naive).
+    """The returns of a ``date,return`` CSV, indexed by the dates as written (tz-naive; a
+    ``YYYY-MM`` month is dated at its month-end).
 
     Refuses a missing or extra column, an unreadable date or return and an empty return. Month
     rules (gaps, repeated months, a return at or below -100%) are checked by

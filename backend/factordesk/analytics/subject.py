@@ -41,6 +41,8 @@ SUBJECT_KINDS: tuple[SubjectKind, ...] = ("ticker", "upload", "portfolio")
 FREQUENCIES: tuple[Frequency, ...] = ("daily", "monthly")
 LEVEL_BASE = 100.0
 """Starting value of the level index built from a return series (growth of 100)."""
+MONTH_END_DAYS = 7
+"""A monthly return must be dated in the last 7 calendar days of its month (month-end stamp)."""
 
 
 def _empty_meta() -> Mapping[str, str]:
@@ -138,11 +140,12 @@ def subject_from_monthly_returns(
 ) -> ReturnSubject:
     """A monthly subject from one simple return per calendar month.
 
-    Each date is moved to its calendar month-end (a fund that reports on the last business day
-    and the French file then share one stamp). The months must be consecutive, one return each,
-    finite and above -100%; anything else raises ``ValueError`` naming the first offending
-    month. The origin is the month-end before the first return and the levels are a
-    growth-of-100 index. Nothing is filled or dropped.
+    Each date must fall in the last ``MONTH_END_DAYS`` calendar days of its month and is moved
+    to its calendar month-end (a fund that reports on the last business day and the French file
+    then share one stamp); a mid-month date raises ``ValueError`` naming the first such date.
+    The months must be consecutive, one return each, finite and above -100%; anything else
+    raises ``ValueError`` naming the first offending month. The origin is the month-end before
+    the first return and the levels are a growth-of-100 index. Nothing is filled or dropped.
     """
     if kind == "ticker":
         raise ValueError("a ticker subject is built from its price history")
@@ -151,7 +154,16 @@ def subject_from_monthly_returns(
     index = returns.index
     if not isinstance(index, pd.DatetimeIndex) or index.tz is not None:
         raise ValueError("returns must have a tz-naive DatetimeIndex")
-    month_ends = pd.DatetimeIndex(index.normalize() + pd.offsets.MonthEnd(0), name="date")
+    days = index.normalize()
+    month_ends = pd.DatetimeIndex(days + pd.offsets.MonthEnd(0), name="date")
+    early = np.flatnonzero((month_ends - days).days >= MONTH_END_DAYS)
+    if early.size:
+        when = pd.Timestamp(index[int(early[0])])
+        raise ValueError(
+            f"the date {when:%Y-%m-%d} is not in the last {MONTH_END_DAYS} days of its month; "
+            f"date each monthly return at its month-end (for example "
+            f"{pd.Timestamp(month_ends[int(early[0])]):%Y-%m-%d})"
+        )
     if not month_ends.is_monotonic_increasing:
         raise ValueError("return dates must be in increasing order")
     if month_ends.has_duplicates:
