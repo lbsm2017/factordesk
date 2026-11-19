@@ -20,7 +20,7 @@ import {
 import type { RollingWindowDays } from "../../state/url";
 import { rollingOutcome } from "../../text/outcome";
 import { PLAIN } from "../../text/plain";
-import { type ChartTokens, useChartTokens } from "../charts/chartTokens";
+import { CHART_FONT_PX, type ChartTokens, useChartTokens } from "../charts/chartTokens";
 import type { ECharts, EChartsCoreOption } from "../charts/echartsCore";
 import { useEChart } from "../charts/useEChart";
 import { KeySwatch, numN, signedN } from "./barParts";
@@ -162,8 +162,8 @@ export function buildRowOption(block: RollingBlockData, row: RollingRowData, tok
       backgroundColor: tokens.surface,
       borderColor: tokens.axis,
       borderWidth: 1,
-      padding: [2, 6],
-      textStyle: { color: tokens.ink, fontFamily: tokens.sans, fontSize: 12 },
+      padding: [3, 8],
+      textStyle: { color: tokens.ink, fontFamily: tokens.sans, fontSize: CHART_FONT_PX },
       extraCssText: "box-shadow:none;",
       axisPointer: { type: "line", lineStyle: { color: tokens.ink3, width: 1 } },
       position: (point: number[], _p: unknown, _d: unknown, _r: unknown, size: { contentSize: number[]; viewSize: number[] }) => [

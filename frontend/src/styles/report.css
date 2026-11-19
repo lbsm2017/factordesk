@@ -313,7 +313,7 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 @media print {
   @page { size: A4; margin: 14mm 12mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { background: var(--page); font-size: 13px; }
+  body { background: var(--page); font-size: 14px; }
   .report-region { max-width: none; padding: 0; display: block; }
   .report-region > * + * { margin-top: 10px; }
   .price-wrap, .bars, .data-grid > div, .reg { break-inside: avoid; }

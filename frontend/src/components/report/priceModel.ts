@@ -4,6 +4,7 @@
  */
 import type { FactorReport } from "../../api/types";
 import { dateLong, num, pct } from "../../format";
+import { CHART_FONT_PX } from "../charts/chartTokens";
 import type { ChartTokens } from "../charts/chartTokens";
 import type { EChartsCoreOption } from "../charts/echartsCore";
 
@@ -169,11 +170,11 @@ export function priceOption(model: PriceModel, tokens: ChartTokens, { full }: Pr
     if (endPoint) rules.push({ xAxis: endPoint.ms });
   }
 
-  const label = { color: tokens.ink3, fontFamily: tokens.sans, fontSize: 12.5 };
+  const label = { color: tokens.ink3, fontFamily: tokens.sans, fontSize: CHART_FONT_PX };
   return {
     useUTC: true,
-    textStyle: { fontFamily: tokens.sans },
-    grid: { left: 48, right: 8, top: 8, bottom: 30 },
+    textStyle: { fontFamily: tokens.sans, fontSize: CHART_FONT_PX },
+    grid: { left: 58, right: 10, top: 10, bottom: 36 },
     tooltip: {
       trigger: "axis",
       confine: true,
@@ -181,7 +182,7 @@ export function priceOption(model: PriceModel, tokens: ChartTokens, { full }: Pr
       borderColor: tokens.axis,
       borderWidth: 1,
       padding: [6, 10],
-      textStyle: { color: tokens.ink, fontFamily: tokens.sans, fontSize: 12.5 },
+      textStyle: { color: tokens.ink, fontFamily: tokens.sans, fontSize: CHART_FONT_PX },
       axisPointer: { type: "line", lineStyle: { color: tokens.ink3, width: 1 } },
       formatter: (params: unknown) => {
         const first = Array.isArray(params) ? (params[0] as { value?: unknown } | undefined) : undefined;
@@ -199,6 +200,7 @@ export function priceOption(model: PriceModel, tokens: ChartTokens, { full }: Pr
       splitLine: { show: false },
       axisLabel: {
         ...label,
+        margin: 10,
         hideOverlap: true,
         formatter: { year: "{yyyy}", month: "{MMM}", day: "{d} {MMM}" },
       },

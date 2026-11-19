@@ -39,6 +39,6 @@ line.cred { stroke: var(--ink-2); stroke-width: 1.25; }
   .bars.shrunk td.pull { grid-column: 4; grid-row: 1; }
   .bars.shrunk td.se { grid-column: 1; grid-row: 3; text-align: left; }
   .bars.shrunk td.ci-text { grid-column: 2 / -1; grid-row: 3; text-align: right; white-space: nowrap; }
-  .bars.shrunk td.num::before { content: attr(data-label); display: block; font-size: 11px; line-height: 1.2; color: var(--ink-3); font-weight: 400; }
+  .bars.shrunk td.num::before { content: attr(data-label); display: block; font-size: 14px; line-height: 1.2; color: var(--ink-3); font-weight: 400; }
   .bars.shrunk tfoot tr { padding-top: 0; }
 }

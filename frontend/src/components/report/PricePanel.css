@@ -1,6 +1,6 @@
 /* Price panel (T6). Colours come from tokens.css only. */
 .price-main { min-width: 0; }
-.price-zones { display: flex; justify-content: space-between; gap: var(--s-4); min-height: 20px; margin-left: 48px; font-size: var(--fs-1); color: var(--ink-2); }
+.price-zones { display: flex; justify-content: space-between; gap: var(--s-4); min-height: 20px; margin-left: 58px; font-size: var(--fs-1); color: var(--ink-2); }
 .price-zones .zone-tag { white-space: nowrap; }
 .price-zones .zone-tag-end { margin-left: auto; text-align: right; }
 .price-chart { height: 240px; width: 100%; margin-top: 6px; }
@@ -8,7 +8,7 @@
 .zoom-toggle:hover { background: var(--sunk); }
 
 @media (max-width: 719px) {
-  .price-zones { margin-left: 40px; flex-wrap: wrap; row-gap: 2px; }
+  .price-zones { margin-left: 58px; flex-wrap: wrap; row-gap: 2px; }
   .price-chart { height: 200px; }
   .zoom-toggle { min-height: 44px; }
 }
