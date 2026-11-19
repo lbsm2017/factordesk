@@ -140,3 +140,9 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 
 - `docs/ROADMAP.md` updated (update 3): ranks 1, 8, 12 and 14 are Done on `dev`, not on `prod`; the nightly workflow is merged but has not run on GitHub; three new tickets (currency check N1, browser and accessibility pass N2, Kalman screen-reader strings N3) and an open-items list added.
 - The nightly `slow` job now sets `FACTORDESK_KB_REPS` to 200 (`.github/workflows/nightly.yml`, `wiki/decision-nightly-slow-tests.md`). Not verified until it runs on GitHub.
+
+## 2026-11-19 (integration of the dashboard v2 branches)
+
+- Company name and currency refusal, performance, world beta, the dashboard v2 specification and the design prototypes merged into `integrate/ui-v2`. Not merged to dev.
+- The schema version stays at 4: the `performance` and `world_beta` sections and `data.security` are additive optional fields (contract SC5). The "5" that the security branch wrote was reverted; a version 4 file written before `data.security` still loads.
+- `SECTIONS` and the section fields are listed in panel order: world beta (350), performance (450), then the five of the contract.
