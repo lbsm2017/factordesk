@@ -110,7 +110,14 @@ def plan_of(tree: PortfolioTree) -> PortfolioPlan:
                 if item.kind == "cash" or item.ticker is None:
                     rows.append(PlanRow(None, item.label, None, item.weight))
                     continue
-                ticker = validate_ticker(item.ticker)
+                try:
+                    ticker = validate_ticker(item.ticker)
+                except PriceDataError as exc:
+                    raise _invalid(
+                        f"{item.ticker!r} is not a valid ticker.",
+                        "Use 1 to 12 letters, digits or . ^ = - (for example SPY or BRK-B); a "
+                        "ticker cannot start with a dot.",
+                    ) from exc
                 if ticker not in tickers:
                     tickers.append(ticker)
                 rows.append(PlanRow(LEAF_PREFIX + item.id, item.label, ticker, item.weight))

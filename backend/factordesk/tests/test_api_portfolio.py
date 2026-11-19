@@ -514,3 +514,8 @@ def test_a_refusal_is_not_cached(world: World, client: ApiClient) -> None:
     refused(post(client, body), 422, "unknown_ticker")
     world.provider.histories["NOPE"] = _history("NOPE", 9, world.dates)
     assert post(client, body).status_code == 200
+
+
+def test_a_ticker_starting_with_a_dot_is_422(client: ApiClient) -> None:
+    error = refused(post(client, tree([holding(0, ".AAA", 1.0)])), 422, "invalid_portfolio")
+    assert "'.AAA' is not a valid ticker" in error.message
