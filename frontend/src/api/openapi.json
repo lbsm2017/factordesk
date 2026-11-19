@@ -3080,6 +3080,212 @@
         "title": "PriceSeries",
         "description": "Adjusted close for charting only (never used for regression here)."
       },
+      "ProxyBeta": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Index the proxy stands in for, for example 'MSCI Europe'."
+          },
+          "proxy": {
+            "type": "string",
+            "title": "Proxy",
+            "description": "Yahoo ticker of the proxy fund, for example 'IEUR'."
+          },
+          "n_days": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Days",
+            "description": "Days common to the analysis sample and the proxy."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start",
+            "description": "First of those common days."
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End",
+            "description": "Last of those common days."
+          },
+          "hac_lags": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hac Lags",
+            "description": "Newey-West lags of both regressions; null if none."
+          },
+          "n_not_in_benchmark": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Not In Benchmark",
+            "description": "Rows of the analysis sample with no usable proxy return."
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date",
+            "description": "First date of the proxy price history used; null if there is none."
+          },
+          "last_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Date",
+            "description": "Last date of the proxy price history used; null if there is none."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Set when the proxy refresh failed: where the cached history ends, or why there is none."
+          },
+          "audit_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Audit Warnings",
+            "description": "Warnings of the proxy price audit (M1.4)."
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BetaFit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Against the proxy fund, excess of RF."
+          },
+          "us_market": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BetaFit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Against the US market, same days."
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "about_the_same",
+                  "higher",
+                  "lower"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison",
+            "description": "Proxy beta against the US market beta: about_the_same when the two 95% intervals overlap, otherwise higher or lower (a reading of the intervals, not a test)."
+          },
+          "comparison_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Text",
+            "description": "The plain reading of the comparison."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "label",
+          "proxy",
+          "n_days",
+          "start",
+          "end",
+          "hac_lags",
+          "n_not_in_benchmark",
+          "first_date",
+          "last_date",
+          "note",
+          "audit_warnings",
+          "benchmark",
+          "us_market",
+          "comparison",
+          "comparison_text"
+        ],
+        "title": "ProxyBeta",
+        "description": "The quick beta against one more proxy (Europe: IEUR), with its own status.\n\nHolds what the ACWI fields of ``WorldBetaSection`` hold, for one proxy: the beta against the\nproxy and against the US market on the same days, the comparison, the days and the price\nhistory it rests on. It answers for its own numbers: a block that is not ``ok`` has no fit."
+      },
       "QualityGate": {
         "properties": {
           "status": {
@@ -6574,6 +6780,17 @@
             "title": "Comparison Text",
             "description": "The plain reading of the comparison."
           },
+          "europe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProxyBeta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same quick beta against the Europe proxy (IEUR, stand-in for MSCI Europe), with its own status and reason; null when it was not computed. The section status is that of the ACWI fields above, so a failed Europe block never changes it."
+          },
           "labels": {
             "items": {
               "type": "string",
@@ -6605,6 +6822,7 @@
           "us_market",
           "comparison",
           "comparison_text",
+          "europe",
           "labels"
         ],
         "title": "WorldBetaSection",

@@ -1244,6 +1244,95 @@ export interface components {
             factor_coverage_end: string;
         };
         /**
+         * ProxyBeta
+         * @description The quick beta against one more proxy (Europe: IEUR), with its own status.
+         *
+         *     Holds what the ACWI fields of ``WorldBetaSection`` hold, for one proxy: the beta against the
+         *     proxy and against the US market on the same days, the comparison, the days and the price
+         *     history it rests on. It answers for its own numbers: a block that is not ``ok`` has no fit.
+         */
+        ProxyBeta: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            /**
+             * Label
+             * @description Index the proxy stands in for, for example 'MSCI Europe'.
+             */
+            label: string;
+            /**
+             * Proxy
+             * @description Yahoo ticker of the proxy fund, for example 'IEUR'.
+             */
+            proxy: string;
+            /**
+             * N Days
+             * @description Days common to the analysis sample and the proxy.
+             */
+            n_days: number;
+            /**
+             * Start
+             * @description First of those common days.
+             */
+            start: string | null;
+            /**
+             * End
+             * @description Last of those common days.
+             */
+            end: string | null;
+            /**
+             * Hac Lags
+             * @description Newey-West lags of both regressions; null if none.
+             */
+            hac_lags: number | null;
+            /**
+             * N Not In Benchmark
+             * @description Rows of the analysis sample with no usable proxy return.
+             */
+            n_not_in_benchmark: number;
+            /**
+             * First Date
+             * @description First date of the proxy price history used; null if there is none.
+             */
+            first_date: string | null;
+            /**
+             * Last Date
+             * @description Last date of the proxy price history used; null if there is none.
+             */
+            last_date: string | null;
+            /**
+             * Note
+             * @description Set when the proxy refresh failed: where the cached history ends, or why there is none.
+             */
+            note: string | null;
+            /**
+             * Audit Warnings
+             * @description Warnings of the proxy price audit (M1.4).
+             */
+            audit_warnings: string[];
+            /** @description Against the proxy fund, excess of RF. */
+            benchmark: components["schemas"]["BetaFit"] | null;
+            /** @description Against the US market, same days. */
+            us_market: components["schemas"]["BetaFit"] | null;
+            /**
+             * Comparison
+             * @description Proxy beta against the US market beta: about_the_same when the two 95% intervals overlap, otherwise higher or lower (a reading of the intervals, not a test).
+             */
+            comparison: ("about_the_same" | "higher" | "lower") | null;
+            /**
+             * Comparison Text
+             * @description The plain reading of the comparison.
+             */
+            comparison_text: string | null;
+        };
+        /**
          * QualityGate
          * @description Residual quality gate for non-synchronous prices (M3.6).
          */
@@ -2527,6 +2616,8 @@ export interface components {
              * @description The plain reading of the comparison.
              */
             comparison_text: string | null;
+            /** @description The same quick beta against the Europe proxy (IEUR, stand-in for MSCI Europe), with its own status and reason; null when it was not computed. The section status is that of the ACWI fields above, so a failed Europe block never changes it. */
+            europe: components["schemas"]["ProxyBeta"] | null;
             /** Labels */
             labels: ("L-DESC" | "L-WORLD-PROXY" | "L-WORLD-ASYNC")[];
         };
