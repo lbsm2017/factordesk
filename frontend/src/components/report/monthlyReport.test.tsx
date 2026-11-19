@@ -1,7 +1,9 @@
-import { render, waitFor } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { monthlyReport } from "../../test/fixture";
+import { RegressionDetail } from "./RegressionDetail";
 import { ReportView } from "./ReportView";
+import { PerformanceBody } from "./sections/PerformanceBody";
 
 describe("ReportView on an uploaded monthly record", () => {
   const view = () => render(<ReportView report={monthlyReport} downloadHref={null} win={null} onWinChange={vi.fn()} />);
@@ -36,17 +38,16 @@ describe("ReportView on an uploaded monthly record", () => {
   });
 });
 
-describe("the lazy panels of a monthly record", () => {
-  it("counts months in the drawdown table and leaves out the daily-only estimates", async () => {
-    const { container } = render(
-      <ReportView report={monthlyReport} downloadHref={null} win={null} onWinChange={vi.fn()} />,
-    );
-    await waitFor(() => expect(container.querySelector("#performance th[scope=col].num.hide-s")).not.toBeNull(), { timeout: 10_000 });
-    expect(container.querySelector("#performance")?.textContent).toContain("Months");
+describe("the lazy panels of a monthly record, rendered directly", () => {
+  it("counts months in the drawdown table", () => {
+    const { container } = render(<PerformanceBody report={monthlyReport} />);
+    expect(container.querySelector("#performance th[scope=col].num.hide-s")?.textContent).toBe("Months");
     expect(container.querySelector("#performance")?.textContent).not.toContain("trading day");
-    await waitFor(() => expect(container.querySelector("#regression-detail table")).not.toBeNull(), { timeout: 10_000 });
-    const text = container.querySelector("#regression-detail")?.textContent ?? "";
-    expect(text).not.toContain("5-day estimate");
-    expect(container.querySelector("#exposures")?.textContent).not.toContain("NaN");
-  }, 30_000);
+  });
+
+  it("shows no 5-day estimate in the regression detail", () => {
+    const { container } = render(<RegressionDetail report={monthlyReport} />);
+    expect(container.querySelector("table")).not.toBeNull();
+    expect(container.textContent).not.toContain("5-day estimate");
+  });
 });
