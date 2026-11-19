@@ -8,7 +8,9 @@ export interface PanelProps {
   title: string;
   /** The plain-words question under the title. */
   question?: string;
-  /** Legend or control on the right of the head. */
+  /** Short text on the right of the title row: a period, a unit or a headline figure (v4a). */
+  aside?: ReactNode;
+  /** Legend or control on the right of the title row. */
   legend?: ReactNode;
   /** Reading line above the body (76ch). */
   reading?: ReactNode;
@@ -21,18 +23,21 @@ export interface PanelProps {
   children?: ReactNode;
 }
 
-/** The common panel anatomy of design section D. */
-export function Panel({ id, title, question, legend, reading, footnote, how, empty, children }: PanelProps) {
+/**
+ * The common panel anatomy (prototype v4a): a title row with the title on the left and the
+ * optional `aside` text and `legend` on the right, then the question as the takeaway line, the
+ * reading, the body, and the footnote with "How this is computed".
+ */
+export function Panel({ id, title, question, aside, legend, reading, footnote, how, empty, children }: PanelProps) {
   const headingId = `${id}-title`;
   return (
     <section className="panel" id={id} aria-labelledby={headingId}>
       <div className="panel-head">
-        <div>
-          <h2 id={headingId}>{title}</h2>
-          {question ? <p className="q">{question}</p> : null}
-        </div>
+        <h2 id={headingId}>{title}</h2>
+        {aside ? <div className="pm">{aside}</div> : null}
         {legend}
       </div>
+      {question ? <p className="q">{question}</p> : null}
       {empty ? (
         <EmptyState reason={empty.reason} action={empty.action} />
       ) : (

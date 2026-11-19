@@ -158,7 +158,7 @@ describe("RangeChips", () => {
     render(<RangeChips options={mockRanges("SPY").options} selected="FULL" onSelect={vi.fn()} />);
     const group = screen.getByRole("group", { name: "Date range" });
     const radios = within(group).getAllByRole("radio");
-    expect(radios.map((r) => (r as HTMLInputElement).value)).toEqual(["3Y", "5Y", "FULL"]);
+    expect(radios.map((r) => (r as HTMLInputElement).value)).toEqual(["3Y", "5Y", "10Y", "FULL"]);
     expect(screen.getByRole("radio", { name: "Full history" })).toHaveProperty("checked", true);
   });
 

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import type { FactorReport, FactorStat, MultiDayRegression, ResidualDiagnostics } from "../../api/types";
 import { num, pct, pval, signed, tstat } from "../../format";
+import { useShowStats } from "../../state/stats";
 import "./regression.css";
 import { EmptyState } from "./EmptyState";
 import { Panel } from "./Panel";
@@ -87,8 +88,11 @@ function Num({ label, className = "", children }: { label: string; className?: s
   );
 }
 
-/** Alpha row, then one row per factor. `vif` is null for the 5-day table, which has no VIF column. */
-function TermRows({ fit, vif }: { fit: TermFit; vif: Record<string, number | null> | null }) {
+/**
+ * Alpha row, then one row per factor. `vif` is null for the 5-day table, which has no VIF column.
+ * With statistics off only the term, the estimate and Significant are shown (dashboard spec DV5).
+ */
+function TermRows({ fit, vif, stats }: { fit: TermFit; vif: Record<string, number | null> | null; stats: boolean }) {
   const alphaNs = fit.alpha_tag !== "reliable";
   return (
     <>
@@ -97,14 +101,18 @@ function TermRows({ fit, vif }: { fit: TermFit; vif: Record<string, number | nul
           Alpha, a year
         </th>
         <Num label="Estimate">{pctText(fit.alpha_annual)}</Num>
-        <Num label="Std. error">{pctText(fit.alpha_se_annual, 2, false)}</Num>
-        <Num label="t">{tText(fit.alpha_z)}</Num>
-        <Num label="p">{pText(fit.alpha_p)}</Num>
-        <Num label="p, adjusted">single test</Num>
-        <Num label="95% interval">
-          {pctText(fit.alpha_ci_low_annual)} to {pctText(fit.alpha_ci_high_annual)}
-        </Num>
-        {vif !== null ? <Num label="VIF">{"–"}</Num> : null}
+        {stats ? (
+          <>
+            <Num label="Std. error">{pctText(fit.alpha_se_annual, 2, false)}</Num>
+            <Num label="t">{tText(fit.alpha_z)}</Num>
+            <Num label="p">{pText(fit.alpha_p)}</Num>
+            <Num label="p, adjusted">single test</Num>
+            <Num label="95% interval">
+              {pctText(fit.alpha_ci_low_annual)} to {pctText(fit.alpha_ci_high_annual)}
+            </Num>
+            {vif !== null ? <Num label="VIF">{"–"}</Num> : null}
+          </>
+        ) : null}
         <Num label="Significant" className=" sig">
           {alphaNs ? "No" : "Yes"}
         </Num>
@@ -117,14 +125,18 @@ function TermRows({ fit, vif }: { fit: TermFit; vif: Record<string, number | nul
               {s.name}
             </th>
             <Num label="Estimate">{sgn(s.beta)}</Num>
-            <Num label="Std. error">{plain(s.se, 4)}</Num>
-            <Num label="t">{tText(s.z)}</Num>
-            <Num label="p">{pText(s.p)}</Num>
-            <Num label="p, adjusted">{pText(s.p_adj_bh)}</Num>
-            <Num label="95% interval">
-              {sgn(s.ci_low)} to {sgn(s.ci_high)}
-            </Num>
-            {vif !== null ? <Num label="VIF">{plain(vif[s.name], 2)}</Num> : null}
+            {stats ? (
+              <>
+                <Num label="Std. error">{plain(s.se, 4)}</Num>
+                <Num label="t">{tText(s.z)}</Num>
+                <Num label="p">{pText(s.p)}</Num>
+                <Num label="p, adjusted">{pText(s.p_adj_bh)}</Num>
+                <Num label="95% interval">
+                  {sgn(s.ci_low)} to {sgn(s.ci_high)}
+                </Num>
+                {vif !== null ? <Num label="VIF">{plain(vif[s.name], 2)}</Num> : null}
+              </>
+            ) : null}
             <Num label="Significant" className=" sig">
               {ns ? "No" : "Yes"}
             </Num>
@@ -137,9 +149,12 @@ function TermRows({ fit, vif }: { fit: TermFit; vif: Record<string, number | nul
 
 const MAIN_HEADS = ["Term", "Estimate", "Std. error", "t", "p", "p, adjusted", "95% interval", "VIF", "Significant"];
 const FIVE_HEADS = ["Term", "Estimate", "Std. error", "t", "p", "p, adjusted", "95% interval", "Significant"];
+const PLAIN_HEADS = ["Term", "Estimate", "Significant"];
+const DIAG_HEADS = ["Test", "Statistic", "Reference", "p", "Reading"];
+const DIAG_PLAIN_HEADS = ["Test", "Reading"];
 
 /** The 5-day estimate (M3.6): present only when the quality gate fired. */
-function FiveDayTable({ five }: { five: MultiDayRegression }) {
+function FiveDayTable({ five, stats }: { five: MultiDayRegression; stats: boolean }) {
   if (five.status !== "ok") return null;
   const caption =
     `${five.caption} R² ${plain(five.r2, 4)}, residual volatility ` +
@@ -147,8 +162,8 @@ function FiveDayTable({ five }: { five: MultiDayRegression }) {
   return (
     <>
       <h3 className="reg-title">5-day estimate ({five.n_blocks.toLocaleString("en-US")} blocks)</h3>
-      <RegTable label="5-day estimate table" heads={FIVE_HEADS}>
-        <TermRows fit={five} vif={null} />
+      <RegTable label="5-day estimate table" heads={stats ? FIVE_HEADS : PLAIN_HEADS}>
+        <TermRows fit={five} vif={null} stats={stats} />
       </RegTable>
       <p className="foot">{caption}</p>
     </>
@@ -156,7 +171,7 @@ function FiveDayTable({ five }: { five: MultiDayRegression }) {
 }
 
 /** Residual diagnostics (M3.5) with their plain-language readings. */
-function DiagnosticsTable({ rd }: { rd: ResidualDiagnostics }) {
+function DiagnosticsTable({ rd, stats }: { rd: ResidualDiagnostics; stats: boolean }) {
   if (rd.status !== "ok") {
     return (
       <>
@@ -173,16 +188,20 @@ function DiagnosticsTable({ rd }: { rd: ResidualDiagnostics }) {
       <h3 className="reg-title">Residual diagnostics</h3>
       <RegTable
         label="Residual diagnostics table"
-        heads={["Test", "Statistic", "Reference", "p", "Reading"]}
-        readingCol={4}
+        heads={stats ? DIAG_HEADS : DIAG_PLAIN_HEADS}
+        readingCol={stats ? 4 : 1}
       >
         <tr role="row">
           <th role="rowheader" scope="row">
             Lag-1 autocorrelation
           </th>
-          <Num label="Statistic">{sgn(rd.lag1_autocorrelation)}</Num>
-          <Num label="Reference">z {tText(rd.lag1_z)}</Num>
-          <Num label="p">{pText(rd.lag1_p)}</Num>
+          {stats ? (
+            <>
+              <Num label="Statistic">{sgn(rd.lag1_autocorrelation)}</Num>
+              <Num label="Reference">z {tText(rd.lag1_z)}</Num>
+              <Num label="p">{pText(rd.lag1_p)}</Num>
+            </>
+          ) : null}
           <td role="cell" className="rd">
             {rd.lag1_reading ?? ""}
           </td>
@@ -192,9 +211,13 @@ function DiagnosticsTable({ rd }: { rd: ResidualDiagnostics }) {
             <th role="rowheader" scope="row">
               {t.name}
             </th>
-            <Num label="Statistic">{plain(t.statistic, 2)}</Num>
-            <Num label="Reference">{t.df === null ? "" : `df ${t.df}`}</Num>
-            <Num label="p">{pText(t.p)}</Num>
+            {stats ? (
+              <>
+                <Num label="Statistic">{plain(t.statistic, 2)}</Num>
+                <Num label="Reference">{t.df === null ? "" : `df ${t.df}`}</Num>
+                <Num label="p">{pText(t.p)}</Num>
+              </>
+            ) : null}
             <td role="cell" className="rd">
               {t.reading}
             </td>
@@ -215,6 +238,7 @@ function labelTexts(report: FactorReport, keys: readonly string[]): string[] {
 
 /** Regression detail table, its readings, the 5-day estimate and the residual diagnostics. */
 export function RegressionDetail({ report }: ReportPanelProps) {
+  const stats = useShowStats();
   const rg = report.regression;
   const title = "Regression detail";
   const question = "OLS with an intercept and Newey-West standard errors.";
@@ -246,8 +270,8 @@ export function RegressionDetail({ report }: ReportPanelProps) {
     .join(" ");
   return (
     <Panel id="regression-detail" title={title} question={question} footnote={footnote} how={how}>
-      <RegTable label="Regression detail table" heads={MAIN_HEADS} scroll>
-        <TermRows fit={rg} vif={rg.vif} />
+      <RegTable label="Regression detail table" heads={stats ? MAIN_HEADS : PLAIN_HEADS} scroll>
+        <TermRows fit={rg} vif={rg.vif} stats={stats} />
       </RegTable>
       {rg.alpha_sentence ? <p className="reading">{rg.alpha_sentence}</p> : null}
       {reads.length ? (
@@ -260,8 +284,8 @@ export function RegressionDetail({ report }: ReportPanelProps) {
           </ul>
         </>
       ) : null}
-      <FiveDayTable five={report.five_day_regression} />
-      <DiagnosticsTable rd={report.residual_diagnostics} />
+      <FiveDayTable five={report.five_day_regression} stats={stats} />
+      <DiagnosticsTable rd={report.residual_diagnostics} stats={stats} />
     </Panel>
   );
 }

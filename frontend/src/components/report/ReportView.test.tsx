@@ -4,6 +4,7 @@ import { mockReport } from "../../test/fixture";
 import { EmptyState } from "./EmptyState";
 import { Panel } from "./Panel";
 import { ReportView } from "./ReportView";
+import { Shell } from "../shell/Shell";
 
 const report = mockReport;
 
@@ -14,8 +15,6 @@ describe("ReportView", () => {
     expect(ids).toEqual([
       "header",
       "notice",
-      "equation",
-      "kpis",
       "price",
       "exposures",
       "returns",
@@ -26,6 +25,23 @@ describe("ReportView", () => {
       "colophon",
     ]);
     expect(container.querySelector("main")?.getAttribute("aria-busy")).toBe("false");
+  });
+
+  it("keeps the panels direct children of <main> inside the shell, with the sidebar outside <main>", () => {
+    const { container } = render(
+      <Shell sidebar={<p>controls</p>} report={report}>
+        <ReportView report={report} downloadHref="#" win={null} onWinChange={vi.fn()} />
+      </Shell>,
+    );
+    const main = container.querySelector("main") as HTMLElement;
+    const aside = container.querySelector("aside#sidebar") as HTMLElement;
+    expect(aside).not.toBeNull();
+    expect(main.contains(aside)).toBe(false);
+    expect(aside.contains(main)).toBe(false);
+    expect(main.querySelector(":scope > #header")).not.toBeNull();
+    expect(main.querySelector(":scope > #regression-detail")).not.toBeNull();
+    expect(container.querySelector("a.skip")?.getAttribute("href")).toBe("#report");
+    expect(container.querySelector("#report")?.contains(main)).toBe(true);
   });
 
   it("marks the region busy while a request runs", () => {

@@ -1394,7 +1394,7 @@ export interface components {
              * Preset
              * @enum {string}
              */
-            preset: "3Y" | "5Y" | "FULL";
+            preset: "3Y" | "5Y" | "10Y" | "FULL";
             /** Start */
             start: string | null;
             /** N Obs */
@@ -1406,7 +1406,7 @@ export interface components {
         };
         /**
          * RangeOptions
-         * @description Availability of every preset for one ticker (always three, in preset order).
+         * @description Availability of every preset for one ticker (always four, in preset order).
          */
         RangeOptions: {
             /** Ticker */
@@ -2820,7 +2820,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Range preset; not together with start or end. */
-                range?: ("3Y" | "5Y" | "FULL") | null;
+                range?: ("3Y" | "5Y" | "10Y" | "FULL") | null;
                 /** @description First requested date, YYYY-MM-DD. */
                 start?: string | null;
                 /** @description Last requested date, YYYY-MM-DD. */
@@ -2903,7 +2903,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Range preset; not together with start or end. */
-                range?: ("3Y" | "5Y" | "FULL") | null;
+                range?: ("3Y" | "5Y" | "10Y" | "FULL") | null;
                 /** @description First requested date, YYYY-MM-DD. */
                 start?: string | null;
                 /** @description Last requested date, YYYY-MM-DD. */

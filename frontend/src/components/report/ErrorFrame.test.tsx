@@ -24,6 +24,6 @@ describe("one page heading in every state (review A4)", () => {
     expect(h1s[0]?.textContent).toContain("SPY");
     expect(h1s[0]?.closest('[aria-hidden="true"]')).toBeNull();
     // The placeholder panel titles stay hidden from the outline.
-    expect(container.querySelectorAll('[aria-hidden="true"] h2')).toHaveLength(7);
+    expect(container.querySelectorAll('[aria-hidden="true"] h2')).toHaveLength(8);
   });
 });

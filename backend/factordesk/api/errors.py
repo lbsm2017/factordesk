@@ -214,7 +214,7 @@ def validation_error(errors: Sequence[object], ticker: str | None) -> ApiExcepti
     if "range" in names:
         return ApiException(
             "bad_range",
-            "The range is not one of 3Y, 5Y or FULL.",
+            "The range is not one of 3Y, 5Y, 10Y or FULL.",
             "Choose one of the listed ranges, or pass start and end dates.",
         )
     shown_names = ", ".join(sorted(set(names))) or "the request"

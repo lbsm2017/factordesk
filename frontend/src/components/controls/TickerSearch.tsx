@@ -151,7 +151,7 @@ export function TickerSearch({
           submit(text);
         }}
       >
-        <label className="vh" htmlFor={INPUT_ID}>
+        <label className="side-label" htmlFor={INPUT_ID}>
           Ticker
         </label>
         <div className="ctl-combo">

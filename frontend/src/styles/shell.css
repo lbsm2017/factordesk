@@ -1,0 +1,103 @@
+/* App shell (prototype v4a, design J): the navy sidebar, the canvas, and under 900 px the top bar
+   and the drawer. Colours come from tokens.css only. Cyan (--rail-cyan) appears only on navy. */
+
+.skip {
+  position: fixed; left: 12px; top: -60px; z-index: 60; padding: 10px 16px;
+  border: 2px solid var(--accent); border-radius: var(--r-control); background: var(--surface);
+  color: var(--accent); font-weight: 600;
+}
+.skip:focus { top: 12px; }
+
+.sidebar {
+  position: fixed; inset: 0 auto 0 0; width: var(--side-w); z-index: 40;
+  display: flex; flex-direction: column; background: var(--rail); color: var(--rail-text);
+}
+.side-scroll {
+  flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 18px 16px 20px;
+  display: flex; flex-direction: column; gap: 18px; scrollbar-color: var(--rail-line) transparent;
+}
+.canvas { margin-left: var(--side-w); min-width: 0; outline: none; }
+
+.mark { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; color: inherit; text-decoration: none; }
+.mark-svg { width: 26px; height: 26px; flex: none; }
+.mark-svg .m-bg { fill: var(--rail-cyan); }
+.mark-svg .m-bar { fill: var(--rail); }
+.side-top { display: flex; align-items: center; }
+
+/* groups of the rail, split by a hairline */
+.side-group { display: flex; flex-direction: column; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.side-group + .side-group, .controls + .side-group { padding-top: 16px; border-top: 1px solid var(--rail-line); }
+.side-label { font-size: var(--fs-cap); font-weight: 600; color: var(--rail-2); padding: 0; }
+.side-note { font-size: var(--fs-cap); color: var(--rail-2); line-height: 1.4; }
+.side-note b { color: var(--rail-text); font-weight: 600; }
+
+/* switch: a button with role="switch"; the thumb's transform is the only motion */
+.switch {
+  position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: var(--rail-text);
+  font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+}
+.switch-text { display: flex; flex-direction: column; }
+.sw-hint { font-size: var(--fs-cap); font-weight: 400; color: var(--rail-2); }
+.track { position: relative; flex: none; width: 40px; height: 22px; border-radius: var(--r-round); background: var(--rail-track); }
+.thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: var(--r-round); background: var(--rail-text); transition: transform 160ms var(--ease); }
+.switch[aria-checked="true"] .track { background: var(--rail-cyan); }
+.switch[aria-checked="true"] .thumb { transform: translateX(18px); background: var(--rail); }
+.switch:focus-visible { outline: none; }
+.switch:focus-visible .track { outline: 2px solid var(--rail-cyan); outline-offset: 3px; }
+
+/* section navigation */
+.nav ul { display: flex; flex-direction: column; gap: 1px; }
+.nav a {
+  position: relative; display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 0 8px;
+  border-radius: var(--r-control); color: var(--rail-2); text-decoration: none; font-size: var(--fs-body); font-weight: 500;
+  transition: background-color 150ms var(--ease);
+}
+.nav a:hover { background: var(--rail-hover); color: var(--rail-text); }
+.nav a[aria-current="location"] { background: var(--rail-hover); color: var(--rail-cyan); font-weight: 600; }
+.nav a:focus-visible { outline-color: var(--rail-cyan); outline-offset: 0; }
+.nav-label { flex: 1; }
+.nav-sub { margin-top: 8px; padding: 0 8px 2px; font-size: var(--fs-cap); color: var(--rail-2); font-weight: 600; }
+.nav-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 7px;
+  border-radius: var(--r-round); background: var(--caution-50); color: var(--caution); font-size: var(--fs-cap); font-weight: 600;
+}
+.nav-badge.error { background: var(--neg-50); color: var(--neg); }
+
+/* top bar, scrim and drawer close: phones only */
+.topbar, .scrim, .drawer-close { display: none; }
+.menu-btn, .drawer-close {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
+  border: 0; border-radius: var(--r-control); background: none; color: var(--rail-text); cursor: pointer;
+}
+.menu-btn:hover, .drawer-close:hover { background: var(--rail-hover); }
+.menu-btn:focus-visible, .drawer-close:focus-visible { outline: 2px solid var(--rail-cyan); outline-offset: 0; }
+
+@media (max-width: 899px) {
+  html { scroll-padding-top: 68px; }
+  .topbar {
+    position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px;
+    height: 56px; padding: 0 16px; background: var(--rail); color: var(--rail-text);
+  }
+  .menu-btn { margin-left: -10px; }
+  .topbar .where { margin-left: auto; font-size: var(--fs-cap); font-weight: 600; color: var(--rail-text); }
+  .drawer-close { display: inline-flex; margin: -8px -8px -8px auto; }
+  .sidebar {
+    width: min(320px, 88vw); transform: translateX(-100%); visibility: hidden;
+    transition: transform 200ms var(--ease), visibility 0s linear 200ms;
+  }
+  .drawer-open .sidebar { transform: none; visibility: visible; transition: transform 200ms var(--ease), visibility 0s; }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: var(--scrim); cursor: pointer; }
+  .canvas { margin-left: 0; }
+  .panel, .notice { scroll-margin-top: 68px; }
+  .switch, .nav a { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .thumb, .nav a { transition: none !important; }
+}
+
+@media print {
+  .sidebar, .topbar, .scrim, .skip { display: none !important; }
+  .canvas { margin: 0; }
+}

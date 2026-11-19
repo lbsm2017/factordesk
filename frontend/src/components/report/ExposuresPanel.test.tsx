@@ -1,10 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { pval, signed, tstat } from "../../format";
 import { cloneReport, mockReport } from "../../test/fixture";
+import { StatsProvider } from "../../state/stats";
 import { position } from "../charts/BarCell";
 import { ExposuresPanel } from "./ExposuresPanel";
 import { axisLabels, exposureModel, exposuresUnavailable, niceDomain } from "./exposureModel";
+
+/** The statistics columns show only with "Show statistics" on; most cases below read them. */
+const statsOn = {
+  wrapper: ({ children }: { children: ReactNode }) => <StatsProvider initial>{children}</StatsProvider>,
+};
 
 const report = mockReport;
 
@@ -40,7 +47,7 @@ describe("niceDomain and axisLabels (ported from render_html.py)", () => {
 
 describe("ExposuresPanel table", () => {
   it("carries every number in text columns", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const g = report.regression;
     const avg = new Map(report.average_beta.factors.map((a) => [a.name, a.mean]));
     expect(g.factors).toHaveLength(5);
@@ -59,13 +66,13 @@ describe("ExposuresPanel table", () => {
   });
 
   it("names every factor in plain words and the first factor Market", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     expect(rowOf(container, "Mkt-RF").querySelector(".sub")?.textContent).toBe("Market");
     expect(rowOf(container, "RMW").querySelector(".sub")?.textContent).toBe("Profitability");
   });
 
   it("gives every plot cell a native title with beta, interval, t and adjusted p", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const f = report.regression.factors[0];
     if (!f) throw new Error("no factor");
     const title = rowOf(container, f.name).querySelector("svg.bar-svg > title")?.textContent;
@@ -76,7 +83,7 @@ describe("ExposuresPanel table", () => {
   });
 
   it("fades non-significant betas and says No in the Significant column", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const hml = rowOf(container, "HML");
     expect(hml.className).toBe("ns");
     expect(hml.querySelector("rect.faded")).not.toBeNull();
@@ -87,7 +94,7 @@ describe("ExposuresPanel table", () => {
   });
 
   it("draws the bar 36% of the row, a 7 px diamond on the centre line, and a 3 px interval cap", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const row = rowOf(container, "SMB");
     expect(row.querySelector("rect.neg")?.getAttribute("height")).toBe("36%");
     const diamond = row.querySelector("svg.avgm");
@@ -101,7 +108,7 @@ describe("ExposuresPanel table", () => {
   });
 
   it("centres each diamond on the average rolling beta", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const model = exposureModel(report);
     const { lo, hi } = model.domain;
     for (const r of model.rows) {
@@ -116,13 +123,13 @@ describe("ExposuresPanel table", () => {
     if (!cma) throw new Error("no CMA");
     cma.ci_low = (cma.beta as number) - 0.0005;
     cma.ci_high = (cma.beta as number) + 0.0005;
-    const { container } = render(<ExposuresPanel report={r} />);
+    const { container } = render(<ExposuresPanel report={r} />, statsOn);
     expect(rowOf(container, "CMA").querySelectorAll("line.ci")).toHaveLength(1);
     expect(rowOf(container, "SMB").querySelectorAll("line.ci")).toHaveLength(3);
   });
 
   it("explains the marks in the legend, with the window in the diamond entry", () => {
-    render(<ExposuresPanel report={report} />);
+    render(<ExposuresPanel report={report} />, statsOn);
     const legend = screen.getByRole("list", { name: "Legend" });
     const items = within(legend)
       .getAllByRole("listitem")
@@ -137,7 +144,7 @@ describe("ExposuresPanel table", () => {
   });
 
   it("shows the reading line, the footnote and the folded method detail", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     expect(container.querySelector(".reading")?.textContent).toMatch(/^Over this window the stock moves roughly one-for-one with the market/);
     expect(container.querySelector(".foot > p")?.textContent).toMatch(/Significant means the adjusted p is below 0\.05\.$/);
     expect(container.querySelector("details.how")?.textContent).toContain("Benjamini-Hochberg");
@@ -147,7 +154,7 @@ describe("ExposuresPanel table", () => {
     const r = cloneReport();
     r.average_beta.status = "insufficient_data";
     r.average_beta.reason = "Too few rolling windows.";
-    const { container } = render(<ExposuresPanel report={r} />);
+    const { container } = render(<ExposuresPanel report={r} />, statsOn);
     expect(container.querySelector("svg.avgm")).toBeNull();
     const cells = within(rowOf(container, "Mkt-RF")).getAllByRole("cell");
     expect(cells[4]?.textContent).toBe("–");
@@ -155,7 +162,7 @@ describe("ExposuresPanel table", () => {
   });
 
   it("keeps the rows in the report's order and links each row id for the equation", () => {
-    const { container } = render(<ExposuresPanel report={report} />);
+    const { container } = render(<ExposuresPanel report={report} />, statsOn);
     const ids = Array.from(container.querySelectorAll("tbody tr")).map((el) => el.id);
     expect(ids).toEqual(report.regression.factors.map((f) => `beta-${f.name}`));
     expect(rowOf(container, "SMB").getAttribute("tabindex")).toBe("-1");
@@ -167,7 +174,7 @@ describe("ExposuresPanel empty state", () => {
     const r = cloneReport();
     r.regression.status = "insufficient_data";
     r.regression.reason = "Only 120 aligned days; at least 504 are needed.";
-    const { container } = render(<ExposuresPanel report={r} />);
+    const { container } = render(<ExposuresPanel report={r} />, statsOn);
     expect(screen.getByText("Only 120 aligned days; at least 504 are needed.")).toBeTruthy();
     expect(screen.getByText("Widen the date range and run the report again.")).toBeTruthy();
     expect(container.querySelector("table")).toBeNull();
@@ -179,7 +186,18 @@ describe("ExposuresPanel empty state", () => {
     const r = cloneReport();
     for (const f of r.regression.factors) f.beta = null;
     r.regression.reason = null;
-    render(<ExposuresPanel report={r} />);
+    render(<ExposuresPanel report={r} />, statsOn);
     expect(screen.getByText("Insufficient data: no factor betas available.")).toBeTruthy();
+  });
+});
+
+describe("ExposuresPanel with statistics off (dashboard spec DV5)", () => {
+  it("shows Factor, chart, Beta and Significant only", () => {
+    const { container } = render(<ExposuresPanel report={report} />);
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(heads).toEqual(["Factor", "Chart", "Beta", "SignificantSig."]);
+    const cells = within(rowOf(container, "Mkt-RF")).getAllByRole("cell");
+    expect(cells.slice(1).map((c) => c.textContent)).toEqual(["+0.998", "Yes"]);
+    expect(container.querySelector("table.bars")?.className).toBe("bars cols-2");
   });
 });

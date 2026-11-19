@@ -55,7 +55,9 @@ NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
 DOWNLOADED = datetime(2026, 10, 2, 8, 30, tzinfo=UTC)
 N_PRICES = 1400
 CUT = 30
-OWNER_PRESETS = ("3Y", "5Y", "FULL")
+OWNER_PRESETS = ("3Y", "5Y", "10Y", "FULL")
+SHORT_SPAN = ("3Y", "5Y", "FULL")
+"""The presets that cover the synthetic history of about five and a half years."""
 
 
 class ApiClient(Protocol):
@@ -241,8 +243,9 @@ def test_preset_starts_follow_the_anchor() -> None:
     anchor = date(2026, 9, 30)
     assert preset_start("3Y", anchor) == date(2023, 10, 1)
     assert preset_start("5Y", anchor) == date(2021, 10, 1)
+    assert preset_start("10Y", anchor) == date(2016, 10, 1)
     assert preset_start("FULL", anchor) is None
-    assert [preset_label(p) for p in OWNER_PRESETS] == ["3Y", "5Y", "Full history"]
+    assert [preset_label(p) for p in OWNER_PRESETS] == ["3Y", "5Y", "10Y", "Full history"]
 
 
 def test_29_february_maps_to_28_february() -> None:
@@ -251,6 +254,7 @@ def test_29_february_maps_to_28_february() -> None:
     assert years_back(date(2027, 2, 28), 3) == date(2024, 2, 28)
     assert preset_start("3Y", date(2028, 2, 29)) == date(2025, 3, 1)
     assert preset_start("5Y", date(2028, 2, 29)) == date(2023, 3, 1)
+    assert preset_start("10Y", date(2028, 2, 29)) == date(2018, 3, 1)
 
 
 def test_anchor_is_the_earlier_of_factor_and_price_ends() -> None:
@@ -330,6 +334,26 @@ def test_range_options_reason_names_the_minimum_and_the_count() -> None:
     assert by_preset["5Y"].available and by_preset["5Y"].reason is None
     assert by_preset["FULL"].available and by_preset["FULL"].n_obs == N_PRICES - CUT
     assert options.min_obs == 800
+    ten = by_preset["10Y"]
+    assert ten.start is not None and not ten.available
+    assert ten.n_obs == by_preset["FULL"].n_obs
+    assert ten.reason == (
+        f"10Y needs prices from {long_date(ten.start)}, but the history starts "
+        f"{long_date(options.first_return_date)}. Full history covers all of it."
+    )
+
+
+def test_ten_years_of_history_make_10y_available_with_its_own_start() -> None:
+    n = 2700
+    d = dgp_a(rng_for(404), n=n)
+    options = range_options("SYN", d.history, d.factors.iloc[: n - CUT])
+    by_preset = {o.preset: o for o in options.options}
+    ten = by_preset["10Y"]
+    assert ten.available and ten.reason is None
+    anchor = options.factors_last_date
+    assert ten.start == preset_start("10Y", anchor)
+    assert ten.start is not None and ten.start > options.first_return_date
+    assert by_preset["5Y"].n_obs < ten.n_obs < by_preset["FULL"].n_obs
 
 
 # ------------------------------------------------------------------------- report
@@ -401,13 +425,18 @@ def test_report_and_ranges_agree_on_row_counts(world: World, client: ApiClient) 
     assert options.min_obs == MIN_OBS
     assert tuple(o.preset for o in options.options) == RANGE_PRESETS
     for option in options.options:
+        if option.preset not in SHORT_SPAN:
+            continue
         assert option.available == (option.n_obs >= MIN_OBS)
         if not option.available:
             assert option.reason == (
                 f"{preset_label(option.preset)} has {option.n_obs} trading days; "
                 f"a regression needs at least {MIN_OBS}."
             )
-    for preset in OWNER_PRESETS:
+    ten = next(o for o in options.options if o.preset == "10Y")
+    assert not ten.available and ten.reason is not None
+    assert ten.reason.endswith("Full history covers all of it.")
+    for preset in SHORT_SPAN:
         option = next(o for o in options.options if o.preset == preset)
         assert option.available, option
         rep = report_of(client.get(f"/api/report/SYN?range={preset}"))
@@ -507,7 +536,7 @@ def test_invalid_ticker_names_the_symbol(client: ApiClient) -> None:
         ),
         ("start=yesterday", "The start date is not a valid date."),
         ("end=2026-02-30", "The end date is not a valid date."),
-        ("range=10Y", None),
+        ("range=2Y", None),
         ("range=1Y", None),
         ("range=YTD", None),
     ],

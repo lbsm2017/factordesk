@@ -3,12 +3,12 @@ import type { RangePreset } from "../api/types";
 
 /**
  * URL state contract (dashboard spec DB6.1). Shapes: `/?t=SPY&range=3Y`,
- * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126`. Panels read `win`
- * through props, never from `location`.
+ * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126` and `stats=1`. Panels
+ * read `win` through props and `stats` through `useShowStats()`, never from `location`.
  */
 
-/** Presets shown as chips (owner decision 1): the API lists exactly these three. */
-export const PRESETS = ["3Y", "5Y", "FULL"] as const satisfies readonly RangePreset[];
+/** Presets of the range control (owner decisions of 2026-11-18 and 2026-11-19): the API lists exactly these four. */
+export const PRESETS = ["3Y", "5Y", "10Y", "FULL"] as const satisfies readonly RangePreset[];
 export type Preset = (typeof PRESETS)[number];
 
 export type RollingWindowDays = 126 | 252;
@@ -24,9 +24,11 @@ export interface UrlState {
   end: string | null;
   /** Rolling window of the exposure-over-time panel; null means the report's primary window. */
   win: RollingWindowDays | null;
+  /** The "Show statistics" switch (dashboard spec DV6): `stats=1` when on, absent when off. */
+  stats: boolean;
 }
 
-export const EMPTY_URL_STATE: UrlState = { ticker: null, range: null, start: null, end: null, win: null };
+export const EMPTY_URL_STATE: UrlState = { ticker: null, range: null, start: null, end: null, win: null, stats: false };
 
 /** The server's ticker pattern (`validate_ticker`): 1 to 12 of letters, digits and . ^ = -, not starting with a dot. */
 const TICKER_PATTERN = /^[A-Za-z0-9.^=-]{1,12}$/;
@@ -81,6 +83,7 @@ export function parseUrl(search: string): UrlState {
     start,
     end,
     win: parseWin(params.get("win")),
+    stats: params.get("stats") === "1",
   };
 }
 
@@ -95,6 +98,7 @@ export function toSearch(state: UrlState): string {
     params.set("range", state.range);
   }
   if (state.win !== null) params.set("win", String(state.win));
+  if (state.stats) params.set("stats", "1");
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
 }

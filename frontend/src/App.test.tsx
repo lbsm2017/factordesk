@@ -72,8 +72,11 @@ describe("first load", () => {
     const frame = screen.getByTestId("loading-frame");
     expect(frame.getAttribute("aria-busy")).toBe("true");
     expect(frame.querySelector(".ticker")?.textContent).toBe("SPY");
-    expect(frame.querySelectorAll(".kpi")).toHaveLength(5);
+    expect(frame.querySelectorAll(".abar > div")).toHaveLength(4);
     expect(frame.querySelectorAll("section.panel").length).toBeGreaterThan(5);
+    // The sidebar stays outside <main> in every state.
+    expect(document.querySelector("aside#sidebar main")).toBeNull();
+    expect(frame.closest("#report")).not.toBeNull();
 
     expect(await screen.findByTestId("report-ticker")).toHaveProperty("textContent", "SPY");
     expect(screen.queryByTestId("loading-frame")).toBeNull();
@@ -261,6 +264,31 @@ describe("committing changes", () => {
     release();
     await waitFor(() => expect(screen.getByTestId("report-ticker").textContent).toBe("QQQ"));
     expect(screen.getByTestId("report-region").getAttribute("aria-busy")).toBe("false");
+  });
+});
+
+describe("Show statistics", () => {
+  it("starts off, turns on with stats=1 replacing the history entry, and keeps it across a range change", async () => {
+    renderAt("/?t=SPY");
+    await screen.findByTestId("report-ticker");
+    const toggle = screen.getByRole("switch", { name: "Show statistics" });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    const before = window.history.length;
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(window.location.search).toBe("?t=SPY&stats=1");
+    expect(window.history.length).toBe(before);
+    fireEvent.click(screen.getByRole("radio", { name: "3Y" }));
+    expect(window.location.search).toBe("?t=SPY&range=3Y&stats=1");
+    fireEvent.click(toggle);
+    expect(window.location.search).toBe("?t=SPY&range=3Y");
+  });
+
+  it("reads stats=1 from the first URL", async () => {
+    renderAt("/?t=SPY&stats=1");
+    expect(screen.getByRole("switch", { name: "Show statistics" }).getAttribute("aria-checked")).toBe("true");
+    await screen.findByTestId("report-ticker");
+    expect(window.location.search).toBe("?t=SPY&stats=1");
   });
 });
 

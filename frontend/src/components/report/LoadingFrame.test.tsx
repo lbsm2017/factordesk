@@ -2,60 +2,39 @@ import { render } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { Shell } from "../shell/Shell";
 import { LoadingFrame } from "./LoadingFrame";
 
 const css = readFileSync(resolve(process.cwd(), "src/styles/frame.css"), "utf8");
 
-/** Every custom property a loading block takes its final height from. */
-const VARS = [
-  "head",
-  "notice",
-  "eq",
-  "kpis",
-  "price",
-  "exposures",
-  "returns",
-  "risk",
-  "rolling",
-  "data",
-  "regression",
-  "colophon",
-].map((name) => `--sk-${name}`);
-
-/** The `:root { ... }` declarations of the base rule and of each width tier. */
-function tiers(): string[] {
-  return [...css.matchAll(/:root\s*\{([^}]*)\}/g)].map((m) => m[1] ?? "");
-}
-
-describe("LoadingFrame (layout shift, review S2)", () => {
-  it("holds a block for the header, notice, equation, KPI cells, seven panels and the colophon", () => {
+describe("LoadingFrame (dashboard v2)", () => {
+  it("holds the header, the analysis bar and eight panels, with the ticker as the page heading", () => {
     const { container } = render(<LoadingFrame ticker="SPY" />);
-    for (const cls of ["sk-head", "sk-notice", "sk-eq", "sk-kpis", "sk-colophon"]) {
-      expect(container.querySelector(`.${cls}`), cls).not.toBeNull();
-    }
-    expect(container.querySelectorAll("section.sk-panel")).toHaveLength(7);
-    expect(container.querySelectorAll(".kpi")).toHaveLength(5);
-    // The KPI cells carry a note line, as the real strip does, so their height matches.
-    expect(container.querySelectorAll(".kpi .n")).toHaveLength(5);
-    // The equation block reuses the report's own margins.
-    expect(container.querySelector(".sk-eq")?.classList.contains("model")).toBe(true);
+    expect(container.querySelector("h1 .ticker")?.textContent).toBe("SPY");
+    expect(container.querySelectorAll(".abar > div")).toHaveLength(4);
+    expect(container.querySelectorAll("section.sk-panel")).toHaveLength(8);
+    expect(container.querySelector("main")?.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("Loading the report for SPY.");
   });
 
-  it("sets the final height of every block in the widest tier and in each narrower tier", () => {
-    const all = tiers();
-    expect(all.length).toBeGreaterThanOrEqual(5);
-    for (const [i, decls] of all.entries()) {
-      for (const v of VARS) expect(decls, `tier ${i} lacks ${v}`).toMatch(new RegExp(String.raw`${v}:\s*\d+px`));
+  it("uses one set of panel heights, with no width tiers", () => {
+    expect(css).not.toMatch(/@media/);
+    expect(css).not.toMatch(/--sk-/);
+    const { container } = render(<LoadingFrame ticker="SPY" />);
+    for (const el of container.querySelectorAll("section.sk-panel")) {
+      const cls = [...el.classList].find((c) => c !== "sk-panel" && c !== "panel") as string;
+      expect(css, cls).toMatch(new RegExp(String.raw`\.${cls}\s*\{\s*min-height:\s*\d+px;\s*\}`));
     }
   });
 
-  it("gives every placeholder a min-height from its variable, so content can grow past it", () => {
-    const { container } = render(<LoadingFrame ticker="SPY" />);
-    const panelClasses = [...container.querySelectorAll("section.sk-panel")].map(
-      (el) => [...el.classList].find((c) => c !== "sk-panel" && c !== "panel") as string,
+  it("sits in the shell beside the sidebar", () => {
+    const { container } = render(
+      <Shell sidebar={<p>controls</p>} ticker="SPY">
+        <LoadingFrame ticker="SPY" />
+      </Shell>,
     );
-    for (const cls of ["sk-head", "sk-notice", "sk-eq", "sk-kpis", "sk-colophon", ...panelClasses]) {
-      expect(css, cls).toMatch(new RegExp(String.raw`\.${cls}\b[^{}]*\{[^}]*min-height:\s*var\(--${cls}\)`));
-    }
+    const main = container.querySelector("main") as HTMLElement;
+    expect(container.querySelector("aside#sidebar")).not.toBeNull();
+    expect(main.closest("#report")).not.toBeNull();
   });
 });

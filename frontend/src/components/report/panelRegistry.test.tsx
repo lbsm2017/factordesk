@@ -6,12 +6,10 @@ import { orderedPanels, PANELS } from "./panelRegistry";
 import type { PanelEntry } from "./panelRegistry";
 import { ReportView } from "./ReportView";
 
-/** Panel order of the schema v3 contract (SC4). */
+/** Panel order of the schema v3 contract (SC4), without `equation` and `kpis` (dashboard v2, DV1). */
 const ORDER = [
   "header",
   "notice",
-  "equation",
-  "kpis",
   "world_beta",
   "price",
   "performance",
@@ -50,6 +48,12 @@ describe("panel registry", () => {
     expect(orderedPanels().map((p) => p.position)).toEqual(
       [...PANELS].map((p) => p.position).sort((a, b) => a - b),
     );
+  });
+
+  it("no longer registers the equation or the KPI strip (owner, dashboard v2)", () => {
+    const names = PANELS.map((p) => p.name);
+    expect(names).not.toContain("equation");
+    expect(names).not.toContain("kpis");
   });
 
   it("refuses a name or a position used twice", () => {

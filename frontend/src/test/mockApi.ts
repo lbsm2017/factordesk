@@ -34,6 +34,13 @@ export function mockRanges(ticker: string): RangeOptions {
         available: false,
         reason: `5Y has 400 trading days; a regression needs at least 504.`,
       },
+      {
+        preset: "10Y",
+        start: "2016-10-01",
+        n_obs: 559,
+        available: false,
+        reason: "10Y needs prices from 1 Oct 2016, but the history starts 8 Aug 2024. Full history covers all of it.",
+      },
       { preset: "FULL", start: null, n_obs: 559, available: true, reason: null },
     ],
   };
