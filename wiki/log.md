@@ -7,6 +7,30 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-19 (dollar index and VIX)
+
+- The owner asked about a dollar index and VIX. After an honest assessment, the Fed broad dollar index replaced EUR/USD in the macro section, and VIX was skipped for now. The [macro decision page](decision-factor-models-and-macro.md) has a dated update. The research notes have G3.
+
+## 2026-11-19 (candidate factors)
+
+- The owner reviewed candidate factors beyond FF6 and added commodities and inflation to the macro section. Other candidates were declined for licence reasons, deferred, or skipped because they only improve fit. The [macro decision page](decision-factor-models-and-macro.md) has a dated update, and the research notes have section G.
+
+## 2026-11-19 (causal discipline)
+
+- The owner supplied a study guide of López de Prado (2023), *Causal Factor Investing*, and asked where it fits. After a research round the owner adopted wording and model notes, a specification curve and Minimum Track Record Length, and asked for research on other candidate factors. Added [the decision page](decision-causal-discipline-guardrails.md), section F of the research notes, the study guide and epic E9.
+
+## 2026-11-19 (joint tail)
+
+- The owner asked for joint tail analysis of portfolios using copula and GEV methods, and supplied a summary of Labovitz (2009). After a research round the owner chose model-free measures plus one t copula, no EVT in version 1, and parked Labovitz's method for large stock universes. Added [the decision page](decision-joint-tail.md), section E of the research notes, the Labovitz summary and epic E8.
+
+## 2026-11-19 (VaR and CVaR)
+
+- The owner added VaR and CVaR for every mode and chose the methods and levels after a research round. Added [the decision page](decision-var-and-cvar.md), section D of the research notes and epic E7 in the spec.
+
+## 2026-11-19 (next stage: track records and portfolios)
+
+- The owner approved the next stage: track-record uploads, an SAA-tree portfolio backtest, a five/six-factor switch with an alpha strip, and a macro section. Added five decision pages, an index section and the research notes. The monthly-uploads page amends the daily-returns decision; it does not replace it.
+
 ## 2026-11-18 (performance metrics)
 
 - The owner asked for the stock's own annualised return, volatility, Sharpe ratio and maximum drawdown in the report. Added [the decision page](decision-performance-metrics.md) and an index entry. The section is built on `feat/performance` and not yet independently validated.
