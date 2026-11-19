@@ -50,8 +50,8 @@ function datesText(dates: readonly string[]): string {
 }
 
 /** "2026-11-01T00:00:00Z" as "1 Nov 2026, 00:00 UTC" (the API sends UTC). */
-function downloadedText(iso: string | null): string {
-  if (!iso) return "Injected, not downloaded";
+function downloadedText(iso: string | null, record = false): string {
+  if (!iso) return record ? "Uploaded, not downloaded" : "Injected, not downloaded";
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(iso);
   return m ? `${dateLong(m[1] as string)}, ${m[2]} UTC` : iso;
 }
@@ -76,7 +76,7 @@ function coverage(report: FactorReport): [string, string][] {
     ["After factor data", after],
     ["Before factor data", `${count(d.dropped_price_dates_before_factors)} ${periodWord(report)}`],
     ["Factor data ends", `${dateLong(d.factors_last_date)}, ${count(d.factors_days_behind)} days before the report`],
-    ["Factor file downloaded", downloadedText(d.factors_downloaded_at)],
+    ["Factor file downloaded", downloadedText(d.factors_downloaded_at, isSubjectReport(report))],
     [isSubjectReport(report) ? "Returns" : "Prices", d.price_source],
     // Plain text on purpose: the report never links out.
     ["Factors", d.factors_source_url],

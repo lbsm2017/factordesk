@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { monthlyReport } from "../../test/fixture";
+import { mockReport, monthlyReport } from "../../test/fixture";
 import { summaryOf } from "./DataNotes";
 import { RegressionDetail } from "./RegressionDetail";
 import { ReportView } from "./ReportView";
@@ -49,6 +49,25 @@ describe("ReportView on an uploaded monthly record", () => {
     r.warnings = [{ code: "factor_data_lag", message: "raw" }];
     const { container } = render(<ReportView report={r} downloadHref={null} win={null} onWinChange={vi.fn()} />);
     expect(container.querySelector(".notes-line")?.textContent).toContain("newest months");
+  });
+
+  it("uses subject-neutral words, and a ticker report keeps the stock wording", () => {
+    const upload = structuredClone(monthlyReport);
+    upload.data.factors_downloaded_at = null;
+    const rec = render(<ReportView report={upload} downloadHref={null} win={null} onWinChange={vi.fn()} />).container;
+    expect(rec.querySelector("#price caption")?.textContent).toBe("Data points");
+    expect(rec.querySelector("#risk")?.textContent).toContain("specific to this record");
+    expect(rec.querySelector("#risk")?.textContent).toContain("Specific to this record");
+    expect(rec.querySelector("#data")?.textContent).toContain("Uploaded, not downloaded");
+    for (const gone of ["Price points", "tock-specific", "Injected"]) {
+      expect(rec.textContent).not.toContain(gone);
+    }
+    const tick = structuredClone(mockReport);
+    tick.data.factors_downloaded_at = null;
+    const t = render(<ReportView report={tick} downloadHref={null} win={null} onWinChange={vi.fn()} />).container;
+    expect(t.querySelector("#price caption")?.textContent).toBe("Price points");
+    expect(t.querySelector("#risk")?.textContent).toContain("Stock-specific");
+    expect(t.querySelector("#data")?.textContent).toContain("Injected, not downloaded");
   });
 
   it("names the record and has no download link", () => {

@@ -114,7 +114,7 @@ export function PricePanel({ report }: ReportPanelProps) {
       <div className="price-wrap">
         <PriceChart model={model} full={full} />
         <table className="side">
-          <caption className="vh">Price points</caption>
+          <caption className="vh">{record ? "Data points" : "Price points"}</caption>
           <thead className="vh">
             <tr>
               <th scope="col">Point</th>
