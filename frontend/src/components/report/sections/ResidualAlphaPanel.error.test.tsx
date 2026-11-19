@@ -24,7 +24,7 @@ describe("ResidualAlphaPanel when its body fails", () => {
       </main>,
     );
     expect(await screen.findByText("This section could not be shown.")).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Residual return" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Beyond the factors" })).not.toBeNull();
     expect(screen.getByText("sibling")).not.toBeNull();
   });
 });

@@ -19,7 +19,7 @@ from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Literal, Protocol, cast, runtime_checkable
+from typing import Final, Literal, Protocol, cast, runtime_checkable
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -431,6 +431,32 @@ def _clean(value: object) -> str | None:
     return text or None
 
 
+EXCHANGE_LABELS: Final[Mapping[str, str]] = {
+    "NMS": "NASDAQ",
+    "NGM": "NASDAQ",
+    "NCM": "NASDAQ",
+    "NasdaqGS": "NASDAQ",
+    "NasdaqGM": "NASDAQ",
+    "NasdaqCM": "NASDAQ",
+    "NYQ": "NYSE",
+    "NYSE": "NYSE",
+    "ASE": "NYSE American",
+    "NYSE American": "NYSE American",
+    "PCX": "NYSE Arca",
+    "NYSEArca": "NYSE Arca",
+    "NYSE Arca": "NYSE Arca",
+    "BTS": "Cboe BZX",
+    "Cboe BZX": "Cboe BZX",
+    "BATS": "Cboe BZX",
+}
+"""Yahoo exchange values (short codes and full names) to the label a reader sees (DV2.2)."""
+
+
+def exchange_label(exchange: str | None) -> str | None:
+    """The reader label of a Yahoo exchange value; a value not in the table is returned as given."""
+    return None if exchange is None else EXCHANGE_LABELS.get(exchange, exchange)
+
+
 def security_from_info(info: Mapping[str, object]) -> Security | None:
     """The ``Security`` in a Yahoo quote summary; None when it holds none of its fields.
 
@@ -440,7 +466,9 @@ def security_from_info(info: Mapping[str, object]) -> Security | None:
     found = Security(
         name=_clean(info.get("longName")) or _clean(info.get("shortName")),
         currency=_clean(info.get("currency")),
-        exchange=_clean(info.get("fullExchangeName")) or _clean(info.get("exchange")),
+        exchange=exchange_label(
+            _clean(info.get("fullExchangeName")) or _clean(info.get("exchange"))
+        ),
         quote_type=_clean(info.get("quoteType")),
     )
     return found if found != Security() else None
@@ -463,7 +491,7 @@ def _read_security_file(path: Path) -> tuple[Security, datetime] | None:
         security = Security(
             name=_clean(fields.get("name")),
             currency=_clean(fields.get("currency")),
-            exchange=_clean(fields.get("exchange")),
+            exchange=exchange_label(_clean(fields.get("exchange"))),
             quote_type=_clean(fields.get("quote_type")),
         )
     except FileNotFoundError:

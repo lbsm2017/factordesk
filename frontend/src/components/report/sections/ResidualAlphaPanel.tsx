@@ -3,7 +3,7 @@ import { Panel } from "../Panel";
 import { PanelBoundary } from "../PanelBoundary";
 import type { ReportPanelProps } from "../types";
 
-export const TITLE = "Residual return";
+export const TITLE = "Beyond the factors";
 export const DEFAULT_QUESTION =
   "What did this stock return beyond its factor exposures, and does it hold up without hindsight?";
 

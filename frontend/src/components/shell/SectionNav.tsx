@@ -36,6 +36,24 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: "regression-detail", label: "Regression detail", icon: "detail", deeper: true },
 ];
 
+/** Report field behind each optional section; its item is hidden while the field is null or absent. */
+const SECTION_FIELD: Readonly<Record<string, keyof FactorReport>> = {
+  performance: "performance",
+  "world-beta": "world_beta",
+  residual: "residual",
+  kalman: "kalman_betas",
+  shrunk: "shrunk_betas",
+  "lead-lag": "lead_lag",
+  fragility: "fragility",
+};
+
+/** True when the item's section has data in `report` (always true for items with no optional field). */
+export function sectionHasData(report: FactorReport | undefined, id: string): boolean {
+  const field = SECTION_FIELD[id];
+  if (report === undefined || field === undefined) return true;
+  return (report as unknown as Record<string, unknown>)[field] != null;
+}
+
 /** Audit findings with severity warning or error, and whether any is an error. */
 export function auditBadge(report: FactorReport | undefined): { count: number; error: boolean } {
   const findings = report?.data.audit_findings ?? [];
@@ -140,7 +158,8 @@ export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
   };
 
   if (entries.length === 0) return null;
-  const listed = entries.map((e) => e.item);
+  const listed = entries.map((e) => e.item).filter((i) => sectionHasData(report, i.id));
+  if (listed.length === 0) return null;
   // Page order for the main sections; the deeper checks keep the order of NAV_ITEMS.
   const items = [
     ...listed.filter((i) => !i.deeper),

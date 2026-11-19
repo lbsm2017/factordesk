@@ -14,7 +14,7 @@ const EMPTY_ACTION = "Widen the date range and run the report again.";
 export function RiskPanel({ report }: ReportPanelProps) {
   const stats = useShowStats();
   const rk = report.risk_contribution;
-  const title = "Where the risk comes from";
+  const title = "Risk sources";
   const question = "What share of the day-to-day variance does each factor drive?";
 
   const shares = new Map<string, number | null>(Object.entries(rk.factors).map(([n, v]) => [n, finite(v)]));

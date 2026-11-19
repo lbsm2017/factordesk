@@ -18,7 +18,7 @@ function Holder({ id }: { id: string }) {
 export function LazyKalmanPanel({ report }: ReportPanelProps) {
   if (report.kalman_betas === null) return null;
   return (
-    <PanelBoundary id="kalman" title="Kalman-filter betas" question="">
+    <PanelBoundary id="kalman" title="Tracked day by day" question="">
       <Suspense fallback={<Holder id="kalman" />}>
         <Kalman report={report} />
       </Suspense>
@@ -29,7 +29,7 @@ export function LazyKalmanPanel({ report }: ReportPanelProps) {
 export function LazyShrunkBetasPanel({ report }: ReportPanelProps) {
   if (report.shrunk_betas === null) return null;
   return (
-    <PanelBoundary id="shrunk" title="Pulled toward typical" question="">
+    <PanelBoundary id="shrunk" title="Adjusted for noise" question="">
       <Suspense fallback={<Holder id="shrunk" />}>
         <Shrunk report={report} />
       </Suspense>

@@ -8,7 +8,7 @@ import { Panel } from "../Panel";
  */
 export function LeadLagPanel({ report }: ReportPanelProps) {
   const section = report.lead_lag;
-  if (section === null) return null;
+  if (section == null) return null;
   const empty = section.status === "ok" ? {} : { empty: { reason: section.reason ?? "", action: "" } };
   return (
     <Panel
