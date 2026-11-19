@@ -435,6 +435,56 @@ Researched on 2026-11-19 at the owner's request. The input was the owner's [summ
 - **Downside beta:** Ang, Chen & Xing (2006), *Review of Financial Studies* 19(4) (nc).
 - **CoVaR** conditions the wrong way for a holdings view. Adrian & Brunnermeier (2016), *American Economic Review* 106(7) (nc). Deferred.
 
+## F. Causal Factor Investing: what applies to factordesk
+
+Researched on 2026-11-19. Primary input: the owner's [study guide](causal_factor_investing_agent_kb.md) of López de Prado (2023), *Causal Factor Investing*, Cambridge Elements, DOI 10.1017/9781009397315 (open access; SSRN 4205613). The guide was checked against the book text. It agreed on every point checked: adjusted R² of 0.784 vs 0.144, F of 9,069 vs 840.8, and the out-of-sample passage in §6.5. Two flags on the guide:
+
+- "Factor mirage" is not in the 2023 book. It comes from the 2025 companion work with Zoonekynd.
+- Rule R7 points to Part 4.8 for the hierarchy of evidence, but that hierarchy is in Part 4.6.
+
+### F1. Claims that bear on an attribution tool
+
+- **Factor models are undeclared causal models.** Choosing a specification by fit is a causal error, and the misspecified model can have the higher adjusted R² [B §6.1, §6.4.2.3, §7.3].
+- **Type-A errors (noise)** are fixed by multiple-testing corrections such as Benjamini-Hochberg and the deflated Sharpe ratio.
+- **Type-B errors (misspecification)** are not fixed by those corrections, and they grow more "significant" with more data [B §6.4].
+  - An omitted confounder biases beta, and a shifting covariance can flip its sign. That looks like a time-varying premium [B §6.4.2.1].
+  - Controlling for a collider or a mediator biases beta as much as omitting a confounder [B §6.4.2.2].
+- **Out-of-sample tests help against type-A errors, not type-B** [B §6.5].
+
+### F2. What does not apply
+
+- **Causal discovery, do-calculus, natural experiments and mechanism analysis** support claims that a factor earns a premium. factordesk makes no such claim; it describes exposures.
+- **The deflated Sharpe ratio** corrects a strategy search, and factordesk runs none.
+
+### F3. Decisions (owner, 2026-11-19)
+
+**Adopted**
+
+- **Wording and model notes.**
+  - The alpha strip carries a caption: higher R² does not make a model more correct, and alpha is conditional on the model.
+  - Use associational language ("co-moved with", never "driven by" or "earned from").
+  - Each regression gets a fixed "model note" saying what it assumes and what it omits.
+  - The out-of-sample caveat says it "rules out hindsight in the betas, not luck and not a missing factor".
+  - Benjamini-Hochberg "reliable" tags must not read as "correctly attributed".
+- **Specification curve.** Alpha across model × window × start date, showing the share of specifications where alpha keeps its sign and its reliability tag. No specification is highlighted as best.
+- **Minimum Track Record Length** (Bailey & López de Prado 2012; formula verified in V1), in the track-record diagnostics: "this Sharpe ratio needs N months to differ from zero; you have M".
+
+**Declined for now**
+
+- the regressor-overlap warning (subject or holding is a building block of a factor, e.g. IEF/LQD in TERM/DEF)
+- the drift alert under both FF5 and FF6
+- the analysis-choices card
+- the per-report placebo test
+- the omitted-variable "what it would take" alpha check
+
+**Follow-up research:** other candidate factors, to be justified by a plausible causal role rather than by fit.
+
+Sources:
+
+- Book: https://www.cambridge.org/core/elements/causal-factor-investing/9AFE270D7099B787B8FD4F4CBADE0C6E
+- López de Prado & Zoonekynd (2024), "Why Has Factor Investing Failed?: The Role of Specification Errors", ADIA Lab Research Paper Series No. 7. https://www.adialab.ae/research-series/why-has-factor-investing-failed-the-role-of-specification-errors
+- Cinelli & Hazlett (2020), "Making sense of sensitivity", *JRSS B* 82(1), 39-67.
+
 ## Verification results (2026-11-19)
 
 ### V1. Sharpe-ratio formulas, checked against the primary texts

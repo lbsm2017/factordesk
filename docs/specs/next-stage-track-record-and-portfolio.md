@@ -87,6 +87,7 @@ Score = R × I × C / E.
 | E4 | **Macro sensitivities**: TERM/DEF/EUR-USD in all modes. | 7 | 1 | 0.6 | 3 | 1.4 | Should |
 | E7 | **VaR and CVaR** (added 2026-11-19) for single names, track records and portfolios: historical, Gaussian and Cornish-Fisher side by side with bootstrap bands; per-holding CVaR for portfolios. | 10 | 2 | 0.8 | 3 | 5.3 | Should |
 | E8 | **Joint tail** (added 2026-11-19), portfolios only: 'crash together' heatmap, co-crash histogram, one t-copula, worst-days table. | 4 | 2 | 0.6 | 4 | 1.2 | Could |
+| E9 | **Causal-discipline guardrails** (added 2026-11-19): wording and model notes (E9a), specification curve (E9b), Minimum Track Record Length (E9c). | 10 | 1 | 0.8 | 2 | 4.0 | Should (E9a Must) |
 | — | Deferred list above | | | | | | Won't (now) |
 
 E0 is pulled to the top despite its lower RICE score, because it is the enabling thin slice: E2, E3 and E5 all depend on its seam. E5 gets a strategic boost because it is the "heavy" headline feature.
@@ -98,9 +99,9 @@ Each release ends the same way:
 3. A `dev` → `prod` pull request goes up.
 
 ```
-NOW   R1  E0 skeleton  ──►  E1 FF6 + alpha strip      (ticker + upload modes)
+NOW   R1  E0 skeleton  ──►  E1 FF6 + alpha strip + E9a wording/model notes
 NEXT  R2  E2 upload hardening ║ E5 portfolio slice ║ E7a VaR/CVaR (ticker + upload)
-      R3  E3 diagnostics     ║ E6 attribution tree ║ E7b per-holding CVaR
+      R3  E3 diagnostics + E9c MinTRL ║ E6 attribution tree ║ E7b per-holding CVaR ║ E9b spec curve
 LATER R4  E4 macro sensitivities (all modes) ║ E8 joint tail (portfolios)
       R5+ European mode / EUR base, Alternatives proxies, weekly, HTML export
 ```
@@ -200,6 +201,23 @@ Research: [research notes, section E](../research/next-stage-research.md) and th
   - The t-copula fit recovers ν and ρ on simulated t data.
   - The co-crash histogram matches hand counts.
   - Bootstrap coverage is checked on simulated data.
+
+## E9: Causal-discipline guardrails (decided 2026-11-19)
+
+Research: [research notes, section F](../research/next-stage-research.md) and the owner's [Causal Factor Investing study guide](../research/causal_factor_investing_agent_kb.md).
+
+- **E9a, wording and model notes (R1, with E1):**
+  - A caption under the alpha strip: higher R² does not make a model more correct, and alpha depends on the model.
+  - Associational verbs throughout ("co-moved with").
+  - A fixed model note for each of FF5, FF6 and the macro regression, saying what it assumes and what it leaves out.
+  - The out-of-sample caveat extended: it "rules out hindsight in the betas, not luck and not a missing factor".
+  - "Reliable" tags are explained as noise protection only.
+- **E9b, specification curve (R3):**
+  - Alpha and its t-statistic across model (CAPM/FF3/FF5/FF6) × window × start date, sorted by alpha.
+  - The headline is the share of specifications where alpha keeps its sign and its reliability tag.
+  - No "best" specification is marked.
+- **E9c, Minimum Track Record Length (R3, inside E3):** n* = 1 + [1 − γ3·SR + ((γ4 − 1)/4)·SR²]·(z_α/(SR − SR*))², with per-observation SR and SR* = 0. Reported as "needs N months; you have M".
+- **Declined for now:** the regressor-overlap warning, the FF5/FF6 drift check, the analysis-choices card, the per-report placebo, and the omitted-variable alpha check.
 
 ## Draft default proxy template (to be validated in E5)
 
