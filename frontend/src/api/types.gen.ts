@@ -881,6 +881,8 @@ export interface components {
             alpha_strip?: components["schemas"]["AlphaStrip"] | null;
             /** @description How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio. */
             portfolio_backtest?: components["schemas"]["PortfolioBacktestSection"] | null;
+            /** @description Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed. */
+            macro?: components["schemas"]["MacroSection"] | null;
         };
         /**
          * FactorStat
@@ -1228,6 +1230,203 @@ export interface components {
              * @description Quote currency of the proxy.
              */
             currency: string | null;
+        };
+        /**
+         * MacroLeg
+         * @description One fund behind a factor, with its first price date.
+         */
+        MacroLeg: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Role
+             * @description What it feeds, for example "TERM = IEF minus RF".
+             */
+            role: string;
+            /**
+             * First Date
+             * @description First price date; None when not fetched.
+             */
+            first_date: string | null;
+        };
+        /**
+         * MacroRow
+         * @description One factor of the macro regression.
+         */
+        MacroRow: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "mkt_rf" | "term" | "def" | "comm" | "infl" | "usd";
+            /**
+             * Name
+             * @description Display name: "Mkt-RF", "TERM", "DEF", "COMM", "INFL", "USD".
+             */
+            name: string;
+            /**
+             * Label
+             * @description Plain label: Market, Rates, Credit, Commodities, Inflation, US dollar.
+             */
+            label: string;
+            /**
+             * Definition
+             * @description How the factor is built, for example "IEF minus RF".
+             */
+            definition: string;
+            /**
+             * Note
+             * @description Caveat on the factor, for example the DEF label.
+             */
+            note: string | null;
+            /**
+             * Beta
+             * @description Raw beta (the summed same-day and lag beta for the dollar).
+             */
+            beta: number;
+            /**
+             * Se
+             * @description Newey-West HAC standard error of beta.
+             */
+            se: number;
+            /**
+             * T
+             * @description HAC t-statistic of beta.
+             */
+            t: number;
+            /**
+             * P
+             * @description Two-sided p-value of t.
+             */
+            p: number;
+            /**
+             * Ci Low
+             * @description Lower end of the 95% interval, beta - q * se.
+             */
+            ci_low: number;
+            /**
+             * Ci High
+             * @description Upper end of the 95% interval, beta + q * se.
+             */
+            ci_high: number;
+            /**
+             * Tag
+             * @description Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the factors of this regression.
+             * @enum {string}
+             */
+            tag: "reliable" | "noise";
+            /**
+             * Vif
+             * @description Variance inflation factor among the factors.
+             */
+            vif: number;
+            /**
+             * Beta Same Day
+             * @description Dollar row of a daily subject: the same-day part of the summed beta.
+             */
+            beta_same_day: number | null;
+            /**
+             * Beta Lag
+             * @description Dollar row of a daily subject: the previous-day part of the summed beta.
+             */
+            beta_lag: number | null;
+        };
+        /**
+         * MacroSection
+         * @description The macro sensitivities: one row per factor, one regression.
+         */
+        MacroSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Model Note
+             * @description Fixed note: separate regression, raw betas, not alpha.
+             */
+            model_note: string;
+            /**
+             * N Obs
+             * @description Rows of the regression.
+             */
+            n_obs: number;
+            /**
+             * N Sample
+             * @description Rows of the analysis sample before the funds.
+             */
+            n_sample: number;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "monthly";
+            /**
+             * Hac Lags
+             * @description Newey-West lag of the fit.
+             */
+            hac_lags: number;
+            /**
+             * T Reference
+             * @description Reference distribution of the p-values; None when not computed.
+             */
+            t_reference: ("normal" | "student_t") | null;
+            /**
+             * R2
+             * @description R squared of the regression.
+             */
+            r2: number | null;
+            /**
+             * Adj R2
+             * @description Adjusted R squared of the regression.
+             */
+            adj_r2: number | null;
+            /**
+             * Rows
+             * @description Market, rates, credit, commodities, inflation, dollar.
+             */
+            rows: components["schemas"]["MacroRow"][];
+            /**
+             * Correlation Codes
+             * @description Factors of the correlation matrix, in row and column order.
+             */
+            correlation_codes: ("mkt_rf" | "term" | "def" | "comm" | "infl" | "usd")[];
+            /**
+             * Correlation
+             * @description Correlation matrix of the factors.
+             */
+            correlation: number[][];
+            /**
+             * Legs
+             * @description The funds behind the factors, with first dates.
+             */
+            legs: components["schemas"]["MacroLeg"][];
+            /**
+             * Window Limited By
+             * @description The fund whose first date starts the window, when it is later than the subject's own start; None otherwise.
+             */
+            window_limited_by: string | null;
+            /**
+             * Usd Included
+             * @description False when the dollar index was unavailable.
+             */
+            usd_included: boolean;
+            /**
+             * Usd Note
+             * @description Why the dollar row is missing, or a note on the dollar series.
+             */
+            usd_note: string | null;
+            /**
+             * Usd Lag Note
+             * @description Explains the summed dollar beta of a daily subject; None for monthly.
+             */
+            usd_lag_note: string | null;
         };
         /**
          * MultiDayRegression

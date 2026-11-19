@@ -359,6 +359,7 @@ class ReportService:
             )
             frame = await self._model_frame(loaded, now, model)
             inputs = await self._with_world_benchmark(None)
+            inputs = await self._with_macro(inputs)
 
             def build() -> FactorReport:
                 return pr.build_portfolio_report(

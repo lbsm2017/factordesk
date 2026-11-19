@@ -2284,6 +2284,17 @@
               }
             ],
             "description": "How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio."
+          },
+          "macro": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MacroSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed."
           }
         },
         "additionalProperties": false,
@@ -3068,6 +3079,386 @@
         ],
         "title": "LibraryLine",
         "description": "One sub-asset class of the owner's Asset Class Library and the proxy that stands for it."
+      },
+      "MacroLeg": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "What it feeds, for example \"TERM = IEF minus RF\"."
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date",
+            "description": "First price date; None when not fetched."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "role",
+          "first_date"
+        ],
+        "title": "MacroLeg",
+        "description": "One fund behind a factor, with its first price date."
+      },
+      "MacroRow": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "mkt_rf",
+              "term",
+              "def",
+              "comm",
+              "infl",
+              "usd"
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name: \"Mkt-RF\", \"TERM\", \"DEF\", \"COMM\", \"INFL\", \"USD\"."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Plain label: Market, Rates, Credit, Commodities, Inflation, US dollar."
+          },
+          "definition": {
+            "type": "string",
+            "title": "Definition",
+            "description": "How the factor is built, for example \"IEF minus RF\"."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Caveat on the factor, for example the DEF label."
+          },
+          "beta": {
+            "type": "number",
+            "title": "Beta",
+            "description": "Raw beta (the summed same-day and lag beta for the dollar)."
+          },
+          "se": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Se",
+            "description": "Newey-West HAC standard error of beta."
+          },
+          "t": {
+            "type": "number",
+            "title": "T",
+            "description": "HAC t-statistic of beta."
+          },
+          "p": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P",
+            "description": "Two-sided p-value of t."
+          },
+          "ci_low": {
+            "type": "number",
+            "title": "Ci Low",
+            "description": "Lower end of the 95% interval, beta - q * se."
+          },
+          "ci_high": {
+            "type": "number",
+            "title": "Ci High",
+            "description": "Upper end of the 95% interval, beta + q * se."
+          },
+          "tag": {
+            "type": "string",
+            "enum": [
+              "reliable",
+              "noise"
+            ],
+            "title": "Tag",
+            "description": "Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the factors of this regression."
+          },
+          "vif": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Vif",
+            "description": "Variance inflation factor among the factors."
+          },
+          "beta_same_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Same Day",
+            "description": "Dollar row of a daily subject: the same-day part of the summed beta."
+          },
+          "beta_lag": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Lag",
+            "description": "Dollar row of a daily subject: the previous-day part of the summed beta."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "label",
+          "definition",
+          "note",
+          "beta",
+          "se",
+          "t",
+          "p",
+          "ci_low",
+          "ci_high",
+          "tag",
+          "vif",
+          "beta_same_day",
+          "beta_lag"
+        ],
+        "title": "MacroRow",
+        "description": "One factor of the macro regression."
+      },
+      "MacroSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "model_note": {
+            "type": "string",
+            "title": "Model Note",
+            "description": "Fixed note: separate regression, raw betas, not alpha."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Rows of the regression."
+          },
+          "n_sample": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Sample",
+            "description": "Rows of the analysis sample before the funds."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Frequency"
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lag of the fit."
+          },
+          "t_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "student_t"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T Reference",
+            "description": "Reference distribution of the p-values; None when not computed."
+          },
+          "r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R2",
+            "description": "R squared of the regression."
+          },
+          "adj_r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adj R2",
+            "description": "Adjusted R squared of the regression."
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MacroRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Market, rates, credit, commodities, inflation, dollar."
+          },
+          "correlation_codes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "mkt_rf",
+                "term",
+                "def",
+                "comm",
+                "infl",
+                "usd"
+              ]
+            },
+            "type": "array",
+            "title": "Correlation Codes",
+            "description": "Factors of the correlation matrix, in row and column order."
+          },
+          "correlation": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Correlation",
+            "description": "Correlation matrix of the factors."
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/MacroLeg"
+            },
+            "type": "array",
+            "title": "Legs",
+            "description": "The funds behind the factors, with first dates."
+          },
+          "window_limited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Limited By",
+            "description": "The fund whose first date starts the window, when it is later than the subject's own start; None otherwise."
+          },
+          "usd_included": {
+            "type": "boolean",
+            "title": "Usd Included",
+            "description": "False when the dollar index was unavailable."
+          },
+          "usd_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Note",
+            "description": "Why the dollar row is missing, or a note on the dollar series."
+          },
+          "usd_lag_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Lag Note",
+            "description": "Explains the summed dollar beta of a daily subject; None for monthly."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "model_note",
+          "n_obs",
+          "n_sample",
+          "frequency",
+          "hac_lags",
+          "t_reference",
+          "r2",
+          "adj_r2",
+          "rows",
+          "correlation_codes",
+          "correlation",
+          "legs",
+          "window_limited_by",
+          "usd_included",
+          "usd_note",
+          "usd_lag_note"
+        ],
+        "title": "MacroSection",
+        "description": "The macro sensitivities: one row per factor, one regression."
       },
       "MultiDayRegression": {
         "properties": {

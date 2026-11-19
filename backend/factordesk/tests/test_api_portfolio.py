@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import socket
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,6 +40,7 @@ from factordesk.data.prices import (
     TickerOutcome,
 )
 from factordesk.report.schema import ApiError, FactorReport
+from factordesk.section_hooks.context import DollarInput, MacroInput, WorldBenchmarkInput
 from factordesk.section_hooks.registry import HOOKS
 from factordesk.tests.fixtures.dgp import dgp_a, price_history, rng_for
 
@@ -118,7 +119,7 @@ class World:
     extra: dict[str, Any] = field(default_factory=lambda: {})
 
 
-def make_world(tmp_path: Path) -> World:
+def make_world(tmp_path: Path, load_macro: Callable[[], MacroInput] | None = None) -> World:
     d = dgp_a(rng_for(701), n=N)
     dates = pd.DatetimeIndex(d.factors.index)
     full = dates.insert(0, pd.Timestamp("2009-12-31"))
@@ -158,6 +159,7 @@ def make_world(tmp_path: Path) -> World:
         data_dir=tmp_path,
         static_dir=None,
         load_ff6=lambda at: factors,
+        load_macro=load_macro,
     )
     return World(create_app(deps), provider, factors, dates, tmp_path)
 
@@ -343,6 +345,39 @@ def test_the_route_gives_a_portfolio_report(world: World, client: ApiClient) -> 
     assert report.alpha_strip is not None
     # one batch download, once
     assert world.provider.many_calls == [("AAA", "BBB")]
+
+
+def test_a_portfolio_report_has_the_macro_section_when_macro_inputs_are_given(
+    tmp_path: Path,
+) -> None:
+    rng = np.random.default_rng(703)
+    dates = pd.bdate_range("2010-01-04", periods=N, name="date")
+    funds = {
+        t: WorldBenchmarkInput(
+            history=price_history(rng.normal(0.0002, 0.003, size=N), dates, ticker=t)
+        )
+        for t in ("IEF", "LQD", "DBC", "TIP", "IEI")
+    }
+    levels = pd.Series(
+        100.0 * np.concatenate([[1.0], np.cumprod(1.0 + rng.normal(0.0, 0.002, size=N))]),
+        index=pd.DatetimeIndex([pd.Timestamp("2009-12-31"), *dates], name="date"),
+    )
+    macro = MacroInput(funds=funds, dollar=DollarInput(levels=levels))
+    world = make_world(tmp_path, load_macro=lambda: macro)
+    with TestClient(world.app) as test_client:  # pyright: ignore[reportUnknownVariableType]
+        body = tree([holding(0, "AAA", 0.6), holding(1, "BBB", 0.3)], name="Balanced")
+        report = report_of(post(cast(ApiClient, test_client), body))
+    section = report.macro
+    assert section is not None and section.status == "ok" and section.usd_included
+    assert [r.label for r in section.rows][0] == "Market" and len(section.rows) == 6
+    assert section.model_note.endswith("Not the headline alpha.")
+
+
+def test_a_portfolio_report_has_no_macro_section_without_macro_inputs(
+    client: ApiClient,
+) -> None:
+    body = tree([holding(0, "AAA", 0.6)], name="One")
+    assert report_of(post(client, body)).macro is None
 
 
 def test_ff5_and_a_range_are_accepted(client: ApiClient) -> None:
