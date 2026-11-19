@@ -19,6 +19,9 @@ from factordesk.analytics.tail_risk import (
     CF_INVALID,
     LEVELS,
     Frequency,
+    Measure,
+    Method,
+    band_quality,
     cornish_fisher_globally_monotone,
     cornish_fisher_monotone,
     cornish_fisher_quantile,
@@ -349,9 +352,9 @@ def test_block_length_rule() -> None:
 def test_band_coverage_on_simulated_normal_data() -> None:
     """Coverage of the true figure by the 90% percentile band.
 
-    Gaussian and historical VaR bands cover close to 90%. Percentile bands of tail means
-    (historical CVaR) and of the Cornish-Fisher figures are known to under-cover on small
-    tails (measured here at about 75-85%), so they get a wider, documented floor.
+    "validated" bands (Gaussian, historical VaR) cover close to 90%. "approximate" bands
+    (historical CVaR, Cornish-Fisher) under-cover on small tails (about 75-85% measured), so
+    they get a wider, documented floor.
     """
     cases: tuple[tuple[Frequency, int, float, float, int], ...] = (
         ("daily", 600, 0.0004, 0.01, 150),
@@ -359,7 +362,7 @@ def test_band_coverage_on_simulated_normal_data() -> None:
     )
     for freq, n, mu, sd, reps in cases:
         rng = np.random.default_rng(123)
-        hits: dict[tuple[str, str, float], list[bool]] = {}
+        hits: dict[tuple[Method, Measure, float], list[bool]] = {}
         for i in range(reps):
             x = rng.normal(mu, sd, n)
             r = tail_risk(x, freq, seed=i, n_resamples=400)
@@ -372,11 +375,11 @@ def test_band_coverage_on_simulated_normal_data() -> None:
                 hits.setdefault((f.method, f.measure, f.level), []).append(
                     f.band.low <= true <= f.band.high
                 )
-        for (method, measure, level), v in hits.items():
+        for key, v in hits.items():
+            method, measure, level = key
             coverage = float(np.mean(v))
             assert len(v) >= reps // 2
-            loose = method == "cornish_fisher" or (method == "historical" and measure == "cvar")
-            floor = 0.70 if loose else 0.84
+            floor = 0.84 if band_quality(method, measure) == "validated" else 0.70
             assert floor <= coverage <= 0.96, (freq, method, measure, level, coverage)
 
 
@@ -393,3 +396,21 @@ def test_cornish_fisher_band_withheld_below_80_percent_valid_resamples() -> None
     for f in r.figures:
         if f.method != "cornish_fisher":
             assert f.band_reason is None
+
+
+def test_band_quality_labels() -> None:
+    r = tail_risk(_normal(1, 240), "monthly", n_resamples=200)
+    for f in r.figures:
+        if f.band is None:
+            assert f.band_quality is None
+            continue
+        if f.method == "gaussian" or (f.method == "historical" and f.measure == "var"):
+            assert f.band_quality == "validated"
+        else:
+            assert f.band_quality == "approximate"
+    assert r.figure("gaussian", "cvar", 0.975).band_quality == "validated"
+    assert r.figure("historical", "var", 0.95).band_quality == "validated"
+    assert r.figure("historical", "cvar", 0.95).band_quality == "approximate"
+    assert r.figure("cornish_fisher", "var", 0.99).band_quality == "approximate"
+    na = tail_risk(_normal(1, 36), "monthly", n_resamples=50).figure("historical", "var", 0.99)
+    assert na.band is None and na.band_quality is None

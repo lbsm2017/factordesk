@@ -61,10 +61,33 @@ For Cornish-Fisher, resamples that fail the local guard are dropped from the ban
 the resamples pass, the band is withheld (``band=None``) and ``band_reason`` says why: a band
 built only from the resamples that happen to pass would understate the uncertainty.
 
-The bands are plain percentile intervals. On simulated normal data (see the slow coverage
-test) Gaussian and historical VaR bands cover about 86-90%; historical CVaR and Cornish-Fisher
-bands under-cover (about 75-85%), as percentile bootstraps of tail means and of higher moments
-do on small tails. Read them as lower bounds on the uncertainty.
+The bands are plain percentile intervals, and each carries ``band_quality``:
+
+* ``"validated"``: Gaussian bands and historical VaR bands. Their coverage of the true figure
+  is close to the nominal 90%.
+* ``"approximate"``: historical CVaR bands and all Cornish-Fisher bands. They under-cover, as
+  percentile bootstraps of tail means and of higher moments do on small tails; read them as
+  lower bounds on the uncertainty.
+
+Measured coverage of the nominal 90% band on simulated normal data (400 resamples per band;
+150 replications daily, 300 monthly; seed 123; 2026-11-19):
+
+==================  ===========  ===========  ===========
+figure              daily n=600  monthly 240  monthly 120
+==================  ===========  ===========  ===========
+Gaussian VaR 99%    0.91         0.89         0.87
+Gaussian CVaR 97.5  0.91         0.89         0.86
+Gaussian 95% rows   --           0.89-0.90    0.87
+hist. VaR 99%       0.85         n/a          n/a
+hist. VaR 95%       --           0.90         0.88
+hist. CVaR 97.5%    0.79         0.75         0.67
+hist. CVaR 95%      --           0.81         0.75
+CF VaR 99%          0.81         0.79         0.77
+CF CVaR 97.5%       0.83         0.86         0.88
+CF 95% rows         --           0.87-0.88    0.86-0.88
+==================  ===========  ===========  ===========
+
+The CF CVaR rows count only the replications whose band was not withheld.
 
 Pure: no I/O, no clock. Randomness only through the ``seed`` argument. Inputs are not mutated.
 """
@@ -85,6 +108,7 @@ FloatArray = NDArray[np.float64]
 Frequency = Literal["daily", "monthly"]
 Method = Literal["historical", "gaussian", "cornish_fisher"]
 Measure = Literal["var", "cvar"]
+BandQuality = Literal["validated", "approximate"]
 
 METHODS: tuple[Method, ...] = ("historical", "gaussian", "cornish_fisher")
 LEVELS: dict[Frequency, tuple[tuple[Measure, float], ...]] = {
@@ -144,6 +168,8 @@ class TailFigure:
     indicative: bool = False
     band_reason: str | None = None
     """Why ``band`` is None although ``value`` is not."""
+    band_quality: BandQuality | None = None
+    """``"validated"`` or ``"approximate"`` (see the module docstring); None without a band."""
 
 
 @dataclass(frozen=True)
@@ -448,6 +474,13 @@ def _resample(
     return {key: np.concatenate([c[key] for c in chunks]) for key in chunks[0]}
 
 
+def band_quality(method: Method, measure: Measure) -> BandQuality:
+    """Gaussian bands and historical VaR bands are validated; the rest are approximate."""
+    if method == "gaussian" or (method == "historical" and measure == "var"):
+        return "validated"
+    return "approximate"
+
+
 def _tail_text(expected: float, minimum: float) -> str:
     """One decimal, or two (truncated) where one would round up to the minimum (1.95 -> 1.95)."""
     text = f"{expected:.1f}"
@@ -557,6 +590,7 @@ def tail_risk(
                     expected,
                     indicative,
                     band_reason,
+                    None if band is None else band_quality(method, measure),
                 )
             )
 
