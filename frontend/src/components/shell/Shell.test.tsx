@@ -28,6 +28,7 @@ describe("SectionNav", () => {
     const nav = await screen.findByRole("navigation", { name: "Sections" });
     const labels = Array.from(nav.querySelectorAll("a")).map((a) => a.querySelector(".nav-label")?.textContent);
     expect(labels).toEqual([
+      "Summary",
       "Price",
       "Factor exposures",
       "Return sources",
@@ -37,7 +38,7 @@ describe("SectionNav", () => {
       "Regression detail",
     ]);
     const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["#price", "#exposures", "#returns", "#risk", "#rolling", "#data", "#regression-detail"]);
+    expect(hrefs).toEqual(["#summary", "#price", "#exposures", "#returns", "#risk", "#rolling", "#data", "#regression-detail"]);
     const sub = nav.querySelector(".nav-sub");
     expect(sub?.textContent).toBe("Deeper checks");
     expect(sub?.closest("li")?.querySelector("a")?.getAttribute("href")).toBe("#data");

@@ -27,11 +27,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: "returns", label: "Return sources", icon: "returns" },
   { id: "risk", label: "Risk sources", icon: "risk" },
   { id: "rolling", label: "Exposure over time", icon: "rolling" },
-  { id: "lead-lag", label: "Lead-lag betas", icon: "leadlag", deeper: true },
-  { id: "fragility", label: "Fragility", icon: "fragility", deeper: true },
   { id: "residual", label: "Beyond the factors", icon: "residual", deeper: true },
   { id: "kalman", label: "Tracked day by day", icon: "kalman", deeper: true },
   { id: "shrunk", label: "Adjusted for noise", icon: "shrunk", deeper: true },
+  { id: "lead-lag", label: "Lead-lag betas", icon: "leadlag", deeper: true },
+  { id: "fragility", label: "Fragility", icon: "fragility", deeper: true },
   { id: "data", label: "Data and audit", icon: "data", deeper: true },
   { id: "regression-detail", label: "Regression detail", icon: "detail", deeper: true },
 ];
@@ -141,7 +141,11 @@ export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
 
   if (entries.length === 0) return null;
   const listed = entries.map((e) => e.item);
-  const items = [...listed.filter((i) => !i.deeper), ...listed.filter((i) => i.deeper)];
+  // Page order for the main sections; the deeper checks keep the order of NAV_ITEMS.
+  const items = [
+    ...listed.filter((i) => !i.deeper),
+    ...NAV_ITEMS.filter((i) => i.deeper && listed.includes(i)),
+  ];
   const badge = auditBadge(report);
   const firstDeeper = items.findIndex((i) => i.deeper);
   return (

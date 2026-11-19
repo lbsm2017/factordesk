@@ -17,7 +17,7 @@ const HREF = "/api/report/SPY/html?range=3Y";
 describe("Header", () => {
   it("shows the ticker, the download link at the right and the analysis bar", () => {
     const { container } = render(<Header report={mockReport} downloadHref={HREF} />);
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("SPY");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("SPYExample Corp");
     const dl = screen.getByRole("link", { name: "Download report" });
     expect(dl.getAttribute("href")).toBe(HREF);
     expect(dl.hasAttribute("download")).toBe(true);
@@ -38,7 +38,9 @@ describe("Header", () => {
   });
 
   it("falls back to the ticker alone when the report has no security field", () => {
-    const { container } = render(<Header report={mockReport} downloadHref={HREF} />);
+    const r = cloneReport();
+    delete (r.data as { security?: unknown }).security;
+    const { container } = render(<Header report={r} downloadHref={HREF} />);
     expect(container.querySelector(".nm")).toBeNull();
     expect(container.querySelector(".badge")).toBeNull();
     expect(container.querySelector(".listing")).toBeNull();

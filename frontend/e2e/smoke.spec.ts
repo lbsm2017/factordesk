@@ -45,7 +45,7 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   // The formula is gone (owner, dashboard v2); the sidebar sits outside <main>.
   const summary = page.locator("#summary");
   await expect(summary).toContainText("Alpha (annual)");
-  await expect(summary).toContainText("R²");
+  await expect(summary).toContainText("RÂ²");
   await expect(page.locator("#equation")).toHaveCount(0);
   await expect(page.locator("main aside, main #sidebar")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Price" })).toBeVisible();

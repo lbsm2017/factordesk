@@ -12,7 +12,7 @@ npm run gen:types  # after: uv run python -m factordesk.api.openapi_dump fronten
 
 In development, `/?demo=1` renders the mock report so panels can be seen without the API. The demo is not in the production build.
 
-ECharts loads in its own lazy chunk (`echarts`), so it is not in the initial JS; React and TanStack Query have their own vendor chunks. `npm run size` counts the entry script plus preloaded chunks against a budget of 405 kB raw and 125 kB gzip (measured: 401 and 123.5). Raise the budget in `scripts/size.mjs` only on purpose.
+ECharts loads in its own lazy chunk (`echarts`), so it is not in the initial JS; React and TanStack Query have their own vendor chunks. `npm run size` counts the entry script plus preloaded chunks against a budget of 400 kB raw and 125 kB gzip (measured: 396 and 123.5). Raise the budget in `scripts/size.mjs` only on purpose.
 
 ## Component map
 

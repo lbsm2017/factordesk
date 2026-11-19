@@ -5,16 +5,10 @@ import { cloneReport } from "../../../test/fixture";
 import { withSection } from "../../../test/sectionFixtures";
 import { WorldBetaBody } from "./WorldBetaBody";
 import { WorldBetaPanel } from "./WorldBetaPanel";
-import { compareFits, europeRow, outcomeLine } from "./worldBetaModel";
+import { compareFits, europeOk, outcomeLine } from "./worldBetaModel";
 
 const state = vi.hoisted(() => ({ stats: false }));
 vi.mock("../../../state/stats", () => ({ useShowStats: () => state.stats }));
-
-const EUROPE = {
-  proxy: "IEUR",
-  n_sample: 480,
-  world: { beta: 0.71, se: 0.05, ci_low: 0.61, ci_high: 0.81, r2: 0.55, correlation: 0.74, alpha_annual: 0.01, alpha_t: 0.3 },
-};
 
 function reportWith(edit?: (s: NonNullable<FactorReport["world_beta"]>) => void): FactorReport {
   const report = withSection(cloneReport(), "world_beta");
@@ -22,8 +16,9 @@ function reportWith(edit?: (s: NonNullable<FactorReport["world_beta"]>) => void)
   return report;
 }
 
-function withEurope(s: NonNullable<FactorReport["world_beta"]>) {
-  (s as unknown as { europe: unknown }).europe = structuredClone(EUROPE);
+function setEurope(s: NonNullable<FactorReport["world_beta"]>, edit: (e: NonNullable<typeof s.europe>) => void) {
+  if (!s.europe) throw new Error("the fixture has no Europe block");
+  edit(s.europe);
 }
 
 function heads(container: HTMLElement): string[] {
@@ -82,13 +77,19 @@ describe("WorldBetaBody", () => {
     expect(container.querySelector(".reading")?.textContent).toBe("About the same against the world as against the US market.");
   });
 
-  it("with statistics off shows Against, chart, Beta and Days only, on two rows", () => {
+  it("with statistics off shows Against, chart, Beta and Days only, on three rows with Europe in the middle", () => {
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     expect(heads(container)).toEqual(["Against", "Chart", "Beta", "Days"]);
     expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "559"]);
     expect(cells(container, "us")).toEqual(["US market", "+1.00", "same"]);
-    expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
-    expect(container.querySelector("#world-beta-europe")).toBeNull();
+    expect(cells(container, "europe")).toEqual(["Europe IEUR, MSCI Europe stand-in", "+0.80", "540"]);
+    expect(Array.from(container.querySelectorAll("tbody tr")).map((r) => r.id)).toEqual([
+      "world-beta-acwi",
+      "world-beta-europe",
+      "world-beta-us",
+    ]);
+    expect(container.querySelectorAll(".reading")).toHaveLength(2);
+    expect(container.querySelectorAll(".reading")[1]?.textContent).toMatch(/^Europe: Lower against Europe/);
   });
 
   it("with statistics on adds the 95% interval and R squared columns", () => {
@@ -112,21 +113,42 @@ describe("WorldBetaBody", () => {
     expect(container.querySelector("tr.axis-row")?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("adds the Europe row when the section has it, on the same axis", () => {
+  it("shows the Europe row on the same axis with its interval and R squared when statistics are on", () => {
     state.stats = true;
-    const { container } = render(<WorldBetaBody report={reportWith(withEurope)} />);
-    expect(container.querySelectorAll("tbody tr")).toHaveLength(3);
-    expect(cells(container, "europe")).toEqual(["Europe (IEUR)", "+0.71", "0.61 to 0.81", "0.55", "480"]);
+    const { container } = render(<WorldBetaBody report={reportWith()} />);
+    expect(cells(container, "europe")).toEqual(["Europe IEUR, MSCI Europe stand-in", "+0.80", "0.72 to 0.88", "0.64", "540"]);
     expect(container.querySelector("details.how")?.textContent).toContain("IEUR");
   });
 
+  it("adds the US market on the Europe days as its own row when its fit differs from the ACWI days", () => {
+    const report = reportWith((s) => setEurope(s, (e) => {
+      if (e.us_market) Object.assign(e.us_market, { beta: 0.98, ci_low: 0.93, ci_high: 1.03 });
+    }));
+    const { container } = render(<WorldBetaBody report={report} />);
+    expect(Array.from(container.querySelectorAll("tbody tr")).map((r) => r.id)).toEqual([
+      "world-beta-acwi",
+      "world-beta-europe",
+      "world-beta-us",
+      "world-beta-us-europe",
+    ]);
+    expect(cells(container, "us-europe")).toEqual(["US market, same days as Europe", "+0.98", "540"]);
+  });
+
   it("leaves the Europe row out when the block is absent, null or not ok", () => {
-    for (const europe of [undefined, null, { status: "failed", reason: "x", proxy: "IEUR" }]) {
-      const report = reportWith((s) => {
-        (s as unknown as { europe: unknown }).europe = europe;
-      });
-      const { container, unmount } = render(<WorldBetaBody report={report} />);
+    const edits: Array<(s: NonNullable<FactorReport["world_beta"]>) => void> = [
+      (s) => {
+        s.europe = null;
+      },
+      (s) => setEurope(s, (e) => {
+        e.status = "failed";
+        e.benchmark = null;
+        e.us_market = null;
+      }),
+    ];
+    for (const edit of edits) {
+      const { container, unmount } = render(<WorldBetaBody report={reportWith(edit)} />);
       expect(container.querySelector("#world-beta-europe")).toBeNull();
+      expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
       unmount();
     }
   });
@@ -145,6 +167,7 @@ describe("WorldBetaBody", () => {
 
   it("shows the reason and the action when the status is not ok", () => {
     const short = reportWith((s) => {
+      s.europe = null;
       s.status = "insufficient_data";
       s.reason = "Too few days overlap with the world fund: 90, at least 252 needed.";
     });
@@ -154,6 +177,7 @@ describe("WorldBetaBody", () => {
     expect(a.container.querySelector("table, .foot")).toBeNull();
     a.unmount();
     const failed = reportWith((s) => {
+      s.europe = null;
       s.status = "failed";
       s.reason = "The world fund could not be fetched.";
     });
@@ -192,13 +216,11 @@ describe("world beta model", () => {
     expect(outcomeLine({ ...s, us_market: null, comparison: null })).toBeNull();
   });
 
-  it("reads the Europe block in either shape", () => {
+  it("gives the Europe block only when it is ok and carries both fits", () => {
     const s = reportWith().world_beta;
     if (!s) throw new Error("no fixture");
-    expect(europeRow(s)).toBeNull();
-    const flat = { ...s, europe: { ...EUROPE.world, proxy: "IEUR", n_sample: 12 } } as unknown as typeof s;
-    expect(europeRow(flat)?.days).toBe(12);
-    const nested = { ...s, europe: EUROPE } as unknown as typeof s;
-    expect(europeRow(nested)?.fit.beta).toBe(0.71);
+    expect(europeOk(s)?.proxy).toBe("IEUR");
+    expect(europeOk({ ...s, europe: null })).toBeNull();
+    expect(europeOk({ ...s, europe: s.europe && { ...s.europe, status: "failed" } })).toBeNull();
   });
 });

@@ -7,9 +7,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
-// Measured on 2026-11-18: 372.2 kB raw, 114.4 kB gzip. Raw raised from 400 to 405 kB on 2026-11-19 for the
-// Summary panel (verdict text, readings and two tables); the gzip budget is unchanged.
-const BUDGET_RAW_KB = 405;
+// Measured on 2026-11-18: 372.2 kB raw, 114.4 kB gzip. Headroom: 7% raw, 9% gzip.
+const BUDGET_RAW_KB = 400;
 const BUDGET_GZIP_KB = 125;
 
 const dist = fileURLToPath(new URL("../dist", import.meta.url));

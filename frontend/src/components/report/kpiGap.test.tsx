@@ -28,13 +28,13 @@ describe("gap between the blocks of the report (review DF7)", () => {
     expect(rule(".panel")).not.toMatch(/(^|[\s;])margin(-top)?:/);
   });
 
-  it("puts every block, the notice and the empty states included, in the grid", () => {
+  it("puts every block, the summary and the empty states included, in the grid", () => {
     const r = cloneReport();
     r.regression.status = "insufficient_data";
     const { container } = render(<ReportView report={r} downloadHref="#" win={null} onWinChange={vi.fn()} />);
     const main = container.querySelector("main.report-region") as HTMLElement;
     const ids = Array.from(main.querySelectorAll(":scope > [id]")).map((el) => el.id);
-    expect(ids.slice(0, 3)).toEqual(["header", "notice", "price"]);
+    expect(ids.slice(0, 3)).toEqual(["header", "summary", "price"]);
     expect(main.querySelector(":scope > #exposures .empty")).not.toBeNull();
   });
 });

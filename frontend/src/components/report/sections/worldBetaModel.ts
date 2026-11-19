@@ -4,11 +4,7 @@ import type { WorldBetaSection } from "../../../api/types";
 export type BetaFit = NonNullable<WorldBetaSection["world"]>;
 export type Comparison = NonNullable<WorldBetaSection["comparison"]>;
 
-export interface EuropeRow {
-  fit: BetaFit;
-  days: number | null;
-  proxy: string;
-}
+export type ProxyBeta = NonNullable<WorldBetaSection["europe"]>;
 
 const LINES: Record<Comparison, string> = {
   about_the_same: "About the same against the world as against the US market.",
@@ -32,26 +28,14 @@ export function outcomeLine(s: WorldBetaSection): string | null {
   return category === null ? null : LINES[category];
 }
 
-function isFit(x: unknown): x is BetaFit {
-  const f = x as Partial<BetaFit> | null;
-  return typeof f === "object" && f !== null && typeof f.beta === "number" && typeof f.ci_low === "number" && typeof f.ci_high === "number";
+/** The Europe block when it carries a result (status ok, both fits), else null. */
+export function europeOk(s: WorldBetaSection): ProxyBeta | null {
+  const e = s.europe;
+  if (e === null || e === undefined || e.status !== "ok" || e.benchmark === null || e.us_market === null) return null;
+  return e;
 }
 
-/**
- * The Europe row, when the report has one. The block follows the shape of the ACWI block: the fit
- * sits in `europe.world` (or is `europe` itself), the days in `europe.n_sample`. A block whose status
- * is not "ok", or without a fit, gives no row.
- */
-export function europeRow(s: WorldBetaSection): EuropeRow | null {
-  const raw = (s as unknown as { europe?: Record<string, unknown> | null }).europe;
-  if (raw === undefined || raw === null || typeof raw !== "object") return null;
-  if (raw["status"] !== undefined && raw["status"] !== "ok") return null;
-  const fit = [raw["world"], raw["fit"], raw].find(isFit);
-  if (!fit) return null;
-  const days = [raw["n_sample"], (raw["sample"] as { n?: unknown } | undefined)?.n, raw["n"]].find((d) => typeof d === "number");
-  return {
-    fit,
-    days: typeof days === "number" ? days : null,
-    proxy: typeof raw["proxy"] === "string" ? raw["proxy"] : "IEUR",
-  };
+/** Same fit to the digits shown; used to decide whether the Europe days need their own US market row. */
+export function sameFit(a: BetaFit, b: BetaFit): boolean {
+  return a.beta === b.beta && a.ci_low === b.ci_low && a.ci_high === b.ci_high && a.r2 === b.r2;
 }
