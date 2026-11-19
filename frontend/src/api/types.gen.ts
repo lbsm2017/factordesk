@@ -85,6 +85,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/report/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Report
+         * @description The factor report of an uploaded monthly track record (kept in memory, never stored).
+         */
+        post: operations["upload_report_api_report_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/report/{ticker}/ranges": {
         parameters: {
             query?: never;
@@ -188,7 +208,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request";
+            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request" | "invalid_upload" | "upload_too_large";
             /** Message */
             message: string;
             /** Action */
@@ -325,6 +345,24 @@ export interface components {
              * @description HAC t of the intercept; null on an exact fit.
              */
             alpha_t: number | null;
+        };
+        /** Body_upload_report_api_report_upload_post */
+        Body_upload_report_api_report_upload_post: {
+            /**
+             * File
+             * @description CSV with a date and a return column.
+             */
+            file: string;
+            /**
+             * Name
+             * @description Display name of the record.
+             */
+            name?: string | null;
+            /**
+             * Gross Net
+             * @description gross or net of fees; empty when unknown.
+             */
+            gross_net?: string | null;
         };
         /**
          * CorrPair
@@ -2791,6 +2829,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_report_api_report_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_report_api_report_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorReport"];
+                };
+            };
+            /** @description The file is larger than 1 MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The file or a form field cannot be used, or the record is too short. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The report could not be computed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The downloaded factor file failed validation. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description A data source could not be reached or refused. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
