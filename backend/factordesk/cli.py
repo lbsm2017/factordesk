@@ -425,6 +425,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
+    logging.getLogger("factordesk").setLevel(logging.INFO)  # the server logs one line per step
+
     print(f"Dashboard: {_browser_url(host, port)}" + (" (API only, dev)" if args.dev else ""))
     if args.open:
         _open_when_ready(host, port)

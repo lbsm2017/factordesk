@@ -8,6 +8,8 @@ and production is same-origin.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 
 from factordesk.api.deps import AppDeps, default_deps
@@ -44,4 +46,7 @@ def create_app(deps: AppDeps) -> FastAPI:
 
 def create_dev_app() -> FastAPI:
     """Uvicorn factory (API only) with the real providers and the configured data directory."""
+    if not logging.getLogger().handlers:  # the reload worker is a fresh process
+        logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
+    logging.getLogger("factordesk").setLevel(logging.INFO)
     return create_app(default_deps(None))

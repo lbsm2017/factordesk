@@ -23,6 +23,8 @@ The hooks are looked up by module attribute at call time, so a test may replace 
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -38,6 +40,11 @@ from factordesk.section_hooks import shrunk as shrunk_hook
 from factordesk.section_hooks import tail_risk as tail_risk_hook
 from factordesk.section_hooks import world_beta as world_beta_hook
 from factordesk.section_hooks.context import FACTOR_MODELS, FactorModel, SectionContext
+
+logger = logging.getLogger(__name__)
+
+SLOW_SECTION_SECONDS = 1.0
+"""A section that takes longer than this is named in the log."""
 
 Hook = Callable[[SectionContext], object | None]
 
@@ -129,9 +136,26 @@ HOOKS: tuple[HookSpec, ...] = (
 
 
 def run_hooks(ctx: SectionContext, hooks: tuple[HookSpec, ...] = HOOKS) -> dict[str, object | None]:
-    """Each hook's section by report field; ``None`` for a hook that does not apply."""
+    """Each hook's section by report field; ``None`` for a hook that does not apply.
+
+    Logs one INFO line with the number of sections built and the seconds they took, and one more
+    line for every section that took longer than ``SLOW_SECTION_SECONDS``.
+    """
     kind, frequency = ctx.subject.kind, ctx.subject.frequency
-    return {
-        spec.field: spec.build(ctx) if spec.applies(kind, frequency, ctx.model) else None
-        for spec in hooks
-    }
+    out: dict[str, object | None] = {}
+    slow: list[tuple[str, float]] = []
+    started = time.perf_counter()
+    for spec in hooks:
+        if not spec.applies(kind, frequency, ctx.model):
+            out[spec.field] = None
+            continue
+        began = time.perf_counter()
+        out[spec.field] = spec.build(ctx)
+        took = time.perf_counter() - began
+        if took > SLOW_SECTION_SECONDS:
+            slow.append((spec.field, took))
+    built = sum(1 for value in out.values() if value is not None)
+    logger.info("Sections built: %d in %.1f s", built, time.perf_counter() - started)
+    for name, took in slow:
+        logger.info("Slow section %s: %.1f s", name, took)
+    return out

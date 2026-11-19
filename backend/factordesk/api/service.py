@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Hashable
 from dataclasses import dataclass
@@ -34,9 +35,9 @@ import pandas as pd
 from fastapi import Request
 
 from factordesk.api import ranges
-from factordesk.api.errors import ApiException
+from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime
-from factordesk.data.factors import FactorError
+from factordesk.data.factors import FactorError, FactorStatus
 from factordesk.data.prices import PriceHistory, Security, check_currency, security_of
 from factordesk.report.render_html import render_report_html
 from factordesk.report.schema import FactorModel, FactorReport, RangeOptions, RangePreset
@@ -104,6 +105,9 @@ class SingleFlight[K: Hashable, V]:
 
     def __len__(self) -> int:
         return len(self._done)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._done
 
     def keys(self) -> list[K]:
         """Cached keys, least recently used first."""
@@ -175,6 +179,31 @@ type RangesKey = tuple[str, Vintage, date]
 type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel]
 
 
+def _range_text(preset: RangePreset | None, start: date | None, end: date | None) -> str:
+    """The requested range for the log: the preset, the dates, or FULL."""
+    if preset is not None:
+        return preset
+    if start is None and end is None:
+        return "FULL"
+    return f"{start or 'first'}..{end or 'last'}"
+
+
+def _log_factors(status: FactorStatus | None, now: datetime, seconds: float) -> None:
+    """One INFO line: the factor dataset, whether it came from cache or a download, its vintage."""
+    if status is None:
+        logger.info("Factors: Fama-French 5 daily, no cache record (%.1f s)", seconds)
+        return
+    stamp = _utc(status.last_download_at)
+    source = "downloaded" if stamp is not None and stamp >= now else "from cache"
+    logger.info(
+        "Factors: Fama-French 5 daily, %s, vintage %s (downloaded %s) (%.1f s)",
+        source,
+        status.last_date,
+        "unknown" if stamp is None else stamp.date(),
+        seconds,
+    )
+
+
 def _utc(ts: datetime | None) -> datetime | None:
     """A stored download time as aware UTC (naive values are taken as UTC)."""
     if ts is None:
@@ -215,6 +244,26 @@ class ReportService:
 
         ``model`` is the factor model, FF5 (default) or FF6 (FF5 plus momentum).
         """
+        started = time.perf_counter()
+        logger.info(
+            "Report start: %s, model %s, range %s", ticker, model, _range_text(preset, start, end)
+        )
+        try:
+            return await self._report(ticker, preset, start, end, model, started)
+        except Exception as exc:
+            category = to_api_exception(exc, ticker).code
+            logger.info("Report refused: %s, reason %s", ticker, category)
+            raise
+
+    async def _report(
+        self,
+        ticker: str,
+        preset: RangePreset | None,
+        start: date | None,
+        end: date | None,
+        model: FactorModel,
+        started: float,
+    ) -> FactorReport:
         ranges.check_request(preset, start, end)
         now = self._now()
         loaded = await self._factors()
@@ -223,6 +272,13 @@ class ReportService:
         cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
         first, last = ranges.resolve(preset, start, end, cov)
         key: ReportKey = (ticker, first, last, loaded.vintage, now.date(), model)
+        if key in self.reports:
+            logger.info(
+                "Report cache hit: %s, model %s (%.0f ms)",
+                ticker,
+                model,
+                (time.perf_counter() - started) * 1000,
+            )
 
         async def make() -> FactorReport:
             frame = await self._model_frame(loaded, now, model)
@@ -243,7 +299,16 @@ class ReportService:
                     model=model,
                 )
 
-            return await self.runtime.run(build)
+            built_at = time.perf_counter()
+            report = await self.runtime.run(build)
+            logger.info(
+                "Report built: %s, model %s in %.1f s (total %.1f s)",
+                ticker,
+                model,
+                time.perf_counter() - built_at,
+                time.perf_counter() - started,
+            )
+            return report
 
         return await self.reports.get(key, make)
 
@@ -291,8 +356,10 @@ class ReportService:
 
     async def _load_factors(self) -> LoadedFactors:
         now = self._now()
+        began = time.perf_counter()
         frame = await self.runtime.run(self.deps.load_factors, False, now)
         status = await self.runtime.run(self.deps.factor_status, now)
+        _log_factors(status, now, time.perf_counter() - began)
         if status is None:  # the loader always caches what it returns; be safe anyway
             last = pd.Timestamp(str(frame.index[-1])).date()
             return LoadedFactors(Vintage(last, None), frame)
@@ -377,7 +444,17 @@ class ReportService:
 
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:
-            return await self.runtime.run(self.deps.price_provider.fetch, ticker)
+            asked = self._now()
+            began = time.perf_counter()
+            history = await self.runtime.run(self.deps.price_provider.fetch, ticker)
+            logger.info(
+                "Prices %s: %s, %d days, %.1f s",
+                ticker,
+                "downloaded" if history.fetched_at >= asked else "from cache",
+                len(history.frame),
+                time.perf_counter() - began,
+            )
+            return history
 
         return await self.prices.get((ticker, today), make)
 
