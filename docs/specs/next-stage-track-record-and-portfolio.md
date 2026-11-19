@@ -158,7 +158,7 @@ graph LR
 - **Hook registry.** `section_hooks/registry.py` holds `HookSpec(sources, frequencies, models)`. The Kalman, shrunk, fragility, lead-lag and residual sections are daily and FF5 only. World beta is daily only.
 - **Regression.** `run_regression(codes, periods)` keeps its current defaults. The hard-coded `A = 252` in regression.py:38, attribution.py and performance.py becomes a parameter. `ols_hac` is reused unchanged.
 - **French data.** A generic loader in `data/french.py` covers FF5 and Mom, daily and monthly. It follows the `parse_portfolio_csv` pattern because the current `parse_french_csv` (factors.py:113) only reads FF5 daily. FRED data goes in `data/fred.py`.
-- **Schema.** An optional `subject` block is added, "5" is added to SUPPORTED, and the frontend types are regenerated. `ReportKey` (service.py:167) becomes a dataclass including model and frequency. Uploads bypass every cache; portfolios are cached in memory, keyed by the SHA-256 of the tree.
+- **Schema.** An optional `subject` block is added and the frontend types are regenerated. The version stays "4": under contract SC5 an optional additive field does not bump the version, and ticker reports omit the block so they stay byte-identical (decided in E0, 2026-11-19). `ReportKey` (service.py:167) becomes a dataclass including model and frequency. Uploads bypass every cache; portfolios are cached in memory, keyed by the SHA-256 of the tree.
 - **Reuse.**
   - audit A4 (flags returns over 40%) and A6 (`distribution_checks`, with a 1% threshold) for portfolio data checks;
   - `fetch_many` (prices.py:740) and `throttle.py` for portfolio prices;
@@ -270,7 +270,7 @@ Bonds Europe uses IGOV (a mixed proxy with about 41% in euro-area government bon
 - **Statistics:**
   - `ols_hac` matches statsmodels HAC;
   - Mom matches the published rows;
-  - compounded daily Mkt+RF matches monthly within 5 bp;
+  - compounded daily Mkt−RF matches monthly within 5 bp once each file's own RF is removed (the daily file rounds RF to 0.01% a day, so a combined Mkt+RF check fails in many months; found in E0);
   - SPY monthly β matches daily β within 0.1;
   - SPY uploaded as a NAV reproduces the ticker-mode betas;
   - capture, Lo η and Ljung-Box match hand-worked or statsmodels values;
