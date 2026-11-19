@@ -51,6 +51,18 @@ Every report can switch between the five-factor and six-factor (with momentum) m
 - If the spot EUR/USD factor gives misleading results, a multi-currency dollar factor is the later alternative (Lustig, Roussanov and Verdelhan, 2011).
 - If the macro factors overlap too much (high VIF), we would consider residualising them in a stated order. Orthogonalisation is not in version 1.
 
+## Update, 2026-11-19: two more macro factors
+
+- **What changed:** the owner added commodities (DBC − RF) and inflation (TIP − IEI) to the macro section, after research on candidate factors ([research notes, section G](../docs/research/next-stage-research.md)).
+- **Why these two:** each one passed the causal-discipline test (multi-asset portfolios hold these asset classes), not a fit test.
+- **Effect on the start date:** the macro section now starts at about 2007-01 instead of 2002-07-30. IEI starts last.
+- **Still not adopted:**
+  - High-yield credit, which is collinear with the market factor and with DEF.
+  - A broad dollar index, which measures the same cause as EUR/USD.
+  - AQR's BAB and QMJ, because of their licence terms.
+  - q-factors, which are deferred.
+  - Strategy-specific factors, which are deferred.
+
 ## Sources
 
 - [Next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md): owner decisions on factors and the macro section, and epics E1 and E4.

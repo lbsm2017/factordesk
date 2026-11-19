@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-19 (candidate factors)
+
+- The owner reviewed candidate factors beyond FF6 and added commodities and inflation to the macro section. Other candidates were declined for licence reasons, deferred, or skipped because they only improve fit. The [macro decision page](decision-factor-models-and-macro.md) has a dated update, and the research notes have section G.
+
 ## 2026-11-19 (causal discipline)
 
 - The owner supplied a study guide of López de Prado (2023), *Causal Factor Investing*, and asked where it fits. After a research round the owner adopted wording and model notes, a specification curve and Minimum Track Record Length, and asked for research on other candidate factors. Added [the decision page](decision-causal-discipline-guardrails.md), section F of the research notes, the study guide and epic E9.

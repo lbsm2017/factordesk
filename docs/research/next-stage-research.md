@@ -485,6 +485,34 @@ Sources:
 - López de Prado & Zoonekynd (2024), "Why Has Factor Investing Failed?: The Role of Specification Errors", ADIA Lab Research Paper Series No. 7. https://www.adialab.ae/research-series/why-has-factor-investing-failed-the-role-of-specification-errors
 - Cinelli & Hazlett (2020), "Making sense of sensitivity", *JRSS B* 82(1), 39-67.
 
+## G. Candidate factors beyond FF6
+
+Researched on 2026-11-19. Each candidate was tested against the causal-discipline rule from section F: add a factor only if it is a plausible cause of the subject's return (the subject holds or trades it), not because it raises fit. Start dates marked [unverified] come from memory.
+
+### G1. Verdicts
+
+| Candidate | Source and terms | Verdict (owner, 2026-11-19) |
+|---|---|---|
+| Commodities, DBC − RF | ETF via the existing price feed; from 2006-02 | **Adopted** in the macro section. Multi-asset portfolios hold this asset class, and it is nearly orthogonal to FF6. |
+| Inflation, TIP − IEI | ETFs; TIP from 2003-12 [unverified], IEI from about 2007-01 [unverified]. FRED T10YIE is a level, not a return. | **Adopted** in the macro section. The book names inflation as an ignored confounder. IEI is duration-matched, unlike IEF. |
+| High-yield credit, HYG − LQD | ETFs; HYG from 2007-04 | Not adopted. It is collinear with the market factor and with DEF. |
+| Broad USD, FRED DTWEXBGS | Public domain, citation requested | Not adopted. It is the same cause as EUR/USD and must never be entered alongside it. |
+| BAB, QMJ (AQR) | AQR terms forbid reproduction or distribution without written consent | Skipped for now; revisit if consent is obtained. They have the strongest confounding case for stocks and equity managers. QMJ would replace RMW, not be added to it. |
+| q-factor model (q5) | global-q.org daily CSVs; no stated terms; the URL changes every year | Deferred. It is a rival measurement of the same causes as RMW and CMA, so it would be an alternative model and never stacked on FF5. |
+| Short-term reversal, TSMOM, Fung-Hsieh PTFS, ΔVIX | Ken French (ST_Rev); AQR terms (TSMOM); academic-use-only terms (PTFS) | Deferred. These only make sense for managers who trade these strategies, so they would be unlocked by a declared strategy type on uploads. |
+| Regional FF5 + Mom (Ken French) | Daily, in USD | The factor set for the future European mode. |
+| Long-term reversal, HML Devil, Stambaugh-Yuan M4 | — | Skipped. They fit better but have no distinct mechanism, and M4 data ends in 2016. |
+
+### G2. Sources
+
+- Ken French Data Library. https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+- AQR Terms of Use. https://www.aqr.com/Terms-of-Use
+- AQR datasets. https://www.aqr.com/Insights/Datasets
+- Hou, Xue & Zhang (2015), "Digesting anomalies: an investment approach", *Review of Financial Studies* 28(3); q5 factors at https://global-q.org/factors.html
+- Frazzini & Pedersen (2014), "Betting against beta", *Journal of Financial Economics* 111(1).
+- Asness, Frazzini & Pedersen (2019), "Quality minus junk", *Review of Accounting Studies* 24(1).
+- FRED DTWEXBGS. https://fred.stlouisfed.org/series/DTWEXBGS
+
 ## Verification results (2026-11-19)
 
 ### V1. Sharpe-ratio formulas, checked against the primary texts

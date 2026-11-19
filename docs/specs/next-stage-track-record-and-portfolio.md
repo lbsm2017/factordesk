@@ -37,8 +37,10 @@ The owner's decisions from three question rounds are listed below.
   - mkt_rf
   - TERM = IEF − RF
   - DEF = LQD − IEF, labelled "not duration-matched"
+  - COMM = DBC − RF (broad commodities; added 2026-11-19)
+  - INFL = TIP − IEI (TIPS minus duration-matched Treasuries, a breakeven proxy; added 2026-11-19)
   - EUR/USD from FRED DEXUSEU, falling back to yfinance; daily data adds a 1-day FX lag and reports the summed beta
-  - data starts 2002-07-30
+  - data starts at the latest first-trade date among the macro ETFs: about 2007-01 once IEI is included (IEF/LQD 2002-07-30, TIP 2003-12, DBC 2006-02-06, IEI about 2007-01; TIP and IEI dates to be confirmed in E4)
 
 **Track record**
 - **Input:** CSV or XLSX template with date plus return or NAV, and header fields for currency, gross/net and name. Format is auto-detected.
@@ -84,7 +86,7 @@ Score = R × I × C / E.
 | E5 | **Portfolio slice**: tree builder (template) → backtest → factor report. | 7 | 3 | 0.7 | 5 | 2.9 | Must |
 | E3 | **Track-record diagnostics**: ACWI statistics, smoothing checks, Lo Sharpe. | 6 | 2 | 0.8 | 3 | 3.2 | Should |
 | E6 | **Portfolio attribution tree**: contribution and risk share rolled up per group, plus cost line and data checks. | 7 | 2 | 0.8 | 3 | 3.7 | Should |
-| E4 | **Macro sensitivities**: TERM/DEF/EUR-USD in all modes. | 7 | 1 | 0.6 | 3 | 1.4 | Should |
+| E4 | **Macro sensitivities**: TERM/DEF/COMM/INFL/EUR-USD in all modes. | 7 | 1 | 0.6 | 3 | 1.4 | Should |
 | E7 | **VaR and CVaR** (added 2026-11-19) for single names, track records and portfolios: historical, Gaussian and Cornish-Fisher side by side with bootstrap bands; per-holding CVaR for portfolios. | 10 | 2 | 0.8 | 3 | 5.3 | Should |
 | E8 | **Joint tail** (added 2026-11-19), portfolios only: 'crash together' heatmap, co-crash histogram, one t-copula, worst-days table. | 4 | 2 | 0.6 | 4 | 1.2 | Could |
 | E9 | **Causal-discipline guardrails** (added 2026-11-19): wording and model notes (E9a), specification curve (E9b), Minimum Track Record Length (E9c). | 10 | 1 | 0.8 | 2 | 4.0 | Should (E9a Must) |
