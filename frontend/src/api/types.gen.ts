@@ -85,6 +85,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Library
+         * @description The 44 lines of the Asset Class Library, in the owner's order, with their proxies.
+         */
+        get: operations["get_library_api_portfolio_library_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/report/upload": {
         parameters: {
             query?: never;
@@ -327,6 +347,19 @@ export interface components {
             message: string;
             /** Action */
             action: string;
+        };
+        /**
+         * AssetClassLibrary
+         * @description The library: lines in the owner's order, grouped by asset class.
+         */
+        AssetClassLibrary: {
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+            /** Lines */
+            lines: components["schemas"]["LibraryLine"][];
         };
         /**
          * AuditFinding
@@ -1091,6 +1124,43 @@ export interface components {
              */
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
+        };
+        /**
+         * LibraryLine
+         * @description One sub-asset class of the owner's Asset Class Library and the proxy that stands for it.
+         */
+        LibraryLine: {
+            /** Id */
+            id: string;
+            /** Asset Class */
+            asset_class: string;
+            /** Sub Asset Class */
+            sub_asset_class: string;
+            /**
+             * Proxy
+             * @description A ticker, "RF" for the risk-free rate, or null when there is no proxy yet.
+             */
+            proxy: string | null;
+            /**
+             * Proxy Kind
+             * @enum {string}
+             */
+            proxy_kind: "etf" | "risk_free" | "listed_proxy" | "none";
+            /**
+             * Note
+             * @description The caveat a reader should see with the proxy.
+             */
+            note: string;
+            /**
+             * First Date
+             * @description First daily price date of the proxy.
+             */
+            first_date: string | null;
+            /**
+             * Currency
+             * @description Quote currency of the proxy.
+             */
+            currency: string | null;
         };
         /**
          * MultiDayRegression
@@ -3132,6 +3202,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_library_api_portfolio_library_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetClassLibrary"];
                 };
             };
         };

@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from factordesk.api.deps import AppDeps, default_deps
 from factordesk.api.errors import install_error_handlers
 from factordesk.api.routes_factors import router as factors_router
+from factordesk.api.routes_portfolio import router as portfolio_router
 from factordesk.api.routes_report import router as report_router
 from factordesk.api.routes_upload import UploadSizeLimit
 from factordesk.api.routes_upload import router as upload_router
@@ -37,6 +38,7 @@ def create_app(deps: AppDeps) -> FastAPI:
     install_error_handlers(app)
     app.add_middleware(UploadSizeLimit)
     app.include_router(factors_router)
+    app.include_router(portfolio_router)
     app.include_router(upload_router)  # before /api/report/{ticker}
     app.include_router(report_router)
     if deps.static_dir is not None:

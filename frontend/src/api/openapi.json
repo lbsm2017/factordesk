@@ -137,6 +137,25 @@
         }
       }
     },
+    "/api/portfolio/library": {
+      "get": {
+        "summary": "Get Library",
+        "description": "The 44 lines of the Asset Class Library, in the owner's order, with their proxies.",
+        "operationId": "get_library_api_portfolio_library_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetClassLibrary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/report/upload": {
       "post": {
         "summary": "Upload Report",
@@ -976,6 +995,30 @@
         ],
         "title": "ApiError",
         "description": "Every error body: ``message`` says what went wrong, ``action`` what to do."
+      },
+      "AssetClassLibrary": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "lines"
+        ],
+        "title": "AssetClassLibrary",
+        "description": "The library: lines in the owner's order, grouped by asset class."
       },
       "AuditFinding": {
         "properties": {
@@ -2671,6 +2714,96 @@
         ],
         "title": "LeadLagSection",
         "description": "Timing-adjusted betas: same-day plus previous- and next-day factor coefficients (LL0.1)."
+      },
+      "LibraryLine": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Id"
+          },
+          "asset_class": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Asset Class"
+          },
+          "sub_asset_class": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Sub Asset Class"
+          },
+          "proxy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy",
+            "description": "A ticker, \"RF\" for the risk-free rate, or null when there is no proxy yet."
+          },
+          "proxy_kind": {
+            "type": "string",
+            "enum": [
+              "etf",
+              "risk_free",
+              "listed_proxy",
+              "none"
+            ],
+            "title": "Proxy Kind"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Note",
+            "description": "The caveat a reader should see with the proxy."
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date",
+            "description": "First daily price date of the proxy."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Quote currency of the proxy."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "asset_class",
+          "sub_asset_class",
+          "proxy",
+          "proxy_kind",
+          "note",
+          "first_date",
+          "currency"
+        ],
+        "title": "LibraryLine",
+        "description": "One sub-asset class of the owner's Asset Class Library and the proxy that stands for it."
       },
       "MultiDayRegression": {
         "properties": {
