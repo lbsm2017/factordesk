@@ -84,3 +84,13 @@ Every report can switch between the five-factor and six-factor (with momentum) m
 - [Which betas count as reliable](decision-which-betas-count-as-reliable.md)
 - [Factor data source: the Ken French Data Library](decision-factor-data-source-french-library.md)
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md)
+
+## Update, 2026-11-20: the macro section as built
+
+- **Six factors, one regression:** market, TERM, DEF, COMM, INFL and USD. It is separate from the headline model and its intercept is not the headline alpha.
+- **First price dates of the funds (checked on Yahoo):** IEF 2002-07-30, LQD 2002-07-30, TIP 2003-12-05, DBC 2006-02-06, IEI 2007-01-11. The dollar index starts 2006-01-02. So the window starts in January 2007, set by IEI.
+- **Same-interval rule:** a daily fund return counts only when the fund's previous price date is the subject's previous date. A missing price is never filled.
+- **Dollar timing:** the index is a noon New York fixing, so daily data adds the previous day's return and reports the summed beta. The standard error of the sum comes from the full HAC covariance. Monthly data compounds each fund to the month-end and has no lag term.
+- **If FRED is unreachable:** the section runs without the dollar and says "dollar index unavailable". An older cached copy is used first, with a note.
+- **Overlap:** VIF and the correlation matrix show how much the factors share. The VIF is computed on the six factors without the lag term. A badge shows when VIF is above 5.
+- **Tags:** reliable or noise by the same Benjamini-Hochberg rule as the headline betas, across the factors of this regression.
