@@ -7,6 +7,10 @@ implementation is plain linear algebra and is cross-checked against the statsmod
 call ``OLS(y, X).fit(cov_type="HAC", cov_kwds={"maxlags": L, "use_correction": False},
 use_t=False)`` in the tests.
 
+Monthly subjects (owner decision) use the small-sample variant: the HAC covariance is scaled
+by ``m / (m - k)`` and p-values, intervals and tags use Student-t with ``m - k`` degrees of
+freedom, as statsmodels does with ``use_correction=True, use_t=True``. Daily output is unchanged.
+
 Pure: no I/O, no clock, no randomness. Inputs are not mutated.
 """
 
@@ -21,6 +25,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.stats import t as student_t  # pyright: ignore[reportMissingTypeStubs]
 from statsmodels.stats.multitest import (  # pyright: ignore[reportMissingTypeStubs]
     multipletests,  # pyright: ignore[reportUnknownVariableType]
 )
@@ -46,12 +51,23 @@ Z_975: float = NormalDist().inv_cdf(0.975)
 """Two-sided 95% normal quantile (1.959964...)."""
 
 _multipletests = cast(Callable[..., tuple[Any, Any, Any, Any]], multipletests)
+_student_t = cast(Any, student_t)
 _erfc = np.frompyfunc(math.erfc, 1, 1)
 
 
 def two_sided_p(z: FloatArray) -> FloatArray:
     """``p = 2 (1 - Phi(|z|)) = erfc(|z| / sqrt 2)``, accurate in the far tail (M0.5)."""
     return np.asarray(_erfc(np.abs(z) / math.sqrt(2.0)), dtype=np.float64)
+
+
+def two_sided_t_p(t: FloatArray, df: int) -> FloatArray:
+    """Two-sided Student-t p-value ``2 (1 - F_df(|t|))``, from the survival function."""
+    return np.asarray(2.0 * _student_t.sf(np.abs(t), df), dtype=np.float64)
+
+
+def t_975(df: int) -> float:
+    """Two-sided 95% Student-t quantile with ``df`` degrees of freedom."""
+    return float(_student_t.ppf(0.975, df))
 
 
 LARGE_ALPHA = 0.03
@@ -158,6 +174,9 @@ class OLSHACFit:
     rsquared_adj: float
     nobs: int
     lags: int
+    t_df: int | None = None
+    """Student-t degrees of freedom of the small-sample variant; None for the normal reference.
+    ``zvalues`` then holds t-statistics."""
 
 
 def ols_hac(
@@ -165,6 +184,8 @@ def ols_hac(
     factors: FloatArray,
     lags: int | None = None,
     names: Sequence[str] = _DEFAULT_NAMES,
+    *,
+    small_sample: bool = False,
 ) -> OLSHACFit:
     """Fit ``y = alpha + beta' f + e`` by OLS with Newey-West HAC covariance (M0.5).
 
@@ -172,6 +193,9 @@ def ols_hac(
     matrix (no normal equations), so precision does not depend on the scale of the columns.
     Raises ``DegenerateInputError`` when the design is singular or nearly so, or ``y`` is
     constant (M3.1, D30); ``names`` label the factors in that message.
+
+    ``small_sample`` (monthly subjects) scales the covariance by ``m / (m - k)`` and uses
+    Student-t with ``m - k`` degrees of freedom for the p-values and the 95% intervals.
     """
     yv = np.asarray(y, dtype=np.float64)
     x = with_intercept(factors)
@@ -198,9 +222,13 @@ def ols_hac(
     bread = r_inv @ r_inv.T  # (X'X)^-1
     resid: FloatArray = yv - x @ params
     cov: FloatArray = bread @ hac_meat(x * resid[:, None], n_lags) @ bread
+    t_df = m - k if small_sample else None
+    if t_df is not None:
+        cov = cov * (m / t_df)
     bse: FloatArray = np.sqrt(np.diag(cov))
     z = params / bse
-    pvalues = two_sided_p(z)
+    pvalues = two_sided_p(z) if t_df is None else two_sided_t_p(z, t_df)
+    q975 = Z_975 if t_df is None else t_975(t_df)
 
     ssr = float(resid @ resid)
     centred = yv - yv.mean()
@@ -213,13 +241,14 @@ def ols_hac(
         bse=bse,
         zvalues=z,
         pvalues=pvalues,
-        ci_low=params - Z_975 * bse,
-        ci_high=params + Z_975 * bse,
+        ci_low=params - q975 * bse,
+        ci_high=params + q975 * bse,
         resid=resid,
         rsquared=r2,
         rsquared_adj=r2_adj,
         nobs=m,
         lags=n_lags,
+        t_df=t_df,
     )
 
 
@@ -378,19 +407,23 @@ class FullSampleRegression:
         return float(self.fit.params[0])
 
 
-def run_regression(sample: AnalysisSample, periods: int = A) -> FullSampleRegression:
+def run_regression(
+    sample: AnalysisSample, periods: int = A, *, small_sample: bool = False
+) -> FullSampleRegression:
     """Full-sample OLS of ``y`` on the five factors with HAC ``L(n)`` (M3.1-M3.4).
 
     ``periods`` is the number of observations a year (252 daily, 12 monthly). It scales the
     annualised figures only: alpha and its standard error and interval by ``periods`` (arithmetic,
     M0.4) and the residual volatility by ``sqrt(periods)``. The fit itself does not depend on it.
+    ``small_sample`` (monthly subjects) selects the corrected covariance and Student-t inference
+    of ``ols_hac``; the tags follow from those p-values.
     """
     if periods <= 0:
         raise ValueError("periods must be positive")
     y = sample.xret.to_numpy(dtype=np.float64)
     f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
     names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
-    fit = ols_hac(y, f, names=names)
+    fit = ols_hac(y, f, names=names, small_sample=small_sample)
 
     beta_p = [float(p) for p in fit.pvalues[1:]]
     _, p_adj = bh_adjust(beta_p)

@@ -143,8 +143,9 @@ NOTE_US_FACTORS_SERIES = (
 )
 NOTE_MONTHLY = (
     "Monthly data: the regression uses the Fama-French monthly factors and annualises with 12 "
-    "periods a year. Newey-West HAC standard errors are asymptotic, so the z-statistics and "
-    "intervals are approximate for records of 36 to 60 months."
+    "periods a year. The Newey-West HAC covariance is scaled by n / (n - 6), and p-values, "
+    "intervals and tags use Student-t with n - 6 degrees of freedom; they remain approximate "
+    "for records of 36 to 60 months."
 )
 
 FACTOR_SOURCE_URL: dict[str, str] = {
@@ -273,8 +274,13 @@ def _regression_section(
     col = reg.collinearity
     caption = (
         f"In-sample: uses the whole window ({info.start} to {info.end}, n = {info.n}). "
-        f"Newey-West HAC standard errors with {fit.lags} lags, normal reference distribution. "
-        "Betas are tagged reliable when significant after a Benjamini-Hochberg correction "
+        f"Newey-West HAC standard errors with {fit.lags} lags, "
+        + (
+            "normal reference distribution. "
+            if fit.t_df is None
+            else f"scaled by n / (n - 6), Student-t reference with {fit.t_df} degrees of freedom. "
+        )
+        + "Betas are tagged reliable when significant after a Benjamini-Hochberg correction "
         "across the 5 betas (q = 0.05); alpha is a single test at 5%. Bars show the 95% "
         "interval for each beta on its own (not adjusted for multiple testing)."
     )
@@ -973,7 +979,7 @@ def assemble_subject_report(
     sample = build_subject_sample(subject, factor_frame, start, end)
     vintage = FactorVintage(last_date=sample.factor_last_date, downloaded_at=factors_downloaded_at)
     info = _sample_info(sample, vintage)
-    first_fit = run_regression(sample, periods=periods)
+    first_fit = run_regression(sample, periods=periods, small_sample=not is_daily)
     factor_values = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
     diag = (
         None

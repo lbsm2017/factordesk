@@ -214,7 +214,12 @@ class FactorStat(FrozenModel):
     name: str
     beta: float | None
     se: float | None = Field(description="Newey-West HAC standard error of beta.")
-    z: float | None = Field(description="HAC z-statistic (normal reference distribution).")
+    z: float | None = Field(
+        description=(
+            "HAC test statistic: a z-statistic (normal reference) for daily subjects, a "
+            "t-statistic (Student-t, n - 6 degrees of freedom) for monthly subjects."
+        )
+    )
     p: float | None = Field(description="Two-sided p-value, unadjusted.")
     p_adj_bh: float | None = Field(description="Benjamini-Hochberg adjusted p (family of 5).")
     ci_low: float | None = Field(description="Lower bound of the unadjusted 95% HAC interval.")

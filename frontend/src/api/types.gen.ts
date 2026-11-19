@@ -690,7 +690,7 @@ export interface components {
             se: number | null;
             /**
              * Z
-             * @description HAC z-statistic (normal reference distribution).
+             * @description HAC test statistic: a z-statistic (normal reference) for daily subjects, a t-statistic (Student-t, n - 6 degrees of freedom) for monthly subjects.
              */
             z: number | null;
             /**
