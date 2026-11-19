@@ -40,11 +40,22 @@ Methods
   * **Local** (decides n/a): ``g'(z) > 0`` on the range the figure uses, ``[z_p, 0]`` for VaR
     (the map from the centre out to the quantile) and ``[-4, z_p]`` for CVaR (the tail it
     averages). If it fails the figure is n/a with the reason :data:`CF_INVALID`.
-  * **Global** (Maillard's domain): ``g'(z) > 0`` for every real ``z``, which holds iff
-    ``a > 0`` and ``b^2 - 4 a c < 0`` (or ``a = b = 0 < c``). A figure that passes the local
-    check but not the global one keeps its value with ``indicative=True`` and the reason
-    :data:`CF_INDICATIVE`. Any negative excess kurtosis below ``4 S^2 / 3`` makes ``a < 0``,
-    so such samples are always indicative.
+  * **Indicative** (flag only): ``g'(z) > 0`` on ``[-3.5, 3.5]``, the practical domain of
+    the map. A figure that passes its local check but where the map is not monotone somewhere
+    on ``[-3.5, 3.5]`` keeps its value with ``indicative=True`` and the reason
+    :data:`CF_INDICATIVE`. The condition over all real ``z`` (Maillard's global domain,
+    ``a > 0`` and ``b^2 - 4 a c < 0``) is not used: any excess kurtosis below ``4 S^2 / 3``
+    breaks it, which flags about half of all normal samples and so carries no information.
+
+    Share of simulated normal samples flagged (4,000 samples each, seed 7, 2026-11-19):
+
+    =========  ===============  =============
+    months     on [-3.5, 3.5]   on [-4, 4]
+    =========  ===============  =============
+    36         0.46             0.57
+    120        0.08             0.22
+    240        0.01             0.06
+    =========  ===============  =============
 
 Uncertainty
 -----------
@@ -124,7 +135,9 @@ MIN_EXPECTED_TAIL_MONTHLY_95 = 2.0
 CF_Z_LOW = -4.0
 """Lower end of the interval on which the Cornish-Fisher map must be increasing."""
 CF_INVALID = "outside the valid range of the expansion (Maillard 2012)"
-CF_INDICATIVE = "outside the global validity domain (Maillard 2012); indicative only"
+CF_INDICATIVE = "not monotone on z in [-3.5, 3.5] (Maillard 2012); indicative only"
+CF_Z_INDICATIVE = 3.5
+"""The map must be increasing on ``[-CF_Z_INDICATIVE, CF_Z_INDICATIVE]`` not to be indicative."""
 MIN_CF_VALID_SHARE = 0.80
 """A Cornish-Fisher band needs at least this share of resamples inside the valid range."""
 MIN_OBS = 12
@@ -150,8 +163,8 @@ class TailFigure:
     """One VaR or CVaR figure: one method, one measure, one confidence level.
 
     ``value`` is a positive fraction of value for a loss, or None when the figure is n/a; then
-    ``reason`` says why. A Cornish-Fisher figure outside Maillard's global domain keeps its value
-    with ``indicative=True`` and the caveat in ``reason``. ``tail_count`` is the number of
+    ``reason`` says why. A Cornish-Fisher figure whose map bends back on ``[-3.5, 3.5]`` keeps
+    its value with ``indicative=True`` and the caveat in ``reason``. ``tail_count`` is the number of
     observations with a loss at or beyond this method's VaR at ``level`` (for the historical
     method, the observations the figure is computed from). ``expected_tail_obs`` is
     ``n (1 - level)``.
@@ -254,22 +267,6 @@ def cornish_fisher_monotone(
     inside = (vertex > z_low) & (vertex < z_high)
     lowest = np.where(inside, np.minimum(lowest, deriv(np.nan_to_num(vertex))), lowest)
     return np.asarray(np.isfinite(lowest) & (lowest > 0.0))
-
-
-def cornish_fisher_globally_monotone(skew: ArrayLike, exkurt: ArrayLike) -> NDArray[np.bool_]:
-    """True where ``g'(z) > 0`` for every real ``z`` (Maillard's domain of validity).
-
-    With ``g'(z) = a z^2 + b z + c`` (see :func:`cornish_fisher_monotone`) this is ``a > 0`` and
-    ``b^2 - 4 a c < 0``, or the degenerate ``a = b = 0`` with ``c > 0``.
-    """
-    s = np.asarray(skew, dtype=np.float64)
-    k = np.asarray(exkurt, dtype=np.float64)
-    a = k / 8.0 - s**2 / 6.0
-    b = s / 3.0
-    c = 1.0 - k / 8.0 + 5.0 * s**2 / 36.0
-    proper: NDArray[np.bool_] = np.asarray((a > 0.0) & (b**2 - 4.0 * a * c < 0.0))
-    flat: NDArray[np.bool_] = np.asarray(np.equal(a, 0.0) & np.equal(b, 0.0) & (c > 0.0))
-    return proper | flat
 
 
 def cornish_fisher_range(measure: Measure, level: float) -> tuple[float, float]:
@@ -560,7 +557,9 @@ def tail_risk(
                 )
                 continue
             if method == "cornish_fisher" and not bool(
-                cornish_fisher_globally_monotone(m.skew[0], m.exkurt[0])
+                cornish_fisher_monotone(
+                    m.skew[0], m.exkurt[0], z_high=CF_Z_INDICATIVE, z_low=-CF_Z_INDICATIVE
+                )
             ):
                 indicative = True
                 reason = CF_INDICATIVE

@@ -17,12 +17,12 @@ from scipy import integrate  # pyright: ignore[reportMissingTypeStubs]
 from factordesk.analytics.tail_risk import (
     CF_INDICATIVE,
     CF_INVALID,
+    CF_Z_INDICATIVE,
     LEVELS,
     Frequency,
     Measure,
     Method,
     band_quality,
-    cornish_fisher_globally_monotone,
     cornish_fisher_monotone,
     cornish_fisher_quantile,
     cornish_fisher_range,
@@ -154,28 +154,35 @@ def test_guard_ranges_per_measure() -> None:
     assert cornish_fisher_range("cvar", 0.975) == (-4.0, N.inv_cdf(0.025))
 
 
-def test_global_domain_closed_form() -> None:
-    assert bool(cornish_fisher_globally_monotone(0.0, 0.0))  # a = b = 0 < c
-    assert bool(cornish_fisher_globally_monotone(0.0, 2.0))
-    assert not bool(cornish_fisher_globally_monotone(0.0, -0.1))  # a < 0
-    assert not bool(cornish_fisher_globally_monotone(0.0, 9.0))  # c < 0: g'(0) < 0
-    # Against a wide grid: the closed form agrees with min g'(z) > 0 on [-50, 50].
-    rng = np.random.default_rng(3)
-    s = rng.uniform(-2.0, 2.0, 2000)
-    k = rng.uniform(-1.0, 10.0, 2000)
-    grid = np.linspace(-50.0, 50.0, 20001)[:, None]
-    deriv = (k / 8 - s**2 / 6) * grid**2 + (s / 3) * grid + 1 - k / 8 + 5 * s**2 / 36
-    brute = deriv.min(axis=0) > 0
-    assert np.count_nonzero(cornish_fisher_globally_monotone(s, k) != brute) <= 3
-
-
-def test_negative_excess_kurtosis_keeps_99_var_as_indicative() -> None:
+def test_negative_excess_kurtosis_keeps_99_var() -> None:
     r = tail_risk(_normal(0, 240), "monthly", n_resamples=200)
     assert r.excess_kurtosis < 0.0
     f = r.figure("cornish_fisher", "var", 0.99)
-    assert f.value is not None
-    assert f.indicative and f.reason == CF_INDICATIVE
+    assert f.value is not None and f.reason is None and not f.indicative
     assert f.band is not None and f.tail_count is not None
+
+
+_WIDE = {"z_high": CF_Z_INDICATIVE, "z_low": -CF_Z_INDICATIVE}
+
+
+def test_indicative_rule_is_monotonicity_on_plus_minus_3_5() -> None:
+    # Excess kurtosis 9 with no skew: g'(0) = 1 - 9/8 < 0, though the tails are fine.
+    assert not bool(cornish_fisher_monotone(0.0, 9.0, **_WIDE))
+    assert bool(cornish_fisher_monotone(0.0, -0.1, **_WIDE))
+    assert bool(cornish_fisher_monotone(0.2, -0.3, **_WIDE))
+
+
+def test_indicative_rate_on_normal_samples_is_low() -> None:
+    # Seed 7 as in the module docstring; the rate over 4,000 samples is 0.083.
+    rng = np.random.default_rng(7)
+    flagged = 0
+    for _ in range(200):
+        r = tail_risk(rng.normal(0.006, 0.045, 120), "monthly", n_resamples=1)
+        bends = not bool(cornish_fisher_monotone(r.skewness, r.excess_kurtosis, **_WIDE))
+        shown = [f for f in r.figures if f.method == "cornish_fisher" and f.value is not None]
+        assert all(f.indicative == bends for f in shown)
+        flagged += bends
+    assert flagged / 200 < 0.10
 
 
 def test_high_kurtosis_daily_cvar_is_indicative() -> None:
