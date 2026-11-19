@@ -5,13 +5,17 @@ Four layers, each a ``SingleFlight`` (a dict of running tasks plus an LRU of res
 1. factor frame: loaded on every request through ``load_factors(False, now)`` (which may run
    the 40-day auto-refresh), then identified by its vintage ``(last_date, last_download_at)``;
 2. price history: key ``(ticker, today)``, matching the same-day cache of ``YFinanceProvider``;
-3. report: key ``(ticker, start, end, vintage, today)`` after preset resolution, so ``range=3Y``
-   and the same explicit dates share one entry;
+3. report: key ``(ticker, start, end, vintage, today, model)`` after preset resolution, so
+   ``range=3Y`` and the same explicit dates share one entry, and FF5 and FF6 never do;
 4. ranges: the report key without start and end.
 
 A request whose key is running awaits the same task through ``asyncio.shield``, so a closed
 browser tab does not cancel work that others wait for. Failures are not cached; every waiter
 gets the same exception. When the vintage changes, entries of other vintages are dropped.
+
+Every report is built on the FF6 frame (``AppDeps.load_ff6``, cached per vintage and day) so it
+carries the alpha strip. An FF5 report whose FF6 frame cannot be loaded falls back to the FF5
+frame without the strip; an FF6 report fails with the loader's error.
 Shared state is touched only on the event-loop thread; worker functions take inputs and return
 values, so no locks are needed.
 """
@@ -30,10 +34,12 @@ import pandas as pd
 from fastapi import Request
 
 from factordesk.api import ranges
+from factordesk.api.errors import ApiException
 from factordesk.api.runtime import Runtime
+from factordesk.data.factors import FactorError
 from factordesk.data.prices import PriceHistory, Security, check_currency, security_of
 from factordesk.report.render_html import render_report_html
-from factordesk.report.schema import FactorReport, RangeOptions, RangePreset
+from factordesk.report.schema import FactorModel, FactorReport, RangeOptions, RangePreset
 
 if TYPE_CHECKING:
     from factordesk.section_hooks.context import SectionInputs
@@ -52,6 +58,7 @@ def assemble_report(
     end: date | None = None,
     section_inputs: SectionInputs | None = None,
     security: Security | None = None,
+    model: FactorModel = "ff5",
 ) -> FactorReport:
     """``factordesk.pipeline.assemble_report``, imported on first use.
 
@@ -70,6 +77,7 @@ def assemble_report(
         end=end,
         section_inputs=section_inputs,
         security=security,
+        model=model,
     )
 
 
@@ -164,7 +172,7 @@ class LoadedFactors:
 type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
 type RangesKey = tuple[str, Vintage, date]
-type ReportKey = tuple[str, date | None, date | None, Vintage, date]
+type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel]
 
 
 def _utc(ts: datetime | None) -> datetime | None:
@@ -190,6 +198,7 @@ class ReportService:
         )
         self.securities: SingleFlight[SecurityKey, Security] = SingleFlight(PRICE_CACHE_SIZE * 4)
         self.inputs: SingleFlight[tuple[Vintage, date], SectionInputs | None] = SingleFlight(1)
+        self.ff6: SingleFlight[tuple[Vintage, date], pd.DataFrame] = SingleFlight(1)
         self.vintage: Vintage | None = None
 
     # ------------------------------------------------------------------ public
@@ -200,8 +209,12 @@ class ReportService:
         preset: RangePreset | None = None,
         start: date | None = None,
         end: date | None = None,
+        model: FactorModel = "ff5",
     ) -> FactorReport:
-        """The report for an already validated ticker; no range and no dates means FULL."""
+        """The report for an already validated ticker; no range and no dates means FULL.
+
+        ``model`` is the factor model, FF5 (default) or FF6 (FF5 plus momentum).
+        """
         ranges.check_request(preset, start, end)
         now = self._now()
         loaded = await self._factors()
@@ -209,9 +222,10 @@ class ReportService:
         history = await self._history(ticker, now.date())
         cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
         first, last = ranges.resolve(preset, start, end, cov)
-        key: ReportKey = (ticker, first, last, loaded.vintage, now.date())
+        key: ReportKey = (ticker, first, last, loaded.vintage, now.date(), model)
 
         async def make() -> FactorReport:
+            frame = await self._model_frame(loaded, now, model)
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs)
 
@@ -219,13 +233,14 @@ class ReportService:
                 return assemble_report(
                     ticker,
                     history,
-                    loaded.frame,
+                    frame,
                     now=now,
                     factors_downloaded_at=loaded.vintage.downloaded_at,
                     start=first,
                     end=last,
                     section_inputs=inputs,
                     security=security,
+                    model=model,
                 )
 
             return await self.runtime.run(build)
@@ -251,9 +266,10 @@ class ReportService:
         preset: RangePreset | None = None,
         start: date | None = None,
         end: date | None = None,
+        model: FactorModel = "ff5",
     ) -> str:
         """The offline HTML report of the same (cached) report, from the unchanged renderer."""
-        report = await self.report(ticker, preset, start, end)
+        report = await self.report(ticker, preset, start, end, model)
         return await self.runtime.run(render_report_html, report)
 
     # ------------------------------------------------------------------ layers
@@ -281,6 +297,35 @@ class ReportService:
             last = pd.Timestamp(str(frame.index[-1])).date()
             return LoadedFactors(Vintage(last, None), frame)
         return LoadedFactors(Vintage(status.last_date, _utc(status.last_download_at)), frame)
+
+    async def _model_frame(
+        self, loaded: LoadedFactors, now: datetime, model: FactorModel
+    ) -> pd.DataFrame:
+        """The factor frame of a report: the FF6 frame, or the FF5 one when FF5 cannot have it.
+
+        FF6 needs ``AppDeps.load_ff6``; without it the request is refused, and a loader error is
+        raised as is. FF5 uses the FF6 frame for the alpha strip when it loads, else the FF5 frame.
+        """
+        loader = self.deps.load_ff6
+        if loader is None:
+            if model == "ff6":
+                raise ApiException(
+                    "bad_request",
+                    "The FF6 model is not available on this server.",
+                    "Use the FF5 model.",
+                )
+            return loaded.frame
+
+        async def make() -> pd.DataFrame:
+            return await self.runtime.run(loader, now)
+
+        try:
+            return await self.ff6.get((loaded.vintage, now.date()), make)
+        except (FactorError, OSError):
+            if model == "ff6":
+                raise
+            logger.warning("Momentum factor unavailable; FF5 report without the alpha strip")
+            return loaded.frame
 
     async def _section_inputs(self, vintage: Vintage, now: datetime) -> SectionInputs | None:
         """The extra data of the optional sections, once per vintage and day (None: not wired)."""

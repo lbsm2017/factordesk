@@ -6,7 +6,8 @@
 
 It builds the real application (``create_app``) with fake collaborators: a price provider that
 serves one synthetic history (``dgp_a``) for any ticker except ``XYZ``, a factor frame cut 30
-rows before the price end, a monthly factor frame for the upload route, a fixed clock and an
+rows before the price end (with a synthetic momentum column for FF6 and the alpha strip), a monthly
+factor frame for the upload route (also with momentum), a fixed clock and an
 empty temporary data directory. It serves the
 built page from ``frontend/dist``. Nothing here reads the real data directory or the network, and
 the output is the same on every run.
@@ -19,6 +20,7 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI
 
@@ -81,10 +83,18 @@ def create() -> FastAPI:
     _, monthly, _ = monthly_case(MONTHLY_MONTHS, 21, start=MONTHLY_START)
     monthly.attrs = {"downloaded_at": DOWNLOADED.isoformat()}
 
+    monthly_ff6 = _with_mom(monthly, 0.03)
+    daily_ff6 = _with_mom(factors, 0.007)
+
     def load_monthly(**_kwargs: object) -> pd.DataFrame:
         return monthly
 
-    routes_upload.load_ff5_monthly = load_monthly  # the upload route never reaches the network
+    def load_monthly_ff6(frequency: str, **_kwargs: object) -> pd.DataFrame:
+        return monthly_ff6
+
+    # The upload route never reaches the network.
+    routes_upload.load_ff5_monthly = load_monthly
+    routes_upload.load_ff6 = load_monthly_ff6
     deps = AppDeps(
         price_provider=FakeProvider(d.history),
         load_factors=lambda refresh, at: factors,
@@ -92,5 +102,14 @@ def create() -> FastAPI:
         now=lambda: now,
         data_dir=data_dir,
         static_dir=FRONTEND_DIST,
+        load_ff6=lambda at: daily_ff6,
     )
     return create_app(deps)
+
+
+def _with_mom(frame: pd.DataFrame, sd: float) -> pd.DataFrame:
+    """``frame`` plus a synthetic momentum column ``Mom`` (fixed seed), attrs kept."""
+    out = frame.copy()
+    out["Mom"] = np.random.default_rng(TEST_NUMBER + 1).normal(0.0, sd, size=len(frame))
+    out.attrs = dict(frame.attrs)
+    return out
