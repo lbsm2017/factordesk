@@ -380,7 +380,7 @@ Full sample `S`, using the full-sample OLS:
 
 Exposure x volatility x correlation (tooltip): `sigma_i = sqrt(Sigma_f[i,i])`, systematic return `F_sys,t = beta_hat' f_t`, `sigma_sys = sqrt(beta_hat' Sigma_f beta_hat)`, `rho_i,sys = (Sigma_f beta_hat)_i / (sigma_i sigma_sys)`. Exact identity: `RC_i V = beta_hat_i * sigma_i * rho_i,sys * sigma_sys`. Tooltip shows `beta_hat_i`, `sqrt(A) sigma_i`, `rho_i,sys`, `RC_i`. If `sigma_sys = 0`, `rho` is `null` with status `not_applicable`.
 
-Disagreement sentence: among **reliable** betas only, rank by `|beta_hat_i|` (1 = largest) and by `RC_i` (1 = largest). If some factor has `rank_RC <= rank_beta - 2`, emit one sentence for the factor with the largest gap (ties: canonical order): "{Factor} ranks #{rank_RC} by risk but only #{rank_beta} by beta size: the factor is volatile or moves with your other exposures." If a reliable beta has `RC_i < 0`: "{Factor} reduces total risk because it offsets your other exposures."
+Disagreement sentence: among **reliable** betas only, rank by `|beta_hat_i|` (1 = largest) and by `RC_i` (1 = largest). If some factor has `rank_RC <= rank_beta - 2`, emit one sentence for the factor with the largest gap (ties: canonical order): "{Factor} ranks #{rank_RC} by risk but only #{rank_beta} by beta size: the factor is volatile or moves with the other exposures." If a reliable beta has `RC_i < 0`: "{Factor} has a negative share: it offsets part of the other exposures in the variance split."
 
 Label: L-DESC + "Shares of variance over {dates}; they add to 100%."
 
