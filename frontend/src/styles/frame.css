@@ -64,10 +64,9 @@
    (review S4: --grid is 1.07:1 on --page in light). The longer chains
    outrank the faded-term and not-significant colours in lead.css. */
 [aria-busy="true"] .ticker,
-[aria-busy="true"] .kpis .kpi .v,
-[aria-busy="true"] .kpis .kpi .n,
-[aria-busy="true"] .model .term .m,
-[aria-busy="true"] .model .term .ann span {
+[aria-busy="true"] #summary .verdict,
+[aria-busy="true"] #summary .tbl td.v,
+[aria-busy="true"] #summary .tbl td.rd {
   color: transparent;
   background: var(--border);
   border-radius: 2px;

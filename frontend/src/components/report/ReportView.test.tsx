@@ -13,9 +13,7 @@ describe("ReportView", () => {
     const ids = Array.from(container.querySelectorAll("main > [id]")).map((el) => el.id);
     expect(ids).toEqual([
       "header",
-      "notice",
-      "equation",
-      "kpis",
+      "summary",
       "price",
       "exposures",
       "returns",

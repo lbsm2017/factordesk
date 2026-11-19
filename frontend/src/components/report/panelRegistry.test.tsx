@@ -9,9 +9,7 @@ import { ReportView } from "./ReportView";
 /** Panel order of the schema v3 contract (SC4). */
 const ORDER = [
   "header",
-  "notice",
-  "equation",
-  "kpis",
+  "summary",
   "world_beta",
   "price",
   "performance",
@@ -35,7 +33,7 @@ const SECTION_PANELS = {
   lead_lag: { id: "lead-lag", after: "exposures" },
   shrunk_betas: { id: "shrunk", after: "lead-lag" },
   fragility: { id: "fragility", after: "shrunk" },
-  world_beta: { id: "world-beta", after: "kpis" },
+  world_beta: { id: "world-beta", after: "summary" },
   residual: { id: "residual", after: "risk" },
   kalman_betas: { id: "kalman", after: "rolling" },
 } as const;

@@ -37,12 +37,11 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await ticker.fill("SYN");
   await ticker.press("Enter");
   await expect(page).toHaveURL(/[?&]t=SYN\b/);
-  const kpis = page.locator("#kpis");
+  const kpis = page.locator("#summary");
   // The first report of a run is computed from scratch and can take long on a busy machine.
   await expect(kpis).toBeVisible({ timeout: FIRST_REPORT_MS });
-  await expect(kpis).toContainText("Alpha, a year");
+  await expect(kpis).toContainText("Alpha (annual)");
   await expect(kpis).toContainText("R²");
-  await expect(page.locator("#equation")).toBeVisible();
 
   // The residual panel loads as its own chunk and shows the table and the stability section.
   const residual = page.locator("#residual");
@@ -54,13 +53,13 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]range=3Y\b/);
   await expect(page.getByRole("radio", { name: "3Y" })).toBeChecked();
   await expect(kpis).toBeVisible();
-  await expect(kpis).toContainText("Analysed range");
+  await expect(kpis).toContainText("Past data, not a forecast");
 
   // A Details disclosure opens.
-  const details = page.locator("details", { has: page.locator("summary", { hasText: /^Details$/ }) }).first();
+  const details = page.locator("#summary").getByRole("button", { name: "Details" });
   await expect(details).toBeVisible();
-  await details.locator("summary").click();
-  await expect(details).toHaveJSProperty("open", true);
+  await details.click();
+  await expect(details).toHaveAttribute("aria-expanded", "true");
 
   // The "/" shortcut focuses the ticker field from outside a text field.
   await page.locator("body").click({ position: { x: 2, y: 2 } });
@@ -109,7 +108,7 @@ test("dashboard smoke on the fake backend", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/[?&]start=2013-01-01(&|$)/);
   expect(await page.evaluate(() => window.history.length)).toBe(historyBefore + 1);
-  await expect(kpis).toContainText("Analysed range");
+  await expect(kpis).toContainText("Past data, not a forecast");
   expect(new Set(apiStarts)).toEqual(new Set(["2013-01-01"]));
 
   // No sideways scroll at 1440 and at 390; screenshots of the synthetic report.
