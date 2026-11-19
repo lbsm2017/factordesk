@@ -36,7 +36,7 @@ const EMPTY_ACTION = "Widen the date range and run the report again.";
 export function ReturnPanel({ report }: ReportPanelProps) {
   const rc = report.return_contribution;
   const reg = report.regression;
-  const title = "Where the return came from";
+  const title = "Return sources";
   const question = "How much of the average yearly return does each factor explain?";
 
   const tags = new Map(reg.factors.map((f) => [f.name, f.tag]));

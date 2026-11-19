@@ -227,7 +227,7 @@ describe("thinning keeps spikes", () => {
 describe("KalmanPanel accessibility", () => {
   it("names the section, its tables and every row, and hides the drawing and the axis", () => {
     const { container } = renderPanel(withKalman());
-    const section = screen.getByRole("region", { name: "Kalman-filter betas" });
+    const section = screen.getByRole("region", { name: "Tracked day by day" });
     expect(section.id).toBe("kalman");
     const main = within(section).getAllByRole("table")[0] as HTMLElement;
     expect(main.querySelector("caption")?.textContent).toMatch(/Kalman-filter beta per factor/);

@@ -54,7 +54,7 @@ describe("Kalman panel wording", () => {
     const { container } = render(<KalmanPanel report={report} />);
     const seen = squash(container.textContent ?? "") + " " + container.innerHTML;
     const must = [
-      text.title,
+      "Tracked day by day",
       text.question,
       text.reading,
       ...text.legend,

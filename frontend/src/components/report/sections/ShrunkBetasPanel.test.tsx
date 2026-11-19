@@ -165,8 +165,8 @@ describe("ShrunkBetasPanel", () => {
 
   it("exposes landmarks, a labelled table, column headers and hidden decoration", () => {
     const { container } = render(<ShrunkBetasPanel report={reportWith()} />);
-    expect(screen.getByRole("region", { name: "Pulled toward typical" })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 2, name: "Pulled toward typical" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Adjusted for noise" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Adjusted for noise" })).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "Latest 252-day window" })).toBeTruthy();
     const tables = screen.getAllByRole("table");
     expect(tables).toHaveLength(2);

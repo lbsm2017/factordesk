@@ -49,7 +49,7 @@ function cells(row: Element): string[] {
 describe("ReturnPanel", () => {
   it("shows every contribution, the hatched residual, the total and the memo list", () => {
     const { container } = render(<ReturnPanel report={mockReport} />);
-    expect(screen.getByRole("heading", { level: 2, name: "Where the return came from" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Return sources" })).toBeTruthy();
     const rows = Array.from(container.querySelectorAll("tbody tr"));
     expect(rows.map((r) => cells(r).filter((_, i) => i !== 1))).toEqual([
       ["Mkt-RFMarket", "+11.57%", "Yes"],

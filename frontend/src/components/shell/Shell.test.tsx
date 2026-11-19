@@ -45,6 +45,15 @@ describe("SectionNav", () => {
     for (const a of nav.querySelectorAll("a")) expect(a.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("titles every listed panel with the label of its nav item", async () => {
+    page();
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    for (const a of nav.querySelectorAll("a")) {
+      const id = (a.getAttribute("href") ?? "").slice(1);
+      expect(document.querySelector(`#${id} h2`)?.textContent, id).toBe(a.querySelector(".nav-label")?.textContent);
+    }
+  });
+
   it("hides the item of a section that is null or absent in the report", () => {
     const r = cloneReport();
     expect(sectionHasData(r, "lead-lag")).toBe(false);

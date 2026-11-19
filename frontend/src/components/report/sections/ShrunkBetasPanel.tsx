@@ -329,7 +329,7 @@ export function ShrunkBetasPanel({ report }: ReportPanelProps) {
   return (
     <Panel
       id="shrunk"
-      title="Pulled toward typical"
+      title="Adjusted for noise"
       question={QUESTION}
       legend={legend}
       footnote={ok.length === 0 ? undefined : (texts["L-DESC"] ?? DEFAULT_DESC)}

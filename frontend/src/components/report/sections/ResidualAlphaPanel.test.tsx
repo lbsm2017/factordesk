@@ -15,7 +15,7 @@ describe("ResidualAlphaPanel (lazy wrapper)", () => {
     // Synchronously: the section element with its id, title and question, and no numbers yet.
     const frame = container.querySelector("section#residual");
     expect(frame).not.toBeNull();
-    expect(frame?.querySelector("h2")?.textContent).toBe("Residual return");
+    expect(frame?.querySelector("h2")?.textContent).toBe("Beyond the factors");
     expect(frame?.querySelector(".q")?.textContent).toMatch(/^What did this stock return/);
     expect(frame?.querySelector("table")).toBeNull();
     // Then the chunk arrives and the same element holds the table.
