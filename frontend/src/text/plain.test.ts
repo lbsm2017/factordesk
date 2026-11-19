@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { FactorStat } from "../api/types";
 import { mockReport } from "../test/fixture";
 import { exposureReading, plainName, tagText, WARN_PLAIN, warningSummary } from "./plain";
 
@@ -60,5 +61,17 @@ describe("plain text", () => {
     expect(exposureReading(noise)).toBe(
       "There is no clear tilt to market (Mkt-RF), size (SMB), value (HML), profitability (RMW) or investment (CMA).",
     );
+  });
+
+  it("mentions a style lean by one rule for every factor: significant and not negligible", () => {
+    const base = mockReport.regression.factors[0] as FactorStat;
+    const make = (name: string, beta: number): FactorStat => ({ ...base, name, beta, tag: "reliable" });
+    const text = exposureReading([make("Mkt-RF", 1.008), make("SMB", -0.148), make("CMA", 0.01), make("Mom", -0.012)]);
+    expect(text).toContain("leans toward large companies (SMB -0.148)".replace("-", "−"));
+    expect(text).not.toContain("recent losers");
+    expect(text).not.toContain("CMA +0.010");
+    expect(text).toContain("There is no clear tilt to investment (CMA) or momentum (Mom).");
+    expect(exposureReading([make("Mom", -0.2)])).toBe("Over this window the stock leans toward recent losers (Mom −0.200).");
+    expect(exposureReading([make("Mom", 0.2)])).toContain("recent winners (Mom +0.200)");
   });
 });

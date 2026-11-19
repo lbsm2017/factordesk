@@ -60,13 +60,21 @@ export function warningSummary(warnings: readonly ReportWarning[]): string {
   return warnings.slice(0, 2).map((w) => warningText(w)).join(" ");
 }
 
+/** Smallest style beta (absolute) that counts as a lean; a smaller significant beta is too small to describe. */
+export const MIN_LEAN = 0.05;
+
+/** The one rule for mentioning a style lean, the same for every factor including Mom: significant and not negligible. */
+export function isLean(f: FactorStat): boolean {
+  return f.tag === "reliable" && f.beta !== null && Math.abs(f.beta) >= MIN_LEAN;
+}
+
 /** The reading line of the exposures panel (H.2). */
 export function exposureReading(factors: readonly FactorStat[], subject = "the stock"): string {
   const parts: string[] = [];
   const quiet: string[] = [];
   for (const f of factors) {
     const { name, beta } = f;
-    if (f.tag !== "reliable" || beta === null) {
+    if (beta === null || (name === "Mkt-RF" ? f.tag !== "reliable" : !isLean(f))) {
       quiet.push(`${plainName(name).toLowerCase()} (${name})`);
       continue;
     }
