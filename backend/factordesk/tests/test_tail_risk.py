@@ -24,6 +24,7 @@ from factordesk.analytics.tail_risk import (
     cornish_fisher_quantile,
     cornish_fisher_range,
     historical_rank,
+    min_expected_tail,
     modified_tail_mean,
     politis_white_block_length,
     stationary_bootstrap_indices,
@@ -258,9 +259,28 @@ def test_historical_is_na_at_36_months_for_99() -> None:
     assert r.figure("historical", "cvar", 0.975).reason == "0.9 expected tail observations"
     assert r.figure("historical", "var", 0.95).reason == "1.8 expected tail observations"
     assert r.figure("gaussian", "var", 0.99).value is not None
-    # 60 months reach 3 expected tail observations at 95%: shown.
-    r60 = tail_risk(_normal(2, 60), "monthly", n_resamples=50)
-    assert r60.figure("historical", "var", 0.95).value is not None
+    # 40 months reach the monthly 95% minimum of 2 expected tail months: shown.
+    srt = sorted(_normal(2, 40))
+    r40 = tail_risk(_normal(2, 40), "monthly", n_resamples=50)
+    assert historical_rank(40, 0.95) == 2
+    assert r40.figure("historical", "var", 0.95).value == -srt[1]
+    assert r40.figure("historical", "cvar", 0.95).value == pytest.approx(
+        -(srt[0] + srt[1]) / 2, abs=1e-16
+    )
+    assert r40.figure("historical", "var", 0.95).band is not None
+    # The other levels keep the minimum of 3: 97.5% at 40 months is 1.0 expected.
+    assert r40.figure("historical", "cvar", 0.975).reason == "1.0 expected tail observations"
+    r39 = tail_risk(_normal(2, 39), "monthly", n_resamples=50)
+    # 1.95 is not shown as "2.0", which would read as meeting the minimum.
+    assert r39.figure("historical", "var", 0.95).reason == "1.95 expected tail observations"
+
+
+def test_min_expected_tail_rule() -> None:
+    assert min_expected_tail("monthly", 0.95) == 2.0
+    assert min_expected_tail("monthly", 0.99) == 3.0
+    assert min_expected_tail("monthly", 0.975) == 3.0
+    assert min_expected_tail("daily", 0.99) == 3.0
+    assert min_expected_tail("daily", 0.975) == 3.0
 
 
 # ----------------------------------------------------------------------------- shape and inputs

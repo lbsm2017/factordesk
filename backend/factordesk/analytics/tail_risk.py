@@ -18,8 +18,8 @@ Methods
 * **Historical.** ``VaR = -r_(k)`` with ``k = ceil(n p)``, where ``r_(1) <= ... <= r_(n)`` are
   the sorted returns. This is the inverse of the empirical CDF, ``inf{x : F_n(x) >= p}``
   (Hyndman-Fan type 1); no interpolation. CVaR is the mean loss of the observations at or beyond
-  VaR (``r <= r_(k)``, ties included). When the expected tail count ``n p`` is below 3 the figure
-  is n/a.
+  VaR (``r <= r_(k)``, ties included). When the expected tail count ``n p`` is below
+  :func:`min_expected_tail` (3, or 2 for the monthly 95% row) the figure is n/a.
 * **Gaussian.** ``VaR = -(mu + z_p sigma)`` and ``CVaR = -mu + sigma phi(z_p) / p``, with the
   sample mean and the sample standard deviation (``ddof = 1``).
 * **Cornish-Fisher (modified).** Zangari (1996) / Favre & Galeano (2002):
@@ -95,6 +95,8 @@ LEVELS: dict[Frequency, tuple[tuple[Measure, float], ...]] = {
 
 MIN_EXPECTED_TAIL = 3.0
 """A historical figure needs at least this many expected tail observations ``n (1 - level)``."""
+MIN_EXPECTED_TAIL_MONTHLY_95 = 2.0
+"""Exception for the monthly 95% row, so that 40 months (2 expected tail months) show it."""
 CF_Z_LOW = -4.0
 """Lower end of the interval on which the Cornish-Fisher map must be increasing."""
 CF_INVALID = "outside the valid range of the expansion (Maillard 2012)"
@@ -175,6 +177,13 @@ def tail_probability(level: float) -> float:
     if not 0.5 < level < 1.0:
         raise ValueError(f"confidence level must be in (0.5, 1), got {level}")
     return round(1.0 - level, 12)
+
+
+def min_expected_tail(frequency: Frequency, level: float) -> float:
+    """Minimum expected tail observations for a historical figure at ``level``."""
+    if frequency == "monthly" and math.isclose(level, 0.95):
+        return MIN_EXPECTED_TAIL_MONTHLY_95
+    return MIN_EXPECTED_TAIL
 
 
 def historical_rank(n: int, level: float) -> int:
@@ -439,6 +448,14 @@ def _resample(
     return {key: np.concatenate([c[key] for c in chunks]) for key in chunks[0]}
 
 
+def _tail_text(expected: float, minimum: float) -> str:
+    """One decimal, or two (truncated) where one would round up to the minimum (1.95 -> 1.95)."""
+    text = f"{expected:.1f}"
+    if float(text) >= minimum:
+        text = f"{math.floor(expected * 100.0) / 100.0:.2f}"
+    return text
+
+
 # ----------------------------------------------------------------------------- entry point
 def tail_risk(
     returns: Sequence[float] | FloatArray,
@@ -499,8 +516,9 @@ def tail_risk(
             value = float(point[(method, measure, level)][0])
             reason: str | None = None
             indicative = False
-            if method == "historical" and expected < MIN_EXPECTED_TAIL - 1e-9:
-                reason = f"{expected:.1f} expected tail observations"
+            minimum = min_expected_tail(frequency, level)
+            if method == "historical" and expected < minimum - 1e-9:
+                reason = f"{_tail_text(expected, minimum)} expected tail observations"
             elif method == "cornish_fisher" and math.isnan(value):
                 reason = CF_INVALID
             if reason is not None:
