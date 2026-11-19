@@ -56,8 +56,10 @@ Patton, Politis & White (2009), applied to the absolute demeaned returns, becaus
 clustering, not return autocorrelation, is the dependence that moves tail measures. The length
 is floored at 1 and capped at ``min(3 sqrt(n), n / 3)``.
 
-For Cornish-Fisher, resamples that fall outside the valid range are dropped from the band;
-``Band.resamples`` says how many were used.
+For Cornish-Fisher, resamples that fail the local guard are dropped from the band and
+``Band.resamples`` says how many were used. If fewer than :data:`MIN_CF_VALID_SHARE` (80%) of
+the resamples pass, the band is withheld (``band=None``) and ``band_reason`` says why: a band
+built only from the resamples that happen to pass would understate the uncertainty.
 
 The bands are plain percentile intervals. On simulated normal data (see the slow coverage
 test) Gaussian and historical VaR bands cover about 86-90%; historical CVaR and Cornish-Fisher
@@ -97,6 +99,8 @@ CF_Z_LOW = -4.0
 """Lower end of the interval on which the Cornish-Fisher map must be increasing."""
 CF_INVALID = "outside the valid range of the expansion (Maillard 2012)"
 CF_INDICATIVE = "outside the global validity domain (Maillard 2012); indicative only"
+MIN_CF_VALID_SHARE = 0.80
+"""A Cornish-Fisher band needs at least this share of resamples inside the valid range."""
 MIN_OBS = 12
 """Fewer observations are refused: the moments behind the parametric methods are meaningless."""
 
@@ -136,6 +140,8 @@ class TailFigure:
     tail_count: int | None
     expected_tail_obs: float
     indicative: bool = False
+    band_reason: str | None = None
+    """Why ``band`` is None although ``value`` is not."""
 
 
 @dataclass(frozen=True)
@@ -510,13 +516,30 @@ def tail_risk(
             draws = boot[(method, measure, level)]
             draws = draws[np.isfinite(draws)]
             band = None
-            if draws.size:
+            band_reason: str | None = None
+            if draws.size < MIN_CF_VALID_SHARE * n_resamples - 1e-9:
+                band_reason = (
+                    f"only {draws.size} of {n_resamples} resamples inside the valid range "
+                    f"of the expansion (minimum {MIN_CF_VALID_SHARE:.0%})"
+                )
+            else:
                 low, high = np.quantile(draws, tail_q)
                 band = Band(float(low), float(high), int(draws.size))
             var = float(_var_of(method, x_sorted, m, level)[0])
             count = int(np.count_nonzero(x <= -var))
             figures.append(
-                TailFigure(method, measure, level, value, reason, band, count, expected, indicative)
+                TailFigure(
+                    method,
+                    measure,
+                    level,
+                    value,
+                    reason,
+                    band,
+                    count,
+                    expected,
+                    indicative,
+                    band_reason,
+                )
             )
 
     return TailRisk(

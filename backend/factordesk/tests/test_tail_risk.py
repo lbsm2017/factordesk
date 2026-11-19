@@ -358,3 +358,18 @@ def test_band_coverage_on_simulated_normal_data() -> None:
             loose = method == "cornish_fisher" or (method == "historical" and measure == "cvar")
             floor = 0.70 if loose else 0.84
             assert floor <= coverage <= 0.96, (freq, method, measure, level, coverage)
+
+
+def test_cornish_fisher_band_withheld_below_80_percent_valid_resamples() -> None:
+    r = tail_risk(_normal(0, 36), "monthly", n_resamples=200)
+    cvar = r.figure("cornish_fisher", "cvar", 0.975)
+    assert cvar.value is not None and cvar.band is None
+    assert cvar.band_reason == (
+        "only 147 of 200 resamples inside the valid range of the expansion (minimum 80%)"
+    )
+    var = r.figure("cornish_fisher", "var", 0.99)
+    assert var.band is not None and var.band_reason is None
+    assert 160 <= var.band.resamples < 200
+    for f in r.figures:
+        if f.method != "cornish_fisher":
+            assert f.band_reason is None
