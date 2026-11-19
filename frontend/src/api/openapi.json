@@ -1488,7 +1488,19 @@
           },
           "ticker": {
             "type": "string",
-            "title": "Ticker"
+            "title": "Ticker",
+            "description": "The ticker symbol, or the subject's label (subject.label)."
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubjectInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the report is about when it is not a daily ticker; absent (not null) for a ticker report, which is daily and annualised with 252."
           },
           "generated_at": {
             "type": "string",
@@ -1664,7 +1676,7 @@
           "kalman_betas"
         ],
         "title": "FactorReport",
-        "description": "Everything the UI or an exported file needs to describe one ticker's factor exposures."
+        "description": "Everything the UI or an exported file needs to describe one subject's factor exposures."
       },
       "FactorStat": {
         "properties": {
@@ -6489,6 +6501,84 @@
         ],
         "title": "SplitHalfAlpha",
         "description": "One prespecified split at the middle of S (R5.3)."
+      },
+      "SubjectInfo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ticker",
+              "upload",
+              "portfolio"
+            ],
+            "title": "Kind",
+            "description": "ticker, upload (track record) or portfolio."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Display name: the fund or portfolio name, or the ticker."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Frequency"
+          },
+          "periods": {
+            "type": "integer",
+            "title": "Periods",
+            "description": "Observations a year used to annualise: 252 for daily data, 12 for monthly."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Where the returns come from, e.g. 'upload'."
+          },
+          "gross_net": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "gross",
+                  "net"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Net",
+            "description": "Whether the returns are before or after fees; None: unknown."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency of the returns (USD only for now); None: unknown."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "frequency",
+          "periods",
+          "source",
+          "gross_net",
+          "currency"
+        ],
+        "title": "SubjectInfo",
+        "description": "What the report is about when it is not a daily ticker (written only for those subjects).\n\nCounts that the report names in days (``n_days``, ``days_peak_to_trough``) are counts of\nobservations at ``frequency``: months for a monthly subject."
       },
       "TickerSuggestion": {
         "properties": {

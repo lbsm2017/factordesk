@@ -569,7 +569,7 @@ export interface components {
         };
         /**
          * FactorReport
-         * @description Everything the UI or an exported file needs to describe one ticker's factor exposures.
+         * @description Everything the UI or an exported file needs to describe one subject's factor exposures.
          */
         FactorReport: {
             /**
@@ -577,8 +577,13 @@ export interface components {
              * @default 4
              */
             schema_version: string;
-            /** Ticker */
+            /**
+             * Ticker
+             * @description The ticker symbol, or the subject's label (subject.label).
+             */
             ticker: string;
+            /** @description What the report is about when it is not a daily ticker; absent (not null) for a ticker report, which is daily and annualised with 252. */
+            subject?: components["schemas"]["SubjectInfo"] | null;
             /**
              * Generated At
              * Format: date-time
@@ -2491,6 +2496,51 @@ export interface components {
             difference_z: number | null;
             /** Difference P */
             difference_p: number | null;
+        };
+        /**
+         * SubjectInfo
+         * @description What the report is about when it is not a daily ticker (written only for those subjects).
+         *
+         *     Counts that the report names in days (``n_days``, ``days_peak_to_trough``) are counts of
+         *     observations at ``frequency``: months for a monthly subject.
+         */
+        SubjectInfo: {
+            /**
+             * Kind
+             * @description ticker, upload (track record) or portfolio.
+             * @enum {string}
+             */
+            kind: "ticker" | "upload" | "portfolio";
+            /**
+             * Label
+             * @description Display name: the fund or portfolio name, or the ticker.
+             */
+            label: string;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "monthly";
+            /**
+             * Periods
+             * @description Observations a year used to annualise: 252 for daily data, 12 for monthly.
+             */
+            periods: number;
+            /**
+             * Source
+             * @description Where the returns come from, e.g. 'upload'.
+             */
+            source: string;
+            /**
+             * Gross Net
+             * @description Whether the returns are before or after fees; None: unknown.
+             */
+            gross_net: ("gross" | "net") | null;
+            /**
+             * Currency
+             * @description Currency of the returns (USD only for now); None: unknown.
+             */
+            currency: string | null;
         };
         /** TickerSuggestion */
         TickerSuggestion: {

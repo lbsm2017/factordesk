@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import UTC, datetime
 
@@ -33,7 +34,13 @@ from factordesk.pipeline import (
     assemble_subject_report,
     unique_dates,
 )
-from factordesk.report.schema import LABEL_TEXT, SECTIONS, FactorReport, report_label_text
+from factordesk.report.schema import (
+    LABEL_TEXT,
+    SECTIONS,
+    FactorReport,
+    SubjectInfo,
+    report_label_text,
+)
 from factordesk.section_hooks.context import SectionInputs, WorldBenchmarkInput
 from factordesk.section_hooks.registry import HOOKS, HookSpec, run_hooks
 from factordesk.tests.test_subject import monthly_case
@@ -299,3 +306,51 @@ def test_daily_upload_subject_matches_the_ticker_statistics() -> None:
         assert getattr(report, field) == getattr(ticker, field), field
     assert report.world_beta is not None and report.kalman_betas is not None
     assert report.data.price_source == "upload (daily returns)"
+
+
+# ----------------------------------------------------------------------------- schema block
+def test_subject_block_of_a_monthly_report_round_trips() -> None:
+    returns, factors, _ = monthly_case(40, 18)
+    subject = subject_from_monthly_returns(
+        returns, label="Example Fund", meta={"gross_net": "net", "file": "fund.csv"}
+    )
+    report = assemble_subject_report(subject, factors, now=NOW, factors_downloaded_at=None)
+    block = report.subject
+    assert block is not None
+    assert block.model_dump() == {
+        "kind": "upload",
+        "label": "Example Fund",
+        "frequency": "monthly",
+        "periods": 12,
+        "source": "upload",
+        "gross_net": "net",
+        "currency": "USD",
+    }
+    assert report.schema_version == "4"
+    text = report.model_dump_json()
+    assert '"subject":{"kind":"upload"' in text
+    assert FactorReport.model_validate_json(text) == report
+
+
+def test_ticker_reports_leave_the_subject_block_out() -> None:
+    case = make_case(3003, n=600)
+    report = assemble_report("STK", case.stock, case.factors, now=NOW, factors_downloaded_at=None)
+    assert report.subject is None
+    assert '"subject"' not in report.model_dump_json()
+    assert "subject" not in report.model_dump()
+    schema = FactorReport.model_json_schema(mode="serialization")
+    required = schema["required"]
+    assert isinstance(required, list) and "subject" not in required and "ticker" in required
+
+
+def test_subject_block_rules() -> None:
+    with pytest.raises(ValueError, match="periods must be 12"):
+        SubjectInfo(kind="upload", label="F", frequency="monthly", periods=252, source="upload")
+    report = monthly_report(40, 19)
+    v3 = report.model_dump(mode="json")
+    v3.update(
+        schema_version="3",
+        **{spec.report_field: None for spec in SECTIONS},
+    )
+    with pytest.raises(ValueError, match="version 3 report cannot hold subject"):
+        FactorReport.model_validate_json(json.dumps(v3))

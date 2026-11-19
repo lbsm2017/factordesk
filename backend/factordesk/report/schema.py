@@ -3,7 +3,8 @@
 Conventions (apply to every model in this module; see ``docs/methodology.md`` M0 and M14):
 
 * Returns, betas, contributions and shares are **decimals** (0.05 means 5%), never percents.
-* ``*_annual`` values are annualised with ``A = 252`` (arithmetic, M0.4) and stated per year.
+* ``*_annual`` values are annualised with ``A = 252`` (arithmetic, M0.4) and stated per year;
+  a report with a ``subject`` block uses ``subject.periods`` instead (12 for monthly data).
 * Dates are ISO ``YYYY-MM-DD`` in JSON; ``generated_at`` is a timezone-aware UTC timestamp.
 * Any statistic that could not be computed is ``None`` (JSON ``null``) with a ``status`` other
   than ``"ok"`` and a ``reason``. NaN and infinity are rejected on construction, so they can
@@ -33,6 +34,14 @@ drawdown; ``report/sections/performance.py``) is additive and does not change th
 The optional section ``world_beta`` (the quick beta against the iShares MSCI ACWI ETF;
 ``report/sections/world_beta.py``) is additive and ``None`` when not computed, so it does not bump
 the version (contract SC5).
+
+The optional ``subject`` block (next-stage spec, return subject) says what a report is about when
+it is not a daily ticker: an uploaded track record or a portfolio, daily or monthly, and the
+``periods`` its annualised figures use. It is written only for those subjects and left out of the
+JSON otherwise (not ``null``), so ticker reports are byte-identical to the ones written before it.
+A report without it is a daily ticker report annualised with 252. It is additive and does not bump
+the version (contract SC5): no field is removed, renamed or retyped, nothing becomes required, and
+no field changes meaning for a reader that knows the block.
 """
 
 from __future__ import annotations
@@ -42,7 +51,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic.config import JsonDict
 
 from factordesk.report.base import FACTOR_NAMES as FACTOR_NAMES
 from factordesk.report.base import LABEL_TEXT as LABEL_TEXT
@@ -126,6 +136,42 @@ class SecurityInfo(FrozenModel):
         default=None,
         description="Security type for the header badge: 'ETF' or 'Equity'; omitted otherwise.",
     )
+
+
+SubjectKind = Literal["ticker", "upload", "portfolio"]
+SubjectFrequency = Literal["daily", "monthly"]
+_PERIODS: dict[str, int] = {"daily": 252, "monthly": 12}
+
+
+class SubjectInfo(FrozenModel):
+    """What the report is about when it is not a daily ticker (written only for those subjects).
+
+    Counts that the report names in days (``n_days``, ``days_peak_to_trough``) are counts of
+    observations at ``frequency``: months for a monthly subject.
+    """
+
+    kind: SubjectKind = Field(description="ticker, upload (track record) or portfolio.")
+    label: str = Field(description="Display name: the fund or portfolio name, or the ticker.")
+    frequency: SubjectFrequency
+    periods: int = Field(
+        description="Observations a year used to annualise: 252 for daily data, 12 for monthly."
+    )
+    source: str = Field(description="Where the returns come from, e.g. 'upload'.")
+    gross_net: Literal["gross", "net"] | None = Field(
+        default=None, description="Whether the returns are before or after fees; None: unknown."
+    )
+    currency: str | None = Field(
+        default=None, description="Currency of the returns (USD only for now); None: unknown."
+    )
+
+    @model_validator(mode="after")
+    def _periods_match_frequency(self) -> SubjectInfo:
+        """``periods`` is fixed by ``frequency``."""
+        if self.periods != _PERIODS[self.frequency]:
+            raise ValueError(
+                f"periods must be {_PERIODS[self.frequency]} for {self.frequency} data"
+            )
+        return self
 
 
 class DataInfo(FrozenModel):
@@ -414,11 +460,26 @@ class PriceSeries(FrozenModel):
         return self
 
 
+def _subject_not_required(schema: JsonDict) -> None:
+    """The ``subject`` block is left out of the JSON when ``None``, so it is never required."""
+    required = schema.get("required")
+    if isinstance(required, list):
+        schema["required"] = [name for name in required if name != "subject"]
+
+
 class FactorReport(FrozenModel):
-    """Everything the UI or an exported file needs to describe one ticker's factor exposures."""
+    """Everything the UI or an exported file needs to describe one subject's factor exposures."""
+
+    model_config = ConfigDict(json_schema_extra=_subject_not_required)
 
     schema_version: str = SCHEMA_VERSION
-    ticker: str
+    ticker: str = Field(description="The ticker symbol, or the subject's label (subject.label).")
+    subject: SubjectInfo | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="What the report is about when it is not a daily ticker; absent (not null) "
+        "for a ticker report, which is daily and annualised with 252.",
+    )
     generated_at: datetime = Field(description="Timezone-aware UTC timestamp.")
     data: DataInfo
     regression: Regression
@@ -481,9 +542,11 @@ class FactorReport(FrozenModel):
 
     @model_validator(mode="after")
     def _sections_need_version_4(self) -> FactorReport:
-        """A version 3 file has no optional sections."""
+        """A version 3 file has no optional sections and no subject block."""
         if self.schema_version == "3":
             present = [s.report_field for s in SECTIONS if getattr(self, s.report_field)]
+            if self.subject is not None:
+                present.append("subject")
             if present:
                 raise ValueError(f"a version 3 report cannot hold {', '.join(present)}")
         return self

@@ -110,6 +110,7 @@ from factordesk.report.schema import (
     SecurityInfo,
     Severity,
     Status,
+    SubjectInfo,
     UncoveredTail,
     report_label_text,
 )
@@ -917,6 +918,22 @@ def _subject_audit(subject: ReturnSubject) -> AuditReport:
     )
 
 
+def _subject_info(subject: ReturnSubject) -> SubjectInfo | None:
+    """The report's ``subject`` block: ``None`` (left out of the JSON) for a ticker."""
+    if subject.kind == "ticker":
+        return None
+    gross_net = subject.meta.get("gross_net")
+    return SubjectInfo(
+        kind=subject.kind,
+        label=subject.label,
+        frequency=subject.frequency,
+        periods=subject.periods,
+        source=subject.source,
+        gross_net=gross_net if gross_net == "gross" or gross_net == "net" else None,
+        currency=subject.currency,
+    )
+
+
 def _check_subject_currency(subject: ReturnSubject) -> None:
     """Only US-dollar returns are analysed (owner decision); an unknown currency passes."""
     currency = subject.currency
@@ -1086,6 +1103,7 @@ def assemble_subject_report(
     return FactorReport.model_validate(
         {
             "ticker": subject.label,
+            "subject": _subject_info(subject),
             "generated_at": now,
             "data": core.data,
             "regression": core.regression,
