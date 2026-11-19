@@ -1,7 +1,8 @@
 """Helpers for the shortcut tasks in pyproject.toml (`uv run poe <task>`). Standard library only.
 
 - `stop --port N` stops the factordesk server on a local port. It stops a process only after
-  `/api/health` on that port answers like factordesk, so it never stops another program.
+  `/api/health` on that port answers like factordesk, so it never stops another program. It also
+  stops the worker of a `serve --dev` server whose parent has already exited.
 - `npm ARGS...` runs npm with ARGS. On Windows npm is `npm.cmd`, which a task runner cannot start
   by name, so this finds it on PATH first.
 """
@@ -69,20 +70,21 @@ SERVER_PROGRAMS = re.compile(r"^(uv|factordesk|python(\d+(\.\d+)?)?w?)(\.exe)?$"
 def program_name(command_line: str) -> str:
     """The file name of the program in a command line, without quotes or folders."""
     text = command_line.strip()
+    if not text:
+        return ""
     first = text[1:].split('"', 1)[0] if text.startswith('"') else text.split(None, 1)[0]
     return re.split(r"[\\/]", first)[-1] if first else ""
 
 
-def serve_pids(port: int) -> set[int]:
-    """Process ids whose command line is `factordesk serve` on this port.
+Process = tuple[int, int, str]  # process id, parent process id, command line
 
-    A fallback for when the port table does not list the server (some Windows security tools
-    hide it). A command line without --port means the default port, 8000.
-    """
+
+def processes() -> list[Process]:
+    """Every running process with its parent and command line."""
     if sys.platform == "win32":
         command = (
-            "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*factordesk*' }"
-            ' | ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }'
+            "Get-CimInstance Win32_Process"
+            ' | ForEach-Object { "$($_.ProcessId)`t$($_.ParentProcessId)`t$($_.CommandLine)" }'
         )
         out = subprocess.run(
             ["powershell", "-NoProfile", "-Command", command],
@@ -90,26 +92,56 @@ def serve_pids(port: int) -> set[int]:
             text=True,
             check=False,
         ).stdout
-        rows = [line.split("\t", 1) for line in out.splitlines() if "\t" in line]
+        rows = [line.split("\t", 2) for line in out.splitlines()]
     else:
         out = subprocess.run(
-            ["ps", "-eo", "pid=,args="], capture_output=True, text=True, check=False
+            ["ps", "-eo", "pid=,ppid=,args="], capture_output=True, text=True, check=False
         ).stdout
-        rows = [line.strip().split(None, 1) for line in out.splitlines() if line.strip()]
-    pids: set[int] = set()
+        rows = [line.strip().split(None, 2) for line in out.splitlines()]
+    result: list[Process] = []
     for row in rows:
-        if len(row) != 2 or not row[0].strip().isdigit():
+        if len(row) == 3 and row[0].strip().isdigit() and row[1].strip().isdigit():
+            result.append((int(row[0]), int(row[1]), row[2]))
+    return result
+
+
+def serve_pids(port: int, procs: list[Process]) -> set[int]:
+    """Process ids whose command line is `factordesk serve` on this port.
+
+    Used when the port table does not list the server (some Windows security tools hide it). A
+    command line without --port means the default port, 8000.
+    """
+    pids: set[int] = set()
+    for pid, _, command_line in procs:
+        if not SERVER_PROGRAMS.match(program_name(command_line)):
             continue
-        if not SERVER_PROGRAMS.match(program_name(row[1])):
-            continue
-        match = SERVE.search(row[1])
+        match = SERVE.search(command_line)
         if match is None:
             continue
         flag = PORT_FLAG.search(match.group("rest"))
         if (int(flag.group(1)) if flag else 8000) == port:
-            pids.add(int(row[0]))
-    pids.discard(os.getpid())
+            pids.add(pid)
     return pids
+
+
+def workers_of(pids: set[int], procs: list[Process]) -> set[int]:
+    """Worker processes of these servers, including workers whose parent has already exited.
+
+    `factordesk serve --dev` runs the app in a multiprocessing worker. On Windows, when the parent
+    exits first, the worker keeps the port open while the port table still names the dead parent.
+    The worker's command line names its parent: `spawn_main(parent_pid=1234, ...)`.
+    """
+    found: set[int] = set()
+    for pid, parent, command_line in procs:
+        if parent in pids and SERVER_PROGRAMS.match(program_name(command_line)):
+            found.add(pid)
+        spawned = SPAWNED_BY.search(command_line)
+        if spawned and int(spawned.group(1)) in pids:
+            found.add(pid)
+    return found
+
+
+SPAWNED_BY = re.compile(r"spawn_main\(parent_pid=(\d+)")
 
 
 def stop(pid: int) -> None:
@@ -137,7 +169,9 @@ def stop_server(port: int) -> int:
     if state is False:
         print(f"error: port {port} is used by another program, not factordesk; nothing stopped.")
         return 1
-    pids = listening_pids(port) or serve_pids(port)
+    procs = processes()
+    servers = listening_pids(port) | serve_pids(port, procs)
+    pids = (servers | workers_of(servers, procs)) - {os.getpid()}
     if not pids:
         print(f"error: factordesk answers on port {port}, but its process was not found.")
         print("Stop it with Ctrl+C in the window where it runs.")
