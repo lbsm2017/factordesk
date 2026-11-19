@@ -236,9 +236,12 @@ def test_alpha_strip_daily_and_monthly(frequency: Frequency, n: int, periods: in
     _check_strip(s, strip)
     # The FF5 row is the full-sample regression on the same rows.
     ff5 = run_regression(s)
-    assert strip.by_model("ff5").alpha_ann == ff5.alpha_ann
-    assert strip.by_model("ff5").rsquared == ff5.fit.rsquared
-    assert strip.by_model("ff6").alpha_ann == run_regression(s, codes=MODELS["ff6"]).alpha_ann
+    # Same rows and same estimator; allow last-bit differences across BLAS builds.
+    assert strip.by_model("ff5").alpha_ann == pytest.approx(ff5.alpha_ann, rel=1e-12, abs=1e-15)
+    assert strip.by_model("ff5").rsquared == pytest.approx(ff5.fit.rsquared, rel=1e-12, abs=1e-15)
+    assert strip.by_model("ff6").alpha_ann == pytest.approx(
+        run_regression(s, codes=MODELS["ff6"]).alpha_ann, rel=1e-12, abs=1e-15
+    )
     other = 12 if periods == 252 else 252
     with pytest.raises(ValueError, match="does not match"):
         compare_models(s, periods=other)
