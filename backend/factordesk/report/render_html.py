@@ -536,11 +536,24 @@ def _notice(report: FactorReport, items: list[tuple[str, str]]) -> str:
     )
 
 
+_EXCHANGE_NAMES = {"NYSEArca": "NYSE Arca"}
+_CURRENCY_NAMES = {"USD": "US dollars"}
+
+
+def _security_text(name: str | None, exchange: str | None, currency: str | None) -> str:
+    """The company line as sentences: 'Name. Listed on Exchange, priced in US dollars.'"""
+    first = f"{name.rstrip('.')}." if name else ""
+    listed = f"listed on {_EXCHANGE_NAMES.get(exchange, exchange)}" if exchange else ""
+    priced = f"priced in {_CURRENCY_NAMES.get(currency, currency)}" if currency else ""
+    second = ", ".join(p for p in (listed, priced) if p)
+    second = f"{second[0].upper()}{second[1:]}." if second else ""
+    return " ".join(p for p in (first, second) if p)
+
+
 def _security_line(report: FactorReport) -> str:
     """One small line under the ticker: company, exchange and currency; empty when unknown."""
     sec = report.data.security
-    parts = [] if sec is None else [sec.name, sec.exchange, sec.currency]
-    text = " · ".join(p for p in parts if p)
+    text = "" if sec is None else _security_text(sec.name, sec.exchange, sec.currency)
     return f'<p class="coverage">{esc(text)}</p>' if text else ""
 
 

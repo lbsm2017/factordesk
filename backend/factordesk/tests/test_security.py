@@ -583,7 +583,7 @@ def test_the_static_download_carries_the_header_line(tmp_path: Path, history: Pr
     with serve(app) as client:
         page = client.get("/api/report/ZM/html")
         assert page.status_code == 200, page.text
-        assert "Zoom Communications, Inc. · NasdaqGS · USD" in page.text
+        assert "Zoom Communications, Inc. Listed on NasdaqGS, priced in US dollars." in page.text
 
 
 # -------------------------------------------------------------------------------- suggestions
@@ -623,9 +623,9 @@ def _header_of(report: FactorReport) -> str:
     return page[start : page.index("</header>", start)]
 
 
-def test_the_static_header_shows_name_exchange_and_currency() -> None:
+def test_the_static_header_writes_name_exchange_and_currency_as_a_sentence() -> None:
     header = _header_of(load_report(MOCK))
-    assert '<p class="coverage">Example Corp · NASDAQ · USD</p>' in header
+    assert '<p class="coverage">Example Corp. Listed on NASDAQ, priced in US dollars.</p>' in header
     assert header.index("Example Corp") < header.index("Analysed")  # under the ticker, first
 
 
@@ -634,9 +634,15 @@ def test_the_static_header_shows_name_exchange_and_currency() -> None:
     [
         (None, None),
         (SecurityInfo(), None),
-        (SecurityInfo(name="Only Name"), "Only Name"),
-        (SecurityInfo(currency="USD"), "USD"),
-        (SecurityInfo(name="A & B <Co>", currency="USD"), "A &amp; B &lt;Co&gt; · USD"),
+        (SecurityInfo(name="Only Name"), "Only Name."),
+        (SecurityInfo(currency="USD"), "Priced in US dollars."),
+        (SecurityInfo(currency="EUR"), "Priced in EUR."),
+        (SecurityInfo(exchange="NYSEArca"), "Listed on NYSE Arca."),
+        (SecurityInfo(name="Foo Inc.", exchange="NASDAQ"), "Foo Inc. Listed on NASDAQ."),
+        (
+            SecurityInfo(name="A & B <Co>", currency="USD"),
+            "A &amp; B &lt;Co&gt;. Priced in US dollars.",
+        ),
     ],
 )
 def test_the_static_header_line_uses_only_what_is_known(
@@ -659,4 +665,9 @@ def test_nothing_else_in_the_static_page_changed() -> None:
     bare = mock.model_copy(update={"data": mock.data.model_copy(update={"security": None})})
     with_name = render_report_html(mock)
     without = render_report_html(bare)
-    assert with_name.replace('<p class="coverage">Example Corp · NASDAQ · USD</p>', "") == without
+    assert (
+        with_name.replace(
+            '<p class="coverage">Example Corp. Listed on NASDAQ, priced in US dollars.</p>', ""
+        )
+        == without
+    )
