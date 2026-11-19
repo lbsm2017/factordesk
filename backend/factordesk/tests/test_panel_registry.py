@@ -94,8 +94,9 @@ def test_absent_sections_draw_nothing() -> None:
 
 
 def test_present_sections_draw_their_frame_in_place() -> None:
-    # Tail risk (E7a) has a React panel only; the static report has none.
-    assert set(SECTION_PANELS) | {"tail_risk"} == set(SECTION_FILES)
+    # Tail risk (E7a) and the portfolio backtest have a React panel only; the static report has
+    # none.
+    assert set(SECTION_PANELS) | {"tail_risk", "portfolio_backtest"} == set(SECTION_FILES)
     report = load_report(MOCK)
     for field in SECTION_PANELS:
         report = report_with_section(report, field)

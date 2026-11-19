@@ -24,5 +24,6 @@
     "L-KTAIL": "Daily price changes for this ticker partly reverse the next day (see the data-quality check). The filter ignores that, so the band is too narrow for this ticker."
   },
   "tail_risk": {},
-  "alpha_strip": {}
+  "alpha_strip": {},
+  "portfolio_backtest": {}
 }

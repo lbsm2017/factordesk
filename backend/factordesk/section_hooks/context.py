@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 import pandas as pd
 
@@ -52,6 +52,29 @@ class WorldBenchmarkInput:
 
 
 @dataclass(frozen=True)
+class PortfolioBacktestInput:
+    """What the backtest of a portfolio subject says about itself (read by the
+    ``portfolio_backtest`` hook; built by ``api.portfolio_report``).
+
+    Leaf names are display labels. ``weights`` holds ``(label, ticker or None, weight)`` for every
+    instrument with a target above 0; with ``unallocated_weight`` they add up to 1.
+    """
+
+    window_start: date
+    window_end: date
+    start_limited_by: tuple[str, ...]
+    end_limited_by: tuple[str, ...]
+    n_instruments: int
+    n_rebalances: int
+    cost_bps: float
+    total_cost: float
+    average_turnover: float
+    unallocated_weight: float
+    survivorship_note: str
+    weights: tuple[tuple[str, str | None, float], ...]
+
+
+@dataclass(frozen=True)
 class SectionInputs:
     """Data a section needs that ``assemble_report`` does not already have.
 
@@ -67,6 +90,8 @@ class SectionInputs:
     europe_benchmark: WorldBenchmarkInput | None = None
     """IEUR prices for the Europe block of the world beta; ``None``: not fetched, the block is
     null. Owned by the world-beta feature."""
+    portfolio_backtest: PortfolioBacktestInput | None = None
+    """The backtest summary of a portfolio subject; ``None`` for every other subject."""
 
 
 @dataclass(frozen=True)

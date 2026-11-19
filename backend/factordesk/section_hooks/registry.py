@@ -13,10 +13,15 @@ Declarations:
   sample and leaves its field ``None`` without it).
 * world beta: daily only (ACWI and IEUR prices are daily), every model.
 * tail risk (VaR and CVaR): every subject, every frequency, every model.
+* portfolio backtest: portfolio subjects only (it describes the backtest behind the series).
 * lead-lag, shrunk betas, fragility, residual alpha analysis, Kalman betas: daily and FF5 only.
   Their methods are built on trading-day windows (252-row windows, 5-day blocks, a lag of one
   trading day, an FF5 prior) and on the five factors, and are not defined for monthly data or
   another model yet. Under FF6 they are hidden; the FF5 report is unchanged.
+* shrunk betas are also hidden for a portfolio: the prior is "a stock that behaves like the
+  market" (Mkt-RF 1, the other betas 0) and its spread comes from portfolios of stocks, so it is
+  the wrong reference for a mix of bonds, commodities and equities. The other FF5 sections
+  read only the return series and stay for a portfolio.
 
 The hooks are looked up by module attribute at call time, so a test may replace one.
 """
@@ -35,6 +40,7 @@ from factordesk.section_hooks import fragility as fragility_hook
 from factordesk.section_hooks import kalman as kalman_hook
 from factordesk.section_hooks import lead_lag as lead_lag_hook
 from factordesk.section_hooks import performance as performance_hook
+from factordesk.section_hooks import portfolio_backtest as portfolio_backtest_hook
 from factordesk.section_hooks import residual_alpha as residual_alpha_hook
 from factordesk.section_hooks import shrunk as shrunk_hook
 from factordesk.section_hooks import tail_risk as tail_risk_hook
@@ -68,6 +74,8 @@ class HookSpec:
 ALL_SOURCES: frozenset[SubjectKind] = frozenset(SUBJECT_KINDS)
 ALL_FREQUENCIES: frozenset[Frequency] = frozenset(FREQUENCIES)
 DAILY: frozenset[Frequency] = frozenset({"daily"})
+NOT_PORTFOLIO: frozenset[SubjectKind] = frozenset({"ticker", "upload"})
+PORTFOLIO: frozenset[SubjectKind] = frozenset({"portfolio"})
 ALL_MODELS: frozenset[FactorModel] = frozenset(FACTOR_MODELS)
 FF5_ONLY: frozenset[FactorModel] = frozenset({"ff5"})
 
@@ -85,7 +93,7 @@ HOOKS: tuple[HookSpec, ...] = (
     HookSpec(
         "shrunk_betas",
         lambda ctx: shrunk_hook.build_shrunk_betas(ctx),
-        ALL_SOURCES,
+        NOT_PORTFOLIO,
         DAILY,
         FF5_ONLY,
     ),
@@ -128,6 +136,13 @@ HOOKS: tuple[HookSpec, ...] = (
         "alpha_strip",
         lambda ctx: alpha_strip_hook.build_alpha_strip(ctx),
         ALL_SOURCES,
+        ALL_FREQUENCIES,
+        ALL_MODELS,
+    ),
+    HookSpec(
+        "portfolio_backtest",
+        lambda ctx: portfolio_backtest_hook.build_portfolio_backtest(ctx),
+        PORTFOLIO,
         ALL_FREQUENCIES,
         ALL_MODELS,
     ),
