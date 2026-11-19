@@ -8,11 +8,15 @@ and production is same-origin.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 
 from factordesk.api.deps import AppDeps, default_deps
 from factordesk.api.errors import install_error_handlers
 from factordesk.api.routes_factors import router as factors_router
+from factordesk.api.routes_portfolio import report_router as portfolio_report_router
+from factordesk.api.routes_portfolio import router as portfolio_router
 from factordesk.api.routes_report import router as report_router
 from factordesk.api.routes_upload import UploadSizeLimit
 from factordesk.api.routes_upload import router as upload_router
@@ -35,7 +39,9 @@ def create_app(deps: AppDeps) -> FastAPI:
     install_error_handlers(app)
     app.add_middleware(UploadSizeLimit)
     app.include_router(factors_router)
+    app.include_router(portfolio_router)
     app.include_router(upload_router)  # before /api/report/{ticker}
+    app.include_router(portfolio_report_router)  # before /api/report/{ticker}
     app.include_router(report_router)
     if deps.static_dir is not None:
         install_static(app, deps.static_dir)  # last: its catch-all must not shadow the API
@@ -44,4 +50,7 @@ def create_app(deps: AppDeps) -> FastAPI:
 
 def create_dev_app() -> FastAPI:
     """Uvicorn factory (API only) with the real providers and the configured data directory."""
+    if not logging.getLogger().handlers:  # the reload worker is a fresh process
+        logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
+    logging.getLogger("factordesk").setLevel(logging.INFO)
     return create_app(default_deps(None))

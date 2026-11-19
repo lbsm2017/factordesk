@@ -137,6 +137,25 @@
         }
       }
     },
+    "/api/portfolio/library": {
+      "get": {
+        "summary": "Get Library",
+        "description": "The 44 lines of the Asset Class Library, in the owner's order, with their proxies.",
+        "operationId": "get_library_api_portfolio_library_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetClassLibrary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/report/upload": {
       "post": {
         "summary": "Upload Report",
@@ -175,6 +194,165 @@
           },
           "422": {
             "description": "The file or a form field cannot be used, or the record is too short.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The report could not be computed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The downloaded factor file failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A data source could not be reached or refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report/portfolio": {
+      "post": {
+        "summary": "Portfolio Report",
+        "description": "The factor report of a backtested portfolio tree (kept in memory, never stored).\n\nThe tree is flattened to its instruments with a weight above 0. Prices come from Yahoo\n(adjusted close), the weights drift and reset to target at each month-end, and the net daily\nreturns go through the same factor analysis as a ticker. The unallocated weight is held in\nUSD cash, which earns the risk-free rate. Only instruments with a weight above 0 limit the\nwindow. The model defaults to ff6; a range or dates cut the analysis sample.",
+        "operationId": "portfolio_report_api_report_portfolio_post",
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "3Y",
+                    "5Y",
+                    "10Y",
+                    "FULL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Range preset; not together with start or end.",
+              "title": "Range"
+            },
+            "description": "Range preset; not together with start or end."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First requested date, YYYY-MM-DD.",
+              "title": "Start"
+            },
+            "description": "First requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last requested date, YYYY-MM-DD.",
+              "title": "End"
+            },
+            "description": "Last requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ff5",
+                "ff6"
+              ],
+              "type": "string",
+              "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
+              "default": "ff6",
+              "title": "Model"
+            },
+            "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioTree"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactorReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range or the dates are not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The portfolio is not valid (a total over 100%, more than 50 instruments, a weight on a line with no proxy), an instrument has no prices, is not quoted in US dollars or shares no trading period with the others, or the history is too short.",
             "content": {
               "application/json": {
                 "schema": {
@@ -954,7 +1132,8 @@
               "internal",
               "bad_request",
               "invalid_upload",
-              "upload_too_large"
+              "upload_too_large",
+              "invalid_portfolio"
             ],
             "title": "Code"
           },
@@ -976,6 +1155,69 @@
         ],
         "title": "ApiError",
         "description": "Every error body: ``message`` says what went wrong, ``action`` what to do."
+      },
+      "AssetClassGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "group",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/SubAssetClassGroup"
+            },
+            "type": "array",
+            "title": "Children"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "children"
+        ],
+        "title": "AssetClassGroup",
+        "description": "Level 1: an asset class (Cash, Fixed Income, ...) with its sub-asset class groups."
+      },
+      "AssetClassLibrary": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "lines"
+        ],
+        "title": "AssetClassLibrary",
+        "description": "The library: lines in the owner's order, grouped by asset class."
       },
       "AuditFinding": {
         "properties": {
@@ -2031,6 +2273,28 @@
               }
             ],
             "description": "Alpha under CAPM, FF3, FF5 and FF6 on the same rows, not ranked; absent (not null) when not computed."
+          },
+          "portfolio_backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioBacktestSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio."
+          },
+          "macro": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MacroSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed."
           }
         },
         "additionalProperties": false,
@@ -2306,6 +2570,60 @@
         ],
         "title": "Health",
         "description": "Liveness answer; reads no disk and no network."
+      },
+      "Instrument": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "holding",
+              "cash"
+            ],
+            "title": "Kind"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Weight",
+            "description": "Target weight as a decimal fraction."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "ticker",
+          "label",
+          "weight"
+        ],
+        "title": "Instrument",
+        "description": "A leaf: one holding (a ticker) or the cash leaf, with its target weight."
       },
       "KalmanBetaSeries": {
         "properties": {
@@ -2671,6 +2989,476 @@
         ],
         "title": "LeadLagSection",
         "description": "Timing-adjusted betas: same-day plus previous- and next-day factor coefficients (LL0.1)."
+      },
+      "LibraryLine": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Id"
+          },
+          "asset_class": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Asset Class"
+          },
+          "sub_asset_class": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Sub Asset Class"
+          },
+          "proxy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy",
+            "description": "A ticker, \"RF\" for the risk-free rate, or null when there is no proxy yet."
+          },
+          "proxy_kind": {
+            "type": "string",
+            "enum": [
+              "etf",
+              "risk_free",
+              "listed_proxy",
+              "none"
+            ],
+            "title": "Proxy Kind"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Note",
+            "description": "The caveat a reader should see with the proxy."
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date",
+            "description": "First daily price date of the proxy."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Quote currency of the proxy."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "asset_class",
+          "sub_asset_class",
+          "proxy",
+          "proxy_kind",
+          "note",
+          "first_date",
+          "currency"
+        ],
+        "title": "LibraryLine",
+        "description": "One sub-asset class of the owner's Asset Class Library and the proxy that stands for it."
+      },
+      "MacroLeg": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "What it feeds, for example \"TERM = IEF minus RF\"."
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date",
+            "description": "First price date; None when not fetched."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "role",
+          "first_date"
+        ],
+        "title": "MacroLeg",
+        "description": "One fund behind a factor, with its first price date."
+      },
+      "MacroRow": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "mkt_rf",
+              "term",
+              "def",
+              "comm",
+              "infl",
+              "usd"
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name: \"Mkt-RF\", \"TERM\", \"DEF\", \"COMM\", \"INFL\", \"USD\"."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Plain label: Market, Rates, Credit, Commodities, Inflation, US dollar."
+          },
+          "definition": {
+            "type": "string",
+            "title": "Definition",
+            "description": "How the factor is built, for example \"IEF minus RF\"."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Caveat on the factor, for example the DEF label."
+          },
+          "beta": {
+            "type": "number",
+            "title": "Beta",
+            "description": "Raw beta (the summed same-day and lag beta for the dollar)."
+          },
+          "se": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Se",
+            "description": "Newey-West HAC standard error of beta."
+          },
+          "t": {
+            "type": "number",
+            "title": "T",
+            "description": "HAC t-statistic of beta."
+          },
+          "p": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P",
+            "description": "Two-sided p-value of t."
+          },
+          "ci_low": {
+            "type": "number",
+            "title": "Ci Low",
+            "description": "Lower end of the 95% interval, beta - q * se."
+          },
+          "ci_high": {
+            "type": "number",
+            "title": "Ci High",
+            "description": "Upper end of the 95% interval, beta + q * se."
+          },
+          "tag": {
+            "type": "string",
+            "enum": [
+              "reliable",
+              "noise"
+            ],
+            "title": "Tag",
+            "description": "Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the factors of this regression."
+          },
+          "vif": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Vif",
+            "description": "Variance inflation factor among the factors."
+          },
+          "beta_same_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Same Day",
+            "description": "Dollar row of a daily subject: the same-day part of the summed beta."
+          },
+          "beta_lag": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Lag",
+            "description": "Dollar row of a daily subject: the previous-day part of the summed beta."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "label",
+          "definition",
+          "note",
+          "beta",
+          "se",
+          "t",
+          "p",
+          "ci_low",
+          "ci_high",
+          "tag",
+          "vif",
+          "beta_same_day",
+          "beta_lag"
+        ],
+        "title": "MacroRow",
+        "description": "One factor of the macro regression."
+      },
+      "MacroSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "model_note": {
+            "type": "string",
+            "title": "Model Note",
+            "description": "Fixed note: separate regression, raw betas, not alpha."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Rows of the regression."
+          },
+          "n_sample": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Sample",
+            "description": "Rows of the analysis sample before the funds."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Frequency"
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lag of the fit."
+          },
+          "t_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "student_t"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T Reference",
+            "description": "Reference distribution of the p-values; None when not computed."
+          },
+          "r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R2",
+            "description": "R squared of the regression."
+          },
+          "adj_r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adj R2",
+            "description": "Adjusted R squared of the regression."
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MacroRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Market, rates, credit, commodities, inflation, dollar."
+          },
+          "correlation_codes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "mkt_rf",
+                "term",
+                "def",
+                "comm",
+                "infl",
+                "usd"
+              ]
+            },
+            "type": "array",
+            "title": "Correlation Codes",
+            "description": "Factors of the correlation matrix, in row and column order."
+          },
+          "correlation": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Correlation",
+            "description": "Correlation matrix of the factors."
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/MacroLeg"
+            },
+            "type": "array",
+            "title": "Legs",
+            "description": "The funds behind the factors, with first dates."
+          },
+          "window_limited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Limited By",
+            "description": "The fund whose first date starts the window, when it is later than the subject's own start; None otherwise."
+          },
+          "usd_included": {
+            "type": "boolean",
+            "title": "Usd Included",
+            "description": "False when the dollar index was unavailable."
+          },
+          "usd_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Note",
+            "description": "Why the dollar row is missing, or a note on the dollar series."
+          },
+          "usd_lag_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Lag Note",
+            "description": "Explains the summed dollar beta of a daily subject; None for monthly."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "model_note",
+          "n_obs",
+          "n_sample",
+          "frequency",
+          "hac_lags",
+          "t_reference",
+          "r2",
+          "adj_r2",
+          "rows",
+          "correlation_codes",
+          "correlation",
+          "legs",
+          "window_limited_by",
+          "usd_included",
+          "usd_note",
+          "usd_lag_note"
+        ],
+        "title": "MacroSection",
+        "description": "The macro sensitivities: one row per factor, one regression."
       },
       "MultiDayRegression": {
         "properties": {
@@ -3367,6 +4155,189 @@
         ],
         "title": "PerformanceSharpe",
         "description": "Sharpe ratio of the periodic excess returns (subject return minus the factor file's RF)."
+      },
+      "PortfolioBacktestSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Window Start",
+            "description": "First day with a portfolio return."
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Window End",
+            "description": "Last day with a portfolio return."
+          },
+          "start_limited_by": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Start Limited By",
+            "description": "Instruments whose history starts latest and so set the window start (several on a tie)."
+          },
+          "end_limited_by": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "End Limited By",
+            "description": "Instruments whose history ends earliest and so set the window end. USD cash ends with the factor file, so it can set the end."
+          },
+          "n_instruments": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "N Instruments",
+            "description": "Instruments with a target weight above 0."
+          },
+          "n_rebalances": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Rebalances",
+            "description": "Month-end closes at which the weights were reset to target."
+          },
+          "n_dates_dropped": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Dates Dropped",
+            "description": "Trading days inside the window on which at least one instrument had no price. They are skipped for all instruments."
+          },
+          "data_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Note",
+            "description": "Plain-words note on those skipped days; None when there were none."
+          },
+          "cost_bps": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Cost Bps",
+            "description": "Cost per unit of turnover, basis points."
+          },
+          "total_cost": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Total Cost",
+            "description": "Sum over the window of the cost paid at each rebalance, as a fraction of the portfolio value at that close."
+          },
+          "average_turnover": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Average Turnover",
+            "description": "Mean one-way turnover of a rebalance, as a fraction of the portfolio; 0 when there was no rebalance."
+          },
+          "unallocated_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Unallocated Weight",
+            "description": "Weight left over by the targets; held in USD cash."
+          },
+          "survivorship_note": {
+            "type": "string",
+            "title": "Survivorship Note",
+            "description": "Fixed warning carried by every backtest."
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/TargetWeightRow"
+            },
+            "type": "array",
+            "title": "Weights",
+            "description": "Target weights, in tree order."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "window_start",
+          "window_end",
+          "start_limited_by",
+          "end_limited_by",
+          "n_instruments",
+          "n_rebalances",
+          "n_dates_dropped",
+          "data_note",
+          "cost_bps",
+          "total_cost",
+          "average_turnover",
+          "unallocated_weight",
+          "survivorship_note",
+          "weights"
+        ],
+        "title": "PortfolioBacktestSection",
+        "description": "The backtest behind a portfolio report. Status is always ``ok`` when the section exists."
+      },
+      "PortfolioTree": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "cost_bps": {
+            "type": "number",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Cost Bps",
+            "description": "Cost per unit of turnover."
+          },
+          "root": {
+            "$ref": "#/components/schemas/RootGroup"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "name",
+          "cost_bps",
+          "root"
+        ],
+        "title": "PortfolioTree",
+        "description": "A named portfolio: the tree and the cost of a rebalance."
       },
       "PowerStatement": {
         "properties": {
@@ -6189,6 +7160,44 @@
         "title": "RollingWindow",
         "description": "Trailing-window betas. ``betas[name][i]`` belongs to ``dates[i]``; None during warm-up.\n\nEach stamp uses exactly ``window`` rows of the sample ending on (and including) its date.\nThe pointwise 95% band is ``beta +/- ci_z * se``."
       },
+      "RootGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "group",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/AssetClassGroup"
+            },
+            "type": "array",
+            "title": "Children"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "children"
+        ],
+        "title": "RootGroup"
+      },
       "SampleInfo": {
         "properties": {
           "n": {
@@ -6890,6 +7899,53 @@
         "title": "SplitHalfAlpha",
         "description": "One prespecified split at the middle of S (R5.3)."
       },
+      "SubAssetClassGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "group",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "library_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Library Id"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/Instrument"
+            },
+            "type": "array",
+            "title": "Children"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "library_id",
+          "children"
+        ],
+        "title": "SubAssetClassGroup",
+        "description": "Level 2: one line of the library with its instruments."
+      },
       "SubjectInfo": {
         "properties": {
           "kind": {
@@ -7291,6 +8347,43 @@
         ],
         "title": "TailSeriesStats",
         "description": "The series behind the figures and the bootstrap settings."
+      },
+      "TargetWeightRow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Display name of the instrument (a sub-asset class line)."
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "Yahoo ticker; None for a USD cash instrument."
+          },
+          "weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Weight",
+            "description": "Target weight as a decimal fraction."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "ticker",
+          "weight"
+        ],
+        "title": "TargetWeightRow",
+        "description": "One instrument and its target weight."
       },
       "TickerSuggestion": {
         "properties": {

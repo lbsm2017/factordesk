@@ -26,7 +26,7 @@ from factordesk.data.factors import (
 from factordesk.data.prices import PriceProvider, YFinanceProvider
 
 if TYPE_CHECKING:
-    from factordesk.section_hooks.context import SectionInputs, WorldBenchmarkInput
+    from factordesk.section_hooks.context import MacroInput, SectionInputs, WorldBenchmarkInput
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,10 @@ class AppDeps:
     load_europe_benchmark: Callable[[], WorldBenchmarkInput] | None = None
     """The IEUR history of the Europe block of the world beta, refreshed like the ACWI one.
     Never raises. ``None``: not wired, so the Europe block is null."""
+    load_macro: Callable[[], MacroInput] | None = None
+    """The fund histories and the dollar index of the macro section, refreshed like the world
+    beta proxies (the dollar file is cached per day). Never raises. ``None``: not wired, so the
+    macro section is not computed."""
     load_ff6: Callable[[datetime], pd.DataFrame] | None = None
     """The daily FF6 frame (FF5 + RF + ``Mom``, ``data.french.load_ff6("daily")``). It feeds the
     FF6 model and the alpha strip of every report. May raise ``FactorError``: an FF6 report then
@@ -129,6 +133,11 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
 
         return load_world_benchmark(price_provider, EUROPE_TICKER)
 
+    def macro() -> MacroInput:
+        from factordesk.section_hooks.macro import load_macro_input
+
+        return load_macro_input(price_provider, data_dir=data_dir, now=utc_now())
+
     return AppDeps(
         price_provider=price_provider,
         load_factors=load_factors,
@@ -140,5 +149,6 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         load_section_inputs=section_inputs,
         load_world_benchmark=world_benchmark,
         load_europe_benchmark=europe_benchmark,
+        load_macro=macro,
         load_ff6=load_ff6_daily,
     )

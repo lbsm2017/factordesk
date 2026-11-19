@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dateLong } from "../../format";
-import { cloneReport, mockReport } from "../../test/fixture";
+import { cloneReport, mockReport, monthlyReport } from "../../test/fixture";
 import type { ChartTokens } from "../charts/chartTokens";
 import { PricePanel } from "./PricePanel";
 import { escapeHtml, priceModel, priceOption, toMs, tooltipHtml, visibleLabels } from "./priceModel";
@@ -244,6 +244,17 @@ describe("PricePanel", () => {
     expect(rows[3]).toBe("After factor data32 days, raw, not analysed+1.23%");
     expect(container.querySelector(".foot > p")?.textContent).toBe(
       "Adjusted close from MOCK price source (Adj Close), for context only; no statistic uses the price line.",
+    );
+  });
+
+  it("words the Growth of 100 footnote by subject kind", () => {
+    const foot = (r: typeof mockReport) => render(<PricePanel report={r} />).container.querySelector(".foot > p")?.textContent;
+    expect(monthlyReport.subject?.kind).toBe("upload");
+    expect(foot(monthlyReport)).toBe("Built from the uploaded monthly returns, for context only; no statistic uses this line.");
+    const portfolio = structuredClone(monthlyReport);
+    portfolio.subject = { ...portfolio.subject!, kind: "portfolio" };
+    expect(foot(portfolio)).toBe(
+      "Built from the backtested daily portfolio returns, for context only; no statistic uses this line.",
     );
   });
 

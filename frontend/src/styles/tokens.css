@@ -57,6 +57,15 @@
   --f4: #1995BA; /* RMW */
   --f5: #A18A21; /* CMA */
   --f6: #7048B8; /* Mom (FF6) */
+  /* asset-class identity, in the portfolio composer only: its own palette, apart from the factor
+     colours above. Every class is also named in text, so colour never carries the meaning alone. */
+  --ac-equities: #2B4FA3;
+  --ac-fixed: #1F8A7A;
+  --ac-alts: #8A4FB0;
+  --ac-real: #C4572B;
+  --ac-comm: #A8780A;
+  --ac-cash: #6B7A99;
+  --ac-other: #7A5C4B;
   /* names kept from rev 2 so the panel stylesheets read the new values */
   --border: var(--line);
   --focus: var(--accent);

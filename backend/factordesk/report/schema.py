@@ -49,8 +49,11 @@ no field changes meaning for a reader that knows the block.
 The optional ``model`` field (E1) is ``"ff6"`` for a report on FF5 plus momentum and ``None`` (left
 out of the JSON) for FF5, so FF5 reports are byte-identical to the ones written before it. The
 optional section ``alpha_strip`` (alpha under CAPM, FF3, FF5 and FF6 on the same rows;
-``report/sections/alpha_strip.py``) is also left out of the JSON when ``None``.
-Both are additive and do not bump the version (contract SC5).
+``report/sections/alpha_strip.py``) is also left out of the JSON when ``None``, and so is
+``portfolio_backtest`` (the backtest behind a portfolio report;
+``report/sections/portfolio_backtest.py``), and so is ``macro`` (macro sensitivities;
+``report/sections/macro.py``).
+All are additive and do not bump the version (contract SC5).
 """
 
 from __future__ import annotations
@@ -82,7 +85,12 @@ from factordesk.report.sections.alpha_strip import ALPHA_STRIP_SECTION, AlphaStr
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
+from factordesk.report.sections.macro import MACRO_SECTION, MacroSection
 from factordesk.report.sections.performance import PERFORMANCE_SECTION, PerformanceSection
+from factordesk.report.sections.portfolio_backtest import (
+    PORTFOLIO_BACKTEST_SECTION,
+    PortfolioBacktestSection,
+)
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
 from factordesk.report.sections.tail_risk import TAIL_RISK_SECTION, TailRiskSection
@@ -111,6 +119,8 @@ SECTIONS: tuple[SectionSpec, ...] = (
     KALMAN_SECTION,
     TAIL_RISK_SECTION,
     ALPHA_STRIP_SECTION,
+    PORTFOLIO_BACKTEST_SECTION,
+    MACRO_SECTION,
 )
 """The optional sections of the schema v3 contract, in panel order (contract SC3.1, SC4)."""
 
@@ -498,13 +508,19 @@ class PriceSeries(FrozenModel):
         return self
 
 
-_OMITTED_WHEN_DEFAULT: tuple[str, ...] = ("subject", "model", "alpha_strip")
+_OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
+    "subject",
+    "model",
+    "alpha_strip",
+    "portfolio_backtest",
+    "macro",
+)
 """Fields left out of the JSON when ``None``, so never required."""
 
 
 def _subject_not_required(schema: JsonDict) -> None:
-    """``subject``, ``model`` and ``alpha_strip`` are left out of the JSON when ``None``, so they
-    are never required."""
+    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest`` and ``macro`` are left out
+    of the JSON when ``None``, so they are never required."""
     required = schema.get("required")
     if isinstance(required, list):
         schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
@@ -588,6 +604,19 @@ class FactorReport(FrozenModel):
         description="Alpha under CAPM, FF3, FF5 and FF6 on the same rows, not ranked; absent "
         "(not null) when not computed.",
     )
+    portfolio_backtest: PortfolioBacktestSection | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="How a portfolio's return series was made: window, limiting instruments, "
+        "rebalances, cost, survivorship note and target weights; absent (not null) for every "
+        "subject except a portfolio.",
+    )
+    macro: MacroSection | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Macro sensitivities: a separate regression on market, rates, credit, "
+        "commodity, inflation and dollar factors; absent (not null) when not computed.",
+    )
 
     @field_validator("schema_version")
     @classmethod
@@ -643,6 +672,7 @@ ErrorCode = Literal[
     "bad_request",
     "invalid_upload",
     "upload_too_large",
+    "invalid_portfolio",
 ]
 """Error codes of the local API (dashboard spec DB2.3). ``bad_request`` covers any other
 malformed request parameter."""

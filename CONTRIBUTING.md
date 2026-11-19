@@ -22,12 +22,14 @@ factordesk works on Windows, macOS and Linux. You only need
 [uv](https://docs.astral.sh/uv/getting-started/installation/) and git.
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/lbsm2017/factordesk.git
 cd factordesk
 uv sync
+uv run factordesk --help
 ```
 
-`uv sync` installs Python 3.12 and every pinned dependency. Copy `.env.example` to `.env` only if
+`uv sync` is uv's install command: it installs Python 3.12 and every dependency pinned in
+`uv.lock`. The last line checks that the install works. Copy `.env.example` to `.env` only if
 you need to override settings.
 
 ## Before you open a pull request
@@ -50,6 +52,12 @@ uv run pytest -m live
 CI runs the offline suite on Windows, macOS and Linux, so avoid anything platform-specific:
 use `pathlib` for paths, open text files as UTF-8, and do not add shell scripts.
 
+## Tests
+
+- Compare floats with a tolerance, never with `==`: use `pytest.approx(expected, rel=1e-12)`.
+- Run `make build` after you pull frontend changes. `factordesk serve` warns when the built
+  dashboard page is older than its source.
+
 ## Code and statistics rules
 
 The full list is in [CODING_STANDARDS.md](CODING_STANDARDS.md). The ones that matter most:
@@ -71,7 +79,7 @@ The full list is in [CODING_STANDARDS.md](CODING_STANDARDS.md). The ones that ma
 ## Branches and pull requests
 
 | Branch | Purpose |
-|---|---|
+| --- | --- |
 | `prod` | Released code. Every commit here is a release candidate that passed review and CI. Releases are tagged `vX.Y.Z`. |
 | `dev` | Integration branch. All finished work lands here first. |
 | `feat/<topic>` | A new feature, branched from `dev`. |

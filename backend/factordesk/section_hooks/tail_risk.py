@@ -2,7 +2,9 @@
 
 The statistics are in ``analytics/tail_risk.py``; this hook runs them on the subject's returns at
 the subject's own frequency, with the default seed, and turns the result into the section model.
-Missing returns (``NaN`` where a level is missing) are dropped first. The hook never raises for
+Only the returns inside the analysed window (the sample start and end dates of the report) are
+used, so the section agrees with every other section on which days it describes. Missing returns
+(``NaN`` where a level is missing) are dropped first. The hook never raises for
 data reasons: a series with fewer than 12 returns gives ``insufficient_data``; a series the
 statistics refuse (constant, a return at or below -100%) gives ``failed`` with the reason.
 """
@@ -10,6 +12,8 @@ statistics refuse (constant, a return at or below -100%) gives ``failed`` with t
 from __future__ import annotations
 
 import logging
+
+import pandas as pd
 
 from factordesk.analytics.tail_risk import MIN_OBS, TailFigure, TailRisk, tail_risk
 from factordesk.report.sections.tail_risk import (
@@ -84,7 +88,11 @@ def _not_ok(ctx: SectionContext, status: str, reason: str) -> TailRiskSection:
 def build_tail_risk(ctx: SectionContext) -> TailRiskSection | None:
     """The tail risk section of the subject's returns (never ``None`` once built)."""
     frequency = ctx.subject.frequency
-    returns = ctx.subject.returns.dropna()
+    returns = ctx.subject.returns
+    info = ctx.sample_info(None)
+    if info.start is not None and info.end is not None:
+        returns = returns.loc[pd.Timestamp(info.start) : pd.Timestamp(info.end)]
+    returns = returns.dropna()
     if len(returns) < MIN_OBS:
         unit = "daily returns" if frequency == "daily" else "monthly returns"
         return _not_ok(

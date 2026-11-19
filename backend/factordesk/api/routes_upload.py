@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -146,8 +147,37 @@ def build_upload_report(
     runtime: Runtime,
     model: FactorModel = "ff5",
 ) -> FactorReport:
-    """Parse, validate and analyse an uploaded monthly record (blocking; run in a worker)."""
+    """Parse, validate and analyse an uploaded monthly record (blocking; run in a worker).
+
+    Logs the row count, the frequency, the seconds and, on a refusal, its reason category. It
+    never logs the file's contents, its name or the display name.
+    """
+    started = time.perf_counter()
+    rows = 0
+    try:
+        report, rows = _build_upload_report(raw, name, gross_net, runtime, model)
+    except Exception as exc:
+        category = to_api_exception(exc).code
+        logger.info("Upload refused: reason %s (%.1f s)", category, time.perf_counter() - started)
+        raise
+    logger.info(
+        "Upload report built: %d rows, monthly, model %s, %.1f s",
+        rows,
+        model,
+        time.perf_counter() - started,
+    )
+    return report
+
+
+def _build_upload_report(
+    raw: bytes,
+    name: str | None,
+    gross_net: str | None,
+    runtime: Runtime,
+    model: FactorModel,
+) -> tuple[FactorReport, int]:
     from factordesk.pipeline import assemble_subject_report
+    from factordesk.section_hooks.context import SectionInputs
 
     label = clean_name(name)
     try:
@@ -167,10 +197,18 @@ def build_upload_report(
         ) from exc
     now = runtime.deps.now().astimezone(UTC)
     frame = monthly_frame(model, runtime, now)
+    load_macro = runtime.deps.load_macro
+    inputs = None if load_macro is None else SectionInputs(macro=load_macro())
     try:
-        return assemble_subject_report(
-            subject, frame, model, now=now, factors_downloaded_at=_downloaded_at(frame)
+        report = assemble_subject_report(
+            subject,
+            frame,
+            model,
+            now=now,
+            factors_downloaded_at=_downloaded_at(frame),
+            section_inputs=inputs,
         )
+        return report, len(returns)
     except InsufficientHistoryError as exc:
         raise to_api_exception(exc, label) from exc
     except DegenerateInputError as exc:

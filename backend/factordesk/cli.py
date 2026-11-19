@@ -93,6 +93,37 @@ def default_static_dir() -> Path:
     return resolve_static_dir(DEFAULT_STATIC_DIR, PACKAGED_STATIC_DIR)
 
 
+STALE_BUILD_WARNING = (
+    "The dashboard page is older than its source. Run `make build` "
+    "(or `make setup` after a package change), then restart."
+)
+
+
+def stale_build_warning(frontend_dir: Path) -> str | None:
+    """The warning to print when the built page is older than its source, else ``None``.
+
+    Compares the newest modification time under ``frontend/src`` and of ``frontend/package.json``
+    with ``frontend/dist/index.html``. A folder without ``src`` (an installed wheel) has nothing to
+    compare, so no warning. A missing ``index.html`` counts as older than any source.
+    """
+    source = frontend_dir / "src"
+    if not source.is_dir():
+        return None
+    newest = 0.0
+    for path in [*source.rglob("*"), frontend_dir / "package.json"]:
+        try:
+            if path.is_file():
+                newest = max(newest, path.stat().st_mtime)
+        except OSError:
+            continue
+    built = frontend_dir / "dist" / "index.html"
+    try:
+        built_at = built.stat().st_mtime
+    except OSError:
+        return STALE_BUILD_WARNING
+    return STALE_BUILD_WARNING if built_at < newest else None
+
+
 def _err(message: str) -> None:
     print(f"{PROG}: error: {message}", file=sys.stderr)
 
@@ -424,6 +455,12 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             "login; anyone who can reach it can use it",
             file=sys.stderr,
         )
+
+    if args.static is None and not args.dev:
+        stale = stale_build_warning(DEFAULT_STATIC_DIR.parent)
+        if stale is not None:
+            print(f"{PROG}: warning: {stale}", file=sys.stderr)
+    logging.getLogger("factordesk").setLevel(logging.INFO)  # the server logs one line per step
 
     print(f"Dashboard: {_browser_url(host, port)}" + (" (API only, dev)" if args.dev else ""))
     if args.open:

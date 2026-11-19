@@ -38,6 +38,7 @@ from factordesk.analytics.residual_stability import (
     split_half_alpha,
 )
 from factordesk.analytics.rolling import RollingBetas, rolling_betas
+from factordesk.analytics.subject import SubjectKind
 from factordesk.report.base import ReportWarning, SampleInfo, Status
 from factordesk.report.sections.residual_alpha import (
     QUESTION,
@@ -82,11 +83,12 @@ LABELS_DIAG_IN_SAMPLE: list[ResidualLabelKey] = ["L-DESC", "L-INSAMPLE"]
 LABELS_DIAG_PIT: list[ResidualLabelKey] = ["L-DESC-PIT", "L-PIT"]
 
 
-def caveats(window: int) -> list[str]:
-    """R8.5, in display order, ``{W}`` filled."""
+def caveats(window: int, kind: SubjectKind = "ticker") -> list[str]:
+    """R8.5, in display order, ``{W}`` filled. The first line says "the stock's return" for a
+    ticker and "the return" for a portfolio or an uploaded record."""
+    what = "the stock's return" if kind == "ticker" else "the return"
     return [
-        "You see the stock's return after removing what its five factor exposures explain. It "
-        "includes alpha.",
+        f"You see {what} after removing what its five factor exposures explain. It includes alpha.",
         "In-sample: betas are fitted on this same period, so the in-sample line always drifts by "
         "the regression alpha. A line ending above zero is not evidence of skill; check the "
         "t-statistic.",
@@ -467,7 +469,7 @@ def build_section(
             _diagnostics(r.diagnostics_in_sample, "in_sample", info_s),
             _diagnostics(r.diagnostics_point_in_time, "point_in_time", info_c),
         ],
-        caveats=caveats(w),
+        caveats=caveats(w, ctx.subject.kind),
         warnings=_warnings(r),
     )
 
@@ -557,7 +559,7 @@ def unavailable_section(
             _diagnostics(DiagnosticsSummary(status=failed, reason=why), "in_sample", info),
             _diagnostics(DiagnosticsSummary(status=failed, reason=why), "point_in_time", info),
         ],
-        caveats=caveats(window),
+        caveats=caveats(window, ctx.subject.kind),
         warnings=[],
     )
 

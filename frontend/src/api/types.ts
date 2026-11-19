@@ -9,6 +9,8 @@ export type ErrorCode = ApiError["code"];
 export type FactorDataStatus = Schemas["FactorDataStatus"];
 export type TickerSuggestion = Schemas["TickerSuggestion"];
 export type TickerSuggestions = Schemas["TickerSuggestions"];
+export type AssetClassLibrary = Schemas["AssetClassLibrary"];
+export type LibraryLine = Schemas["LibraryLine"];
 export type RangeOption = Schemas["RangeOption"];
 export type RangeOptions = Schemas["RangeOptions"];
 export type RangePreset = RangeOption["preset"];
@@ -41,6 +43,10 @@ export type KalmanBetaSeries = Schemas["KalmanBetaSeries"];
 export type WorldBetaSection = Schemas["WorldBetaSection"];
 export type AlphaStrip = Schemas["AlphaStrip"];
 export type AlphaStripRow = Schemas["AlphaStripRow"];
+export type PortfolioBacktestSection = Schemas["PortfolioBacktestSection"];
+export type TargetWeightRow = Schemas["TargetWeightRow"];
+export type MacroSection = Schemas["MacroSection"];
+export type MacroRow = Schemas["MacroRow"];
 
 /** Canonical factor names and order: the five of FF5 (backend FACTOR_NAMES), then Mom, the sixth factor of FF6. */
 export const FACTOR_NAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"] as const;

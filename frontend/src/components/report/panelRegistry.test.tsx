@@ -17,6 +17,7 @@ const ORDER = [
   "exposures",
   "alpha_strip",
   "world_beta",
+  "macro",
   "returns",
   "risk",
   "rolling",
@@ -39,6 +40,7 @@ const SECTION_PANELS = {
   fragility: { id: "fragility", after: "lead-lag" },
   world_beta: { id: "world-beta", after: "alpha-strip" },
   alpha_strip: { id: "alpha-strip", after: "exposures" },
+  macro: { id: "macro", after: "world-beta" },
   residual: { id: "residual", after: "rolling" },
   kalman_betas: { id: "kalman", after: "residual" },
 } as const;

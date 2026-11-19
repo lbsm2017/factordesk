@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Hashable
 from dataclasses import dataclass
@@ -34,14 +35,15 @@ import pandas as pd
 from fastapi import Request
 
 from factordesk.api import ranges
-from factordesk.api.errors import ApiException
+from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime
-from factordesk.data.factors import FactorError
+from factordesk.data.factors import FactorError, FactorStatus
 from factordesk.data.prices import PriceHistory, Security, check_currency, security_of
 from factordesk.report.render_html import render_report_html
 from factordesk.report.schema import FactorModel, FactorReport, RangeOptions, RangePreset
 
 if TYPE_CHECKING:
+    from factordesk.api.portfolio_models import PortfolioTree
     from factordesk.section_hooks.context import SectionInputs
 
 logger = logging.getLogger(__name__)
@@ -104,6 +106,9 @@ class SingleFlight[K: Hashable, V]:
 
     def __len__(self) -> int:
         return len(self._done)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._done
 
     def keys(self) -> list[K]:
         """Cached keys, least recently used first."""
@@ -173,6 +178,34 @@ type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
 type RangesKey = tuple[str, Vintage, date]
 type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel]
+type PortfolioKey = tuple[
+    str, FactorModel, RangePreset | None, date | None, date | None, Vintage, date
+]
+
+
+def _range_text(preset: RangePreset | None, start: date | None, end: date | None) -> str:
+    """The requested range for the log: the preset, the dates, or FULL."""
+    if preset is not None:
+        return preset
+    if start is None and end is None:
+        return "FULL"
+    return f"{start or 'first'}..{end or 'last'}"
+
+
+def _log_factors(status: FactorStatus | None, now: datetime, seconds: float) -> None:
+    """One INFO line: the factor dataset, whether it came from cache or a download, its vintage."""
+    if status is None:
+        logger.info("Factors: Fama-French 5 daily, no cache record (%.1f s)", seconds)
+        return
+    stamp = _utc(status.last_download_at)
+    source = "downloaded" if stamp is not None and stamp >= now else "from cache"
+    logger.info(
+        "Factors: Fama-French 5 daily, %s, vintage %s (downloaded %s) (%.1f s)",
+        source,
+        status.last_date,
+        "unknown" if stamp is None else stamp.date(),
+        seconds,
+    )
 
 
 def _utc(ts: datetime | None) -> datetime | None:
@@ -196,6 +229,9 @@ class ReportService:
         self.reports: SingleFlight[ReportKey, FactorReport] = SingleFlight(
             self.deps.report_cache_size
         )
+        self.portfolios: SingleFlight[PortfolioKey, FactorReport] = SingleFlight(
+            self.deps.report_cache_size
+        )
         self.securities: SingleFlight[SecurityKey, Security] = SingleFlight(PRICE_CACHE_SIZE * 4)
         self.inputs: SingleFlight[tuple[Vintage, date], SectionInputs | None] = SingleFlight(1)
         self.ff6: SingleFlight[tuple[Vintage, date], pd.DataFrame] = SingleFlight(1)
@@ -215,6 +251,26 @@ class ReportService:
 
         ``model`` is the factor model, FF5 (default) or FF6 (FF5 plus momentum).
         """
+        started = time.perf_counter()
+        logger.info(
+            "Report start: %s, model %s, range %s", ticker, model, _range_text(preset, start, end)
+        )
+        try:
+            return await self._report(ticker, preset, start, end, model, started)
+        except Exception as exc:
+            category = to_api_exception(exc, ticker).code
+            logger.info("Report refused: %s, reason %s", ticker, category)
+            raise
+
+    async def _report(
+        self,
+        ticker: str,
+        preset: RangePreset | None,
+        start: date | None,
+        end: date | None,
+        model: FactorModel,
+        started: float,
+    ) -> FactorReport:
         ranges.check_request(preset, start, end)
         now = self._now()
         loaded = await self._factors()
@@ -223,11 +279,19 @@ class ReportService:
         cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
         first, last = ranges.resolve(preset, start, end, cov)
         key: ReportKey = (ticker, first, last, loaded.vintage, now.date(), model)
+        if key in self.reports:
+            logger.info(
+                "Report cache hit: %s, model %s (%.0f ms)",
+                ticker,
+                model,
+                (time.perf_counter() - started) * 1000,
+            )
 
         async def make() -> FactorReport:
             frame = await self._model_frame(loaded, now, model)
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs)
+            inputs = await self._with_macro(inputs)
 
             def build() -> FactorReport:
                 return assemble_report(
@@ -243,9 +307,83 @@ class ReportService:
                     model=model,
                 )
 
-            return await self.runtime.run(build)
+            built_at = time.perf_counter()
+            report = await self.runtime.run(build)
+            logger.info(
+                "Report built: %s, model %s in %.1f s (total %.1f s)",
+                ticker,
+                model,
+                time.perf_counter() - built_at,
+                time.perf_counter() - started,
+            )
+            return report
 
         return await self.reports.get(key, make)
+
+    async def portfolio_report(
+        self,
+        tree: PortfolioTree,
+        preset: RangePreset | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        model: FactorModel = "ff6",
+    ) -> FactorReport:
+        """The report of a portfolio tree (``api.portfolio_report``): in-memory cache only.
+
+        The key is the SHA-256 of the canonical tree JSON, the model, the range as asked, the
+        factor vintage and the day, so a new price day or factor file never serves an old result.
+        Nothing about the portfolio is written to disk or logged beyond counts.
+        """
+        from factordesk.api import portfolio_report as pr
+
+        started = time.perf_counter()
+        ranges.check_request(preset, start, end)
+        plan = pr.plan_of(tree)
+        logger.info(
+            "Portfolio report start: %d instruments, model %s, range %s",
+            len(plan.rows),
+            model,
+            _range_text(preset, start, end),
+        )
+        now = self._now()
+        loaded = await self._factors()
+        key: PortfolioKey = (plan.digest, model, preset, start, end, loaded.vintage, now.date())
+        if key in self.portfolios:
+            logger.info("Portfolio report cache hit")
+
+        async def make() -> FactorReport:
+            for ticker in plan.tickers:
+                await self._security(ticker, now.date())  # refuses a currency other than USD
+            histories = await self.runtime.run(
+                pr.fetch_histories, self.deps.price_provider, plan.tickers
+            )
+            frame = await self._model_frame(loaded, now, model)
+            inputs = await self._with_world_benchmark(None)
+            inputs = await self._with_macro(inputs)
+
+            def build() -> FactorReport:
+                return pr.build_portfolio_report(
+                    plan,
+                    histories,
+                    frame,
+                    model,
+                    now=now,
+                    factors_downloaded_at=loaded.vintage.downloaded_at,
+                    preset=preset,
+                    start=start,
+                    end=end,
+                    inputs=inputs,
+                )
+
+            report = await self.runtime.run(build)
+            logger.info("Portfolio report built in %.1f s", time.perf_counter() - started)
+            return report
+
+        try:
+            return await self.portfolios.get(key, make)
+        except Exception as exc:
+            logger.info("Portfolio report refused: reason %s", to_api_exception(exc).code)
+            raise
 
     async def range_options(self, ticker: str) -> RangeOptions:
         """Availability of every preset for an already validated ticker."""
@@ -287,12 +425,15 @@ class ReportService:
             current = loaded.vintage
             self.reports.discard(lambda key: key[3] == current)
             self.ranges.discard(lambda key: key[1] == current)
+            self.portfolios.discard(lambda key: key[5] == current)
         return loaded
 
     async def _load_factors(self) -> LoadedFactors:
         now = self._now()
+        began = time.perf_counter()
         frame = await self.runtime.run(self.deps.load_factors, False, now)
         status = await self.runtime.run(self.deps.factor_status, now)
+        _log_factors(status, now, time.perf_counter() - began)
         if status is None:  # the loader always caches what it returns; be safe anyway
             last = pd.Timestamp(str(frame.index[-1])).date()
             return LoadedFactors(Vintage(last, None), frame)
@@ -375,9 +516,31 @@ class ReportService:
             inputs or SectionInputs(), world_benchmark=benchmark, europe_benchmark=europe
         )
 
+    async def _with_macro(self, inputs: SectionInputs | None) -> SectionInputs | None:
+        """``inputs`` plus the macro section's funds and dollar index (None: not wired)."""
+        loader = self.deps.load_macro
+        if loader is None:
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import SectionInputs
+
+        macro = await self.runtime.run(loader)
+        return dataclasses.replace(inputs or SectionInputs(), macro=macro)
+
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:
-            return await self.runtime.run(self.deps.price_provider.fetch, ticker)
+            asked = self._now()
+            began = time.perf_counter()
+            history = await self.runtime.run(self.deps.price_provider.fetch, ticker)
+            logger.info(
+                "Prices %s: %s, %d days, %.1f s",
+                ticker,
+                "downloaded" if history.fetched_at >= asked else "from cache",
+                len(history.frame),
+                time.perf_counter() - began,
+            )
+            return history
 
         return await self.prices.get((ticker, today), make)
 

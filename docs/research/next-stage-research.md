@@ -534,6 +534,56 @@ Researched on 2026-11-19. Each candidate was tested against the causal-disciplin
 - Asness, Frazzini & Pedersen (2019), "Quality minus junk", *Review of Accounting Studies* 24(1).
 - FRED DTWEXBGS. https://fred.stlouisfed.org/series/DTWEXBGS
 
+## H. Lessons from MSCI Barra and FaCS (2026-11-19)
+
+Researched at the owner's request. Key: [V] means read in the source, [S] means seen only in a search snippet, [M] means from memory.
+
+### H1. How Barra and FaCS work
+
+- **Descriptors [V]:** each stock descriptor (book-to-price, earnings yield, leverage and so on) is winsorised and then standardised to a cap-weighted mean of 0 and an equal-weighted standard deviation of 1 over the GEMLT universe (based on MSCI ACWI IMI). Descriptors are combined into factors.
+- **Factor returns [S]:** they come from daily cross-sectional regressions on style and industry exposures (Menchero, Orr & Wang 2011, USE4).
+- **Fund exposures [V]:** a fund's exposure is the holdings-weighted average of its stocks' exposures.
+- **FaCS families [V]:** FaCS folds 16 GEMLT factors into 8 families. Extracted weights:
+  - Value: Earnings Yield 60%, Book-to-Price 30%, LT Reversal 10%.
+  - Size: Size 90%, Mid Cap −10%.
+  - Quality: Profitability, Investment Quality and Earnings Quality 25% each; Leverage and Earnings Variability −12.5% each.
+  - Volatility: Beta 60%, Residual Volatility 40%.
+  - The PDF table came out garbled, so check the row assignment before citing it.
+- Source: MSCI (2018), *MSCI FaCS Methodology*. https://www.msci.com/downloads/web/msci-com/research-and-insights/blog-post/factors-and-esg-the-truth-behind-three-myths/factors-and-esg-the-truth-behind-three-myths-MSCI-FaCS-Methodology.pdf
+
+### H2. What a free, returns-based tool can and cannot borrow
+
+- **Not feasible:**
+  - True FaCS exposures, descriptors and cross-sectional factor returns. These need holdings, fundamentals and a stock universe.
+  - The Growth family.
+  - The pairwise-correlation and short-interest components of crowding.
+- **Feasible now:**
+  - A family-grouped display from FF5 + Mom.
+  - Active sensitivities against a benchmark.
+  - Monthly-only long-short spreads from the Ken French univariate sorts: beta, variance, residual variance, E/P, CF/P, D/P, accruals and net issues. The low-vol spread carries a large negative market beta.
+  - Crowding-lite (US): a value spread from the French BE/ME portfolio files (log of the high minus log of the low "Sum of BE / Sum of ME"), plus factor-volatility and factor-reversal z-scores.
+- **A different concept:** the Pastor-Stambaugh liquidity factor measures liquidity-risk beta, not Barra's turnover liquidity.
+- **Licences:** AQR QMJ/BAB terms are unread, so do not bundle that data.
+- **Accuracy limits:** in Morningstar studies, holdings-based style analysis was more accurate than returns-based (Kaplan 2003; Rekenthaler, Gambera & Charlson 2004; https://gladmainnew.morningstar.com/directhelp/Returns_vs_HoldingsPaper.pdf). Returns-based sensitivities mislead in these cases:
+  - collinear factors;
+  - style drift;
+  - short records;
+  - smoothed returns;
+  - single stocks.
+
+  A regression beta is a covariance, not a characteristic, so factordesk calls them "factor sensitivities".
+- **Crowding model:** MSCI's integrated crowding model has five components: valuation spread, short interest, pairwise correlation, factor volatility and factor reversal. Sources: Bayraktar et al. (2015), "Lost in the Crowd?"; Bonne et al. (2018). https://support.msci.com/documents/1296102/15220828/MSCI-Factor-Crowding-Model-cfs-en-2019.pdf
+
+### H3. Owner selection (2026-11-19)
+
+Into the Sprint 2 backlog:
+
+- factor families view;
+- crowding-lite (US);
+- low-vol and monthly spreads, after their own design round.
+
+Not selected: active-sensitivity bars against a benchmark. See [Sprint 2 backlog](../sprints/sprint-2-backlog.md).
+
 ## Verification results (2026-11-19)
 
 ### V1. Sharpe-ratio formulas, checked against the primary texts

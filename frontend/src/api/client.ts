@@ -34,6 +34,7 @@ const KNOWN_CODES: readonly ErrorCode[] = [
   "bad_request",
   "invalid_upload",
   "upload_too_large",
+  "invalid_portfolio",
 ];
 
 function isApiError(value: unknown): value is ApiError {
@@ -73,6 +74,8 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** A multipart body (the track-record upload); the browser sets the content type and boundary. */
   body?: FormData;
+  /** A JSON body (the portfolio run); sent with the JSON content type. Not together with `body`. */
+  json?: unknown;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -80,8 +83,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   try {
     response = await fetch(apiUrl(path, options.query), {
       method: options.method ?? "GET",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(options.json !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
       ...(options.body ? { body: options.body } : {}),
+      ...(options.json !== undefined ? { body: JSON.stringify(options.json) } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     });
   } catch (error) {

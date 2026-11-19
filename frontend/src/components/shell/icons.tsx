@@ -83,6 +83,50 @@ const PATHS = {
       <path d="M16 3v4h-4" />
     </>
   ),
+  caret: <path d="m5.5 8 4.5 4.5L14.5 8" />,
+  plus: <path d="M10 4v12M4 10h12" />,
+  swap: <path d="M3 7h10l-3-3M17 13H7l3 3" />,
+  more: (
+    <>
+      <circle cx="4.5" cy="10" r="1.2" fill="currentColor" />
+      <circle cx="10" cy="10" r="1.2" fill="currentColor" />
+      <circle cx="15.5" cy="10" r="1.2" fill="currentColor" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="9" cy="9" r="5.5" />
+      <path d="m13.2 13.2 4 4" />
+    </>
+  ),
+  check: <path d="m4.5 10.5 3.5 3.5 7.5-8" />,
+  warn: (
+    <>
+      <path d="M10 2.8 18 16.8H2z" />
+      <path d="M10 8v4M10 14.4v.3" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 9v5M10 6.2v.3" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="7" y="7" width="9" height="9" rx="1.5" />
+      <path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="m4 16 .8-3.6 8.7-8.7a1.6 1.6 0 0 1 2.3 0l.5.5a1.6 1.6 0 0 1 0 2.3l-8.7 8.7z" />
+      <path d="m12 5.5 2.5 2.5" />
+    </>
+  ),
+  trash: <path d="M4 6h12M8 6V4h4v2M5.5 6l.7 10h7.6l.7-10" />,
+  play: <path d="M6.5 4.5v11l9-5.5z" fill="currentColor" />,
+  pie: <path d="M4 16V9M10 16V4M16 16v-5" />,
 } as const;
 
 export type IconName = keyof typeof PATHS;

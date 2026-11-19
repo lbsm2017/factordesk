@@ -85,6 +85,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Library
+         * @description The 44 lines of the Asset Class Library, in the owner's order, with their proxies.
+         */
+        get: operations["get_library_api_portfolio_library_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/report/upload": {
         parameters: {
             query?: never;
@@ -99,6 +119,32 @@ export interface paths {
          * @description The factor report of an uploaded monthly track record (kept in memory, never stored).
          */
         post: operations["upload_report_api_report_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/report/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Portfolio Report
+         * @description The factor report of a backtested portfolio tree (kept in memory, never stored).
+         *
+         *     The tree is flattened to its instruments with a weight above 0. Prices come from Yahoo
+         *     (adjusted close), the weights drift and reset to target at each month-end, and the net daily
+         *     returns go through the same factor analysis as a ticker. The unallocated weight is held in
+         *     USD cash, which earns the risk-free rate. Only instruments with a weight above 0 limit the
+         *     window. The model defaults to ff6; a range or dates cut the analysis sample.
+         */
+        post: operations["portfolio_report_api_report_portfolio_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -322,11 +368,41 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request" | "invalid_upload" | "upload_too_large";
+            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request" | "invalid_upload" | "upload_too_large" | "invalid_portfolio";
             /** Message */
             message: string;
             /** Action */
             action: string;
+        };
+        /**
+         * AssetClassGroup
+         * @description Level 1: an asset class (Cash, Fixed Income, ...) with its sub-asset class groups.
+         */
+        AssetClassGroup: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "group";
+            /** Label */
+            label: string;
+            /** Children */
+            children: components["schemas"]["SubAssetClassGroup"][];
+        };
+        /**
+         * AssetClassLibrary
+         * @description The library: lines in the owner's order, grouped by asset class.
+         */
+        AssetClassLibrary: {
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+            /** Lines */
+            lines: components["schemas"]["LibraryLine"][];
         };
         /**
          * AuditFinding
@@ -803,6 +879,10 @@ export interface components {
             tail_risk: components["schemas"]["TailRiskSection"] | null;
             /** @description Alpha under CAPM, FF3, FF5 and FF6 on the same rows, not ranked; absent (not null) when not computed. */
             alpha_strip?: components["schemas"]["AlphaStrip"] | null;
+            /** @description How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio. */
+            portfolio_backtest?: components["schemas"]["PortfolioBacktestSection"] | null;
+            /** @description Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed. */
+            macro?: components["schemas"]["MacroSection"] | null;
         };
         /**
          * FactorStat
@@ -907,6 +987,28 @@ export interface components {
             version: string;
             /** Schema Version */
             schema_version: string;
+        };
+        /**
+         * Instrument
+         * @description A leaf: one holding (a ticker) or the cash leaf, with its target weight.
+         */
+        Instrument: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "holding" | "cash";
+            /** Ticker */
+            ticker: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Target weight as a decimal fraction.
+             */
+            weight: number;
         };
         /**
          * KalmanBetaSeries
@@ -1091,6 +1193,240 @@ export interface components {
              */
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
+        };
+        /**
+         * LibraryLine
+         * @description One sub-asset class of the owner's Asset Class Library and the proxy that stands for it.
+         */
+        LibraryLine: {
+            /** Id */
+            id: string;
+            /** Asset Class */
+            asset_class: string;
+            /** Sub Asset Class */
+            sub_asset_class: string;
+            /**
+             * Proxy
+             * @description A ticker, "RF" for the risk-free rate, or null when there is no proxy yet.
+             */
+            proxy: string | null;
+            /**
+             * Proxy Kind
+             * @enum {string}
+             */
+            proxy_kind: "etf" | "risk_free" | "listed_proxy" | "none";
+            /**
+             * Note
+             * @description The caveat a reader should see with the proxy.
+             */
+            note: string;
+            /**
+             * First Date
+             * @description First daily price date of the proxy.
+             */
+            first_date: string | null;
+            /**
+             * Currency
+             * @description Quote currency of the proxy.
+             */
+            currency: string | null;
+        };
+        /**
+         * MacroLeg
+         * @description One fund behind a factor, with its first price date.
+         */
+        MacroLeg: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Role
+             * @description What it feeds, for example "TERM = IEF minus RF".
+             */
+            role: string;
+            /**
+             * First Date
+             * @description First price date; None when not fetched.
+             */
+            first_date: string | null;
+        };
+        /**
+         * MacroRow
+         * @description One factor of the macro regression.
+         */
+        MacroRow: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "mkt_rf" | "term" | "def" | "comm" | "infl" | "usd";
+            /**
+             * Name
+             * @description Display name: "Mkt-RF", "TERM", "DEF", "COMM", "INFL", "USD".
+             */
+            name: string;
+            /**
+             * Label
+             * @description Plain label: Market, Rates, Credit, Commodities, Inflation, US dollar.
+             */
+            label: string;
+            /**
+             * Definition
+             * @description How the factor is built, for example "IEF minus RF".
+             */
+            definition: string;
+            /**
+             * Note
+             * @description Caveat on the factor, for example the DEF label.
+             */
+            note: string | null;
+            /**
+             * Beta
+             * @description Raw beta (the summed same-day and lag beta for the dollar).
+             */
+            beta: number;
+            /**
+             * Se
+             * @description Newey-West HAC standard error of beta.
+             */
+            se: number;
+            /**
+             * T
+             * @description HAC t-statistic of beta.
+             */
+            t: number;
+            /**
+             * P
+             * @description Two-sided p-value of t.
+             */
+            p: number;
+            /**
+             * Ci Low
+             * @description Lower end of the 95% interval, beta - q * se.
+             */
+            ci_low: number;
+            /**
+             * Ci High
+             * @description Upper end of the 95% interval, beta + q * se.
+             */
+            ci_high: number;
+            /**
+             * Tag
+             * @description Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the factors of this regression.
+             * @enum {string}
+             */
+            tag: "reliable" | "noise";
+            /**
+             * Vif
+             * @description Variance inflation factor among the factors.
+             */
+            vif: number;
+            /**
+             * Beta Same Day
+             * @description Dollar row of a daily subject: the same-day part of the summed beta.
+             */
+            beta_same_day: number | null;
+            /**
+             * Beta Lag
+             * @description Dollar row of a daily subject: the previous-day part of the summed beta.
+             */
+            beta_lag: number | null;
+        };
+        /**
+         * MacroSection
+         * @description The macro sensitivities: one row per factor, one regression.
+         */
+        MacroSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Model Note
+             * @description Fixed note: separate regression, raw betas, not alpha.
+             */
+            model_note: string;
+            /**
+             * N Obs
+             * @description Rows of the regression.
+             */
+            n_obs: number;
+            /**
+             * N Sample
+             * @description Rows of the analysis sample before the funds.
+             */
+            n_sample: number;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "monthly";
+            /**
+             * Hac Lags
+             * @description Newey-West lag of the fit.
+             */
+            hac_lags: number;
+            /**
+             * T Reference
+             * @description Reference distribution of the p-values; None when not computed.
+             */
+            t_reference: ("normal" | "student_t") | null;
+            /**
+             * R2
+             * @description R squared of the regression.
+             */
+            r2: number | null;
+            /**
+             * Adj R2
+             * @description Adjusted R squared of the regression.
+             */
+            adj_r2: number | null;
+            /**
+             * Rows
+             * @description Market, rates, credit, commodities, inflation, dollar.
+             */
+            rows: components["schemas"]["MacroRow"][];
+            /**
+             * Correlation Codes
+             * @description Factors of the correlation matrix, in row and column order.
+             */
+            correlation_codes: ("mkt_rf" | "term" | "def" | "comm" | "infl" | "usd")[];
+            /**
+             * Correlation
+             * @description Correlation matrix of the factors.
+             */
+            correlation: number[][];
+            /**
+             * Legs
+             * @description The funds behind the factors, with first dates.
+             */
+            legs: components["schemas"]["MacroLeg"][];
+            /**
+             * Window Limited By
+             * @description The fund whose first date starts the window, when it is later than the subject's own start; None otherwise.
+             */
+            window_limited_by: string | null;
+            /**
+             * Usd Included
+             * @description False when the dollar index was unavailable.
+             */
+            usd_included: boolean;
+            /**
+             * Usd Note
+             * @description Why the dollar row is missing, or a note on the dollar series.
+             */
+            usd_note: string | null;
+            /**
+             * Usd Lag Note
+             * @description Explains the summed dollar beta of a daily subject; None for monthly.
+             */
+            usd_lag_note: string | null;
         };
         /**
          * MultiDayRegression
@@ -1369,6 +1705,114 @@ export interface components {
              * @description True when the 95% interval contains 0; None when the ratio is not defined.
              */
             ci_includes_zero: boolean | null;
+        };
+        /**
+         * PortfolioBacktestSection
+         * @description The backtest behind a portfolio report. Status is always ``ok`` when the section exists.
+         */
+        PortfolioBacktestSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Window Start
+             * Format: date
+             * @description First day with a portfolio return.
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date
+             * @description Last day with a portfolio return.
+             */
+            window_end: string;
+            /**
+             * Start Limited By
+             * @description Instruments whose history starts latest and so set the window start (several on a tie).
+             */
+            start_limited_by: string[];
+            /**
+             * End Limited By
+             * @description Instruments whose history ends earliest and so set the window end. USD cash ends with the factor file, so it can set the end.
+             */
+            end_limited_by: string[];
+            /**
+             * N Instruments
+             * @description Instruments with a target weight above 0.
+             */
+            n_instruments: number;
+            /**
+             * N Rebalances
+             * @description Month-end closes at which the weights were reset to target.
+             */
+            n_rebalances: number;
+            /**
+             * N Dates Dropped
+             * @description Trading days inside the window on which at least one instrument had no price. They are skipped for all instruments.
+             */
+            n_dates_dropped: number;
+            /**
+             * Data Note
+             * @description Plain-words note on those skipped days; None when there were none.
+             */
+            data_note: string | null;
+            /**
+             * Cost Bps
+             * @description Cost per unit of turnover, basis points.
+             */
+            cost_bps: number;
+            /**
+             * Total Cost
+             * @description Sum over the window of the cost paid at each rebalance, as a fraction of the portfolio value at that close.
+             */
+            total_cost: number;
+            /**
+             * Average Turnover
+             * @description Mean one-way turnover of a rebalance, as a fraction of the portfolio; 0 when there was no rebalance.
+             */
+            average_turnover: number;
+            /**
+             * Unallocated Weight
+             * @description Weight left over by the targets; held in USD cash.
+             */
+            unallocated_weight: number;
+            /**
+             * Survivorship Note
+             * @description Fixed warning carried by every backtest.
+             */
+            survivorship_note: string;
+            /**
+             * Weights
+             * @description Target weights, in tree order.
+             */
+            weights: components["schemas"]["TargetWeightRow"][];
+        };
+        /**
+         * PortfolioTree
+         * @description A named portfolio: the tree and the cost of a rebalance.
+         */
+        PortfolioTree: {
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+            /** Name */
+            name: string;
+            /**
+             * Cost Bps
+             * @description Cost per unit of turnover.
+             */
+            cost_bps: number;
+            root: components["schemas"]["RootGroup"];
         };
         /**
          * PowerStatement
@@ -2401,6 +2845,20 @@ export interface components {
                 [key: string]: (number | null)[];
             };
         };
+        /** RootGroup */
+        RootGroup: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "group";
+            /** Label */
+            label: string;
+            /** Children */
+            children: components["schemas"]["AssetClassGroup"][];
+        };
         /**
          * SampleInfo
          * @description Sample metadata carried by every statistic (M0.8).
@@ -2672,6 +3130,25 @@ export interface components {
             difference_p: number | null;
         };
         /**
+         * SubAssetClassGroup
+         * @description Level 2: one line of the library with its instruments.
+         */
+        SubAssetClassGroup: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "group";
+            /** Label */
+            label: string;
+            /** Library Id */
+            library_id: string;
+            /** Children */
+            children: components["schemas"]["Instrument"][];
+        };
+        /**
          * SubjectInfo
          * @description What the report is about when it is not a daily ticker (written only for those subjects).
          *
@@ -2882,6 +3359,27 @@ export interface components {
              * @description Random seed of the bootstrap.
              */
             seed: number;
+        };
+        /**
+         * TargetWeightRow
+         * @description One instrument and its target weight.
+         */
+        TargetWeightRow: {
+            /**
+             * Label
+             * @description Display name of the instrument (a sub-asset class line).
+             */
+            label: string;
+            /**
+             * Ticker
+             * @description Yahoo ticker; None for a USD cash instrument.
+             */
+            ticker: string | null;
+            /**
+             * Weight
+             * @description Target weight as a decimal fraction.
+             */
+            weight: number;
         };
         /** TickerSuggestion */
         TickerSuggestion: {
@@ -3136,6 +3634,26 @@ export interface operations {
             };
         };
     };
+    get_library_api_portfolio_library_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetClassLibrary"];
+                };
+            };
+        };
+    };
     upload_report_api_report_upload_post: {
         parameters: {
             query?: never;
@@ -3168,6 +3686,84 @@ export interface operations {
                 };
             };
             /** @description The file or a form field cannot be used, or the record is too short. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The report could not be computed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The downloaded factor file failed validation. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description A data source could not be reached or refused. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    portfolio_report_api_report_portfolio_post: {
+        parameters: {
+            query?: {
+                /** @description Range preset; not together with start or end. */
+                range?: ("3Y" | "5Y" | "10Y" | "FULL") | null;
+                /** @description First requested date, YYYY-MM-DD. */
+                start?: string | null;
+                /** @description Last requested date, YYYY-MM-DD. */
+                end?: string | null;
+                /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
+                model?: "ff5" | "ff6";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTree"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorReport"];
+                };
+            };
+            /** @description The range or the dates are not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The portfolio is not valid (a total over 100%, more than 50 instruments, a weight on a line with no proxy), an instrument has no prices, is not quoted in US dollars or shares no trading period with the others, or the history is too short. */
             422: {
                 headers: {
                     [name: string]: unknown;

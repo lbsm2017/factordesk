@@ -18,6 +18,16 @@ describe("apiUrl", () => {
 });
 
 describe("apiRequest", () => {
+  it("sends a JSON body with the JSON content type", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(respond(200, { ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    await apiRequest("/api/report/portfolio", { method: "POST", json: { tree: { name: "A" }, cost_bps: 10 } });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe('{"tree":{"name":"A"},"cost_bps":10}');
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+  });
+
   it("returns the parsed body on 200", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(respond(200, { status: "ok" })));
     await expect(apiRequest("/api/health")).resolves.toEqual({ status: "ok" });

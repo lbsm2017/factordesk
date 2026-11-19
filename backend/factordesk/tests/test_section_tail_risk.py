@@ -215,6 +215,25 @@ def test_short_series_is_insufficient_and_constant_series_fails() -> None:
     assert flat.reason is not None and "constant" in flat.reason and flat.figures is None
 
 
+def test_the_tail_risk_window_is_the_analysed_window_for_a_3y_range() -> None:
+    """A report limited to the last 3 years describes those days, not the whole history."""
+    case = make_case(3001, n=1500)
+    last = case.dates[-1].date()
+    start = (pd.Timestamp(last) - pd.DateOffset(years=3)).date()
+    full = assemble_report("STK", case.stock, case.factors, now=NOW, factors_downloaded_at=None)
+    cut = assemble_report(
+        "STK", case.stock, case.factors, start=start, now=NOW, factors_downloaded_at=None
+    )
+    assert full.tail_risk is not None and full.tail_risk.series is not None
+    assert cut.tail_risk is not None and cut.tail_risk.series is not None
+    window_n = cut.regression.sample.n
+    assert abs(window_n - 756) <= 0.05 * 756  # about 3 years of daily rows
+    assert cut.tail_risk.series.n_obs == window_n
+    assert cut.tail_risk.sample.start == cut.regression.sample.start
+    assert cut.tail_risk.series.n_obs < full.tail_risk.series.n_obs
+    assert full.tail_risk.series.n_obs == full.regression.sample.n
+
+
 def test_missing_returns_are_dropped_not_fatal() -> None:
     _, ctx = daily_report()
     holed = ctx.subject.returns.copy()

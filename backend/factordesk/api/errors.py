@@ -45,6 +45,7 @@ _STATUS: dict[ErrorCode, int] = {
     "bad_request": 400,
     "invalid_upload": 422,
     "upload_too_large": 413,
+    "invalid_portfolio": 422,
 }
 
 _MAX_ECHO = 120
@@ -235,9 +236,52 @@ def validation_error(errors: Sequence[object], ticker: str | None) -> ApiExcepti
     )
 
 
+PORTFOLIO_REPORT_PATH = "/api/report/portfolio"
+
+
+def _in_body(errors: Sequence[object]) -> bool:
+    """True when a validation error is about the request body (not a query parameter)."""
+    for item in errors:
+        if isinstance(item, dict):
+            loc: object = cast(dict[str, object], item).get("loc")
+            if isinstance(loc, list) and cast(list[object], loc)[:1] == ["body"]:
+                return True
+    return False
+
+
+def portfolio_validation_error(errors: Sequence[object]) -> ApiException:
+    """The 422 for a portfolio tree that fails validation: the first problem, in plain words.
+
+    A rule of the tree model (a total over 100%, more than 50 instruments, a weight on a line
+    with no proxy) already names the problem in its message; any other error names where it is.
+    """
+    first: dict[str, object] = {}
+    for item in errors:
+        if isinstance(item, dict):
+            first = cast(dict[str, object], item)
+            break
+    text = str(first.get("msg", "")).strip()
+    where = ""
+    if text.startswith("Value error, "):
+        text = text.removeprefix("Value error, ")
+    else:
+        loc: object = first.get("loc")
+        parts = [str(p) for p in cast(list[object], loc)][1:] if isinstance(loc, list) else []
+        where = ".".join(parts)
+    detail = one_line(text) if text else "it could not be read"
+    message = f"The portfolio is not valid: {f'{where}: ' if where else ''}{detail}."
+    return ApiException(
+        "invalid_portfolio",
+        message,
+        "Correct the portfolio, then run it again.",
+    )
+
+
 async def _validation_handler(request: Request, exc: Exception) -> Response:
     assert isinstance(exc, RequestValidationError)
     errors = jsonable_encoder(exc.errors(), exclude={"input", "ctx", "url"})
+    if request.url.path == PORTFOLIO_REPORT_PATH and _in_body(errors):
+        return _respond(portfolio_validation_error(errors))
     return _respond(validation_error(errors, _ticker_of(request)))
 
 
