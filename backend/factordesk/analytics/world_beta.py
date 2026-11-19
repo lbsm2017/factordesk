@@ -34,6 +34,10 @@ BENCHMARK_TICKER = "ACWI"
 """Yahoo ticker of the proxy: iShares MSCI ACWI ETF, USD, US exchange, history from 2008-03."""
 MIN_OVERLAP = 252
 """Fewest common days with a result (one trading year); fewer is ``insufficient_data``."""
+EXACT_FIT_RELATIVE_SSR = 1e-20
+"""Residual sum of squares, as a share of the total sum of squares, at or below which the fit is
+exact: the residual is rounding noise, so a t value built on it would be the ratio of two
+rounding errors."""
 
 Comparison = Literal["about_the_same", "higher", "lower"]
 
@@ -50,7 +54,8 @@ class BetaEstimate:
     correlation: float
     alpha_annual: float
     alpha_t: float | None
-    """HAC t of alpha; ``None`` when its standard error is zero (an exact fit)."""
+    """HAC t of alpha; ``None`` on an exact fit (residuals are rounding noise, see
+    ``EXACT_FIT_RELATIVE_SSR``) or when its standard error is zero."""
     nobs: int
     lags: int
 
@@ -75,6 +80,10 @@ def single_factor_beta(y: FloatArray, x: FloatArray) -> BetaEstimate:
         fit = ols_hac(yv, xv[:, None], names=(BENCHMARK_TICKER,))
     beta, se = float(fit.params[1]), float(fit.bse[1])
     alpha_se = float(fit.bse[0])
+    resid = yv - float(fit.params[0]) - beta * xv
+    ssr = float(resid @ resid)
+    tss = float(np.sum((yv - yv.mean()) ** 2))
+    exact_fit = ssr <= EXACT_FIT_RELATIVE_SSR * tss
     corr = float(np.corrcoef(yv, xv)[0, 1])
     values = (beta, se, float(fit.ci_low[1]), float(fit.ci_high[1]), fit.rsquared, corr)
     if not all(math.isfinite(v) for v in values):
@@ -87,7 +96,7 @@ def single_factor_beta(y: FloatArray, x: FloatArray) -> BetaEstimate:
         r2=min(max(fit.rsquared, 0.0), 1.0),
         correlation=max(-1.0, min(1.0, corr)),
         alpha_annual=A * float(fit.params[0]),
-        alpha_t=float(fit.params[0]) / alpha_se if alpha_se > 0.0 else None,
+        alpha_t=None if exact_fit or not alpha_se > 0.0 else float(fit.params[0]) / alpha_se,
         nobs=fit.nobs,
         lags=fit.lags,
     )

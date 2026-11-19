@@ -100,7 +100,27 @@ def test_twb02_stock_equal_to_the_benchmark_has_beta_one_and_r2_one() -> None:
     assert est.correlation == pytest.approx(1.0, abs=1e-12)
     assert est.alpha_annual == pytest.approx(0.0, abs=1e-9)
     assert est.se_hac < 1e-12
-    assert est.alpha_t is None or math.isfinite(est.alpha_t)
+    assert est.alpha_t is None  # the residual is rounding noise: no t is reported
+
+
+@pytest.mark.parametrize("scale, shift", [(1.0, 0.0), (2.0, 0.0), (1.0, 0.001), (0.5, -0.0003)])
+def test_twb02b_an_exact_fit_has_no_alpha_t_whatever_the_slope_and_intercept(
+    scale: float, shift: float
+) -> None:
+    x = make_case(702).x
+    est = single_factor_beta(scale * x + shift, x)
+    assert est.beta == pytest.approx(scale, abs=1e-9)
+    assert est.r2 == pytest.approx(1.0, abs=1e-12)
+    assert est.alpha_t is None
+
+
+def test_twb02c_a_noisy_fit_keeps_its_alpha_t() -> None:
+    case = make_case(702)
+    est = single_factor_beta(case.y, case.x)
+    assert est.alpha_t is not None and math.isfinite(est.alpha_t)
+    # A residual one part in 1e6 of the signal is small, but it is not rounding noise.
+    tiny = single_factor_beta(case.x + 1e-6 * make_case(705).x, case.x)
+    assert tiny.alpha_t is not None and math.isfinite(tiny.alpha_t)
 
 
 def test_twb03_independent_stock_has_beta_near_zero() -> None:
