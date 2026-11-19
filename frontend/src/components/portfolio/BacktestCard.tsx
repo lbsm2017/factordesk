@@ -7,8 +7,13 @@ function pct(x: number, digits = 1): string {
 
 /** "IGOV" or "IGOV and EMB" or "A, B and C". */
 function names(list: readonly string[]): string {
-  if (list.length <= 1) return list[0] ?? "none";
-  return `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
+  // The API names a holding "IEF (IEF)" when label and ticker agree.
+  const clean = list.map((name) => {
+    const same = /^(\S+) \((\S+)\)$/.exec(name);
+    return same !== null && same[1] === same[2] ? same[1] : name;
+  });
+  if (clean.length <= 1) return clean[0] ?? "none";
+  return `${clean.slice(0, -1).join(", ")} and ${clean[clean.length - 1]}`;
 }
 
 /**

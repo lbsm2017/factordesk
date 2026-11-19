@@ -32,4 +32,9 @@ describe("BacktestCard", () => {
     expect(card.getByText("4 trading days without a full set of prices")).toBeTruthy();
     expect(card.getByText("Four days were skipped.")).toBeTruthy();
   });
+
+  it("shows a holding once when its label and ticker agree", () => {
+    render(<BacktestCard section={{ ...base, start_limited_by: ["IEF (IEF)"] }} />);
+    expect(screen.getByText("IEF begins")).toBeTruthy();
+  });
 });
