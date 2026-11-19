@@ -511,6 +511,7 @@ def test_the_daily_section_reports_betas_window_vif_and_the_note() -> None:
     assert s.correlation_codes == [r.code for r in s.rows]
     assert len(s.correlation) == 6 and all(len(row) == 6 for row in s.correlation)
     assert s.n_obs == 1199 and s.sample.n == 1199 and s.n_sample == 1200
+    assert s.window_limited_by is None  # every fund starts before the subject
     assert s.sample.start is not None and s.sample.end is not None
     assert s.r2 is not None and s.adj_r2 is not None and s.adj_r2 <= s.r2
     assert {leg.ticker for leg in s.legs} == {*LEG_TICKERS, DOLLAR_SERIES}

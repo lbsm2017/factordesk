@@ -153,11 +153,17 @@ def _rows(fit: MacroFit) -> list[MacroRow]:
 
 
 def _limiting_leg(legs: list[MacroLeg], first_row: date, subject_start: date) -> str | None:
-    """The fund with the latest first date, when the window starts later than the subject."""
+    """The fund with the latest first date, only when it starts on or after the subject.
+
+    A fund that starts before the subject limits nothing: the first row of a daily regression is
+    always dropped for the dollar lag, which is not the fund's doing.
+    """
     dated = [leg for leg in legs if leg.first_date is not None]
     if not dated or first_row <= subject_start:
         return None
     latest = max(dated, key=lambda leg: leg.first_date or date.min)
+    if latest.first_date is None or latest.first_date < subject_start:
+        return None
     return latest.ticker
 
 
