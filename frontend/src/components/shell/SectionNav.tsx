@@ -43,15 +43,23 @@ export function auditBadge(report: FactorReport | undefined): { count: number; e
   return { count: serious.length, error: serious.some((f) => f.severity === "error") };
 }
 
-/** The items whose panel is inside `root`, in page order within each group. */
-function presentItems(root: HTMLElement): NavItem[] {
+interface Entry {
+  item: NavItem;
+  el: HTMLElement;
+}
+
+/** The items whose panel is inside `root`, with their elements, in page order. */
+function presentEntries(root: HTMLElement): Entry[] {
   const found = NAV_ITEMS.flatMap((item) => {
     const el = document.getElementById(item.id);
     return el && root.contains(el) ? [{ item, el }] : [];
   });
-  found.sort((a, b) => (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-  const items = found.map((f) => f.item);
-  return [...items.filter((i) => !i.deeper), ...items.filter((i) => i.deeper)];
+  return found.sort((a, b) => (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+}
+
+/** Same items on the same elements (a lazy panel replaces its placeholder element). */
+function sameEntries(a: readonly Entry[], b: readonly Entry[]): boolean {
+  return a.length === b.length && a.every((e, i) => e.item === b[i]?.item && e.el === b[i]?.el);
 }
 
 function reducedMotion(): boolean {
@@ -73,14 +81,14 @@ export interface SectionNavProps {
  * to the panel, moves focus to its heading and updates the hash without a new history entry.
  */
 export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
-  const [items, setItems] = useState<NavItem[]>([]);
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
     if (root === null) return;
     const scan = () => {
-      const next = presentItems(root);
-      setItems((prev) => (prev.map((i) => i.id).join() === next.map((i) => i.id).join() ? prev : next));
+      const next = presentEntries(root);
+      setEntries((prev) => (sameEntries(prev, next) ? prev : next));
     };
     scan();
     const observer = new MutationObserver(scan);
@@ -89,11 +97,8 @@ export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
   }, [root]);
 
   useEffect(() => {
-    if (items.length === 0 || typeof IntersectionObserver === "undefined") return;
-    const ordered = NAV_ITEMS.flatMap((item) => {
-      const el = items.some((i) => i.id === item.id) ? document.getElementById(item.id) : null;
-      return el ? [el] : [];
-    }).sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    if (entries.length === 0 || typeof IntersectionObserver === "undefined") return;
+    const ordered = entries.map((e) => e.el);
     let frame = 0;
     const pick = () => {
       frame = 0;
@@ -116,7 +121,7 @@ export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
       window.removeEventListener("scroll", schedule);
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
-  }, [items]);
+  }, [entries]);
 
   const go = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
     const target = document.getElementById(id);
@@ -134,7 +139,9 @@ export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
     setActive(id);
   };
 
-  if (items.length === 0) return null;
+  if (entries.length === 0) return null;
+  const listed = entries.map((e) => e.item);
+  const items = [...listed.filter((i) => !i.deeper), ...listed.filter((i) => i.deeper)];
   const badge = auditBadge(report);
   const firstDeeper = items.findIndex((i) => i.deeper);
   return (
