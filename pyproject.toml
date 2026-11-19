@@ -1,6 +1,6 @@
 [project]
 name = "factordesk"
-version = "0.1.0"
+version = "0.2.0"
 description = "factordesk: Fama-French 5-factor analyzer for single tickers"
 requires-python = ">=3.12"
 dependencies = [
