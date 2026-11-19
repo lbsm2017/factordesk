@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import sys
@@ -734,3 +735,86 @@ def test_report_passes_the_factor_last_date_to_the_section_loader(
     (kwargs,) = seen
     assert kwargs["offline"] is False
     assert kwargs["factor_last_date"] == pd.Timestamp(factors.index[-1]).date()
+
+
+# ------------------------------------------------------------------- stale build warning
+
+
+def _frontend(tmp_path: Path, *, built: float | None, source: float | None) -> Path:
+    """A frontend folder whose files carry the given modification times (None: file absent)."""
+    root = tmp_path / "frontend"
+    (root / "dist").mkdir(parents=True)
+    if source is not None:
+        (root / "src").mkdir()
+        page = root / "src" / "App.tsx"
+        page.write_text("export {};", encoding="utf-8")
+        os.utime(page, (source, source))
+        package = root / "package.json"
+        package.write_text("{}", encoding="utf-8")
+        os.utime(package, (source - 100, source - 100))
+    if built is not None:
+        index = root / "dist" / "index.html"
+        index.write_text("<!doctype html>", encoding="utf-8")
+        os.utime(index, (built, built))
+    return root
+
+
+def test_stale_build_is_warned_when_the_source_is_newer(tmp_path: Path) -> None:
+    root = _frontend(tmp_path, built=1_000_000, source=2_000_000)
+    assert cli.stale_build_warning(root) == cli.STALE_BUILD_WARNING
+
+
+def test_stale_build_is_warned_when_package_json_is_newer(tmp_path: Path) -> None:
+    root = _frontend(tmp_path, built=1_000_000, source=500_000)
+    os.utime(root / "package.json", (2_000_000, 2_000_000))
+    assert cli.stale_build_warning(root) == cli.STALE_BUILD_WARNING
+
+
+def test_stale_build_is_warned_when_dist_is_missing(tmp_path: Path) -> None:
+    root = _frontend(tmp_path, built=None, source=2_000_000)
+    assert cli.stale_build_warning(root) == cli.STALE_BUILD_WARNING
+
+
+def test_fresh_build_gives_no_warning(tmp_path: Path) -> None:
+    root = _frontend(tmp_path, built=3_000_000, source=2_000_000)
+    assert cli.stale_build_warning(root) is None
+
+
+def test_no_source_folder_gives_no_warning(tmp_path: Path) -> None:
+    root = _frontend(tmp_path, built=1_000_000, source=None)
+    assert cli.stale_build_warning(root) is None
+    assert cli.stale_build_warning(tmp_path / "absent") is None
+
+
+def test_the_warning_names_the_fix() -> None:
+    assert cli.STALE_BUILD_WARNING == (
+        "The dashboard page is older than its source. Run `make build` "
+        "(or `make setup` after a package change), then restart."
+    )
+
+
+def test_serve_with_a_stale_build_warns_once_and_still_starts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    uvicorn_calls: UvicornCalls,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = _frontend(tmp_path, built=1_000_000, source=2_000_000)
+    monkeypatch.setattr(cli, "DEFAULT_STATIC_DIR", root / "dist")
+    assert cli.main(["serve", "--port", str(_free_port())]) == cli.EXIT_OK
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and cli.STALE_BUILD_WARNING in err
+    assert len(uvicorn_calls.calls) == 1
+
+
+def test_serve_with_a_fresh_build_is_quiet(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    uvicorn_calls: UvicornCalls,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = _frontend(tmp_path, built=3_000_000, source=2_000_000)
+    monkeypatch.setattr(cli, "DEFAULT_STATIC_DIR", root / "dist")
+    assert cli.main(["serve", "--port", str(_free_port())]) == cli.EXIT_OK
+    assert capsys.readouterr().err == ""
+    assert len(uvicorn_calls.calls) == 1
