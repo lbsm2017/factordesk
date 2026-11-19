@@ -36,7 +36,8 @@ FloatArray = NDArray[np.float64]
 Tag = Literal["reliable", "noise"]
 
 A = 252
-"""Annualisation constant, trading days per year (M0.4)."""
+"""Annualisation constant, trading days per year (M0.4). It is the default of every
+``periods`` argument (observations per year): a daily series uses 252, a monthly one 12."""
 BH_Q = 0.05
 """Benjamini-Hochberg level, fixed (M0.6)."""
 ALPHA_LEVEL = 0.05
@@ -250,14 +251,18 @@ def _pct(x: float) -> str:
 
 
 def alpha_sentence(
-    alpha_ann: float, p: float, sigma_e_ann: float, n: int, se_ann: float
+    alpha_ann: float, p: float, sigma_e_ann: float, n: int, se_ann: float, periods: int = A
 ) -> str | None:
-    """Explain a large but insignificant alpha (M3.2); None when it does not apply."""
+    """Explain a large but insignificant alpha (M3.2); None when it does not apply.
+
+    ``n`` observations at ``periods`` a year span ``n / periods`` years.
+    """
     if abs(alpha_ann) < LARGE_ALPHA or p < ALPHA_LEVEL:
         return None
+    years = n / periods
     return (
         f"Alpha of {_pct(alpha_ann)} a year cannot be told apart from zero: residual volatility "
-        f"is {sigma_e_ann * 100:.2f}% a year over {n / A:.1f} years, so the standard error of "
+        f"is {sigma_e_ann * 100:.2f}% a year over {years:.1f} years, so the standard error of "
         f"annual alpha is {se_ann * 100:.2f}%."
     )
 
@@ -361,6 +366,8 @@ class FullSampleRegression:
     sigma_e_ann: float
     collinearity: Collinearity
     end: date
+    periods: int = A
+    """Observations a year used for the annualised figures (252 daily, 12 monthly)."""
 
     @property
     def betas(self) -> FloatArray:
@@ -371,8 +378,15 @@ class FullSampleRegression:
         return float(self.fit.params[0])
 
 
-def run_regression(sample: AnalysisSample) -> FullSampleRegression:
-    """Full-sample OLS of ``y`` on the five factors with HAC ``L(n)`` (M3.1-M3.4)."""
+def run_regression(sample: AnalysisSample, periods: int = A) -> FullSampleRegression:
+    """Full-sample OLS of ``y`` on the five factors with HAC ``L(n)`` (M3.1-M3.4).
+
+    ``periods`` is the number of observations a year (252 daily, 12 monthly). It scales the
+    annualised figures only: alpha and its standard error and interval by ``periods`` (arithmetic,
+    M0.4) and the residual volatility by ``sqrt(periods)``. The fit itself does not depend on it.
+    """
+    if periods <= 0:
+        raise ValueError("periods must be positive")
     y = sample.xret.to_numpy(dtype=np.float64)
     f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
     names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
@@ -381,19 +395,19 @@ def run_regression(sample: AnalysisSample) -> FullSampleRegression:
     beta_p = [float(p) for p in fit.pvalues[1:]]
     _, p_adj = bh_adjust(beta_p)
     tags = significance_tags(beta_p)
-    alpha_ann = A * float(fit.params[0])
-    alpha_se_ann = A * float(fit.bse[0])
-    sigma_e_ann = math.sqrt(A) * float(np.std(fit.resid, ddof=1))
+    alpha_ann = periods * float(fit.params[0])
+    alpha_se_ann = periods * float(fit.bse[0])
+    sigma_e_ann = math.sqrt(periods) * float(np.std(fit.resid, ddof=1))
     a_tag = alpha_tag(float(fit.pvalues[0]))
     return FullSampleRegression(
         fit=fit,
         names=names,
         alpha_ann=alpha_ann,
         alpha_se_ann=alpha_se_ann,
-        alpha_ci_ann=(A * float(fit.ci_low[0]), A * float(fit.ci_high[0])),
+        alpha_ci_ann=(periods * float(fit.ci_low[0]), periods * float(fit.ci_high[0])),
         alpha_tag=a_tag,
         alpha_sentence=alpha_sentence(
-            alpha_ann, float(fit.pvalues[0]), sigma_e_ann, fit.nobs, alpha_se_ann
+            alpha_ann, float(fit.pvalues[0]), sigma_e_ann, fit.nobs, alpha_se_ann, periods
         ),
         beta_p_adj=tuple(p_adj),
         beta_tags=tuple(tags),
@@ -404,4 +418,5 @@ def run_regression(sample: AnalysisSample) -> FullSampleRegression:
         sigma_e_ann=sigma_e_ann,
         collinearity=collinearity(f, names),
         end=sample.end,
+        periods=periods,
     )
