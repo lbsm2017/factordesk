@@ -26,6 +26,7 @@ import { LazyKalmanPanel, LazyRegressionDetail, LazyShrunkBetasPanel } from "./s
 import { LeadLagPanel } from "./sections/LeadLagPanel";
 import { PerformancePanel } from "./sections/PerformancePanel";
 import { ResidualAlphaPanel } from "./sections/ResidualAlphaPanel";
+import { TailRiskPanel } from "./sections/TailRiskPanel";
 import { WorldBetaPanel } from "./sections/WorldBetaPanel";
 
 /** What `ReportView` hands to every panel; each panel reads the props it needs. */
@@ -51,6 +52,7 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "summary", position: 200, Component: SummaryPanel },
   { name: "price", position: 400, Component: PricePanel },
   { name: "performance", position: 450, Component: PerformancePanel },
+  { name: "tail_risk", position: 460, Component: TailRiskPanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
   { name: "world_beta", position: 505, Component: WorldBetaPanel },
   { name: "returns", position: 600, Component: ReturnPanel },

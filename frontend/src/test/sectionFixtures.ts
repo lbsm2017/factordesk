@@ -11,6 +11,8 @@ import leadLag from "@fixtures/sections/lead_lag.json";
 import performanceFixture from "@fixtures/sections/performance.json";
 import residual from "@fixtures/sections/residual_alpha.json";
 import shrunk from "@fixtures/sections/shrunk.json";
+import tailRisk from "@fixtures/sections/tail_risk.json";
+import tailRiskMonthly from "@fixtures/sections/tail_risk_monthly.json";
 import worldBeta from "@fixtures/sections/world_beta.json";
 
 /** The `FactorReport` fields of the optional sections, in panel order. */
@@ -22,6 +24,7 @@ export const SECTION_FIELDS = [
   "fragility",
   "residual",
   "kalman_betas",
+  "tail_risk",
 ] as const;
 export type SectionField = (typeof SECTION_FIELDS)[number];
 
@@ -33,7 +36,11 @@ const PAYLOADS: Record<SectionField, unknown> = {
   world_beta: worldBeta,
   residual,
   kalman_betas: kalman,
+  tail_risk: tailRisk,
 };
+
+/** The monthly (60 months) tail risk section, for a report with a monthly subject. */
+export const TAIL_RISK_MONTHLY: unknown = tailRiskMonthly;
 
 /** A deep copy of `report` with the fixture of `field` attached and the footnote texts of that section added. */
 export function withSection<F extends SectionField>(report: FactorReport, field: F): FactorReport {
