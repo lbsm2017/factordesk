@@ -177,6 +177,7 @@ def _build_upload_report(
     model: FactorModel,
 ) -> tuple[FactorReport, int]:
     from factordesk.pipeline import assemble_subject_report
+    from factordesk.section_hooks.context import SectionInputs
 
     label = clean_name(name)
     try:
@@ -196,9 +197,16 @@ def _build_upload_report(
         ) from exc
     now = runtime.deps.now().astimezone(UTC)
     frame = monthly_frame(model, runtime, now)
+    load_macro = runtime.deps.load_macro
+    inputs = None if load_macro is None else SectionInputs(macro=load_macro())
     try:
         report = assemble_subject_report(
-            subject, frame, model, now=now, factors_downloaded_at=_downloaded_at(frame)
+            subject,
+            frame,
+            model,
+            now=now,
+            factors_downloaded_at=_downloaded_at(frame),
+            section_inputs=inputs,
         )
         return report, len(returns)
     except InsufficientHistoryError as exc:

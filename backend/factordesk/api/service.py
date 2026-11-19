@@ -291,6 +291,7 @@ class ReportService:
             frame = await self._model_frame(loaded, now, model)
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs)
+            inputs = await self._with_macro(inputs)
 
             def build() -> FactorReport:
                 return assemble_report(
@@ -513,6 +514,18 @@ class ReportService:
         return dataclasses.replace(
             inputs or SectionInputs(), world_benchmark=benchmark, europe_benchmark=europe
         )
+
+    async def _with_macro(self, inputs: SectionInputs | None) -> SectionInputs | None:
+        """``inputs`` plus the macro section's funds and dollar index (None: not wired)."""
+        loader = self.deps.load_macro
+        if loader is None:
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import SectionInputs
+
+        macro = await self.runtime.run(loader)
+        return dataclasses.replace(inputs or SectionInputs(), macro=macro)
 
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:
