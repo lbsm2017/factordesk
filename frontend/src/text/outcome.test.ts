@@ -3,6 +3,7 @@ import type { FactorStat } from "../api/types";
 import { cloneReport, mockReport } from "../test/fixture";
 import { withSection } from "../test/sectionFixtures";
 import {
+  analysedGrowth,
   dataOutcome,
   exposuresOutcome,
   priceOutcome,
@@ -45,6 +46,44 @@ describe("outcome lines of DV4.9 on the mock report", () => {
     const gone = cloneReport();
     gone.price_series.adj_close[priceIndex(gone, gone.data.actual_end)] = null;
     expect(priceOutcome(gone)).toBeNull();
+  });
+
+  it("Price: growth is the product of the analysed returns, first day included, and matches the annualised return", () => {
+    const r = cloneReport();
+    // The price day before the first analysed date is the base of the first analysed return (+0.84%).
+    const first = r.price_series.adj_close[priceIndex(r, r.data.actual_start)] as number;
+    r.price_series.dates.unshift("2024-08-07");
+    r.price_series.adj_close.unshift(first / 1.0084);
+    const { dates, adj_close } = r.price_series;
+    const i = dates.indexOf(r.data.actual_start);
+    const j = dates.indexOf(r.data.actual_end);
+    const analysed: number[] = [];
+    for (let k = i; k <= j; k++) analysed.push((adj_close[k] as number) / (adj_close[k - 1] as number) - 1);
+    const n = analysed.length;
+    expect(analysed[0]).toBeCloseTo(0.0084, 12);
+    const growth = analysed.reduce((acc, x) => acc * (1 + x), 1) - 1;
+
+    expect(analysedGrowth(r)).toBeCloseTo(growth, 12);
+    const shown = /rose (\d+\.\d)%/.exec(priceOutcome(r) as string);
+    expect(Number(shown?.[1])).toBeCloseTo(Math.round(growth * 1000) / 10, 9);
+    // Not the growth from the close of the first analysed day, which leaves the first return out.
+    expect(growth).not.toBeCloseTo((adj_close[j] as number) / (adj_close[i] as number) - 1, 4);
+
+    // The Performance block compounds the same n returns: CAGR = (1 + growth)^(periods / n) - 1.
+    const periods = 252;
+    const annualised = analysed.reduce((acc, x) => acc * (1 + x), 1) ** (periods / n) - 1;
+    expect(annualised).toBeCloseTo((1 + (analysedGrowth(r) as number)) ** (periods / n) - 1, 12);
+    // A loaded performance section supplies its own compounded figure, the same sample.
+    const withPerf = withSection(r, "performance");
+    if (withPerf.performance?.returns) {
+      withPerf.performance.returns.cumulative_return = growth;
+      withPerf.performance.returns.cagr = annualised;
+      expect(analysedGrowth(withPerf)).toBe(growth);
+      expect((1 + withPerf.performance.returns.cumulative_return) ** (periods / n) - 1).toBeCloseTo(
+        withPerf.performance.returns.cagr,
+        12,
+      );
+    }
   });
 
   it("Drawdown: growth, largest fall and recovery", () => {

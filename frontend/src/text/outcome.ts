@@ -35,19 +35,36 @@ function capital(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function priceAt(report: FactorReport, date: string): number | null {
+/**
+ * Growth over the analysed range: prod(1 + r) - 1 over exactly the analysed returns, the sample of the
+ * Performance block. The first analysed return is the change from the price day before the first
+ * analysed date, so that day's price is the base, not the close of the first analysed day. When the
+ * performance section is loaded and ok, its compounded figure is used as it is (it also skips rows
+ * excluded from the sample). Null when a price is missing.
+ */
+export function analysedGrowth(report: FactorReport): number | null {
+  const perf = report.performance;
+  if (perf !== null && perf.status === "ok" && perf.returns !== null) {
+    const cumulative = finite(perf.returns.cumulative_return);
+    if (cumulative !== null) return cumulative;
+  }
   const { dates, adj_close } = report.price_series;
-  const i = dates.indexOf(date);
-  return i < 0 ? null : finite(adj_close[i]);
+  const d = report.data;
+  const first = dates.indexOf(d.actual_start);
+  const last = dates.indexOf(d.actual_end);
+  if (first < 0 || last < 0) return null;
+  // Without an earlier price (a series that starts on the first analysed date) the first day's return is not known.
+  const base = finite(adj_close[first > 0 ? first - 1 : first]);
+  const end = finite(adj_close[last]);
+  if (base === null || end === null || base === 0) return null;
+  return end / base - 1;
 }
 
 /** Price: the change over the analysed range, and the uncharted tail. Null when a price is missing. */
 export function priceOutcome(report: FactorReport): string | null {
   const d = report.data;
-  const a = priceAt(report, d.actual_start);
-  const b = priceAt(report, d.actual_end);
-  if (a === null || b === null || a === 0) return null;
-  const ch = b / a - 1;
+  const ch = analysedGrowth(report);
+  if (ch === null) return null;
   const move = pct1(ch) === "0.0%" ? "ended where it started" : `${ch > 0 ? "rose" : "fell"} ${pct1(ch)}`;
   const lead = isSubjectReport(report) ? "" : "With dividends reinvested, ";
   let text = `${lead}${report.ticker} ${move} over the analysed range (${dateLong(d.actual_start)} to ${dateLong(d.actual_end)}).`;
