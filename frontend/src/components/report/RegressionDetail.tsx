@@ -6,6 +6,7 @@ import { num, pct, pval, signed, tstat } from "../../format";
 import { useShowStats } from "../../state/stats";
 import "./regression.css";
 import { EmptyState } from "./EmptyState";
+import { regressionOutcome } from "../../text/outcome";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
 
@@ -269,7 +270,14 @@ export function RegressionDetail({ report }: ReportPanelProps) {
     .filter(Boolean)
     .join(" ");
   return (
-    <Panel id="regression-detail" title={title} question={question} footnote={footnote} how={how}>
+    <Panel
+      id="regression-detail"
+      title={title}
+      question={question}
+      outcome={regressionOutcome(report)}
+      footnote={footnote}
+      how={how}
+    >
       <RegTable label="Regression detail table" heads={stats ? MAIN_HEADS : PLAIN_HEADS} scroll>
         <TermRows fit={rg} vif={rg.vif} stats={stats} />
       </RegTable>

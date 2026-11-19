@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { cloneReport } from "../../test/fixture";
 import { SECTION_FIELDS, withSection } from "../../test/sectionFixtures";
@@ -79,6 +79,20 @@ describe("panel registry", () => {
       expect(container.querySelector(`#${id}`)).toBeNull();
     }
   });
+
+  it("shows an outcome sentence under the title of every panel it covers (DV4.9)", async () => {
+    let report = cloneReport();
+    for (const field of SECTION_FIELDS) report = withSection(report, field);
+    const { container } = render(<ReportView report={report} downloadHref="#" win={null} onWinChange={vi.fn()} />);
+    await waitFor(() => expect(container.querySelector("#world-beta > p.q.outcome")).not.toBeNull(), { timeout: 12_000 });
+    await waitFor(() => expect(container.querySelector("#performance > p.q.outcome")).not.toBeNull(), { timeout: 12_000 });
+    await waitFor(() => expect(container.querySelector("#regression-detail > p.q.outcome")).not.toBeNull(), { timeout: 12_000 });
+    for (const id of ["price", "performance", "exposures", "world-beta", "returns", "risk", "rolling", "data", "regression-detail"]) {
+      const line = container.querySelector(`#${id} > p.q.outcome`);
+      expect(line, id).not.toBeNull();
+      expect(line?.textContent?.length, id).toBeGreaterThan(30);
+    }
+  }, 30_000);
 
   it("draws each present section at its place, with the empty state of a placeholder", () => {
     let report = cloneReport();

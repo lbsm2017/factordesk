@@ -18,6 +18,7 @@ import {
   windowStats,
 } from "../../report/derive";
 import type { RollingWindowDays } from "../../state/url";
+import { rollingOutcome } from "../../text/outcome";
 import { PLAIN } from "../../text/plain";
 import { type ChartTokens, useChartTokens } from "../charts/chartTokens";
 import type { ECharts, EChartsCoreOption } from "../charts/echartsCore";
@@ -527,6 +528,7 @@ export function RollingPanel({ report, win, onWinChange }: RollingPanelProps) {
       id="rolling"
       title={title}
       question={question}
+      outcome={rollingOutcome(report, win)}
       legend={toggle}
       footnote={`${desc} The band is a pointwise 95% interval.`}
       how={how}

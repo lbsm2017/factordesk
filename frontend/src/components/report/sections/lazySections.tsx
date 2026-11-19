@@ -10,6 +10,7 @@ import type { ReportPanelProps } from "../types";
  */
 const Kalman = lazy(() => import("./KalmanPanel").then((m) => ({ default: m.KalmanPanel })));
 const Shrunk = lazy(() => import("./ShrunkBetasPanel").then((m) => ({ default: m.ShrunkBetasPanel })));
+const Regression = lazy(() => import("../RegressionDetail").then((m) => ({ default: m.RegressionDetail })));
 
 function Holder({ id }: { id: string }) {
   return <section className="panel sk-lazy" id={id} aria-busy="true" />;
@@ -21,6 +22,17 @@ export function LazyKalmanPanel({ report }: ReportPanelProps) {
     <PanelBoundary id="kalman" title="Tracked day by day" question="">
       <Suspense fallback={<Holder id="kalman" />}>
         <Kalman report={report} />
+      </Suspense>
+    </PanelBoundary>
+  );
+}
+
+/** The regression detail sits at the foot of the page and is the largest text table, so it is a chunk too. */
+export function LazyRegressionDetail({ report }: ReportPanelProps) {
+  return (
+    <PanelBoundary id="regression-detail" title="Regression detail" question="">
+      <Suspense fallback={<Holder id="regression-detail" />}>
+        <Regression report={report} />
       </Suspense>
     </PanelBoundary>
   );

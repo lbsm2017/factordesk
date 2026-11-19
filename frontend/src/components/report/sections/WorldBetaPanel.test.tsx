@@ -5,7 +5,7 @@ import { cloneReport } from "../../../test/fixture";
 import { withSection } from "../../../test/sectionFixtures";
 import { WorldBetaBody } from "./WorldBetaBody";
 import { WorldBetaPanel } from "./WorldBetaPanel";
-import { compareFits, europeOk, outcomeLine } from "./worldBetaModel";
+import { compareFits, europeOk } from "./worldBetaModel";
 
 const state = vi.hoisted(() => ({ stats: false }));
 vi.mock("../../../state/stats", () => ({ useShowStats: () => state.stats }));
@@ -57,7 +57,9 @@ describe("WorldBetaBody", () => {
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     expect(screen.getByRole("heading", { level: 2, name: "World beta" })).not.toBeNull();
     // the fixture's two intervals overlap, so the line is about the same whatever its category says
-    expect(container.querySelector(".reading")?.textContent).toBe("About the same against the world as against the US market.");
+    expect(container.querySelector(".q")?.textContent).toBe(
+      "Against world stocks, SPY's beta was 0.93 over 8 Aug 2024 to 30 Sep 2026 (540 days), about the same as its beta against the US market on the same days (1.00).",
+    );
     expect(container.querySelector(".pm")?.textContent).toBe("Quick estimate, 540 days, one-factor");
   });
 
@@ -78,7 +80,8 @@ describe("WorldBetaBody", () => {
     const head = container.querySelector("#world-beta-us th");
     expect(head?.textContent).toBe("US market, one-factor, same days");
     expect(head?.getAttribute("title")).toMatch(/five-factor market beta/);
-    expect(container.textContent).not.toMatch(/US market beta/);
+    const heads = Array.from(container.querySelectorAll("tbody th")).map((h) => h.textContent);
+    expect(heads.join(" ")).not.toContain("US market beta");
   });
 
   it("says lower or higher when the intervals are apart", () => {
@@ -86,7 +89,7 @@ describe("WorldBetaBody", () => {
       if (s.world) Object.assign(s.world, { beta: 0.7, ci_low: 0.6, ci_high: 0.8 });
     });
     const { container } = render(<WorldBetaBody report={report} />);
-    expect(container.querySelector(".reading")?.textContent).toBe("Lower against the world than against the US market.");
+    expect(container.querySelector(".q")?.textContent).toContain(", lower than its beta against the US market on the same days (1.00).");
   });
 
   it("never claims a difference from overlapping intervals, even when the category says so", () => {
@@ -94,7 +97,7 @@ describe("WorldBetaBody", () => {
       s.comparison = "higher";
     });
     const { container } = render(<WorldBetaBody report={report} />);
-    expect(container.querySelector(".reading")?.textContent).toBe("About the same against the world as against the US market.");
+    expect(container.querySelector(".q")?.textContent).toContain(", about the same as its beta against the US market");
   });
 
   it("with statistics off shows Against, chart, Beta and Days only, on three rows with Europe in the middle", () => {
@@ -108,8 +111,8 @@ describe("WorldBetaBody", () => {
       "world-beta-europe",
       "world-beta-us",
     ]);
-    expect(container.querySelectorAll(".reading")).toHaveLength(2);
-    expect(container.querySelectorAll(".reading")[1]?.textContent).toMatch(/^Lower against Europe/);
+    expect(container.querySelectorAll(".reading")).toHaveLength(1);
+    expect(container.querySelector(".reading")?.textContent).toMatch(/^Lower against Europe/);
   });
 
   it("with statistics on adds the 95% interval and R squared columns", () => {
@@ -227,13 +230,6 @@ describe("world beta model", () => {
   it("says higher or lower only when the intervals are apart", () => {
     expect(compareFits(fit(1.3, 1.2, 1.4), fit(1.0, 0.9, 1.1))).toBe("higher");
     expect(compareFits(fit(0.7, 0.6, 0.8), fit(1.0, 0.9, 1.1))).toBe("lower");
-  });
-
-  it("uses the category when a fit is missing", () => {
-    const s = reportWith().world_beta;
-    if (!s) throw new Error("no fixture");
-    expect(outcomeLine({ ...s, us_market: null, comparison: "lower" })).toBe("Lower against the world than against the US market.");
-    expect(outcomeLine({ ...s, us_market: null, comparison: null })).toBeNull();
   });
 
   it("gives the Europe block only when it is ok and carries both fits", () => {

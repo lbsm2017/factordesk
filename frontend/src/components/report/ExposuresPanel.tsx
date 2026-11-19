@@ -3,6 +3,7 @@
 /* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role */
 import type { FactorReport } from "../../api/types";
 import { useShowStats } from "../../state/stats";
+import { exposuresOutcome } from "../../text/outcome";
 import { exposureReading, plainName } from "../../text/plain";
 import { BarCell } from "../charts/BarCell";
 import { axisLabels, exposureModel, exposuresUnavailable } from "./exposureModel";
@@ -174,6 +175,7 @@ export function ExposuresPanel({ report }: ReportPanelProps) {
       id="exposures"
       title="Factor exposures"
       question={QUESTION}
+      outcome={exposuresOutcome(report)}
       legend={<Legend window={model.window} hasAverages={model.hasAverages} />}
       reading={reading || undefined}
       footnote={footnote}

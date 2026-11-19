@@ -11,7 +11,8 @@ import type { NiceDomain } from "../exposureModel";
 import { AxisRow } from "../barParts";
 import { Panel } from "../Panel";
 import type { ReportPanelProps } from "../types";
-import { europeOk, outcomeLine, sameFit } from "./worldBetaModel";
+import { worldBetaOutcome } from "../../../text/outcomeDeep";
+import { europeOk, sameFit } from "./worldBetaModel";
 import type { BetaFit, ProxyBeta } from "./worldBetaModel";
 import "./WorldBetaPanel.css";
 
@@ -176,7 +177,7 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
       id="world-beta"
       title={TITLE}
       legend={<div className="pm">{`Quick estimate, ${count(world ? s.sample.n : (europe?.n_days ?? 0))} days, one-factor`}</div>}
-      reading={world ? (outcomeLine(s) ?? undefined) : undefined}
+      outcome={world ? worldBetaOutcome(report) : null}
       footnote={footnote(report, s)}
       how={how(report, s, europe)}
     >

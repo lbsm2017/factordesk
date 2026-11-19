@@ -1,5 +1,6 @@
 /* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role --
    DB7 asks for explicit table roles: the narrow-screen CSS restyles rows as grids, which can drop table semantics. */
+import { riskOutcome } from "../../text/outcome";
 import { PLAIN } from "../../text/plain";
 import { useShowStats } from "../../state/stats";
 import { describe, factorOrder, finite, IDIO, labelTexts, sci, slotOf } from "../../report/derive";
@@ -53,14 +54,10 @@ export function RiskPanel({ report }: ReportPanelProps) {
   const hi = Math.max(1, ...values);
   const ticks = [0, 0.5, 1];
 
-  const top = names.find((n) => n !== IDIO && shares.get(n) != null);
   const vol = finite(rk.total_vol_annual);
-  let reading: string | undefined;
-  if (top !== undefined) {
-    reading = `${top} drives ${pctN(shares.get(top), 1, false)} of the variance; stock-specific risk is ${pctN(shares.get(IDIO), 1, false)}.`;
-    if (vol !== null) reading += ` Total volatility is ${pctN(vol, 1, false)} a year.`;
-    reading += rk.sentences.map((s) => ` ${s}`).join("");
-  }
+  const reading = [vol !== null ? `Total volatility is ${pctN(vol, 1, false)} a year.` : "", ...rk.sentences]
+    .filter(Boolean)
+    .join(" ");
 
   const sumRes = finite(rk.sums_to_one_residual);
   const how = [
@@ -78,7 +75,8 @@ export function RiskPanel({ report }: ReportPanelProps) {
       id="risk"
       title={title}
       question={question}
-      reading={reading}
+      outcome={riskOutcome(report)}
+      reading={reading || undefined}
       footnote={`${desc} Shares add to 100% and can be negative when a factor offsets the others.`}
       how={how}
     >

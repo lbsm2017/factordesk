@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FactorReport } from "../../../api/types";
 import { cloneReport } from "../../../test/fixture";
 import { withSection } from "../../../test/sectionFixtures";
-import { PerformanceBody, outcomeLine } from "./PerformanceBody";
+import { PerformanceBody } from "./PerformanceBody";
 import { PerformancePanel } from "./PerformancePanel";
 import { chartGeometry, episodeDays, MAX_POINTS, sampleIndexes, xLabels, yAxis } from "./performanceModel";
 
@@ -11,12 +11,6 @@ function reportWith(edit?: (p: NonNullable<FactorReport["performance"]>) => void
   const report = withSection(cloneReport(), "performance");
   if (edit && report.performance) edit(report.performance);
   return report;
-}
-
-function dd(report: FactorReport) {
-  const d = report.performance?.drawdown;
-  if (!d) throw new Error("no drawdown");
-  return d;
 }
 
 describe("PerformancePanel (lazy wrapper)", () => {
@@ -38,7 +32,9 @@ describe("PerformanceBody", () => {
     const { container } = render(<PerformanceBody report={reportWith()} />);
     expect(screen.getByRole("heading", { level: 2, name: "Drawdown" })).not.toBeNull();
     expect(container.querySelector(".pm")?.textContent).toBe("Max drawdown −41.0%");
-    expect(container.querySelector(".reading")?.textContent).toBe("Peak 2 Jan 2025, low 12 Mar 2026, not recovered by 30 Sep 2026.");
+    expect(container.querySelector(".q")?.textContent).toBe(
+      "SPY shrank 7.2% a year over the analysed range; its largest fall was 41.0%, from 2 Jan 2025 to 12 Mar 2026, and it had not recovered by 30 Sep 2026.",
+    );
   });
 
   it("says recovered with the date when the price is back at the peak", () => {
@@ -46,7 +42,7 @@ describe("PerformanceBody", () => {
       if (p.drawdown) p.drawdown.recovery_date = "2026-08-03";
     });
     const { container } = render(<PerformanceBody report={report} />);
-    expect(container.querySelector(".reading")?.textContent).toBe("Peak 2 Jan 2025, low 12 Mar 2026, recovered 3 Aug 2026.");
+    expect(container.querySelector(".q")?.textContent).toContain("and it was back at the peak by 3 Aug 2026.");
   });
 
   it("says the price never fell when there is no episode", () => {
@@ -55,7 +51,9 @@ describe("PerformanceBody", () => {
       Object.assign(p.drawdown, { max_drawdown: 0, peak_date: null, trough_date: null, recovery_date: null, episodes: [] });
     });
     const { container } = render(<PerformanceBody report={report} />);
-    expect(container.querySelector(".reading")?.textContent).toBe("The price never fell below an earlier high over the analysed range.");
+    expect(container.querySelector(".q")?.textContent).toBe(
+      "SPY shrank 7.2% a year over the analysed range; its price never fell below an earlier high.",
+    );
     expect(container.querySelector(".pm")?.textContent).toBe("Max drawdown 0%");
     expect(container.querySelector("table")).toBeNull();
   });
@@ -131,9 +129,6 @@ describe("PerformanceBody", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("builds the outcome line without an end date", () => {
-    expect(outcomeLine(dd(reportWith()), null)).toBe("Peak 2 Jan 2025, low 12 Mar 2026, not recovered.");
-  });
 });
 
 describe("performance model", () => {

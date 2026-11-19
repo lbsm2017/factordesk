@@ -68,9 +68,13 @@ describe("ReturnPanel", () => {
     expect(container.querySelector("tr.total line.total-cap")).not.toBeNull();
     expect(screen.getByText("Not in the sum")).toBeTruthy();
     expect(container.querySelectorAll(".memo li")).toHaveLength(2);
-    expect(container.querySelector(".reading")?.textContent).toBe(
-      "Of the 12.64% average excess return a year, market exposure accounts for 11.57%. Alpha adds +0.81%, but it is not significant.",
+    expect(container.querySelector(".q")?.textContent).toBe(
+      "Market exposure accounts for most of the 12.6% a year SPY earned above cash (+11.6%).",
     );
+    expect(container.querySelector(".q")?.getAttribute("title")).toBe(
+      "How much of the average yearly return does each factor explain?",
+    );
+    expect(container.querySelector(".reading")).toBeNull();
   });
 
   it("colours signed values green or red, leaves zero ink, and quiets rows that could be noise", () => {
@@ -169,8 +173,11 @@ describe("RiskPanel", () => {
 
   it("reads the top share, the stock-specific share, total volatility and the sentences", () => {
     const { container } = render(<RiskPanel report={mockReport} />);
+    expect(container.querySelector(".q")?.textContent).toBe(
+      "Market exposure drives 99.4% of SPY's day-to-day risk; 0.5% is specific to SPY.",
+    );
     expect(container.querySelector(".reading")?.textContent).toBe(
-      "Mkt-RF drives 99.4% of the variance; stock-specific risk is 0.5%. Total volatility is 17.0% a year. MOCK: SMB ranks #2 by risk but only #4 by beta size.",
+      "Total volatility is 17.0% a year. MOCK: SMB ranks #2 by risk but only #4 by beta size.",
     );
     expect(container.querySelector("details.how")?.textContent).toContain("Euler decomposition");
   });

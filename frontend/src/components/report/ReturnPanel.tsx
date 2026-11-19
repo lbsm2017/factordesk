@@ -1,5 +1,6 @@
 /* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role --
    DB7 asks for explicit table roles: the narrow-screen CSS restyles rows as grids, which can drop table semantics. */
+import { returnsOutcome } from "../../text/outcome";
 import { PLAIN } from "../../text/plain";
 import { describe, factorOrder, finite, labelTexts, niceDomain, sci } from "../../report/derive";
 import { pct } from "../../format";
@@ -83,15 +84,6 @@ export function ReturnPanel({ report }: ReportPanelProps) {
 
   const { lo, hi, ticks } = niceDomain(Math.min(...values, 0, total ?? 0), Math.max(...values, 0, total ?? 0), 3);
 
-  const mkt = finite(rc.factors["Mkt-RF"]);
-  let reading: string | undefined;
-  if (total !== null && mkt !== null) {
-    const alphaNote = reg.alpha_tag !== "reliable" ? ", but it is not significant" : "";
-    reading =
-      `Of the ${pctN(total, 2, false)} average excess return a year, market exposure ` +
-      `accounts for ${pctN(mkt, 2, false)}. Alpha adds ${pctN(rc.alpha)}${alphaNote}.`;
-  }
-
   const checks: string[] = [];
   const resid = finite(rc.residual);
   if (resid !== null) checks.push(`Residual ${sci(resid)} (zero by construction).`);
@@ -139,7 +131,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
           ]}
         />
       }
-      reading={reading}
+      outcome={returnsOutcome(report)}
       footnote={`${desc} The rows add up exactly to the total.`}
       how={how}
     >

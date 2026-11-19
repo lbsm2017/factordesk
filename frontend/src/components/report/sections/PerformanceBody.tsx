@@ -1,5 +1,6 @@
 import type { PerformanceSection } from "../../../api/types";
 import { count, dateLong, pct } from "../../../format";
+import { drawdownOutcome } from "../../../text/outcomeDeep";
 import { Panel } from "../Panel";
 import type { ReportPanelProps } from "../types";
 import { chartGeometry, episodeDays, xLabels, yAxis } from "./performanceModel";
@@ -17,16 +18,6 @@ const HOW = [
   "An episode runs from a high until the price first regains it; the table lists the five deepest, which do not overlap. Days are trading days from the peak to the recovery, or to the end of the data when the price has not recovered.",
   "Return a year is the compound growth rate, not the simple average of daily returns times 252. That average is higher when returns swing widely, because large swings cut compound growth, and it is not what an investor earned.",
 ].join(" ");
-
-/** "Peak 14 Jul 2025, low 18 Jun 2026, recovered 3 Aug 2026." (or "not recovered by {end}"). */
-export function outcomeLine(dd: Drawdown, end: string | null): string {
-  if (dd.peak_date === null || dd.trough_date === null) {
-    return "The price never fell below an earlier high over the analysed range.";
-  }
-  const head = `Peak ${dateLong(dd.peak_date)}, low ${dateLong(dd.trough_date)}, `;
-  if (dd.recovery_date !== null) return `${head}recovered ${dateLong(dd.recovery_date)}.`;
-  return `${head}${NOT_RECOVERED}${end ? ` by ${dateLong(end)}` : ""}.`;
-}
 
 function nextStep(s: PerformanceSection): string {
   if (s.status === "insufficient_data") return "Widen the date range and run the report again.";
@@ -131,13 +122,12 @@ export function PerformanceBody({ report }: ReportPanelProps) {
     );
   }
   const dd = s.drawdown;
-  const end = s.periods?.end ?? s.sample.end;
   return (
     <Panel
       id="performance"
       title={TITLE}
       legend={<div className="pm">{`Max drawdown ${dd.max_drawdown === 0 ? "0%" : pct(dd.max_drawdown, 1)}`}</div>}
-      reading={outcomeLine(dd, end)}
+      outcome={drawdownOutcome(report, s)}
       footnote={CAPTION}
       how={HOW}
     >

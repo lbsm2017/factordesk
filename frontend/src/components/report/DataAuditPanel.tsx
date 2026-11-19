@@ -1,5 +1,6 @@
 import type { AuditFinding, DataInfo } from "../../api/types";
 import { count, dateLong, pct } from "../../format";
+import { dataOutcome } from "../../text/outcome";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
 
@@ -96,6 +97,7 @@ export function DataAuditPanel({ report }: ReportPanelProps) {
       id="data"
       title="Data and audit"
       question="What went into these numbers, and what was left out?"
+      outcome={dataOutcome(report)}
       footnote="Audit findings are reported, never acted on: no price is changed or removed."
     >
       <div className="data-grid">

@@ -17,13 +17,12 @@ import { DataAuditPanel } from "./DataAuditPanel";
 import { ExposuresPanel } from "./ExposuresPanel";
 import { Header } from "./Header";
 import { PricePanel } from "./PricePanel";
-import { RegressionDetail } from "./RegressionDetail";
 import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
 import { RollingPanel } from "./RollingPanel";
 import { SummaryPanel } from "./SummaryPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
-import { LazyKalmanPanel, LazyShrunkBetasPanel } from "./sections/lazySections";
+import { LazyKalmanPanel, LazyRegressionDetail, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
 import { PerformancePanel } from "./sections/PerformancePanel";
 import { ResidualAlphaPanel } from "./sections/ResidualAlphaPanel";
@@ -63,7 +62,7 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "lead_lag", position: 830, Component: LeadLagPanel },
   { name: "fragility", position: 840, Component: FragilityPanel },
   { name: "data", position: 900, Component: DataAuditPanel },
-  { name: "regression_detail", position: 1000, Component: RegressionDetail },
+  { name: "regression_detail", position: 1000, Component: LazyRegressionDetail },
   { name: "colophon", position: 1100, Component: Colophon },
 ];
 

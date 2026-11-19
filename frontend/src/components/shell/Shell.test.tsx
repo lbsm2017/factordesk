@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
 import { ReportView } from "../report/ReportView";
@@ -50,9 +50,12 @@ describe("SectionNav", () => {
     const nav = await screen.findByRole("navigation", { name: "Sections" });
     for (const a of nav.querySelectorAll("a")) {
       const id = (a.getAttribute("href") ?? "").slice(1);
-      expect(document.querySelector(`#${id} h2`)?.textContent, id).toBe(a.querySelector(".nav-label")?.textContent);
+      await waitFor(
+        () => expect(document.querySelector(`#${id} h2`)?.textContent, id).toBe(a.querySelector(".nav-label")?.textContent),
+        { timeout: 12_000 },
+      );
     }
-  });
+  }, 15_000);
 
   it("hides the item of a section that is null or absent in the report", () => {
     const r = cloneReport();
