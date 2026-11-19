@@ -1,39 +1,67 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
 import { Colophon } from "./Colophon";
-import { Equation } from "./Equation";
 import { GateEvidence } from "./GateEvidence";
-import { Header } from "./Header";
+import { Header, listingLine } from "./Header";
 import { KpiStrip } from "./KpiStrip";
 import { Notice } from "./Notice";
 
 const HREF = "/api/report/SPY/html?range=3Y";
 
 describe("Header", () => {
-  it("shows the ticker, the factor-data chip, the warnings chip and the download link", () => {
+  it("shows the ticker, the download link at the right and the analysis bar", () => {
     const { container } = render(<Header report={mockReport} downloadHref={HREF} />);
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("SPY");
-    expect(screen.getByText("Factor data ends 30 Sep 2026 (49 days ago)")).toBeTruthy();
-    const warn = screen.getByRole("link", { name: "2 warnings" });
-    expect(warn.getAttribute("href")).toBe("#notice");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("SPY");
     const dl = screen.getByRole("link", { name: "Download report" });
     expect(dl.getAttribute("href")).toBe(HREF);
     expect(dl.hasAttribute("download")).toBe(true);
-    expect(dl.className).toBe("btn-secondary");
+    expect(dl.closest(".head-actions")).not.toBeNull();
     expect(container.querySelector(".ticker")?.textContent).toBe("SPY");
+    expect(container.querySelector("dl.abar")?.getAttribute("aria-label")).toBe("Analysis settings");
+    const pairs = Array.from(container.querySelectorAll(".abar > div")).map((d) => [
+      d.querySelector("dt")?.textContent,
+      d.querySelector("dd")?.textContent,
+    ]);
+    expect(pairs).toEqual([
+      ["Analysis period", "8 Aug 2024 to 30 Sep 2026"],
+      ["Observations", "559 trading days"],
+      ["Factor data", "To 30 Sep 2026"],
+      ["Benchmark", "ACWI"],
+    ]);
+    expect(container.querySelector(".abar dd[title]")?.getAttribute("title")).toBe("49 days old");
   });
 
-  it("drops the warnings chip when there is nothing to warn about, and singularises", () => {
+  it("falls back to the ticker alone when the report has no security field", () => {
+    const { container } = render(<Header report={mockReport} downloadHref={HREF} />);
+    expect(container.querySelector(".nm")).toBeNull();
+    expect(container.querySelector(".badge")).toBeNull();
+    expect(container.querySelector(".listing")).toBeNull();
+  });
+
+  it("shows the company name, the type badge and the listing line when the security is known", () => {
     const r = cloneReport();
-    r.warnings = [];
-    r.quality_gate.fired = false;
-    r.data.factors_days_behind = 1;
-    render(<Header report={r} downloadHref={HREF} />);
-    expect(screen.queryByRole("link", { name: /warning/ })).toBeNull();
-    expect(screen.getByText("Factor data ends 30 Sep 2026 (1 day ago)")).toBeTruthy();
+    (r.data as { security?: unknown }).security = {
+      name: "SPDR S&P 500 ETF Trust",
+      exchange: "NYSE Arca",
+      currency: "USD",
+      quote_type: "ETF",
+    };
+    const { container } = render(<Header report={r} downloadHref={HREF} />);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("SPYSPDR S&P 500 ETF Trust");
+    expect(container.querySelector(".badge")?.textContent).toBe("ETF");
+    expect(container.querySelector(".listing")?.textContent).toBe("Listed on NYSE Arca, priced in US dollars");
+  });
+
+  it("leaves out the parts Yahoo did not give", () => {
+    expect(listingLine({ exchange: "NasdaqGS" })).toBe("Listed on NasdaqGS");
+    expect(listingLine({ currency: "EUR" })).toBe("Priced in EUR");
+    expect(listingLine({ name: "X" })).toBeNull();
+    const r = cloneReport();
+    (r.data as { security?: unknown }).security = { name: null, quote_type: "MUTUALFUND" };
+    const { container } = render(<Header report={r} downloadHref={HREF} />);
+    expect(container.querySelector(".nm")).toBeNull();
+    expect(container.querySelector(".badge")).toBeNull();
   });
 });
 
@@ -87,70 +115,6 @@ describe("Notice", () => {
     r.quality_gate.fired = false;
     const { container } = render(<Notice report={r} />);
     expect(container.firstChild).toBeNull();
-  });
-});
-
-describe("Equation", () => {
-  it("typesets the model with italic variables and terms that link to their rows", () => {
-    const { container } = render(<Equation report={mockReport} />);
-    expect(container.querySelectorAll(".lhs var")).toHaveLength(2);
-    expect(container.querySelector(".eps var")?.textContent).toBe("ε");
-    const hrefs = Array.from(container.querySelectorAll("a.term")).map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["#ret-alpha", "#beta-Mkt-RF", "#beta-SMB", "#beta-HML", "#beta-RMW", "#beta-CMA"]);
-    const text = container.querySelector(".terms")?.textContent ?? "";
-    expect(text).toContain("+0.998Mkt-RF");
-    expect(text).toContain("−0.141SMB");
-    expect(text).toContain("0.81%");
-  });
-
-  it("fades and words the terms that are not significant", () => {
-    const { container } = render(<Equation report={mockReport} />);
-    const ns = Array.from(container.querySelectorAll("a.term.ns")).map((a) => a.getAttribute("href"));
-    expect(ns).toEqual(["#ret-alpha", "#beta-HML", "#beta-CMA"]);
-    expect(container.querySelector('a[href="#beta-HML"] .ann')?.textContent).toBe("valuenot significant, t 1.2");
-    expect(container.querySelector('a[href="#beta-SMB"] .ann')?.textContent).toBe("sizesignificant, t −13.8");
-  });
-
-  it("carries a full aria-label", () => {
-    const { container } = render(<Equation report={mockReport} />);
-    const label = container.querySelector("figure")?.getAttribute("aria-label") ?? "";
-    expect(label).toContain("alpha +0.81% a year");
-    expect(label).toContain("+0.998 times Mkt-RF");
-    expect(label).toContain("−0.141 times SMB");
-    expect(label.endsWith("plus a residual.")).toBe(true);
-  });
-
-  it("focuses the row a term links to", () => {
-    const { container } = render(
-      <>
-        <Equation report={mockReport} />
-        <table>
-          <tbody>
-            <tr id="beta-SMB">
-              <th>SMB</th>
-            </tr>
-          </tbody>
-        </table>
-      </>,
-    );
-    const row = document.getElementById("beta-SMB");
-    fireEvent.click(container.querySelector('a[href="#beta-SMB"]') as Element);
-    expect(row?.getAttribute("tabindex")).toBe("-1");
-    expect(document.activeElement).toBe(row);
-  });
-
-  it("is omitted when the regression is not ok", () => {
-    const r = cloneReport();
-    r.regression.status = "insufficient_data";
-    const { container } = render(<Equation report={r} />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("keeps the brackets and wraps at 390 px (stylesheet rules)", () => {
-    const css = readFileSync(join(import.meta.dirname, "..", "..", "styles", "report.css"), "utf8");
-    expect(css).toMatch(/\.term \.ann::before, \.term \.ann::after/);
-    expect(css).toMatch(/\.terms \{[^}]*flex-wrap: wrap/);
-    expect(css).toMatch(/max-width: 719px\)[\s\S]*\.eq \{ grid-template-columns: 1fr/);
   });
 });
 

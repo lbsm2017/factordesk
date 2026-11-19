@@ -1,29 +1,23 @@
 import "../../styles/frame.css";
 
-const KPI_LABELS = [
-  ["Alpha, a year", "Distinguishable from zero at 5%"],
-  ["R²", "Share of daily variance the factors explain"],
-  ["Residual volatility", "A year, left unexplained by the factors"],
-  ["Observations", "Trading days; none excluded"],
-  ["Analysed range", "Requested 1 Jan 2020 to 30 Sep 2026"],
-] as const;
-
-/** Panel titles and the id that `frame.css` sizes them by (final heights, three width tiers). */
+/** Panel titles and the class that `frame.css` gives a fixed height (one set for every width). */
 const FRAMES = [
+  ["summary", "Summary"],
   ["price", "Price"],
   ["exposures", "Factor exposures"],
-  ["returns", "Where the return came from"],
-  ["risk", "Where the risk comes from"],
+  ["returns", "Return sources"],
+  ["risk", "Risk sources"],
   ["rolling", "Exposure over time"],
   ["data", "Data and audit"],
   ["regression", "Regression detail"],
 ] as const;
 
+const BAR = ["Analysis period", "Observations", "Factor data", "Benchmark"] as const;
+
 /**
- * First load (dashboard spec DB6.4): the page frame at final heights, with placeholders for the
- * ticker (the page heading, outside the hidden part), the equation and the KPI cells and `--sunk`
- * panel bodies. No spinner. The heights come
- * from the rendered panels (see `frame.css`), so the report arrives without layout shift.
+ * First load (dashboard spec DB6.4): the page frame with placeholders, inside the same shell as the
+ * report, so the sidebar stays put. The header and the analysis bar keep their real size; each panel
+ * holds one fixed height from `frame.css` (no measured width tiers). No spinner.
  */
 export function LoadingFrame({ ticker }: { ticker: string }) {
   return (
@@ -32,43 +26,28 @@ export function LoadingFrame({ ticker }: { ticker: string }) {
         {`Loading the report for ${ticker}.`}
       </p>
       <header className="masthead sk-head">
-        <div className="mast-top">
+        <div className="page-head">
           <h1>
             <span className="ticker">{ticker}</span>
-            <span className="what">Fama–French five-factor profile</span>
           </h1>
-          <p className="mast-meta" aria-hidden="true">
-            <span className="chip sk-chip" />
-            <span className="btn-secondary sk-chip" />
-          </p>
         </div>
-      </header>
-      <div aria-hidden="true">
-        <div className="sk-notice" />
-        <div className="model sk-eq" />
-        <div className="kpis sk-kpis">
-          <dl>
-            {KPI_LABELS.map(([label, note]) => (
-              <div key={label} className="kpi">
-                <dt>{label}</dt>
-                <dd className="v">0.000</dd>
-                <dd className="n">{note}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        {FRAMES.map(([key, title]) => (
-          <section key={key} className={`panel sk-panel sk-${key}`}>
-            <div className="panel-head">
-              <div>
-                <h2>{title}</h2>
-              </div>
+        <dl className="abar" aria-hidden="true">
+          {BAR.map((label) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>0 Aug 0000</dd>
             </div>
-            <div className="sk-body" />
-          </section>
-        ))}
-        <div className="colophon sk-colophon" />
-      </div>
+          ))}
+        </dl>
+      </header>
+      {FRAMES.map(([key, title]) => (
+        <section key={key} className={`panel sk-panel sk-${key}`} aria-hidden="true">
+          <div className="panel-head">
+            <h2>{title}</h2>
+          </div>
+          <div className="sk-body" />
+        </section>
+      ))}
     </main>
   );
 }

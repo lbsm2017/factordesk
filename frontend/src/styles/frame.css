@@ -1,82 +1,27 @@
-/* Loading frame at final heights (dashboard spec DB6.4, review finding S2).
-   The min-heights are the heights of the rendered blocks for the synthetic report, measured at
-   seven width tiers; the frame keeps the report's own margins, so nothing moves when the report arrives.
-   Re-measure with frontend/shots/heights.mjs after a layout change. Colours come from tokens.css. */
+/* Loading frame and busy placeholders (dashboard spec DB6.4). Colours come from tokens.css.
+   One set of panel heights for every width: the frame is a placeholder, not a measurement, so a
+   panel that arrives taller or shorter only moves what is below it. */
 
-.sk-head { min-height: var(--sk-head); }
-.sk-chip { display: inline-block; height: 28px; border-radius: 4px; background: var(--border); }
-.sk-chip.chip { width: 260px; }
-.sk-chip.btn-secondary { width: 132px; }
-.sk-notice {
-  margin-top: var(--s-3); min-height: var(--sk-notice);
-  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 4px;
-}
-.sk-eq { min-height: var(--sk-eq); background: var(--border); border-radius: 2px; }
-.sk-kpis { min-height: var(--sk-kpis); }
 .sk-panel { display: flex; flex-direction: column; }
-.sk-price { min-height: var(--sk-price); }
-.sk-exposures { min-height: var(--sk-exposures); }
-.sk-returns { min-height: var(--sk-returns); }
-.sk-risk { min-height: var(--sk-risk); }
-.sk-rolling { min-height: var(--sk-rolling); }
-.sk-data { min-height: var(--sk-data); }
-.sk-regression { min-height: var(--sk-regression); }
-.sk-colophon { min-height: var(--sk-colophon); }
-.sk-body { flex: 1; margin-top: var(--s-4); background: var(--sunk); border: 1px solid var(--grid); border-radius: 4px; }
-
-/* widest (content column 1216 px): 1264 px and up, measured at 1440 */
-:root { --sk-head: 46px; --sk-notice: 102px; --sk-eq: 214px; --sk-kpis: 123px; --sk-price: 411px; --sk-exposures: 559px; --sk-returns: 776px; --sk-risk: 588px; --sk-rolling: 628px; --sk-data: 583px; --sk-regression: 1269px; --sk-colophon: 19px; }
-
-/* 1000 to 1263 px, measured at 1000 */
-@media screen and (max-width: 1263px) {
-  :root { --sk-head: 46px; --sk-notice: 102px; --sk-eq: 214px; --sk-kpis: 123px; --sk-price: 411px; --sk-exposures: 594px; --sk-returns: 811px; --sk-risk: 588px; --sk-rolling: 628px; --sk-data: 673px; --sk-regression: 1337px; --sk-colophon: 19px; }
-}
-
-/* 800 to 999 px, measured at 900 */
-@media screen and (max-width: 999px) {
-  :root { --sk-head: 90px; --sk-notice: 102px; --sk-eq: 214px; --sk-kpis: 148px; --sk-price: 411px; --sk-exposures: 594px; --sk-returns: 811px; --sk-risk: 588px; --sk-rolling: 628px; --sk-data: 696px; --sk-regression: 1400px; --sk-colophon: 19px; }
-}
-
-/* 720 to 799 px, measured at 720 */
-@media screen and (max-width: 799px) {
-  :root { --sk-head: 90px; --sk-notice: 102px; --sk-eq: 311px; --sk-kpis: 165px; --sk-price: 411px; --sk-exposures: 617px; --sk-returns: 830px; --sk-risk: 606px; --sk-rolling: 646px; --sk-data: 971px; --sk-regression: 1423px; --sk-colophon: 38px; }
-}
-
-/* 520 to 719 px, measured at 600 */
-@media screen and (max-width: 719px) {
-  :root { --sk-head: 142px; --sk-notice: 142px; --sk-eq: 267px; --sk-kpis: 289px; --sk-price: 618px; --sk-exposures: 810px; --sk-returns: 1070px; --sk-risk: 784px; --sk-rolling: 937px; --sk-data: 1170px; --sk-regression: 1428px; --sk-colophon: 38px; }
-}
-
-/* 410 to 519 px, measured at 430 */
-@media screen and (max-width: 519px) {
-  :root { --sk-head: 194px; --sk-notice: 164px; --sk-eq: 359px; --sk-kpis: 324px; --sk-price: 636px; --sk-exposures: 873px; --sk-returns: 1176px; --sk-risk: 852px; --sk-rolling: 973px; --sk-data: 1368px; --sk-regression: 1622px; --sk-colophon: 38px; }
-}
-
-/* under 410 px, measured at 390 */
-@media screen and (max-width: 409px) {
-  :root { --sk-head: 194px; --sk-notice: 187px; --sk-eq: 451px; --sk-kpis: 324px; --sk-price: 636px; --sk-exposures: 918px; --sk-returns: 1176px; --sk-risk: 870px; --sk-rolling: 996px; --sk-data: 1390px; --sk-regression: 1685px; --sk-colophon: 56px; }
-}
-
-@media screen and (max-width: 719px) { .sk-chip.chip { width: 100%; } }
+.sk-body { flex: 1; margin-top: var(--s-4); background: var(--sunk); }
+.sk-summary { min-height: 380px; }
+.sk-price { min-height: 420px; }
+.sk-exposures { min-height: 520px; }
+.sk-returns { min-height: 560px; }
+.sk-risk { min-height: 520px; }
+.sk-rolling { min-height: 600px; }
+.sk-data { min-height: 560px; }
+.sk-regression { min-height: 900px; }
 
 /* Busy placeholders (spec DB6.4, review S3): while a request runs, the figures that belong to the
-   report on screen are blanked so old numbers never sit beside a new request. The fill is --border, not --grid
-   (review S4: --grid is 1.07:1 on --page in light). The longer chains
-   outrank the faded-term and not-significant colours in lead.css. */
+   report on screen are blanked so old numbers never sit beside a new request. The fill is --border,
+   not --grid (review S4: --grid is barely visible on --page). */
 [aria-busy="true"] .ticker,
-[aria-busy="true"] .kpis .kpi .v,
-[aria-busy="true"] .kpis .kpi .n,
-[aria-busy="true"] .model .term .m,
-[aria-busy="true"] .model .term .ann span {
+[aria-busy="true"] .abar dd {
   color: transparent;
   background: var(--border);
-  border-radius: 2px;
+  border-radius: var(--r-mark);
 }
 
-/* Error state: the ticker heading sits above the notice. */
-.req-error .masthead + .notice { margin-top: var(--s-4); }
-
-/* Review DF7: with the equation omitted, the KPI strip (or its empty state) follows the notice, or
-   the header when there is no notice. It gets the panel spacing instead of touching them. */
-.masthead + .kpis,
-.notice + .kpis { margin-top: var(--s-4); }
+/* A lazy panel while its chunk loads (Kalman and shrunk betas). */
+.sk-lazy { min-height: 480px; }

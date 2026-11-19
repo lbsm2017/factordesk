@@ -1,7 +1,14 @@
 import { render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
+import { StatsProvider } from "../../state/stats";
 import { RegressionDetail } from "./RegressionDetail";
+
+/** The statistics columns show only with "Show statistics" on; most cases below read them. */
+const statsOn = {
+  wrapper: ({ children }: { children: ReactNode }) => <StatsProvider initial>{children}</StatsProvider>,
+};
 
 function rowsOf(region: HTMLElement): string[][] {
   return Array.from(region.querySelectorAll("tbody tr")).map((tr) =>
@@ -11,7 +18,7 @@ function rowsOf(region: HTMLElement): string[][] {
 
 describe("RegressionDetail", () => {
   it("renders the detail table inside a labelled, focusable region", () => {
-    render(<RegressionDetail report={mockReport} />);
+    render(<RegressionDetail report={mockReport} />, statsOn);
     const region = screen.getByRole("region", { name: "Regression detail table, scrolls sideways" });
     expect(region.getAttribute("tabindex")).toBe("0");
     expect(region.querySelector("table.reg")).not.toBeNull();
@@ -30,7 +37,7 @@ describe("RegressionDetail", () => {
   });
 
   it("shows the fixture's numbers, with true minus signs", () => {
-    render(<RegressionDetail report={mockReport} />);
+    render(<RegressionDetail report={mockReport} />, statsOn);
     const rows = rowsOf(screen.getByRole("region", { name: /Regression detail table/ }));
     expect(rows).toHaveLength(6);
     const [alpha, mkt, smb] = rows;
@@ -47,7 +54,7 @@ describe("RegressionDetail", () => {
   });
 
   it("marks a not significant row", () => {
-    const { container } = render(<RegressionDetail report={mockReport} />);
+    const { container } = render(<RegressionDetail report={mockReport} />, statsOn);
     const hml = Array.from(container.querySelectorAll("tbody tr")).find(
       (tr) => tr.querySelector("th")?.textContent === "HML",
     );
@@ -56,7 +63,7 @@ describe("RegressionDetail", () => {
   });
 
   it("keeps one scroll region: the 5-day and diagnostics tables are labelled tables that fit the page", () => {
-    const { container } = render(<RegressionDetail report={mockReport} />);
+    const { container } = render(<RegressionDetail report={mockReport} />, statsOn);
     expect(container.querySelectorAll(".scroll-x")).toHaveLength(1);
     expect(container.querySelectorAll("[tabindex=\"0\"][role=\"region\"]")).toHaveLength(1);
     expect(container.querySelector("table.reg:not(.fit)")).not.toBeNull();
@@ -64,7 +71,7 @@ describe("RegressionDetail", () => {
   });
 
   it("renders the 5-day and diagnostics tables with their own names", () => {
-    render(<RegressionDetail report={mockReport} />);
+    render(<RegressionDetail report={mockReport} />, statsOn);
     const five = screen.getByRole("table", { name: "5-day estimate table" });
     expect(rowsOf(five)).toHaveLength(6);
     expect(screen.getByRole("heading", { level: 3, name: /^5-day estimate \(111 blocks\)$/ })).toBeTruthy();
@@ -79,7 +86,7 @@ describe("RegressionDetail", () => {
   it("omits the 5-day table when that estimate is not available", () => {
     const report = cloneReport();
     report.five_day_regression.status = "not_applicable";
-    render(<RegressionDetail report={report} />);
+    render(<RegressionDetail report={report} />, statsOn);
     expect(screen.queryByRole("table", { name: /5-day estimate/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: /5-day estimate/ })).toBeNull();
   });
@@ -88,7 +95,7 @@ describe("RegressionDetail", () => {
     const report = cloneReport();
     report.residual_diagnostics.status = "insufficient_data";
     report.residual_diagnostics.reason = "Too few days for the tests.";
-    const { container } = render(<RegressionDetail report={report} />);
+    const { container } = render(<RegressionDetail report={report} />, statsOn);
     expect(screen.queryByRole("table", { name: /Residual diagnostics/ })).toBeNull();
     expect(screen.getByRole("heading", { level: 3, name: "Residual diagnostics" })).toBeTruthy();
     expect(container.querySelector(".empty-what")?.textContent).toBe("Too few days for the tests.");
@@ -99,7 +106,7 @@ describe("RegressionDetail", () => {
     const report = cloneReport();
     report.regression.status = "insufficient_data";
     report.regression.reason = "Only 120 aligned days; at least 504 are needed.";
-    const { container } = render(<RegressionDetail report={report} />);
+    const { container } = render(<RegressionDetail report={report} />, statsOn);
     expect(screen.getByRole("heading", { level: 2, name: "Regression detail" })).toBeTruthy();
     expect(container.querySelector(".empty-what")?.textContent).toBe("Only 120 aligned days; at least 504 are needed.");
     expect(container.querySelector(".empty-do")?.textContent).toBeTruthy();
@@ -113,7 +120,7 @@ describe("RegressionDetail", () => {
     if (!first) throw new Error("fixture has no factors");
     first.se = null;
     first.p = null;
-    const { container } = render(<RegressionDetail report={report} />);
+    const { container } = render(<RegressionDetail report={report} />, statsOn);
     expect(container.textContent).not.toContain("NaN");
     const rows = rowsOf(screen.getByRole("region", { name: /Regression detail table/ }));
     expect(rows[1]?.[2]).toBe("n/a");
@@ -121,7 +128,7 @@ describe("RegressionDetail", () => {
   });
 
   it("gives the fit summary as the footnote and the method detail folded", () => {
-    const { container } = render(<RegressionDetail report={mockReport} />);
+    const { container } = render(<RegressionDetail report={mockReport} />, statsOn);
     const foot = container.querySelector("div.foot") as HTMLElement;
     expect(within(foot).getByText(/^R² 0\.9987, adjusted 0\.9987\. Residual volatility 0\.60% a year\. Newey-West lags 6\.$/)).toBeTruthy();
     const how = foot.querySelector("details.how");
@@ -129,8 +136,24 @@ describe("RegressionDetail", () => {
   });
 
   it("lists the readings of the significant betas", () => {
-    render(<RegressionDetail report={mockReport} />);
+    render(<RegressionDetail report={mockReport} />, statsOn);
     expect(screen.getByRole("heading", { level: 3, name: "Reading the significant betas" })).toBeTruthy();
     expect(screen.getByText("MOCK reading of Mkt-RF.")).toBeTruthy();
+  });
+});
+
+describe("RegressionDetail with statistics off (dashboard spec DV5)", () => {
+  it("shows Term, Estimate and Significant, and only Test and Reading in the diagnostics", () => {
+    render(<RegressionDetail report={mockReport} />);
+    const region = screen.getByRole("region", { name: "Regression detail table, scrolls sideways" });
+    expect(Array.from(region.querySelectorAll("thead th")).map((h) => h.textContent)).toEqual([
+      "Term",
+      "Estimate",
+      "Significant",
+    ]);
+    for (const row of rowsOf(region)) expect(row).toHaveLength(3);
+    const diag = screen.getByRole("table", { name: "Residual diagnostics table" });
+    expect(Array.from(diag.querySelectorAll("thead th")).map((h) => h.textContent)).toEqual(["Test", "Reading"]);
+    expect(screen.queryByText("VIF")).toBeNull();
   });
 });

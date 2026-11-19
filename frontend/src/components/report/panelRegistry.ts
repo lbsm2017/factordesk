@@ -1,6 +1,7 @@
 /**
  * Ordered panel registry of the report page (schema v3 contract, SC3.4 and SC4). `ReportView` draws
- * `orderedPanels()` in position order. Names and positions match the static report's registry
+ * `orderedPanels()` in position order. Dashboard v2 removed `equation` (the owner removed the formula)
+ * and `kpis` (replaced by the summary panel at 200). Names and positions match the static report's registry
  * (`backend/factordesk/report/panel_registry.py`); `notice` exists only here, because the static
  * page draws the notice inside its header.
  *
@@ -13,10 +14,8 @@ import type { FactorReport } from "../../api/types";
 import type { RollingWindowDays } from "../../state/url";
 import { Colophon } from "./Colophon";
 import { DataAuditPanel } from "./DataAuditPanel";
-import { Equation } from "./Equation";
 import { ExposuresPanel } from "./ExposuresPanel";
 import { Header } from "./Header";
-import { KpiStrip } from "./KpiStrip";
 import { Notice } from "./Notice";
 import { PricePanel } from "./PricePanel";
 import { RegressionDetail } from "./RegressionDetail";
@@ -24,10 +23,9 @@ import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
 import { RollingPanel } from "./RollingPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
-import { KalmanPanel } from "./sections/KalmanPanel";
+import { LazyKalmanPanel, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
 import { ResidualAlphaPanel } from "./sections/ResidualAlphaPanel";
-import { ShrunkBetasPanel } from "./sections/ShrunkBetasPanel";
 
 /** What `ReportView` hands to every panel; each panel reads the props it needs. */
 export interface PanelHostProps {
@@ -50,18 +48,16 @@ export interface PanelEntry {
 export const PANELS: readonly PanelEntry[] = [
   { name: "header", position: 100, Component: Header },
   { name: "notice", position: 150, Component: Notice },
-  { name: "equation", position: 200, Component: Equation },
-  { name: "kpis", position: 300, Component: KpiStrip },
   { name: "price", position: 400, Component: PricePanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
   { name: "lead_lag", position: 510, Component: LeadLagPanel },
-  { name: "shrunk", position: 520, Component: ShrunkBetasPanel },
+  { name: "shrunk", position: 520, Component: LazyShrunkBetasPanel },
   { name: "fragility", position: 530, Component: FragilityPanel },
   { name: "returns", position: 600, Component: ReturnPanel },
   { name: "risk", position: 700, Component: RiskPanel },
   { name: "residual_alpha", position: 710, Component: ResidualAlphaPanel },
   { name: "rolling", position: 800, Component: RollingPanel },
-  { name: "kalman", position: 810, Component: KalmanPanel },
+  { name: "kalman", position: 810, Component: LazyKalmanPanel },
   { name: "data", position: 900, Component: DataAuditPanel },
   { name: "regression_detail", position: 1000, Component: RegressionDetail },
   { name: "colophon", position: 1100, Component: Colophon },
