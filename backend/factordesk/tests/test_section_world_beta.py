@@ -34,7 +34,7 @@ from factordesk.report.sections.world_beta import (
 )
 from factordesk.report.sections.world_beta import WorldBetaSection
 from factordesk.section_hooks import load_section_inputs
-from factordesk.section_hooks.context import SectionInputs, WorldBenchmarkInput
+from factordesk.section_hooks.context import DollarInput, SectionInputs, WorldBenchmarkInput
 from factordesk.section_hooks.world_beta import UNAVAILABLE_REASON, load_world_benchmark
 from factordesk.tests.fixtures.dgp import StaticProvider, default_rf, dgp_a, price_history, rng_for
 from factordesk.tests.fixtures.sections import report_with_section
@@ -365,16 +365,23 @@ def no_portfolios(*args: object, **kwargs: object) -> None:
     return None
 
 
+def no_dollar(*args: object, **kwargs: object) -> DollarInput:
+    """Stands in for the FRED dollar index loader: no network in these tests."""
+    return DollarInput(levels=None, unavailable_reason="offline")
+
+
 def test_twb36_load_section_inputs_fetches_acwi_through_the_given_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("factordesk.section_hooks.load_shrinkage_inputs", no_portfolios)
+    monkeypatch.setattr("factordesk.section_hooks.macro.load_dollar", no_dollar)
     fake = Fake(make_case(736).bench)
     inputs = load_section_inputs(NOW, offline=False, price_provider=fake)
-    assert fake.calls == ["ACWI", "IEUR"] and inputs.world_benchmark is not None
+    assert fake.calls[:2] == ["ACWI", "IEUR"] and inputs.world_benchmark is not None
+    assert fake.calls[2:] == ["IEF", "LQD", "DBC", "TIP", "IEI"]  # the macro section's funds
     # Offline (factors injected) or without a provider: nothing is fetched.
     offline = load_section_inputs(NOW, offline=True, price_provider=fake)
-    assert offline.world_benchmark is None and fake.calls == ["ACWI", "IEUR"]
+    assert offline.world_benchmark is None and len(fake.calls) == 7
     assert load_section_inputs(NOW, offline=False).world_benchmark is None
 
 
@@ -383,6 +390,7 @@ def test_twb37_build_report_fills_the_section_through_the_pipeline_provider(
 ) -> None:
     case = make_case(737)
     monkeypatch.setattr("factordesk.section_hooks.load_shrinkage_inputs", no_portfolios)
+    monkeypatch.setattr("factordesk.section_hooks.macro.load_dollar", no_dollar)
 
     def load_factors(**kwargs: object) -> pd.DataFrame:
         return case.factors
@@ -404,7 +412,8 @@ def test_twb37_build_report_fills_the_section_through_the_pipeline_provider(
 
     provider = Two()
     report = build_report("STK", provider, now=NOW)
-    assert provider.calls == ["STK", "ACWI", "IEUR"]  # one extra fetch per proxy and run
+    # one extra fetch per proxy and run, then the five funds of the macro section
+    assert provider.calls == ["STK", "ACWI", "IEUR", "IEF", "LQD", "DBC", "TIP", "IEI"]
     assert report.world_beta is not None and report.world_beta.status == "ok"
 
 

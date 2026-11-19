@@ -42,6 +42,7 @@ from factordesk.tests.test_section_world_beta import (
     NOW,
     Fake,
     _yahoo_provider,  # pyright: ignore[reportPrivateUsage]
+    no_dollar,
     no_portfolios,
 )
 from factordesk.tests.test_world_beta import Case, make_case
@@ -200,12 +201,22 @@ def test_teb10_load_section_inputs_fetches_both_proxies_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("factordesk.section_hooks.load_shrinkage_inputs", no_portfolios)
+    monkeypatch.setattr("factordesk.section_hooks.macro.load_dollar", no_dollar)
     fake = Fake(make_case(8010).bench)
     inputs = load_section_inputs(NOW, offline=False, price_provider=fake)
-    assert fake.calls == ["ACWI", "IEUR"]
+    # The two world beta proxies, then the five funds of the macro section (E4).
+    assert fake.calls == ["ACWI", "IEUR", "IEF", "LQD", "DBC", "TIP", "IEI"]
     assert inputs.world_benchmark is not None and inputs.europe_benchmark is not None
+    assert inputs.macro is not None and set(inputs.macro.funds) == {
+        "IEF",
+        "LQD",
+        "DBC",
+        "TIP",
+        "IEI",
+    }
     offline = load_section_inputs(NOW, offline=True, price_provider=fake)
-    assert offline.europe_benchmark is None and fake.calls == ["ACWI", "IEUR"]
+    assert offline.europe_benchmark is None and offline.macro is None
+    assert len(fake.calls) == 7
 
 
 def test_teb11_loader_never_raises_for_ieur() -> None:

@@ -12,6 +12,7 @@ import math
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
@@ -268,7 +269,7 @@ def test_monthly_leg_return_is_the_product_of_its_daily_returns() -> None:
     lv, daily = _daily_levels("2019-12-27", "2021-06-30", 5)  # starts in a partial month
     month_ends = pd.date_range("2020-01-31", "2021-06-30", freq="ME")
     monthly = monthly_leg_returns(lv, month_ends)
-    by_month = (1.0 + daily).groupby(daily.index.to_period("M")).prod() - 1.0
+    by_month = (1.0 + daily).groupby(pd.DatetimeIndex(daily.index).to_period("M")).prod() - 1.0
     for stamp in month_ends:
         assert monthly[stamp] == pytest.approx(by_month[stamp.to_period("M")], rel=1e-9)
     # December 2019 is only partly in the history, so it has no return; January 2020 does.
@@ -300,7 +301,7 @@ def test_monthly_spreads_are_taken_after_compounding() -> None:
         daily[t] = pd.Series(r, index=days[1:])
 
     def comp(t: str) -> pd.Series:
-        s = (1.0 + daily[t]).groupby(daily[t].index.to_period("M")).prod() - 1.0
+        s = (1.0 + daily[t]).groupby(pd.DatetimeIndex(daily[t].index).to_period("M")).prod() - 1.0
         return pd.Series(s.reindex(month_ends.to_period("M")).to_numpy(), index=month_ends)
 
     subject = subject_from_monthly_returns(returns, label="Fund")
@@ -318,7 +319,7 @@ def test_monthly_spreads_are_taken_after_compounding() -> None:
     )
     # The spread of compounded returns is not the compounded spread of daily returns.
     daily_spread = (1.0 + (daily["LQD"] - daily["IEF"])).groupby(
-        daily["LQD"].index.to_period("M")
+        pd.DatetimeIndex(daily["LQD"].index).to_period("M")
     ).prod() - 1.0
     assert not np.allclose(
         cols["def"], daily_spread.reindex(month_ends.to_period("M")).to_numpy()[-design.n :]
@@ -363,10 +364,9 @@ def test_a_monthly_subject_uses_student_t_and_no_lag_term() -> None:
     assert [r.code for r in macro.rows][-1] == "usd"
     assert macro.n_obs == n  # window: every month has all legs (legs start before the subject)
     # The Student-t p-value is wider than the normal one for the same t.
-    from scipy.stats import norm  # pyright: ignore[reportMissingTypeStubs]
-
+    normal = NormalDist()
     for r in macro.rows:
-        assert r.p >= 2 * float(norm.sf(abs(r.t))) - 1e-12
+        assert r.p >= 2.0 * (1.0 - normal.cdf(abs(r.t))) - 1e-12
 
 
 def _history(ticker: str, levels: pd.Series) -> PriceHistory:
