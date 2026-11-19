@@ -163,7 +163,7 @@ def main() -> None:
     rows.append(("Hero headlines (or a title above 28 px)", hero, 0, f"page title {h1} px; verdict set at {sub} px"))
     small = [s for s in sizes if s < 14] + [int(x) for x in re.findall(r"font-size:\s*(\d+)px", CSS) if int(x) < 14]
     rows.append(("Text sizes under 14 px", len(small), 0, f"scale: {', '.join(str(s) for s in sorted(set(sizes)))}"))
-    rows.append(("Em dashes", both.count("—") + both.count("&mdash;") + both.count("&#8212;"), 0, ""))
+    rows.append(("Em dashes", both.count("\u2014") + both.count("&mdash;") + both.count("&#8212;"), 0, ""))
     rows.append(("All-caps text-transform outside the ticker field", len(re.findall(r"text-transform:\s*uppercase", CSS)) - 1, 0, ""))
 
     fails = [(a, b, round(ratio(t[a], t[b]), 2)) for a, b in TEXT_PAIRS if ratio(t[a], t[b]) < 4.5]
