@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
 import { ReportView } from "../report/ReportView";
-import { auditBadge, NAV_ITEMS } from "./SectionNav";
+import { auditBadge, NAV_ITEMS, sectionHasData } from "./SectionNav";
 import { Shell } from "./Shell";
 
 function page(report = mockReport) {
@@ -43,6 +43,25 @@ describe("SectionNav", () => {
     expect(sub?.textContent).toBe("Deeper checks");
     expect(sub?.closest("li")?.querySelector("a")?.getAttribute("href")).toBe("#data");
     for (const a of nav.querySelectorAll("a")) expect(a.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("hides the item of a section that is null or absent in the report", () => {
+    const r = cloneReport();
+    expect(sectionHasData(r, "lead-lag")).toBe(false);
+    expect(sectionHasData(r, "fragility")).toBe(false);
+    expect(sectionHasData(r, "summary")).toBe(true);
+    expect(sectionHasData(undefined, "lead-lag")).toBe(true);
+    delete (r as { kalman_betas?: unknown }).kalman_betas;
+    expect(sectionHasData(r, "kalman")).toBe(false);
+    r.shrunk_betas = [];
+    expect(sectionHasData(r, "shrunk")).toBe(true);
+  });
+
+  it("never lists Lead-lag or Fragility for a report without those sections", async () => {
+    page();
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    const labels = Array.from(nav.querySelectorAll(".nav-label")).map((n) => n.textContent ?? "");
+    expect(labels.join("|")).not.toMatch(/Lead-lag|Fragility/);
   });
 
   it("names a label and an icon for every item, and a target id once only", () => {
