@@ -9,6 +9,7 @@ export const PLAIN: Record<string, string> = {
   HML: "Value",
   RMW: "Profitability",
   CMA: "Investment",
+  Mom: "Momentum",
 };
 
 /** Plain one-sentence warning summaries by code (H.9). Unknown codes fall back to `message`. */
@@ -30,6 +31,7 @@ export const TILT: Record<string, readonly [string, string]> = {
   HML: ["value stocks", "growth stocks"],
   RMW: ["highly profitable firms", "weakly profitable firms"],
   CMA: ["firms that invest conservatively", "firms that invest aggressively"],
+  Mom: ["recent winners", "recent losers"],
 };
 
 /** Reader-facing word for an estimate tag: "significant" or "not significant" (never "reliable" or "noise"). */

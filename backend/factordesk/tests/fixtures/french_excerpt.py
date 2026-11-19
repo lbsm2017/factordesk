@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 # (the preamble lines of the French files are longer than 100 characters; kept verbatim)
-"""Short verbatim excerpts of two Ken French factor files, for offline tests (E0-T2).
+"""Short verbatim excerpts of four Ken French factor files, for offline tests (E0-T2, E1).
 
 Copied line for line (trailing blanks stripped) from the files of the 202609 CRSP vintage,
 downloaded on 2026-11-19 from the Ken French data library
@@ -11,6 +11,11 @@ downloaded on 2026-11-19 from the Ken French data library
 * ``FF5_MONTHLY_2020``: ``F-F_Research_Data_5_Factors_2x3_CSV.zip``, preamble and header, the
   twelve monthly rows of 2020, then the start of the annual block (title, header, 2019 and 2020)
   and the copyright line, so the parser's skipping of the annual block is exercised.
+* ``MOM_MONTHLY_2020``: ``F-F_Momentum_Factor_CSV.zip``, preamble and header, the twelve monthly
+  rows of 2020, the start of the annual block (title, header, 2019 and 2020) and the copyright
+  line.
+* ``MOM_DAILY_2020Q2``: ``F-F_Momentum_Factor_daily_CSV.zip``, preamble and header, the daily rows
+  of April, May and June 2020, the copyright line.
 
 Values are percent, as published. These few rows are test oracles only; the application never
 reads them.
@@ -114,6 +119,125 @@ The annual TBill return is compounded from the monthly T-bill rates from January
 ,Mkt-RF,SMB,HML,RMW,CMA,RF
   2019,   28.40,   -6.53,  -10.36,    3.81,   -2.98,    2.14
   2020,   23.65,    3.74,  -46.94,   -5.21,  -11.70,    0.44
+
+Copyright 2026 Eugene F. Fama and Kenneth R. French
+"""
+
+MOM_MONTHLY_2020 = """\
+This file was created using the 202609 CRSP database.  It
+contains a momentum factor, constructed from six value-weight portfolios formed
+using independent sorts on size and prior return of NYSE, AMEX, and NASDAQ stocks
+Mom    is the average of the returns on two (big and small) high prior return portfolios
+minus the average of the returns on two low prior return portfolios.  The portfolios
+are constructed monthly.  Big means a firm is above the median market cap on the NYSE
+at the end of the previous month; small firms are below the median NYSE market cap.
+Prior return is measured from month -12 to - 2.  Firms in the low prior return
+portfolio are below the 30th NYSE percentile.  Those in the high portfolio are above
+the 70th NYSE percentile.
+
+Missing data are indicated by -99.99 or -999.
+
+,Mom
+202001,   6.02
+202002,  -0.25
+202003,   8.20
+202004,  -5.61
+202005,   0.15
+202006,  -0.87
+202007,   7.70
+202008,   0.43
+202009,   3.18
+202010,  -3.10
+202011, -12.60
+202012,  -2.26
+
+Annual Factors:
+January-December
+,Mom
+  2019,  -2.09
+  2020,   7.34
+
+Copyright 2026 Eugene F. Fama and Kenneth R. French
+"""
+
+MOM_DAILY_2020Q2 = """\
+This file was created by using the 202609 CRSP database.  It
+contains a momentum factor, constructed from six value-weight portfolios formed
+using independent sorts on size and prior return of NYSE, AMEX, and NASDAQ stocks.
+MOM is the average of the returns on two (big and small) high prior return portfolios
+minus the average of the returns on two low prior return portfolios.  The portfolios
+are constructed daily.  Big means a firm is above the median market cap on the NYSE
+at the end of the previous day; small firms are below the median NYSE market cap.
+Prior return is measured from day - 250 to - 21.  Firms in the low prior return
+portfolio are below the 30th NYSE percentile.  Those in the high portfolio are above
+the 70th NYSE percentile.
+
+Missing data are indicated by -99.99 or -999.
+
+,Mom
+20200401,   0.18
+20200402,  -0.97
+20200403,  -0.26
+20200406,  -0.33
+20200407,  -1.77
+20200408,  -2.11
+20200409,  -0.67
+20200413,   0.83
+20200414,   2.12
+20200415,   2.35
+20200416,   3.90
+20200417,  -5.51
+20200420,   1.46
+20200421,  -0.38
+20200422,   0.37
+20200423,  -2.40
+20200424,   0.35
+20200427,  -2.34
+20200428,  -3.34
+20200429,  -4.76
+20200430,   0.80
+20200501,   2.83
+20200504,   0.11
+20200505,   2.23
+20200506,   2.21
+20200507,  -2.19
+20200508,  -3.47
+20200511,   2.51
+20200512,   0.93
+20200513,   3.16
+20200514,  -0.96
+20200515,   0.64
+20200518,  -6.28
+20200519,   1.11
+20200520,  -1.48
+20200521,  -1.24
+20200522,   0.82
+20200526,  -4.81
+20200527,  -2.54
+20200528,   2.21
+20200529,   2.38
+20200601,  -1.98
+20200602,  -1.33
+20200603,  -4.82
+20200604,  -3.43
+20200605,  -5.17
+20200608,  -5.04
+20200609,   4.30
+20200610,   5.98
+20200611,   5.11
+20200612,  -3.94
+20200615,   0.67
+20200616,  -0.91
+20200617,   2.89
+20200618,  -0.10
+20200619,   1.20
+20200622,   1.48
+20200623,   0.29
+20200624,   3.01
+20200625,  -0.51
+20200626,   1.28
+20200629,  -2.60
+20200630,   1.20
 
 Copyright 2026 Eugene F. Fama and Kenneth R. French
 """

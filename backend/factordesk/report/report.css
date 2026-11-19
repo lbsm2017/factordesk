@@ -30,6 +30,7 @@
   --f3: #c25078; /* HML */
   --f4: #1995ba; /* RMW */
   --f5: #a18a21; /* CMA */
+  --f6: #7048b8; /* Mom (FF6) */
   /* type */
   --sans: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --math: "STIX Two Text", "Cambria Math", Cambria, "Times New Roman", serif;
@@ -72,6 +73,7 @@
     --f3: #cb587f;
     --f4: #1493b8;
     --f5: #aa932d;
+    --f6: #7048b8;
   }
 }
 :root[data-theme="dark"] {
@@ -93,6 +95,7 @@
   --f3: #cb587f;
   --f4: #1493b8;
   --f5: #aa932d;
+  --f6: #7048b8;
 }
 
 /* ------------------------------------------------------------------ base */
@@ -236,7 +239,7 @@ rect.hatch { fill: url(#hatch); stroke: var(--ink-3); stroke-width: 1; }
 .hatch-ink { fill: var(--ink-3); }
 .total-line { stroke: var(--ink); stroke-width: 2; }
 .total-cap { stroke: var(--ink); stroke-width: 3; }
-rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--f3); } rect.c4 { fill: var(--f4); } rect.c5 { fill: var(--f5); }
+rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--f3); } rect.c4 { fill: var(--f4); } rect.c5 { fill: var(--f5); } rect.c6 { fill: var(--f6); }
 
 /* line charts */
 .plot { position: relative; }
@@ -247,9 +250,9 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .tailzone { fill: var(--grid); }
 .cutline { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
 .line-svg path.band { stroke: none; fill-opacity: 0.16; }
-.band.c1 { fill: var(--f1); } .band.c2 { fill: var(--f2); } .band.c3 { fill: var(--f3); } .band.c4 { fill: var(--f4); } .band.c5 { fill: var(--f5); }
+.band.c1 { fill: var(--f1); } .band.c2 { fill: var(--f2); } .band.c3 { fill: var(--f3); } .band.c4 { fill: var(--f4); } .band.c5 { fill: var(--f5); } .band.c6 { fill: var(--f6); }
 .rline { stroke-width: 1.75; }
-.rline.c1 { stroke: var(--f1); } .rline.c2 { stroke: var(--f2); } .rline.c3 { stroke: var(--f3); } .rline.c4 { stroke: var(--f4); } .rline.c5 { stroke: var(--f5); }
+.rline.c1 { stroke: var(--f1); } .rline.c2 { stroke: var(--f2); } .rline.c3 { stroke: var(--f3); } .rline.c4 { stroke: var(--f4); } .rline.c5 { stroke: var(--f5); } .rline.c6 { stroke: var(--f6); }
 .short { display: none; }
 .ylabels .yl { position: absolute; right: calc(100% + 8px); transform: translateY(-50%); font-size: var(--fs-1); color: var(--ink-3); white-space: nowrap; line-height: 1; }
 .ylabels .yl.top { transform: none; }
@@ -385,7 +388,7 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
     --chalk: #ffffff; --sheet: #ffffff; --graphite: #16202b; --slate: #465361;
     --cobalt: #2a5bc0; --copper: #b4560c; --sunk: #f5f7f9; --border: #c9d0d8; --grid: #e5e9ee;
     --axis: #8a95a2; --ink-3: #5f6b78; --ink-faded: #777e85;
-    --f1: #7559c5; --f2: #066e33; --f3: #c25078; --f4: #1995ba; --f5: #a18a21;
+    --f1: #7559c5; --f2: #066e33; --f3: #c25078; --f4: #1995ba; --f5: #a18a21; --f6: #7048b8;
     --label-w: 132px; --num-w: 72px;
   }
   @page { size: A4; margin: 14mm 12mm; }

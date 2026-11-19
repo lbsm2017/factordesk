@@ -88,7 +88,7 @@ def test_the_section_is_registered_for_every_source_and_frequency() -> None:
         for freq in ("daily", "monthly"):
             for model in ("ff5", "ff6"):
                 assert spec.applies(kind, freq, model)  # pyright: ignore[reportArgumentType]
-    assert SECTIONS[-1] is TAIL_RISK_SECTION
+    assert TAIL_RISK_SECTION in SECTIONS
     info = FactorReport.model_fields["tail_risk"]
     assert info.default is None and not info.is_required()
     assert TAIL_RISK_SECTION.statistic_models == () and not TAIL_RISK_SECTION.label_text

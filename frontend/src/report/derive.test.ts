@@ -124,7 +124,8 @@ describe("scales and ticks", () => {
 describe("factor helpers", () => {
   it("uses canonical colour slots and falls back to order of appearance", () => {
     expect(slotOf("HML", ["Mkt-RF", "SMB", "HML"])).toBe(3);
-    expect(slotOf("Mom", ["A", "Mom"])).toBe(2);
+    expect(slotOf("Mom", ["A", "Mom"])).toBe(6);
+    expect(slotOf("UMD", ["A", "UMD"])).toBe(2);
     expect(slotOf("Unknown", [])).toBe(1);
   });
 

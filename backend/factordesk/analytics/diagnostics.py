@@ -347,16 +347,23 @@ class MultiDayFit:
     beta_p_adj: tuple[float, ...]
     beta_tags: tuple[Tag, ...]
     sigma_e_ann: float
+    names: tuple[str, ...] = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
+    """Display names of the factors, in the order of the betas."""
 
 
-def multi_day_regression(sample: AnalysisSample, horizon: int = HORIZON) -> MultiDayFit | None:
-    """The 5-day estimate of M3.6, or None when fewer than ``MIN_BLOCKS`` blocks exist."""
+def multi_day_regression(
+    sample: AnalysisSample, horizon: int = HORIZON, codes: Sequence[str] = FACTOR_CODES
+) -> MultiDayFit | None:
+    """The 5-day estimate of M3.6, or None when fewer than ``MIN_BLOCKS`` blocks exist.
+
+    ``codes`` are the factors of the model (default the five).
+    """
     y = sample.xret.to_numpy(dtype=np.float64)
-    f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
+    f = sample.factor_columns(codes).to_numpy(dtype=np.float64)
     if len(y) // horizon < MIN_BLOCKS:
         return None
     yb, fb, unused = block_sums(y, f, horizon)
-    names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
+    names = tuple(DISPLAY_NAMES[c] for c in codes)
     fit = ols_hac(yb, fb, names=names)
     scale = A / horizon
     beta_p = [float(p) for p in fit.pvalues[1:]]
@@ -376,6 +383,7 @@ def multi_day_regression(sample: AnalysisSample, horizon: int = HORIZON) -> Mult
         beta_p_adj=tuple(p_adj),
         beta_tags=tuple(significance_tags(beta_p)),
         sigma_e_ann=math.sqrt(scale) * float(np.std(fit.resid, ddof=1)),
+        names=names,
     )
 
 

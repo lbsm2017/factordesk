@@ -15,7 +15,13 @@ from fastapi.responses import HTMLResponse
 
 from factordesk.api.errors import check_ticker
 from factordesk.api.service import ReportService, get_report_service
-from factordesk.report.schema import ApiError, FactorReport, RangeOptions, RangePreset
+from factordesk.report.schema import (
+    ApiError,
+    FactorModel,
+    FactorReport,
+    RangeOptions,
+    RangePreset,
+)
 
 router = APIRouter(prefix="/api/report")
 
@@ -38,6 +44,10 @@ Preset = Annotated[
 ]
 Start = Annotated[date | None, Query(description="First requested date, YYYY-MM-DD.")]
 End = Annotated[date | None, Query(description="Last requested date, YYYY-MM-DD.")]
+Model = Annotated[
+    FactorModel,
+    Query(description="Factor model: ff5 (default) or ff6 (FF5 plus momentum)."),
+]
 
 
 @router.get("/{ticker}/ranges", responses=_ERRORS)
@@ -53,9 +63,10 @@ async def get_report(
     preset: Preset = None,
     start: Start = None,
     end: End = None,
+    model: Model = "ff5",
 ) -> FactorReport:
     """The factor report for a range preset or custom dates (neither: Full history)."""
-    return await service.report(check_ticker(ticker), preset, start, end)
+    return await service.report(check_ticker(ticker), preset, start, end, model)
 
 
 @router.get(
@@ -69,10 +80,11 @@ async def get_report_html(
     preset: Preset = None,
     start: Start = None,
     end: End = None,
+    model: Model = "ff5",
 ) -> HTMLResponse:
     """The offline HTML report for the same ticker and range, as a file download."""
     symbol = check_ticker(ticker)
-    page = await service.report_html(symbol, preset, start, end)
+    page = await service.report_html(symbol, preset, start, end, model)
     return HTMLResponse(
         content=page,
         headers={"Content-Disposition": f'attachment; filename="{symbol}_report.html"'},

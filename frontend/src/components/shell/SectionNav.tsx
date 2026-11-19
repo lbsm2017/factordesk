@@ -24,6 +24,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: "performance", label: "Drawdown", icon: "drawdown" },
   { id: "tail-risk", label: "Tail risk", icon: "risk" },
   { id: "exposures", label: "Factor exposures", icon: "exposures" },
+  { id: "alpha-strip", label: "Alpha across models", icon: "residual" },
   { id: "world-beta", label: "World beta", icon: "world" },
   { id: "returns", label: "Return sources", icon: "returns" },
   { id: "risk", label: "Risk sources", icon: "risk" },
@@ -41,6 +42,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 const SECTION_FIELD: Readonly<Record<string, keyof FactorReport>> = {
   performance: "performance",
   "tail-risk": "tail_risk",
+  "alpha-strip": "alpha_strip",
   "world-beta": "world_beta",
   residual: "residual",
   kalman: "kalman_betas",

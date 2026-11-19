@@ -4,6 +4,7 @@
  * tests. Each feature replaces its own JSON file; this module does not change.
  */
 import type { FactorReport } from "../api/types";
+import alphaStrip from "@fixtures/sections/alpha_strip.json";
 import fragility from "@fixtures/sections/fragility.json";
 import labels from "@fixtures/sections/label_text.json";
 import kalman from "@fixtures/sections/kalman.json";
@@ -25,6 +26,7 @@ export const SECTION_FIELDS = [
   "residual",
   "kalman_betas",
   "tail_risk",
+  "alpha_strip",
 ] as const;
 export type SectionField = (typeof SECTION_FIELDS)[number];
 
@@ -37,6 +39,7 @@ const PAYLOADS: Record<SectionField, unknown> = {
   residual,
   kalman_betas: kalman,
   tail_risk: tailRisk,
+  alpha_strip: alphaStrip,
 };
 
 /** The monthly (60 months) tail risk section, for a report with a monthly subject. */

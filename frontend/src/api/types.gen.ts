@@ -170,6 +170,120 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AlphaStrip
+         * @description The alpha strip: one row per model, all on the same rows, in a fixed order.
+         */
+        AlphaStrip: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Model
+             * @description Factor model of the report.
+             * @enum {string}
+             */
+            model: "ff5" | "ff6";
+            /**
+             * Caption
+             * @description Fixed caption under the strip.
+             */
+            caption: string;
+            /**
+             * Intro
+             * @description What the strip shows, in one sentence.
+             */
+            intro: string;
+            /**
+             * Model Note
+             * @description What the report's model assumes and leaves out.
+             */
+            model_note: string;
+            /**
+             * N Obs
+             * @description Common rows every model is fitted on.
+             */
+            n_obs: number;
+            /**
+             * N Dropped
+             * @description Sample rows left out because a model lacks a value there.
+             */
+            n_dropped: number;
+            /**
+             * Hac Lags
+             * @description Newey-West lag of every fit.
+             */
+            hac_lags: number;
+            /**
+             * T Reference
+             * @description Reference distribution of the p-values; None when not computed.
+             */
+            t_reference: ("normal" | "student_t") | null;
+            /**
+             * Rows
+             * @description CAPM, FF3, FF5, FF6, in that order.
+             */
+            rows: components["schemas"]["AlphaStripRow"][];
+        };
+        /**
+         * AlphaStripRow
+         * @description One model's alpha on the common rows. Not ranked against the other rows.
+         */
+        AlphaStripRow: {
+            /**
+             * Model
+             * @enum {string}
+             */
+            model: "capm" | "ff3" | "ff5" | "ff6";
+            /**
+             * Label
+             * @description Display label: "CAPM", "FF3", "FF5" or "FF6".
+             */
+            label: string;
+            /**
+             * Factors
+             * @description Display names of the model's factors, in order.
+             */
+            factors: string[];
+            /**
+             * Alpha Annual
+             * @description Intercept times P (252, or subject.periods).
+             */
+            alpha_annual: number;
+            /**
+             * Alpha Se Annual
+             * @description HAC standard error of alpha_annual.
+             */
+            alpha_se_annual: number;
+            /**
+             * Alpha T
+             * @description HAC t-statistic of the intercept (not annualised).
+             */
+            alpha_t: number;
+            /**
+             * Alpha P
+             * @description Two-sided p-value of alpha_t: normal reference for daily subjects, Student-t with n - k degrees of freedom for monthly subjects.
+             */
+            alpha_p: number;
+            /**
+             * R2
+             * @description R squared of the model on the common rows.
+             */
+            r2: number;
+            /**
+             * Adj R2
+             * @description Adjusted R squared of the model on the common rows.
+             */
+            adj_r2: number;
+        };
+        /**
          * AlphaWindow
          * @description One disjoint one-year window of family FR1.
          */
@@ -363,6 +477,13 @@ export interface components {
              * @description gross or net of fees; empty when unknown.
              */
             gross_net?: string | null;
+            /**
+             * Model
+             * @description Factor model: ff5 (default) or ff6 (FF5 plus momentum).
+             * @default ff5
+             * @enum {string}
+             */
+            model: "ff5" | "ff6";
         };
         /**
          * CorrPair
@@ -623,6 +744,11 @@ export interface components {
             /** @description What the report is about when it is not a daily ticker; absent (not null) for a ticker report, which is daily and annualised with 252. */
             subject?: components["schemas"]["SubjectInfo"] | null;
             /**
+             * Model
+             * @description Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report.
+             */
+            model?: "ff6" | null;
+            /**
              * Generated At
              * Format: date-time
              * @description Timezone-aware UTC timestamp.
@@ -675,6 +801,8 @@ export interface components {
             kalman_betas: components["schemas"]["KalmanBetaSeries"] | null;
             /** @description Value at risk and expected shortfall (CVaR) by three methods, with bootstrap bands, at the series' own frequency (spec section E7). */
             tail_risk: components["schemas"]["TailRiskSection"] | null;
+            /** @description Alpha under CAPM, FF3, FF5 and FF6 on the same rows, not ranked; absent (not null) when not computed. */
+            alpha_strip?: components["schemas"]["AlphaStrip"] | null;
         };
         /**
          * FactorStat
@@ -692,7 +820,7 @@ export interface components {
             se: number | null;
             /**
              * Z
-             * @description HAC test statistic: a z-statistic (normal reference) for daily subjects, a t-statistic (Student-t, n - 6 degrees of freedom) for monthly subjects.
+             * @description HAC test statistic: a z-statistic (normal reference) for daily subjects, a t-statistic (Student-t, n - k degrees of freedom, k = factors + 1) for monthly subjects.
              */
             z: number | null;
             /**
@@ -702,7 +830,7 @@ export interface components {
             p: number | null;
             /**
              * P Adj Bh
-             * @description Benjamini-Hochberg adjusted p (family of 5).
+             * @description Benjamini-Hochberg adjusted p (family: the model's betas).
              */
             p_adj_bh: number | null;
             /**
@@ -3162,6 +3290,8 @@ export interface operations {
                 start?: string | null;
                 /** @description Last requested date, YYYY-MM-DD. */
                 end?: string | null;
+                /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
+                model?: "ff5" | "ff6";
             };
             header?: never;
             path: {
@@ -3245,6 +3375,8 @@ export interface operations {
                 start?: string | null;
                 /** @description Last requested date, YYYY-MM-DD. */
                 end?: string | null;
+                /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
+                model?: "ff5" | "ff6";
             };
             header?: never;
             path: {

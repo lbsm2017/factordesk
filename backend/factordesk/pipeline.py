@@ -13,6 +13,9 @@ regressed on the French monthly factors with ``periods = 12``; the sections buil
 days do not apply to it: the rolling windows, the average beta and the residual quality gate
 (with its 5-day estimate) report ``not_applicable`` with a reason, and the daily-only optional
 sections are hidden by the hook registry (``section_hooks/registry.py``).
+The factor model is FF5 (default) or FF6 (FF5 plus momentum, E1). Under FF6 every core section
+uses the six factors, the sample is built on the dates where momentum exists, and the sections
+defined for the five factors only are hidden by the hook registry; the FF5 report is unchanged.
 Providers, the factor frame and the clock are injectable so the whole path runs offline in
 tests. Inputs that cannot support a regression raise ``DegenerateInputError`` (D30).
 """
@@ -52,6 +55,7 @@ from factordesk.analytics.diagnostics import (
 from factordesk.analytics.diagnostics import (
     NOTE as DIAGNOSTICS_NOTE,
 )
+from factordesk.analytics.models import model_codes
 from factordesk.analytics.regression import Z_975, FullSampleRegression, run_regression
 from factordesk.analytics.rolling import (
     PRIMARY_WINDOW,
@@ -62,7 +66,6 @@ from factordesk.analytics.rolling import (
 )
 from factordesk.analytics.sample import (
     DISPLAY_NAMES,
-    FACTOR_CODES,
     AnalysisSample,
     build_subject_sample,
 )
@@ -116,6 +119,7 @@ from factordesk.report.schema import (
 )
 from factordesk.section_hooks import load_section_inputs
 from factordesk.section_hooks.context import (
+    FACTOR_MODELS,
     CoreSections,
     FactorModel,
     SectionContext,
@@ -141,12 +145,21 @@ NOTE_US_FACTORS_SERIES = (
     "The factors are US Fama-French factors in USD, and the returns are taken to be in US "
     "dollars. Returns in another currency would mix factor exposure with currency effects."
 )
-NOTE_MONTHLY = (
+NOTE_MONTHLY_TEMPLATE = (
     "Monthly data: the regression uses the Fama-French monthly factors and annualises with 12 "
-    "periods a year. The Newey-West HAC covariance is scaled by n / (n - 6), and p-values, "
-    "intervals and tags use Student-t with n - 6 degrees of freedom; they remain approximate "
+    "periods a year. The Newey-West HAC covariance is scaled by n / (n - {k}), and p-values, "
+    "intervals and tags use Student-t with n - {k} degrees of freedom; they remain approximate "
     "for records of 36 to 60 months."
 )
+"""Note of a monthly report; ``k`` is the number of parameters (6 for FF5, 7 for FF6)."""
+NOTE_MONTHLY = NOTE_MONTHLY_TEMPLATE.format(k=6)
+"""The monthly note of an FF5 report."""
+NOTE_FF6 = (
+    "Model: FF6, the five Fama-French factors plus momentum (Mom). The sample ends on the last "
+    "date both factor files cover. Sections defined for the five-factor model only are not shown."
+)
+MOM_COLUMN = french.MOM
+"""Column of the momentum factor in the French frame (``data.french.load_ff6``)."""
 
 FACTOR_SOURCE_URL: dict[str, str] = {
     "daily": factor_data.SOURCE_URL,
@@ -256,6 +269,7 @@ def _regression_section(
     reg: FullSampleRegression, info: SampleInfo, gate_fired: bool = False
 ) -> Regression:
     fit = reg.fit
+    n_betas = len(reg.names)
     factors = [
         FactorStat(
             name=reg.names[i],
@@ -278,10 +292,11 @@ def _regression_section(
         + (
             "normal reference distribution. "
             if fit.t_df is None
-            else f"scaled by n / (n - 6), Student-t reference with {fit.t_df} degrees of freedom. "
+            else f"scaled by n / (n - {n_betas + 1}), Student-t reference with {fit.t_df} "
+            "degrees of freedom. "
         )
         + "Betas are tagged reliable when significant after a Benjamini-Hochberg correction "
-        "across the 5 betas (q = 0.05); alpha is a single test at 5%. Bars show the 95% "
+        f"across the {n_betas} betas (q = 0.05); alpha is a single test at 5%. Bars show the 95% "
         "interval for each beta on its own (not adjusted for multiple testing)."
     )
     if gate_fired:
@@ -360,8 +375,8 @@ def _rolling_section(rb: RollingBetas, info: SampleInfo) -> RollingWindow:
         ci_z=Z_975,
         dates=_dates(rb.betas.index),
         window_start=window_start,
-        betas={DISPLAY_NAMES[c]: _series(rb.betas[c], warm) for c in FACTOR_CODES},
-        se={DISPLAY_NAMES[c]: _series(rb.se[c], warm) for c in FACTOR_CODES},
+        betas={DISPLAY_NAMES[c]: _series(rb.betas[c], warm) for c in rb.betas.columns},
+        se={DISPLAY_NAMES[c]: _series(rb.se[c], warm) for c in rb.se.columns},
     )
 
 
@@ -727,7 +742,7 @@ def _five_day_section(
             caption,
         )
     fit = five.fit
-    names = [DISPLAY_NAMES[c] for c in FACTOR_CODES]
+    names = list(five.names)
     factors = [
         FactorStat(
             name=names[i],
@@ -880,6 +895,7 @@ def assemble_report(
     end: date | None = None,
     section_inputs: SectionInputs | None = None,
     security: Security | None = None,
+    model: FactorModel = "ff5",
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
@@ -888,7 +904,8 @@ def assemble_report(
     ``section_inputs`` holds extra data for the optional sections (None: none). ``security`` is
     the Yahoo metadata of the ticker (None: unknown); a known currency other than USD raises
     ``UnsupportedCurrencyError`` (roadmap N1, an unknown currency does not). A wrapper over
-    ``assemble_subject_report`` with the daily ticker subject of ``history`` and FF5.
+    ``assemble_subject_report`` with the daily ticker subject of ``history``; ``model`` is FF5
+    (default) or FF6, which needs the ``Mom`` column of ``data.french.load_ff6``.
     """
     check_currency(ticker, security)
     history = unique_dates(history)
@@ -898,7 +915,7 @@ def assemble_report(
     return assemble_subject_report(
         subject,
         factor_frame,
-        "ff5",
+        model,
         now=now,
         factors_downloaded_at=factors_downloaded_at,
         windows=windows,
@@ -947,6 +964,28 @@ def _check_subject_currency(subject: ReturnSubject) -> None:
         raise UnsupportedCurrencyError(subject.label, currency.strip())
 
 
+def _model_frame(factor_frame: pd.DataFrame, model: FactorModel) -> pd.DataFrame:
+    """The factor frame the report's sample is built on.
+
+    FF5: the frame as given (a ``Mom`` column, when present, rides along for the alpha strip and
+    never removes a row). FF6: the rows where ``Mom`` exists, so every sample row has all six
+    factors; dates after the last momentum value become the uncovered tail. ``ValueError`` when
+    the frame has no ``Mom`` column.
+    """
+    if model == "ff5":
+        return factor_frame
+    if MOM_COLUMN not in factor_frame.columns:
+        raise ValueError(
+            "the FF6 model needs the momentum factor (column 'Mom' of data.french.load_ff6)"
+        )
+    keep = factor_frame[MOM_COLUMN].notna().to_numpy(dtype=bool)
+    if bool(keep.all()):
+        return factor_frame
+    out = factor_frame.loc[keep]
+    out.attrs = dict(factor_frame.attrs)
+    return out
+
+
 def assemble_subject_report(
     subject: ReturnSubject,
     factor_frame: pd.DataFrame,
@@ -964,35 +1003,40 @@ def assemble_subject_report(
     """The report of any return subject: the engine behind every mode.
 
     ``factor_frame`` is the French frame of the subject's frequency (``load_ff5_daily`` or
-    ``data.french.load_ff5_monthly``; French column names, decimals). ``model`` is the factor
-    model; only ``"ff5"`` exists until FF6 (E1). Annualised figures use ``subject.periods``.
+    ``data.french.load_ff5_monthly``, or ``data.french.load_ff6`` with the ``Mom`` column; French
+    column names, decimals). ``model`` is the factor model: ``"ff5"`` or ``"ff6"`` (FF5 plus
+    momentum, which needs the ``Mom`` column; its sample keeps the dates where ``Mom`` exists).
+    A frame with ``Mom`` also gives the alpha strip under FF5; the FF5 sections do not change.
+    Annualised figures use ``subject.periods``.
     A ticker subject's report is exactly ``assemble_report``'s. A subject in a known currency
     other than USD raises ``UnsupportedCurrencyError``; fewer aligned rows than the frequency's
     floor raise ``InsufficientHistoryError`` (daily 504, monthly 36).
     """
-    if model != "ff5":
-        raise ValueError(f"factor model {model!r} is not available yet; use 'ff5'")
+    if model not in FACTOR_MODELS:
+        raise ValueError(f"unknown factor model {model!r}; use 'ff5' or 'ff6'")
+    codes = model_codes(model)
     _check_subject_currency(subject)
     is_daily = subject.frequency == "daily"
     periods = subject.periods
     audit = _subject_audit(subject)
-    sample = build_subject_sample(subject, factor_frame, start, end)
+    model_frame = _model_frame(factor_frame, model)
+    sample = build_subject_sample(subject, model_frame, start, end)
     vintage = FactorVintage(last_date=sample.factor_last_date, downloaded_at=factors_downloaded_at)
     info = _sample_info(sample, vintage)
-    first_fit = run_regression(sample, periods=periods, small_sample=not is_daily)
-    factor_values = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
+    first_fit = run_regression(sample, periods=periods, codes=codes, small_sample=not is_daily)
+    factor_values = sample.factor_columns(codes).to_numpy(dtype=np.float64)
     diag = (
         None
         if exact_fit(first_fit.fit.rsquared)
         else residual_diagnostics(first_fit.fit.resid, factor_values, subject.frequency)
     )
     gate = None if diag is None or not is_daily else quality_gate(diag.lag1)
-    five = multi_day_regression(sample) if gate is not None and gate.fired else None
+    five = multi_day_regression(sample, codes=codes) if gate is not None and gate.fired else None
     reg = apply_gate(first_fit, five) if five is not None else first_fit
 
     all_windows = sorted(set(windows) | {primary_window})
     if is_daily:
-        rolling_by_w = {w: rolling_betas(sample, w) for w in all_windows}
+        rolling_by_w = {w: rolling_betas(sample, w, codes) for w in all_windows}
         rolling_sections = [
             _rolling_section(rb, _sample_info(sample, vintage, w))
             if sample.n >= w
@@ -1080,7 +1124,7 @@ def assemble_subject_report(
         ticker=subject.label,
         now=now,
         history=subject.history,
-        factor_frame=factor_frame,
+        factor_frame=model_frame,
         sample=sample,
         vintage=vintage,
         audit=audit,
@@ -1105,11 +1149,14 @@ def assemble_subject_report(
     else:
         notes = [NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS_SERIES]
     if not is_daily:
-        notes.append(NOTE_MONTHLY)
+        notes.append(NOTE_MONTHLY_TEMPLATE.format(k=len(codes) + 1))
+    if model == "ff6":
+        notes.append(NOTE_FF6)
     return FactorReport.model_validate(
         {
             "ticker": subject.label,
             "subject": _subject_info(subject),
+            "model": "ff6" if model == "ff6" else None,
             "generated_at": now,
             "data": core.data,
             "regression": core.regression,

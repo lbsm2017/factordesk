@@ -142,7 +142,8 @@ def test_fixture_numbers_are_printed() -> None:
         assert expected in text, expected
     assert (
         "In-sample alpha holds up out-of-sample with point-in-time betas (100% kept) and is "
-        "distinguishable from zero. This rules out hindsight in the betas, not luck."
+        "distinguishable from zero. This rules out hindsight in the betas, not luck and not a "
+        "missing factor."
     ) in text
     assert (
         "What did this stock return beyond its factor exposures, and does it hold up without "

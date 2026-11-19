@@ -79,7 +79,7 @@ describe("WorldBetaBody", () => {
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     const head = container.querySelector("#world-beta-us th");
     expect(head?.textContent).toBe("US market, one-factor, same days");
-    expect(head?.getAttribute("title")).toMatch(/five-factor market beta/);
+    expect(head?.getAttribute("title")).toMatch(/market beta of the full factor model/);
     const heads = Array.from(container.querySelectorAll("tbody th")).map((h) => h.textContent);
     expect(heads.join(" ")).not.toContain("US market beta");
   });

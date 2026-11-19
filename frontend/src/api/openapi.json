@@ -382,6 +382,22 @@
               "title": "End"
             },
             "description": "Last requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ff5",
+                "ff6"
+              ],
+              "type": "string",
+              "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
+              "default": "ff5",
+              "title": "Model"
+            },
+            "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum)."
           }
         ],
         "responses": {
@@ -534,6 +550,22 @@
               "title": "End"
             },
             "description": "Last requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ff5",
+                "ff6"
+              ],
+              "type": "string",
+              "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
+              "default": "ff5",
+              "title": "Model"
+            },
+            "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum)."
           }
         ],
         "responses": {
@@ -613,6 +645,194 @@
   },
   "components": {
     "schemas": {
+      "AlphaStrip": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "ff5",
+              "ff6"
+            ],
+            "title": "Model",
+            "description": "Factor model of the report."
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "Fixed caption under the strip."
+          },
+          "intro": {
+            "type": "string",
+            "title": "Intro",
+            "description": "What the strip shows, in one sentence."
+          },
+          "model_note": {
+            "type": "string",
+            "title": "Model Note",
+            "description": "What the report's model assumes and leaves out."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Common rows every model is fitted on."
+          },
+          "n_dropped": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Dropped",
+            "description": "Sample rows left out because a model lacks a value there."
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lag of every fit."
+          },
+          "t_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "student_t"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T Reference",
+            "description": "Reference distribution of the p-values; None when not computed."
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AlphaStripRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "CAPM, FF3, FF5, FF6, in that order."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "model",
+          "caption",
+          "intro",
+          "model_note",
+          "n_obs",
+          "n_dropped",
+          "hac_lags",
+          "t_reference",
+          "rows"
+        ],
+        "title": "AlphaStrip",
+        "description": "The alpha strip: one row per model, all on the same rows, in a fixed order."
+      },
+      "AlphaStripRow": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "capm",
+              "ff3",
+              "ff5",
+              "ff6"
+            ],
+            "title": "Model"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Display label: \"CAPM\", \"FF3\", \"FF5\" or \"FF6\"."
+          },
+          "factors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Factors",
+            "description": "Display names of the model's factors, in order."
+          },
+          "alpha_annual": {
+            "type": "number",
+            "title": "Alpha Annual",
+            "description": "Intercept times P (252, or subject.periods)."
+          },
+          "alpha_se_annual": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Alpha Se Annual",
+            "description": "HAC standard error of alpha_annual."
+          },
+          "alpha_t": {
+            "type": "number",
+            "title": "Alpha T",
+            "description": "HAC t-statistic of the intercept (not annualised)."
+          },
+          "alpha_p": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Alpha P",
+            "description": "Two-sided p-value of alpha_t: normal reference for daily subjects, Student-t with n - k degrees of freedom for monthly subjects."
+          },
+          "r2": {
+            "type": "number",
+            "title": "R2",
+            "description": "R squared of the model on the common rows."
+          },
+          "adj_r2": {
+            "type": "number",
+            "title": "Adj R2",
+            "description": "Adjusted R squared of the model on the common rows."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model",
+          "label",
+          "factors",
+          "alpha_annual",
+          "alpha_se_annual",
+          "alpha_t",
+          "alpha_p",
+          "r2",
+          "adj_r2"
+        ],
+        "title": "AlphaStripRow",
+        "description": "One model's alpha on the common rows. Not ranked against the other rows."
+      },
       "AlphaWindow": {
         "properties": {
           "start": {
@@ -1094,6 +1314,16 @@
             ],
             "title": "Gross Net",
             "description": "gross or net of fees; empty when unknown."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "ff5",
+              "ff6"
+            ],
+            "title": "Model",
+            "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
+            "default": "ff5"
           }
         },
         "type": "object",
@@ -1622,6 +1852,19 @@
             ],
             "description": "What the report is about when it is not a daily ticker; absent (not null) for a ticker report, which is daily and annualised with 252."
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "ff6"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report."
+          },
           "generated_at": {
             "type": "string",
             "format": "date-time",
@@ -1777,6 +2020,17 @@
               }
             ],
             "description": "Value at risk and expected shortfall (CVaR) by three methods, with bootstrap bands, at the series' own frequency (spec section E7)."
+          },
+          "alpha_strip": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlphaStrip"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Alpha under CAPM, FF3, FF5 and FF6 on the same rows, not ranked; absent (not null) when not computed."
           }
         },
         "additionalProperties": false,
@@ -1849,7 +2103,7 @@
               }
             ],
             "title": "Z",
-            "description": "HAC test statistic: a z-statistic (normal reference) for daily subjects, a t-statistic (Student-t, n - 6 degrees of freedom) for monthly subjects."
+            "description": "HAC test statistic: a z-statistic (normal reference) for daily subjects, a t-statistic (Student-t, n - k degrees of freedom, k = factors + 1) for monthly subjects."
           },
           "p": {
             "anyOf": [
@@ -1873,7 +2127,7 @@
               }
             ],
             "title": "P Adj Bh",
-            "description": "Benjamini-Hochberg adjusted p (family of 5)."
+            "description": "Benjamini-Hochberg adjusted p (family: the model's betas)."
           },
           "ci_low": {
             "anyOf": [

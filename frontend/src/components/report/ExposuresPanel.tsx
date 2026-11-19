@@ -151,6 +151,10 @@ function ExposureTable({ model, stats }: { model: ExposureModel; stats: boolean 
   );
 }
 
+/** What the significance tag (the backend's "reliable") does and does not say (E9a). */
+export const NOISE_ONLY =
+  "The tag protects against reading noise as a pattern, and nothing more: it does not show that a factor caused the returns or that the model is the right one.";
+
 function footnotes(report: FactorReport, window: number): { footnote: string; how: string } {
   const g = report.regression;
   const texts = report.label_text;
@@ -161,7 +165,10 @@ function footnotes(report: FactorReport, window: number): { footnote: string; ho
     `The diamond and the Avg ${window}d column are the mean of the overlapping rolling estimates.`,
     ...g.labels.filter((k) => k !== "L-DESC").flatMap((k) => (texts[k] ? [texts[k]] : [])),
   ];
-  return { footnote: `${desc} Significant means the adjusted p is below 0.05.`, how: more.filter(Boolean).join(" ") };
+  return {
+    footnote: `${desc} Significant means the adjusted p is below 0.05. ${NOISE_ONLY}`,
+    how: more.filter(Boolean).join(" "),
+  };
 }
 
 /** Panel 5 (design D5): betas as an SVG-in-table bar chart. Every number is also a text column. */

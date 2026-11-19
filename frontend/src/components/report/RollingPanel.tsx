@@ -47,7 +47,7 @@ const MIN_ZOOM_SPAN_MS = 30 * 86_400_000;
 export interface RollingRowData {
   name: string;
   plain: string;
-  slot: 1 | 2 | 3 | 4 | 5;
+  slot: 1 | 2 | 3 | 4 | 5 | 6;
   /** Stamp times in ms and values; warm-up stamps are left out. */
   ms: number[];
   beta: number[];

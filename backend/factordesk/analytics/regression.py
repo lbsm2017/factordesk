@@ -24,6 +24,7 @@ from statistics import NormalDist
 from typing import Any, Literal, cast
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 from scipy.stats import t as student_t  # pyright: ignore[reportMissingTypeStubs]
 from statsmodels.stats.multitest import (  # pyright: ignore[reportMissingTypeStubs]
@@ -32,6 +33,7 @@ from statsmodels.stats.multitest import (  # pyright: ignore[reportMissingTypeSt
 
 from factordesk.analytics.sample import (
     DISPLAY_NAMES,
+    EXTRA_FACTOR_CODES,
     FACTOR_CODES,
     AnalysisSample,
     DegenerateInputError,
@@ -41,8 +43,11 @@ FloatArray = NDArray[np.float64]
 Tag = Literal["reliable", "noise"]
 
 A = 252
-"""Annualisation constant, trading days per year (M0.4). It is the default of every
-``periods`` argument (observations per year): a daily series uses 252, a monthly one 12."""
+"""Annualisation constant, trading days per year (M0.4): the ``periods`` (observations per
+year) of a daily series; a monthly one uses 12. Functions that take a sample read its own
+``periods`` (``resolve_periods``)."""
+KNOWN_CODES: tuple[str, ...] = (*FACTOR_CODES, *EXTRA_FACTOR_CODES)
+"""Every factor code a regression can use, canonical order."""
 BH_Q = 0.05
 """Benjamini-Hochberg level, fixed (M0.6)."""
 ALPHA_LEVEL = 0.05
@@ -323,7 +328,9 @@ def vif(factors: FloatArray) -> FloatArray:
 
 
 def condition_number(factors: FloatArray) -> float:
-    """``sqrt(lambda_max / lambda_min)`` of the factor correlation matrix (M3.4)."""
+    """``sqrt(lambda_max / lambda_min)`` of the factor correlation matrix (M3.4); 1 for one."""
+    if np.asarray(factors).shape[1] == 1:
+        return 1.0
     eig = np.linalg.eigvalsh(np.corrcoef(np.asarray(factors, dtype=np.float64), rowvar=False))
     return float(math.sqrt(eig[-1] / eig[0]))
 
@@ -397,6 +404,11 @@ class FullSampleRegression:
     end: date
     periods: int = A
     """Observations a year used for the annualised figures (252 daily, 12 monthly)."""
+    codes: tuple[str, ...] = FACTOR_CODES
+    """Factor codes of the fit, in the order of ``names`` and ``betas``."""
+    n_dropped: int = 0
+    """Sample rows left out because a factor of ``codes`` is missing there (only an extra
+    factor such as ``mom`` can be; 0 for the five factors)."""
 
     @property
     def betas(self) -> FloatArray:
@@ -407,22 +419,66 @@ class FullSampleRegression:
         return float(self.fit.params[0])
 
 
-def run_regression(
-    sample: AnalysisSample, periods: int = A, *, small_sample: bool = False
-) -> FullSampleRegression:
-    """Full-sample OLS of ``y`` on the five factors with HAC ``L(n)`` (M3.1-M3.4).
+def resolve_periods(sample: AnalysisSample, periods: int | None) -> int:
+    """The sample's ``periods`` (252 daily, 12 monthly); a given value must equal it.
 
-    ``periods`` is the number of observations a year (252 daily, 12 monthly). It scales the
-    annualised figures only: alpha and its standard error and interval by ``periods`` (arithmetic,
-    M0.4) and the residual volatility by ``sqrt(periods)``. The fit itself does not depend on it.
-    ``small_sample`` (monthly subjects) selects the corrected covariance and Student-t inference
-    of ``ols_hac``; the tags follow from those p-values.
+    ``None`` means the sample's own. Any other value raises ``ValueError``: annualising monthly
+    data by 252, or daily data by 12, is always an error.
     """
+    own = sample.periods
+    if periods is None:
+        return own
     if periods <= 0:
         raise ValueError("periods must be positive")
-    y = sample.xret.to_numpy(dtype=np.float64)
-    f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
-    names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
+    if periods != own:
+        raise ValueError(
+            f"periods={periods} does not match the {sample.frequency} sample ({own} a year); "
+            "leave periods unset to use the sample's own"
+        )
+    return periods
+
+
+def check_codes(codes: Sequence[str]) -> tuple[str, ...]:
+    """``codes`` as a tuple after checking it is non-empty, known and without repeats."""
+    out = tuple(codes)
+    if not out:
+        raise ValueError("a regression needs at least one factor")
+    unknown = [c for c in out if c not in KNOWN_CODES]
+    if unknown:
+        raise ValueError(f"unknown factor codes {unknown}; known: {list(KNOWN_CODES)}")
+    if len(set(out)) != len(out):
+        raise ValueError(f"factor codes repeat: {list(out)}")
+    return out
+
+
+def run_regression(
+    sample: AnalysisSample,
+    periods: int | None = None,
+    *,
+    codes: Sequence[str] = FACTOR_CODES,
+    small_sample: bool = False,
+) -> FullSampleRegression:
+    """Full-sample OLS of ``y`` on the factors ``codes`` with HAC ``L(n)`` (M3.1-M3.4).
+
+    ``codes`` defaults to the five factors; ``analytics.models.MODELS`` holds the CAPM, FF3, FF5
+    and FF6 sets (``mom`` needs a sample built on the FF6 frame). ``periods`` is the number of
+    observations a year; ``None`` uses the sample's own (252 daily, 12 monthly) and any other
+    value must equal it (``resolve_periods``). It scales the annualised figures only: alpha and
+    its standard error and interval by ``periods`` (arithmetic, M0.4) and the residual volatility
+    by ``sqrt(periods)``. The fit itself does not depend on it. ``small_sample`` (monthly
+    subjects) selects the corrected covariance and Student-t inference of ``ols_hac``; the tags
+    follow from those p-values.
+
+    The fit uses ``sample.complete_rows(codes)``: every row for the five factors; for FF6 the
+    rows where ``mom`` also exists (``n_dropped`` counts the others).
+    """
+    periods = resolve_periods(sample, periods)
+    codes = check_codes(codes)
+    rows = sample.complete_rows(codes)
+    y = sample.xret.to_numpy(dtype=np.float64)[rows]
+    f = sample.factor_columns(codes).to_numpy(dtype=np.float64)[rows]
+    last_row = int(np.flatnonzero(rows)[-1]) if rows.any() else len(rows) - 1
+    names = tuple(DISPLAY_NAMES[c] for c in codes)
     fit = ols_hac(y, f, names=names, small_sample=small_sample)
 
     beta_p = [float(p) for p in fit.pvalues[1:]]
@@ -450,6 +506,8 @@ def run_regression(
         ),
         sigma_e_ann=sigma_e_ann,
         collinearity=collinearity(f, names),
-        end=sample.end,
+        end=pd.Timestamp(sample.xret.index[last_row]).date(),
         periods=periods,
+        codes=codes,
+        n_dropped=int(rows.size - rows.sum()),
     )

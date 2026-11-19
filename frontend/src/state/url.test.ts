@@ -157,3 +157,30 @@ describe("mode", () => {
     expect(applyPatch(state({ ticker: "SPY" }), { mode: "track" }).mode).toBe("track");
   });
 });
+
+describe("model", () => {
+  it("is FF5 unless the URL says model=ff6, so old URLs keep their meaning", () => {
+    expect(EMPTY_URL_STATE.model).toBe("ff5");
+    expect(parseUrl("").model).toBe("ff5");
+    expect(parseUrl("?t=SPY&range=3Y").model).toBe("ff5");
+    expect(parseUrl("?t=SPY&model=ff6").model).toBe("ff6");
+    expect(parseUrl("?t=SPY&model=FF6").model).toBe("ff6");
+    expect(parseUrl("?t=SPY&model=ff5").model).toBe("ff5");
+    expect(parseUrl("?t=SPY&model=ff7").model).toBe("ff5");
+  });
+
+  it("writes model=ff6 only for FF6", () => {
+    expect(toSearch(state({ ticker: "SPY", range: "3Y", model: "ff6" }))).toBe("?t=SPY&range=3Y&model=ff6");
+    expect(toSearch(state({ ticker: "SPY", range: "3Y", model: "ff5" }))).toBe("?t=SPY&range=3Y");
+    expect(toSearch(state({ mode: "track", model: "ff6" }))).toBe("?m=track&model=ff6");
+  });
+
+  it("round-trips and patches", () => {
+    for (const text of ["?t=SPY&model=ff6", "?t=SPY&start=2023-01-02&end=2024-01-02&win=126&stats=1&model=ff6", "?t=SPY"]) {
+      expect(toSearch(parseUrl(text))).toBe(text);
+    }
+    const ff6 = applyPatch(state({ ticker: "SPY", range: "5Y" }), { model: "ff6" });
+    expect(ff6).toEqual(state({ ticker: "SPY", range: "5Y", model: "ff6" }));
+    expect(applyPatch(ff6, { range: "3Y" }).model).toBe("ff6");
+  });
+});

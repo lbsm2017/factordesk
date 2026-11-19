@@ -22,7 +22,8 @@ from factordesk.analytics.sample import DegenerateInputError, InsufficientHistor
 from factordesk.analytics.subject import subject_from_monthly_returns
 from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime, get_runtime
-from factordesk.data.french import load_ff5_monthly
+from factordesk.data.factors import FactorError
+from factordesk.data.french import load_ff5_monthly, load_ff6
 from factordesk.data.upload import (
     MAX_UPLOAD_BYTES,
     UploadError,
@@ -30,7 +31,7 @@ from factordesk.data.upload import (
     parse_gross_net,
     parse_monthly_csv,
 )
-from factordesk.report.schema import ApiError, FactorReport
+from factordesk.report.schema import ApiError, FactorModel, FactorReport
 
 logger = logging.getLogger(__name__)
 
@@ -122,8 +123,28 @@ def _downloaded_at(frame: pd.DataFrame) -> datetime | None:
     return stamp.replace(tzinfo=UTC) if stamp.utcoffset() is None else stamp.astimezone(UTC)
 
 
+def monthly_frame(model: FactorModel, runtime: Runtime, now: datetime) -> pd.DataFrame:
+    """The monthly factor frame of an upload: FF6 (``load_ff6``) for both models.
+
+    FF5 falls back to the FF5 file without the alpha strip when momentum cannot be loaded; FF6
+    raises the loader's error.
+    """
+    data_dir = runtime.deps.data_dir
+    try:
+        return load_ff6("monthly", data_dir=data_dir, now=now)
+    except (FactorError, OSError):
+        if model == "ff6":
+            raise
+        logger.warning("Monthly momentum factor unavailable; FF5 report without the alpha strip")
+        return load_ff5_monthly(data_dir=data_dir, now=now)
+
+
 def build_upload_report(
-    raw: bytes, name: str | None, gross_net: str | None, runtime: Runtime
+    raw: bytes,
+    name: str | None,
+    gross_net: str | None,
+    runtime: Runtime,
+    model: FactorModel = "ff5",
 ) -> FactorReport:
     """Parse, validate and analyse an uploaded monthly record (blocking; run in a worker)."""
     from factordesk.pipeline import assemble_subject_report
@@ -145,10 +166,10 @@ def build_upload_report(
             "month, no gaps (for example 2021-01-31,0.012).",
         ) from exc
     now = runtime.deps.now().astimezone(UTC)
-    frame = load_ff5_monthly(data_dir=runtime.deps.data_dir, now=now)
+    frame = monthly_frame(model, runtime, now)
     try:
         return assemble_subject_report(
-            subject, frame, now=now, factors_downloaded_at=_downloaded_at(frame)
+            subject, frame, model, now=now, factors_downloaded_at=_downloaded_at(frame)
         )
     except InsufficientHistoryError as exc:
         raise to_api_exception(exc, label) from exc
@@ -168,6 +189,9 @@ async def upload_report(
     gross_net: Annotated[
         str | None, Form(description="gross or net of fees; empty when unknown.")
     ] = None,
+    model: Annotated[
+        FactorModel, Form(description="Factor model: ff5 (default) or ff6 (FF5 plus momentum).")
+    ] = "ff5",
 ) -> FactorReport:
     """The factor report of an uploaded monthly track record (kept in memory, never stored)."""
     runtime = get_runtime(request)
@@ -175,4 +199,4 @@ async def upload_report(
     await file.close()
     if len(raw) > MAX_UPLOAD_BYTES:
         raise _too_large()
-    return await runtime.run(build_upload_report, raw, name, gross_net, runtime)
+    return await runtime.run(build_upload_report, raw, name, gross_net, runtime, model)

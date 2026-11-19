@@ -2,7 +2,7 @@
  * Page: URL state, the shell with the controls in the sidebar, the data flow and the states between
  * them (dashboard spec DB6, prototype v4a). The "Show statistics" switch lives in `StatsProvider`.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   downloadHref,
   toApiError,
@@ -16,6 +16,7 @@ import {
 import type { FactorReport } from "./api/types";
 import { ControlsStrip } from "./components/controls/ControlsStrip";
 import { ModeSwitch } from "./components/controls/ModeSwitch";
+import { ModelToggle } from "./components/controls/ModelToggle";
 import { Landing, TrackLanding } from "./components/controls/ReportStates";
 import { TrackRecordInput } from "./components/controls/TrackRecordInput";
 import { ErrorFrame } from "./components/report/ErrorFrame";
@@ -84,6 +85,16 @@ function Dashboard() {
       : report.data;
   const busy = !track && state.ticker !== null && report.isFetching && shown !== undefined;
 
+  // A model change re-runs the record on screen with the new model (the upload result is not cached).
+  const lastModel = useRef(state.model);
+  useEffect(() => {
+    if (lastModel.current === state.model) return;
+    lastModel.current = state.model;
+    if (track && upload.variables !== undefined && !upload.isPending) {
+      upload.mutate({ ...upload.variables, model: state.model });
+    }
+  }, [state.model, track, upload]);
+
   const loadedTicker = !track && report.isSuccess && !report.isPlaceholderData ? report.data.ticker : null;
   useEffect(() => {
     if (loadedTicker !== null) addRecent(loadedTicker);
@@ -97,7 +108,7 @@ function Dashboard() {
         <>
           <ModeSwitch mode={state.mode} onSelect={(mode) => commit({ mode })} />
           {track ? (
-            <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate(input)} />
+            <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate({ ...input, model: state.model })} />
           ) : (
             <ControlsStrip
               state={state}
@@ -117,6 +128,9 @@ function Dashboard() {
               }}
             />
           )}
+          <div className="side-group">
+            <ModelToggle selected={state.model} onSelect={(model) => commit({ model })} />
+          </div>
           <StatsSwitch />
         </>
       }

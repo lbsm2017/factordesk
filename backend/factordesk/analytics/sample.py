@@ -20,6 +20,7 @@ Pure: no I/O, no clock. Inputs are not mutated.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Literal, cast
@@ -46,7 +47,15 @@ FRENCH_COLUMNS: dict[str, str] = {
 }
 """French file column -> code name. ``data.factors`` returns the French names."""
 
-DISPLAY_NAMES: dict[str, str] = {code: name for name, code in FRENCH_COLUMNS.items()}
+EXTRA_FRENCH_COLUMNS: dict[str, str] = {"Mom": "mom"}
+"""Optional factor columns: carried into the sample when the factor frame has them (the FF6
+frame of ``data.french.load_ff6``), in ``AnalysisSample.extra_factors``."""
+EXTRA_FACTOR_CODES: tuple[str, ...] = tuple(EXTRA_FRENCH_COLUMNS.values())
+"""Code names of the optional factors, canonical order (after ``FACTOR_CODES``)."""
+
+DISPLAY_NAMES: dict[str, str] = {
+    code: name for name, code in (FRENCH_COLUMNS | EXTRA_FRENCH_COLUMNS).items()
+}
 
 Frequency = Literal["daily", "monthly"]
 """Observation frequency of a return series. Weekly data is refused for now (owner decision)."""
@@ -129,7 +138,11 @@ class AnalysisSample:
     """The aligned sample ``S`` (M2) plus everything needed to report how it was built.
 
     ``xret``, ``ret``, ``rf`` and ``factors`` share one ``date`` index (the rows of ``S``).
-    ``factors`` has exactly the columns ``FACTOR_CODES``.
+    ``factors`` has exactly the columns ``FACTOR_CODES``. ``extra_factors`` holds the optional
+    factors the factor frame carried (``EXTRA_FACTOR_CODES`` present in it, e.g. ``mom``) on the
+    same index, or is None; ``factor_columns`` reads any of them by code. The rows of ``S`` are
+    set by the five factors only: an extra factor may be NaN on some rows, and a fit that uses
+    it keeps the rows of ``complete_rows`` (the five-factor sample never loses a row to it).
     """
 
     xret: pd.Series
@@ -146,6 +159,7 @@ class AnalysisSample:
     frequency: Frequency = "daily"
     warn_obs: int = WARN_OBS
     """Below this many rows the sample is short (``short_history``)."""
+    extra_factors: pd.DataFrame | None = None
 
     @property
     def n(self) -> int:
@@ -167,6 +181,41 @@ class AnalysisSample:
     @property
     def short_history(self) -> bool:
         return self.n < self.warn_obs
+
+    @property
+    def factor_codes(self) -> tuple[str, ...]:
+        """Every factor code the sample carries: ``FACTOR_CODES``, then the extra ones present."""
+        extra = () if self.extra_factors is None else tuple(self.extra_factors.columns)
+        return (*FACTOR_CODES, *extra)
+
+    def complete_rows(self, codes: Sequence[str]) -> NDArray[np.bool_]:
+        """Rows of ``S`` where the excess return and every factor of ``codes`` have a value.
+
+        All True for the five factors; False where an extra factor (``mom``) is missing.
+        """
+        y = self.xret.to_numpy(dtype=np.float64)
+        f = self.factor_columns(codes).to_numpy(dtype=np.float64)
+        return np.asarray(np.isfinite(y) & np.isfinite(f).all(axis=1), dtype=np.bool_)
+
+    def factor_columns(self, codes: Sequence[str]) -> pd.DataFrame:
+        """The factor columns ``codes`` (in that order) on the sample's rows.
+
+        Raises ``ValueError`` for a code the sample does not carry (``mom`` needs the FF6 frame).
+        """
+        available = self.factor_codes
+        missing = [c for c in codes if c not in available]
+        if missing:
+            hint = (
+                "; momentum needs the FF6 factor frame (data.french.load_ff6)"
+                if "mom" in missing
+                else ""
+            )
+            raise ValueError(f"the sample has no factor {missing}{hint}")
+        parts = [self.factors]
+        if self.extra_factors is not None:
+            parts.append(self.extra_factors)
+        frame = pd.concat(parts, axis=1) if len(parts) > 1 else self.factors
+        return frame.loc[:, list(codes)]
 
 
 def _as_date(value: object) -> date:
@@ -200,13 +249,38 @@ def all_month_ends(index: pd.DatetimeIndex) -> bool:
     return bool((days == lengths).all())
 
 
+def infer_periods(index: pd.Index) -> int | None:
+    """Observations a year implied by the spacing of ``index``: 252 or 12, or None if unclear.
+
+    The median gap between consecutive dates decides: at most 5 calendar days is daily (252), 28
+    to 31 days is monthly (12, calendar or business month-ends). Fewer than two dates, or any
+    other spacing (weekly, quarterly), gives None.
+    """
+    dates = pd.DatetimeIndex(index)
+    if len(dates) < 2:
+        return None
+    days = dates.to_numpy().astype("datetime64[D]").astype(np.int64)  # any datetime unit
+    gap = float(np.median(np.diff(days)))
+    if 0.0 < gap <= 5.0:
+        return PERIODS_PER_YEAR["daily"]
+    if 28.0 <= gap <= 31.0:
+        return PERIODS_PER_YEAR["monthly"]
+    return None
+
+
 def factor_frame_to_codes(factors: pd.DataFrame) -> pd.DataFrame:
-    """Validate a French factor frame (decimals) and rename it to code names, canonical order."""
+    """Validate a French factor frame (decimals) and rename it to code names, canonical order.
+
+    The optional columns of ``EXTRA_FRENCH_COLUMNS`` (``Mom``) are kept, after the others, when
+    the frame has them.
+    """
     validate_date_index(factors.index, "factor frame")
     missing = [c for c in FRENCH_COLUMNS if c not in factors.columns]
     if missing:
         raise ValueError(f"factor frame is missing columns {missing}")
-    out = factors.loc[:, list(FRENCH_COLUMNS)].astype("float64").rename(columns=FRENCH_COLUMNS)
+    columns = {**FRENCH_COLUMNS}
+    columns.update({k: v for k, v in EXTRA_FRENCH_COLUMNS.items() if k in factors.columns})
+    out = factors.loc[:, list(columns)].astype("float64").rename(columns=columns)
     out.index.name = "date"
     return out
 
@@ -350,7 +424,9 @@ def align_returns(
 
     in_range = (ret_dates >= lo) & (ret_dates <= hi)
     fac_on_ret = fac.reindex(ret_dates)  # rows absent from the French file become NaN here
-    factor_nan = fac_on_ret.isna().any(axis=1).to_numpy()
+    # Only the five factors and RF decide the rows of S; a missing extra factor (Mom) does not.
+    core = [c for c in fac.columns if c not in EXTRA_FACTOR_CODES]
+    factor_nan = fac_on_ret.loc[:, core].isna().any(axis=1).to_numpy()
     price_nan = ret.isna().to_numpy()
 
     reasons: list[ExclusionReason | None] = []
@@ -409,10 +485,12 @@ def align_returns(
             "would only describe the risk-free rate"
         )
     s_fac = fac.loc[s_dates, list(FACTOR_CODES)]
+    extra_codes = [c for c in EXTRA_FACTOR_CODES if c in fac.columns]
+    s_extra = fac.loc[s_dates, extra_codes] if extra_codes else None
     s_rf = fac.loc[s_dates, "rf"]
     s_xret = s_ret - s_rf  # y_t = r_t - RF_t (M2 step 5)
     s_ret.name, s_rf.name, s_xret.name = "ret", "rf", "xret"
-    for obj in (s_ret, s_rf, s_xret, s_fac):
+    for obj in (s_ret, s_rf, s_xret, s_fac, *(() if s_extra is None else (s_extra,))):
         obj.index.name = "date"
 
     return AnalysisSample(
@@ -429,4 +507,5 @@ def align_returns(
         n_before_factors=n_before,
         frequency=frequency,
         warn_obs=warn_obs,
+        extra_factors=s_extra,
     )

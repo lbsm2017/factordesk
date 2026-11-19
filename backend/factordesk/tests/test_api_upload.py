@@ -1,7 +1,7 @@
 """``POST /api/report/upload``: happy path, every refusal, the 1 MB cap and privacy (E0-T3).
 
-Offline: the monthly factor loader is replaced by a synthetic French-shaped frame, the clock is
-fixed and ``tmp_path`` is the data folder.
+Offline: the monthly factor loaders (FF5 and FF6) are replaced by a synthetic French-shaped frame,
+the clock is fixed and ``tmp_path`` is the data folder.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 import httpx
+import numpy as np
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
@@ -62,7 +63,15 @@ def factors(monkeypatch: pytest.MonkeyPatch) -> pd.DataFrame:
     def load(**_kw: object) -> pd.DataFrame:
         return frame
 
+    def load_ff6(frequency: str, **_kw: object) -> pd.DataFrame:
+        assert frequency == "monthly"
+        out = frame.copy()
+        out["Mom"] = np.random.default_rng(93).normal(0.006, 0.03, size=len(frame))
+        out.attrs = dict(frame.attrs)
+        return out
+
     monkeypatch.setattr(routes_upload, "load_ff5_monthly", load)
+    monkeypatch.setattr(routes_upload, "load_ff6", load_ff6)
     return frame
 
 

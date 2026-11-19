@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
 
 import pandas as pd
 
@@ -23,6 +22,7 @@ from factordesk.data.prices import PriceHistory
 from factordesk.report.schema import (
     AverageBetaPanel,
     DataInfo,
+    FactorModel,
     FactorVintage,
     MultiDayRegression,
     PriceSeries,
@@ -35,8 +35,6 @@ from factordesk.report.schema import (
     SampleInfo,
 )
 
-FactorModel = Literal["ff5", "ff6"]
-"""Factor model of the regression: FF5, or FF6 = FF5 + momentum (FF6 arrives with E1)."""
 FACTOR_MODELS: tuple[FactorModel, ...] = ("ff5", "ff6")
 
 
