@@ -19,6 +19,7 @@ import { ReportView } from "../report/ReportView";
 import { Shell } from "../shell/Shell";
 import { Icon } from "../shell/icons";
 import "../../styles/portfolio.css";
+import { BacktestCard } from "./BacktestCard";
 import { Composer } from "./Composer";
 import { PortfolioSidebar } from "./PortfolioSidebar";
 import { UndoToast } from "./UndoToast";
@@ -170,6 +171,7 @@ export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
               </button>
             </div>
           </div>
+          {report.portfolio_backtest ? <BacktestCard section={report.portfolio_backtest} /> : null}
         </div>
         <ReportView
           report={report}

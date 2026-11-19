@@ -91,6 +91,7 @@ test("build a 2-holding portfolio and run it on the fake backend", async ({ page
   await expect(fold).toContainText("100% allocated");
   await expect(page.locator(".abar")).toBeVisible();
   await expect(page.locator("#header h1")).toContainText("Two holdings");
+  await expect(page.getByTestId("backtest-card")).toContainText("Rebalances");
   await expect(page.locator(".tree-panel")).toHaveCount(0);
 
   // Edit reopens the composer with the weights as they were.

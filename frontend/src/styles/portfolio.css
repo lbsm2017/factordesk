@@ -401,3 +401,6 @@
 .checks .errc { color: var(--neg); }
 .pf-rename .row { flex-direction: row; }
 .run-dock .dock-tot span.ok { color: var(--pos); }
+.pf-fold-wrap { display: flex; flex-direction: column; gap: var(--gap); max-width: var(--canvas-max); padding: 20px var(--page-x) 0; }
+.sumcard .foot-note { margin-top: var(--s-3); font-size: var(--fs-cap); color: var(--caution); }
+.sumcard .foot { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--grid); font-size: var(--fs-cap); color: var(--ink-2); }

@@ -193,11 +193,9 @@ export interface PortfolioRunInput {
   end: string | null;
 }
 
-/** The JSON body of `POST /api/report/portfolio`: the tree, its cost, the model and the range. */
-export function portfolioBody({ tree, model, range, start, end }: PortfolioRunInput): Record<string, unknown> {
+/** The query of `POST /api/report/portfolio`: the model, and custom dates or the range preset. The tree is the body. */
+export function portfolioQuery({ model, range, start, end }: PortfolioRunInput): Record<string, string> {
   return {
-    tree,
-    cost_bps: tree.cost_bps,
     model,
     ...(start || end ? { ...(start ? { start } : {}), ...(end ? { end } : {}) } : { range: range ?? DEFAULT_RANGE }),
   };
@@ -207,7 +205,11 @@ export function portfolioBody({ tree, model, range, start, end }: PortfolioRunIn
 export function usePortfolioReport() {
   return useMutation({
     mutationFn: (input: PortfolioRunInput) =>
-      apiRequest<FactorReport>("/api/report/portfolio", { method: "POST", json: portfolioBody(input) }),
+      apiRequest<FactorReport>("/api/report/portfolio", {
+        method: "POST",
+        query: portfolioQuery(input),
+        json: input.tree,
+      }),
     retry: false,
   });
 }

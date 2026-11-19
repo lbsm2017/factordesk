@@ -30,21 +30,20 @@ function renderAt(url: string) {
   );
 }
 
-const bodies: Record<string, unknown>[] = [];
+const bodies: { tree: Record<string, unknown>; query: Record<string, string> }[] = [];
 
 function mockPortfolioApi(refuse = false) {
   server.use(
     http.get("*/api/portfolio/library", () => HttpResponse.json({ version: 1, lines: LIBRARY })),
     http.post("*/api/report/portfolio", async ({ request }) => {
-      const body = (await request.json()) as Record<string, unknown>;
-      bodies.push(body);
+      const tree = (await request.json()) as { name: string };
+      bodies.push({ tree, query: Object.fromEntries(new URL(request.url).searchParams) });
       if (refuse) {
         return HttpResponse.json(
           { code: "unknown_ticker", message: "No prices were returned for XYZ.", action: "Check the ticker symbol." },
           { status: 404 },
         );
       }
-      const tree = body["tree"] as { name: string };
       return HttpResponse.json({ ...monthlyReport, ticker: tree.name });
     }),
   );
@@ -136,9 +135,10 @@ describe("the portfolio mode", () => {
     fireEvent.click(live.getByRole("button", { name: "Run backtest" }));
     expect(await screen.findByTestId("report-ticker")).toHaveProperty("textContent", "Folded");
     expect(bodies).toHaveLength(1);
-    const body = bodies[0] as { tree: { name: string; cost_bps: number }; cost_bps: number; model: string; range: string };
-    expect(body).toMatchObject({ cost_bps: 25, model: "ff5", range: "5Y" });
-    expect(body.tree).toMatchObject({ name: "Folded", cost_bps: 25 });
+    const sent = bodies[0];
+    // The body is the tree itself, with the cost inside it; the model and the range are in the query.
+    expect(sent?.tree).toMatchObject({ version: 1, name: "Folded", cost_bps: 25 });
+    expect(sent?.query).toEqual({ model: "ff5", range: "5Y" });
     const fold = within(screen.getByRole("group", { name: "Portfolio summary" }));
     expect(fold.getByText("Folded")).toBeTruthy();
     expect(fold.getByText("2 lines")).toBeTruthy();
