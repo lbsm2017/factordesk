@@ -51,7 +51,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from factordesk.analytics.regression import A
+from factordesk.analytics.sample import infer_periods
 
 FloatArray = NDArray[np.float64]
 
@@ -194,7 +194,7 @@ def performance_stats(
     rf: pd.Series,
     origin: date | pd.Timestamp | None = None,
     *,
-    periods: int = A,
+    periods: int | None = None,
     min_obs: int = MIN_OBS,
 ) -> PerformanceResult:
     """Growth, volatility, Sharpe ratio and drawdowns over the sample (module docstring).
@@ -202,10 +202,24 @@ def performance_stats(
     ``ret`` and ``rf`` are simple returns and risk-free rates per period (decimals) on one
     strictly increasing date index. ``origin`` dates the starting point of the return path;
     ``None`` uses the first date of ``ret``. ``periods`` is the number of observations a year
-    (252 daily, 12 monthly); fewer than ``min_obs`` rows raise ``InsufficientObservations``.
+    (252 daily, 12 monthly); ``None`` uses the frequency of ``ret``'s dates
+    (``sample.infer_periods``), and a given value must agree with it when the dates show one,
+    else ``ValueError``. Fewer than ``min_obs`` rows raise ``InsufficientObservations``.
     """
+    inferred = infer_periods(ret.index)
+    if periods is None:
+        if inferred is None:
+            raise ValueError(
+                "cannot tell the frequency of the returns from their dates; pass periods "
+                "(252 daily, 12 monthly)"
+            )
+        periods = inferred
     if periods <= 0:
         raise ValueError("periods must be positive")
+    if inferred is not None and periods != inferred:
+        raise ValueError(
+            f"periods={periods} does not match the dates of the returns ({inferred} a year)"
+        )
     if len(ret) != len(rf) or not ret.index.equals(rf.index):
         raise ValueError("ret and rf must share one index")
     n = len(ret)

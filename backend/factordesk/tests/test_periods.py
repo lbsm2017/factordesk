@@ -1,6 +1,8 @@
-"""The ``periods`` argument (observations a year) of the annualised statistics (E0-T2).
+"""The ``periods`` argument (observations a year) of the annualised statistics (E0-T2, E1).
 
-The default is 252, so daily results are unchanged. ``periods = 12`` (monthly data) must scale
+The default (``None``) is the sample's own: 252 for a daily sample, so daily results are
+unchanged, and 12 for a monthly one. A value that disagrees with the sample raises. ``periods = 12``
+(monthly data) must scale
 every annualised figure by the textbook rule: arithmetic means and alpha by ``periods``,
 volatilities by ``sqrt(periods)``, the compound growth rate by the exponent ``periods / n``.
 Nothing that is not annualised (betas, standard errors of the betas, R²) may move.
@@ -8,6 +10,7 @@ Nothing that is not annualised (betas, standard errors of the betas, R²) may mo
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import numpy as np
@@ -26,10 +29,15 @@ def _sample() -> AnalysisSample:
     return build_sample(case.history, case.factors)
 
 
+def _as_monthly(sample: AnalysisSample) -> AnalysisSample:
+    """The same rows read as a monthly sample: only ``periods`` changes (12 instead of 252)."""
+    return dataclasses.replace(sample, frequency="monthly")
+
+
 def test_regression_periods_scale_only_annualised_figures() -> None:
     sample = _sample()
     daily = run_regression(sample)
-    monthly = run_regression(sample, periods=12)
+    monthly = run_regression(_as_monthly(sample))
     assert daily.periods == A == 252
     assert monthly.periods == 12
     np.testing.assert_array_equal(daily.fit.params, monthly.fit.params)
@@ -50,6 +58,44 @@ def test_regression_rejects_non_positive_periods() -> None:
         run_regression(_sample(), periods=0)
 
 
+def test_periods_default_to_the_samples_own_and_must_agree_with_it() -> None:
+    sample = _sample()
+    assert run_regression(sample).periods == sample.periods == 252
+    assert run_regression(sample, periods=252).alpha_ann == run_regression(sample).alpha_ann
+    monthly = _as_monthly(sample)
+    reg = run_regression(monthly)
+    assert reg.periods == monthly.periods == 12
+    assert reg.alpha_ann == pytest.approx(12 * reg.alpha, rel=1e-15)
+    with pytest.raises(ValueError, match="does not match the daily sample"):
+        run_regression(sample, periods=12)
+    with pytest.raises(ValueError, match="does not match the monthly sample"):
+        run_regression(monthly, periods=252)
+    with pytest.raises(ValueError, match="periods=252 but the monthly sample has 12"):
+        return_contribution_for(monthly, run_regression(sample))
+    with pytest.raises(ValueError, match="periods=12 but the daily sample has 252"):
+        risk_contribution_for(sample, reg)
+
+
+def test_performance_periods_default_to_the_dates_and_must_agree_with_them() -> None:
+    months = pd.date_range("2020-01-31", periods=36, freq="ME")
+    days = pd.bdate_range("2020-01-02", periods=80)
+    r_m = pd.Series(np.tile([0.01, -0.005], 18), index=months)
+    r_d = pd.Series(np.tile([0.001, -0.0005], 40), index=days)
+    assert performance_stats(r_m, r_m * 0.0, min_obs=36).years == 3.0
+    assert performance_stats(r_d, r_d * 0.0).years == pytest.approx(80 / 252, rel=1e-15)
+    bme = pd.date_range("2020-01-31", periods=36, freq="BME")  # business month-ends
+    r_b = pd.Series(r_m.to_numpy(), index=bme)
+    assert performance_stats(r_b, r_b * 0.0, min_obs=36).years == 3.0
+    with pytest.raises(ValueError, match="does not match the dates"):
+        performance_stats(r_m, r_m * 0.0, periods=252, min_obs=36)
+    with pytest.raises(ValueError, match="does not match the dates"):
+        performance_stats(r_d, r_d * 0.0, periods=12)
+    quarters = pd.date_range("2000-03-31", periods=80, freq="QE")
+    r_q = pd.Series(r_d.to_numpy(), index=quarters)
+    with pytest.raises(ValueError, match="cannot tell the frequency"):
+        performance_stats(r_q, r_q * 0.0)
+
+
 def test_alpha_sentence_counts_years_with_periods() -> None:
     text = alpha_sentence(0.05, 0.4, 0.2, 48, 0.06, periods=12)
     assert text is not None and "over 4.0 years" in text
@@ -58,8 +104,8 @@ def test_alpha_sentence_counts_years_with_periods() -> None:
 
 
 def test_attribution_periods() -> None:
-    sample = _sample()
-    reg = run_regression(sample, periods=12)
+    sample = _as_monthly(_sample())
+    reg = run_regression(sample)
     ra = return_contribution_for(sample, reg)
     f = sample.factors.to_numpy(dtype=np.float64)
     expected = 12 * reg.betas * f.mean(axis=0)

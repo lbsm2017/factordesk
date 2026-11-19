@@ -23,7 +23,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from factordesk.analytics.regression import A, FullSampleRegression, Tag
-from factordesk.analytics.sample import FACTOR_CODES, AnalysisSample, Exclusion, UncoveredTail
+from factordesk.analytics.sample import AnalysisSample, Exclusion, UncoveredTail
 
 FloatArray = NDArray[np.float64]
 
@@ -56,12 +56,15 @@ def return_contribution(
     betas: FloatArray,
     resid: FloatArray,
     names: Sequence[str],
-    periods: int = A,
+    periods: int,
 ) -> ReturnAttribution:
     """Static full-sample return contribution (M6.1). Arrays are the rows of ``S``.
 
-    ``periods`` is the number of rows a year (252 daily, 12 monthly).
+    ``periods`` is the number of rows a year (252 daily, 12 monthly). It has no default: the
+    arrays do not carry their frequency, so the caller passes the sample's (``sample.periods``).
     """
+    if periods <= 0:
+        raise ValueError("periods must be positive")
     f = np.asarray(factors, dtype=np.float64)
     b = np.asarray(betas, dtype=np.float64)
     contrib = periods * b * f.mean(axis=0)
@@ -78,14 +81,24 @@ def return_contribution(
     )
 
 
+def _check_reg(sample: AnalysisSample, reg: FullSampleRegression) -> None:
+    if reg.periods != sample.periods:
+        raise ValueError(
+            f"the regression is annualised with periods={reg.periods} but the "
+            f"{sample.frequency} sample has {sample.periods} a year"
+        )
+
+
 def return_contribution_for(sample: AnalysisSample, reg: FullSampleRegression) -> ReturnAttribution:
     """``return_contribution`` on the analysis sample and its full-sample regression.
 
-    Annualised with the regression's own ``periods``.
+    Uses the regression's factors (``reg.codes``) and the sample's ``periods``; a regression
+    annualised with other ``periods`` raises ``ValueError``.
     """
+    _check_reg(sample, reg)
     return return_contribution(
         sample.xret.to_numpy(dtype=np.float64),
-        sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64),
+        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64),
         reg.alpha,
         reg.betas,
         reg.fit.resid,
@@ -175,7 +188,7 @@ def risk_contribution(
     f = np.asarray(factors, dtype=np.float64)
     e = np.asarray(resid, dtype=np.float64)
     n = f.shape[0]
-    sigma_f = np.cov(f, rowvar=False, ddof=1)
+    sigma_f = np.atleast_2d(np.cov(f, rowvar=False, ddof=1))  # 1 x 1 for a one-factor model
     return euler_risk(sigma_f, betas, float(e @ e) / (n - 1), names, periods)
 
 
@@ -217,10 +230,12 @@ def euler_risk(
 def risk_contribution_for(sample: AnalysisSample, reg: FullSampleRegression) -> RiskAttribution:
     """``risk_contribution`` on the analysis sample and its full-sample regression.
 
-    Annualised with the regression's own ``periods``.
+    Uses the regression's factors (``reg.codes``) and the sample's ``periods``; a regression
+    annualised with other ``periods`` raises ``ValueError``.
     """
+    _check_reg(sample, reg)
     return risk_contribution(
-        sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64),
+        sample.factor_columns(reg.codes).to_numpy(dtype=np.float64),
         reg.betas,
         reg.fit.resid,
         reg.names,
