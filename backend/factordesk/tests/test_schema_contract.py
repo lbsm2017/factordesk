@@ -46,8 +46,9 @@ SECTION_FIELDS = (
     "fragility",
     "residual",
     "kalman_betas",
+    "tail_risk",
 )
-"""The seven optional fields, in panel order (contract SC2, SC4; performance and world beta are
+"""The eight optional fields, in panel order (contract SC2, SC4; performance and world beta are
 additions to the five of the contract, see docs/validation/performance-contract-note-2026-11-18.md
 and docs/validation/world-beta-contract-note-2026-11-18.md)."""
 
@@ -61,7 +62,7 @@ def _optional_parts(annotation: Any) -> tuple[Any, ...]:
 
 
 # ----------------------------------------------------------------------------- fields and specs
-def test_sections_are_the_seven_optional_fields() -> None:
+def test_sections_are_the_eight_optional_fields() -> None:
     assert tuple(spec.report_field for spec in SECTIONS) == SECTION_FIELDS
     for spec in SECTIONS:
         info = FactorReport.model_fields[spec.report_field]
@@ -237,7 +238,7 @@ def _assemble(**kwargs: Any) -> FactorReport:
     )
 
 
-BUILT_SECTIONS: tuple[str, ...] = ("performance", "residual", "kalman_betas")
+BUILT_SECTIONS: tuple[str, ...] = ("performance", "residual", "kalman_betas", "tail_risk")
 """Fields whose feature is built: the offline pipeline fills them. Each feature branch adds its
 field.
 

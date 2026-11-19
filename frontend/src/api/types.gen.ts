@@ -673,6 +673,8 @@ export interface components {
             residual: components["schemas"]["ResidualAnalysis"] | null;
             /** @description Kalman-filter betas (docs/specs/kalman-betas.md). */
             kalman_betas: components["schemas"]["KalmanBetaSeries"] | null;
+            /** @description Value at risk and expected shortfall (CVaR) by three methods, with bootstrap bands, at the series' own frequency (spec section E7). */
+            tail_risk: components["schemas"]["TailRiskSection"] | null;
         };
         /**
          * FactorStat
@@ -2585,6 +2587,173 @@ export interface components {
              * @description Currency of the returns (USD only for now); None: unknown.
              */
             currency: string | null;
+        };
+        /**
+         * TailBand
+         * @description A percentile bootstrap band around one figure.
+         */
+        TailBand: {
+            /**
+             * Low
+             * @description Lower end of the band, as a fraction of value.
+             */
+            low: number;
+            /**
+             * High
+             * @description Upper end of the band, as a fraction of value.
+             */
+            high: number;
+            /**
+             * Resamples
+             * @description Bootstrap resamples behind the band (those inside the valid range).
+             */
+            resamples: number;
+        };
+        /**
+         * TailFigureInfo
+         * @description One VaR or CVaR figure: one method, one measure, one confidence level.
+         */
+        TailFigureInfo: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "historical" | "gaussian" | "cornish_fisher";
+            /**
+             * Measure
+             * @enum {string}
+             */
+            measure: "var" | "cvar";
+            /**
+             * Level
+             * @description Confidence level: 0.99 for VaR and 0.975 for CVaR; monthly series also 0.95.
+             */
+            level: number;
+            /**
+             * Value
+             * @description Loss as a positive fraction of value; None when the figure is not available (then reason says why).
+             */
+            value: number | null;
+            /**
+             * Reason
+             * @description Why value is None; or, with indicative = true, the caveat on the value.
+             */
+            reason: string | null;
+            /**
+             * Indicative
+             * @description True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5]: the value is shown, as an indication only.
+             */
+            indicative: boolean;
+            /** @description Bootstrap band; None when none is shown. */
+            band: components["schemas"]["TailBand"] | null;
+            /**
+             * Band Quality
+             * @description validated: the band covered about its nominal level on simulated normal data. approximate: it covered less (it tends to be narrow). None without a band.
+             */
+            band_quality: ("validated" | "approximate") | null;
+            /**
+             * Band Reason
+             * @description Why band is None although value is not; None otherwise.
+             */
+            band_reason: string | null;
+            /**
+             * Tail Count
+             * @description Observations with a loss at or beyond this method's VaR at this level; None when the figure is not available.
+             */
+            tail_count: number | null;
+            /**
+             * Expected Tail Obs
+             * @description Observations expected in the tail: n x (1 - level).
+             */
+            expected_tail_obs: number;
+        };
+        /**
+         * TailRiskSection
+         * @description VaR and CVaR by three methods, with bootstrap bands.
+         *
+         *     Statuses: ``ok``; ``insufficient_data`` (fewer than 12 returns); ``failed`` (the series has no
+         *     usable tail statistic, for example it is constant).
+         */
+        TailRiskSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Frequency
+             * @description Frequency of the series; the figures are at this horizon.
+             */
+            frequency: ("daily" | "monthly") | null;
+            series: components["schemas"]["TailSeriesStats"] | null;
+            /**
+             * Figures
+             * @description Every figure: levels in the order VaR 99%, CVaR 97.5%, then (monthly only) VaR 95% and CVaR 95%; within a level historical, Gaussian, Cornish-Fisher.
+             */
+            figures: components["schemas"]["TailFigureInfo"][] | null;
+        };
+        /**
+         * TailSeriesStats
+         * @description The series behind the figures and the bootstrap settings.
+         */
+        TailSeriesStats: {
+            /**
+             * N Obs
+             * @description Returns used (days or months).
+             */
+            n_obs: number;
+            /**
+             * Mean
+             * @description Sample mean of the periodic simple returns.
+             */
+            mean: number;
+            /**
+             * Std
+             * @description Sample standard deviation (ddof 1) of the returns.
+             */
+            std: number;
+            /**
+             * Skewness
+             * @description Moment estimator of skewness.
+             */
+            skewness: number;
+            /**
+             * Excess Kurtosis
+             * @description Moment estimator of excess kurtosis.
+             */
+            excess_kurtosis: number;
+            /**
+             * Bootstrap
+             * @description iid for monthly series; stationary block bootstrap for daily series.
+             * @enum {string}
+             */
+            bootstrap: "iid" | "stationary";
+            /**
+             * Mean Block Length
+             * @description Mean block length of the stationary bootstrap; None for the iid bootstrap.
+             */
+            mean_block_length: number | null;
+            /**
+             * N Resamples
+             * @description Bootstrap resamples drawn.
+             */
+            n_resamples: number;
+            /**
+             * Band Level
+             * @description Coverage of the bands (0.9 is a 90% band).
+             */
+            band_level: number;
+            /**
+             * Seed
+             * @description Random seed of the bootstrap.
+             */
+            seed: number;
         };
         /** TickerSuggestion */
         TickerSuggestion: {
