@@ -8,6 +8,7 @@ every node except the added ``alpha_strip`` section.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 
 import numpy as np
@@ -20,6 +21,10 @@ from factordesk.analytics.sample import build_subject_sample
 from factordesk.analytics.subject import subject_from_monthly_returns
 from factordesk.data.prices import Security
 from factordesk.pipeline import NOTE_FF6, assemble_report, assemble_subject_report
+from factordesk.report.render_html import (
+    _slot,  # pyright: ignore[reportPrivateUsage]
+    render_report_html,
+)
 from factordesk.report.schema import FactorReport
 from factordesk.report.sections.alpha_strip import CAPTION, MODEL_NOTES
 from factordesk.section_hooks.context import SectionInputs, WorldBenchmarkInput
@@ -199,3 +204,20 @@ def test_strip_matches_compare_models_on_the_report_sample() -> None:
     for row, ref in zip(strip.rows, direct.models, strict=True):
         assert row.alpha_t == pytest.approx(ref.alpha_t, rel=1e-12)
         assert row.adj_r2 == pytest.approx(ref.rsquared_adj, rel=1e-12)
+
+
+# ----------------------------------------------------------------------------- static export
+def test_ff6_html_export_colours_mom_with_slot_6_and_names_the_model() -> None:
+    page = render_report_html(ticker_report("ff6"))
+    assert "Fama&#8211;French six-factor profile (five factors plus momentum)" in page
+    assert "five-factor profile" not in page
+    assert re.search(r'cat c6"[^<]*(?:<[^>]*>){0,6}[^<]*Mom', page)
+    assert "rect.c6 { fill: var(--f6); }" in page and "--f6: #7048b8" in page
+    ff5 = render_report_html(ticker_report("ff5"))
+    assert "Fama&#8211;French five-factor profile" in ff5 and "cat c6" not in ff5
+
+
+def test_static_slots_put_mom_sixth() -> None:
+    assert _slot("Mom", ["Mkt-RF", "Mom"]) == 6
+    assert _slot("CMA", []) == 5
+    assert _slot("Mkt-RF", []) == 1

@@ -42,6 +42,7 @@ PLAIN = {
     "HML": "Value",
     "RMW": "Profitability",
     "CMA": "Investment",
+    "Mom": "Momentum",
 }
 EXCLUSION_TEXT = {
     "multi_day_return": "return spans several factor days",
@@ -54,6 +55,7 @@ TILT = {
     "HML": ("value stocks", "growth stocks"),
     "RMW": ("highly profitable firms", "weakly profitable firms"),
     "CMA": ("firms that invest conservatively", "firms that invest aggressively"),
+    "Mom": ("recent winners", "recent losers"),
 }
 WARN_PLAIN = {
     "residual_reversal": (
@@ -327,11 +329,22 @@ def _factor_order(report: FactorReport) -> list[str]:
     return names or list(report.return_contribution.factors)
 
 
+SLOT_NAMES: tuple[str, ...] = (*FACTOR_NAMES, "Mom")
+"""Factor names by colour slot: the five FF5 factors (slots 1-5), then Mom of FF6 (slot 6)."""
+
+
 def _slot(name: str, order: Sequence[str]) -> int:
-    """Colour slot 1-5: canonical position, else order of appearance."""
-    if name in FACTOR_NAMES:
-        return FACTOR_NAMES.index(name) + 1
-    return order.index(name) % 5 + 1 if name in order else 1
+    """Colour slot 1-6: canonical position (Mom is 6), else order of appearance."""
+    if name in SLOT_NAMES:
+        return SLOT_NAMES.index(name) + 1
+    return order.index(name) % len(SLOT_NAMES) + 1 if name in order else 1
+
+
+MODEL_HEADERS: dict[str | None, str] = {
+    None: "Fama&#8211;French five-factor profile",
+    "ff6": "Fama&#8211;French six-factor profile (five factors plus momentum)",
+}
+"""Header text by ``FactorReport.model`` (``None`` is FF5)."""
 
 
 def _plain_name(name: str) -> str:
@@ -569,7 +582,7 @@ def _header(report: FactorReport) -> str:
     return (
         '<header class="masthead"><div class="mast-top"><h1>'
         f'<span class="ticker">{esc(report.ticker)}</span>'
-        '<span class="what">Fama&#8211;French five-factor profile</span></h1>'
+        f'<span class="what">{MODEL_HEADERS[report.model]}</span></h1>'
         f'<p class="mast-meta">{chips}</p></div>'
         f"{_security_line(report)}"
         f'<p class="coverage">{esc(_range_line(report))}</p>{_notice(report, items)}</header>'
