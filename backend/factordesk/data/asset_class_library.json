@@ -1,0 +1,445 @@
+{
+  "version": 1,
+  "lines": [
+    {
+      "id": "cash_eur",
+      "asset_class": "Cash",
+      "sub_asset_class": "EUR Cash",
+      "proxy": "FXE",
+      "proxy_kind": "etf",
+      "note": "currency deposit trust: deposit rate plus the euro move against USD",
+      "first_date": "2005-12-12",
+      "currency": "USD"
+    },
+    {
+      "id": "cash_usd",
+      "asset_class": "Cash",
+      "sub_asset_class": "USD Cash",
+      "proxy": "RF",
+      "proxy_kind": "risk_free",
+      "note": "French risk-free rate (one-month T-bill)",
+      "first_date": "1963-07-01",
+      "currency": "USD"
+    },
+    {
+      "id": "cash_chf",
+      "asset_class": "Cash",
+      "sub_asset_class": "CHF Cash",
+      "proxy": "FXF",
+      "proxy_kind": "etf",
+      "note": "currency deposit trust: deposit rate plus the franc move against USD",
+      "first_date": "2006-06-26",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_eur_gov",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "European Government Bonds",
+      "proxy": "IGOV",
+      "proxy_kind": "etf",
+      "note": "international (ex-US) government bonds, not Europe only",
+      "first_date": "2009-01-30",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_eur_ig",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "European Corporate Investment Grade Bonds",
+      "proxy": "PICB",
+      "proxy_kind": "etf",
+      "note": "international (ex-US) corporate bonds, not Europe only",
+      "first_date": "2010-06-03",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_eur_hy",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "European High Yield Bonds",
+      "proxy": "IHY",
+      "proxy_kind": "etf",
+      "note": "international (ex-US) high yield, not Europe only; the first choice HYXU has no price data",
+      "first_date": "2012-04-03",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_na_gov",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "N. American Government Bonds",
+      "proxy": "IEF",
+      "proxy_kind": "etf",
+      "note": "7-10 year US Treasuries",
+      "first_date": "2002-07-30",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_na_ig",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "N. American Corporate Investment Grade Bonds",
+      "proxy": "LQD",
+      "proxy_kind": "etf",
+      "note": "US investment grade corporate bonds",
+      "first_date": "2002-07-30",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_na_hy",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "N. American High Yield Bonds",
+      "proxy": "HYG",
+      "proxy_kind": "etf",
+      "note": "US high yield corporate bonds",
+      "first_date": "2007-04-11",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_global",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "Global Bonds",
+      "proxy": "BNDW",
+      "proxy_kind": "etf",
+      "note": "total world bond market",
+      "first_date": "2018-09-06",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_global_hy",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "Global High Yield Bonds",
+      "proxy": "GHYG",
+      "proxy_kind": "etf",
+      "note": "US and international high yield corporate bonds",
+      "first_date": "2012-04-09",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_em",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "Emerging Market Bonds",
+      "proxy": "EMB",
+      "proxy_kind": "etf",
+      "note": "USD-denominated emerging market government bonds",
+      "first_date": "2007-12-19",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_infl_linked",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "Inflation Linked Bonds",
+      "proxy": "WIP",
+      "proxy_kind": "etf",
+      "note": "international (ex-US) inflation-linked government bonds",
+      "first_date": "2008-03-19",
+      "currency": "USD"
+    },
+    {
+      "id": "fi_tips",
+      "asset_class": "Fixed Income",
+      "sub_asset_class": "Inflation Linked Bonds (TIPS)",
+      "proxy": "TIP",
+      "proxy_kind": "etf",
+      "note": "US Treasury inflation-protected securities",
+      "first_date": "2003-12-05",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_eur_large",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity Europe - Large Cap",
+      "proxy": "IEV",
+      "proxy_kind": "etf",
+      "note": "Europe large cap",
+      "first_date": "2000-07-28",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_eur_smid",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity Europe - Sm/Mid Cap",
+      "proxy": "IEUS",
+      "proxy_kind": "etf",
+      "note": "Europe small cap",
+      "first_date": "2007-11-19",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_swiss",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity Switzerland",
+      "proxy": "EWL",
+      "proxy_kind": "etf",
+      "note": "MSCI Switzerland",
+      "first_date": "1996-03-18",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_uk",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity UK",
+      "proxy": "EWU",
+      "proxy_kind": "etf",
+      "note": "MSCI United Kingdom",
+      "first_date": "1996-03-18",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_na_large",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity N. America - Large Cap",
+      "proxy": "IVV",
+      "proxy_kind": "etf",
+      "note": "S&P 500; US only, no Canada",
+      "first_date": "2000-05-19",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_na_smid",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity N. America - Sm/Mid Cap",
+      "proxy": "VXF",
+      "proxy_kind": "etf",
+      "note": "US extended market (mid and small cap); no Canada",
+      "first_date": "2002-01-04",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_usa_small",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity USA - Small Cap",
+      "proxy": "IJR",
+      "proxy_kind": "etf",
+      "note": "S&P SmallCap 600",
+      "first_date": "2000-05-26",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_japan_pacific",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity Japan and Pacific",
+      "proxy": "VPL",
+      "proxy_kind": "etf",
+      "note": "developed Pacific: Japan, Australia and others",
+      "first_date": "2005-03-10",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_em",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity Emerging Markets",
+      "proxy": "EEM",
+      "proxy_kind": "etf",
+      "note": "MSCI Emerging Markets",
+      "first_date": "2003-04-14",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_china",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity China",
+      "proxy": "FXI",
+      "proxy_kind": "etf",
+      "note": "China large cap",
+      "first_date": "2004-10-08",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_global",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity Global",
+      "proxy": "ACWI",
+      "proxy_kind": "etf",
+      "note": "MSCI ACWI",
+      "first_date": "2008-03-28",
+      "currency": "USD"
+    },
+    {
+      "id": "eq_thematic",
+      "asset_class": "Equities",
+      "sub_asset_class": "Equity Thematic",
+      "proxy": "QQQ",
+      "proxy_kind": "etf",
+      "note": "placeholder; swap to the theme you hold",
+      "first_date": "1999-03-10",
+      "currency": "USD"
+    },
+    {
+      "id": "alt_pe",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Private Equity",
+      "proxy": "PSP",
+      "proxy_kind": "listed_proxy",
+      "note": "listed proxy: smoother private returns not captured",
+      "first_date": "2006-10-24",
+      "currency": "USD"
+    },
+    {
+      "id": "alt_vc",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Venture Capital",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no proxy yet",
+      "first_date": null,
+      "currency": null
+    },
+    {
+      "id": "alt_secondaries",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Secondaries",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no proxy yet",
+      "first_date": null,
+      "currency": null
+    },
+    {
+      "id": "alt_direct",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Direct Investments",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no proxy yet",
+      "first_date": null,
+      "currency": null
+    },
+    {
+      "id": "alt_private_credit",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Private Credit",
+      "proxy": "BIZD",
+      "proxy_kind": "listed_proxy",
+      "note": "listed proxy: smoother private returns not captured",
+      "first_date": "2013-02-12",
+      "currency": "USD"
+    },
+    {
+      "id": "alt_hedge",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Hedge Funds",
+      "proxy": "QAI",
+      "proxy_kind": "listed_proxy",
+      "note": "listed proxy: smoother private returns not captured",
+      "first_date": "2009-03-25",
+      "currency": "USD"
+    },
+    {
+      "id": "alt_real_estate",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Real Estate",
+      "proxy": "VNQ",
+      "proxy_kind": "listed_proxy",
+      "note": "listed proxy: smoother private returns not captured",
+      "first_date": "2004-09-29",
+      "currency": "USD"
+    },
+    {
+      "id": "alt_real_estate_funds",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Real Estate Funds",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no proxy yet",
+      "first_date": null,
+      "currency": null
+    },
+    {
+      "id": "alt_real_assets",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Real Assets / Infrastructure",
+      "proxy": "IGF",
+      "proxy_kind": "listed_proxy",
+      "note": "listed proxy: smoother private returns not captured",
+      "first_date": "2007-12-12",
+      "currency": "USD"
+    },
+    {
+      "id": "alt_crypto",
+      "asset_class": "Alternatives",
+      "sub_asset_class": "Crypto/Digital Assets",
+      "proxy": "IBIT",
+      "proxy_kind": "listed_proxy",
+      "note": "listed proxy: smoother private returns not captured",
+      "first_date": "2024-01-11",
+      "currency": "USD"
+    },
+    {
+      "id": "re_direct",
+      "asset_class": "Real Estate",
+      "sub_asset_class": "Direct Real Estate",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no proxy yet",
+      "first_date": null,
+      "currency": null
+    },
+    {
+      "id": "re_funds",
+      "asset_class": "Real Estate",
+      "sub_asset_class": "Real Estate Funds",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no proxy yet",
+      "first_date": null,
+      "currency": null
+    },
+    {
+      "id": "com_gold",
+      "asset_class": "Commodities",
+      "sub_asset_class": "Gold",
+      "proxy": "GLD",
+      "proxy_kind": "etf",
+      "note": "gold bullion",
+      "first_date": "2004-11-18",
+      "currency": "USD"
+    },
+    {
+      "id": "com_silver",
+      "asset_class": "Commodities",
+      "sub_asset_class": "Silver",
+      "proxy": "SLV",
+      "proxy_kind": "etf",
+      "note": "silver bullion",
+      "first_date": "2006-04-28",
+      "currency": "USD"
+    },
+    {
+      "id": "com_copper",
+      "asset_class": "Commodities",
+      "sub_asset_class": "Copper",
+      "proxy": "CPER",
+      "proxy_kind": "etf",
+      "note": "copper futures",
+      "first_date": "2011-11-15",
+      "currency": "USD"
+    },
+    {
+      "id": "com_global",
+      "asset_class": "Commodities",
+      "sub_asset_class": "Global Commodities",
+      "proxy": "DBC",
+      "proxy_kind": "etf",
+      "note": "diversified commodity futures, precious metals included",
+      "first_date": "2006-02-06",
+      "currency": "USD"
+    },
+    {
+      "id": "com_global_ex_precious",
+      "asset_class": "Commodities",
+      "sub_asset_class": "Global commodities (ex- precious metal)",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no clean US-listed proxy",
+      "first_date": null,
+      "currency": null
+    },
+    {
+      "id": "other_own_company",
+      "asset_class": "Other assets",
+      "sub_asset_class": "Own Company Stake",
+      "proxy": null,
+      "proxy_kind": "none",
+      "note": "no proxy yet",
+      "first_date": null,
+      "currency": null
+    }
+  ]
+}

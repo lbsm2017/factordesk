@@ -21,6 +21,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from datetime import date
+from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Final, Literal
 
 from pydantic import Field, model_validator
@@ -56,9 +59,7 @@ class Instrument(FrozenModel):
         if self.ticker is not None and not _TICKER_RE.fullmatch(self.ticker):
             raise ValueError(f"instrument {self.id!r} has an invalid ticker {self.ticker!r}")
         if self.kind == "holding" and self.ticker is None and self.weight > 0.0:
-            raise ValueError(
-                f"instrument {self.id!r} has no proxy yet, so it cannot take a weight"
-            )
+            raise ValueError(f"instrument {self.id!r} has no proxy yet, so it cannot take a weight")
         return self
 
 
@@ -138,3 +139,63 @@ class PortfolioTree(FrozenModel):
         if rest > 0.0:
             return [f"{rest:.2%} is not allocated; it is held in USD cash."]
         return []
+
+
+# --------------------------------------------------------------------------- Asset Class Library
+
+LIBRARY_PATH: Final = Path(__file__).resolve().parents[1] / "data" / "asset_class_library.json"
+RISK_FREE_PROXY: Final = "RF"
+"""Proxy value of the USD cash line: the French risk-free rate, not a ticker."""
+
+ProxyKind = Literal["etf", "risk_free", "listed_proxy", "none"]
+
+
+class LibraryLine(FrozenModel):
+    """One sub-asset class of the owner's Asset Class Library and the proxy that stands for it."""
+
+    id: NodeId
+    asset_class: Text
+    sub_asset_class: Text
+    proxy: str | None = Field(
+        description='A ticker, "RF" for the risk-free rate, or null when there is no proxy yet.'
+    )
+    proxy_kind: ProxyKind
+    note: str = Field(min_length=1, description="The caveat a reader should see with the proxy.")
+    first_date: date | None = Field(description="First daily price date of the proxy.")
+    currency: str | None = Field(description="Quote currency of the proxy.")
+
+    @model_validator(mode="after")
+    def _check(self) -> LibraryLine:
+        if (self.proxy is None) != (self.proxy_kind == "none"):
+            raise ValueError(f"line {self.id!r}: proxy is null exactly when proxy_kind is none")
+        if (self.proxy == RISK_FREE_PROXY) != (self.proxy_kind == "risk_free"):
+            raise ValueError(f"line {self.id!r}: RF goes with proxy_kind risk_free only")
+        if (
+            self.proxy is not None
+            and self.proxy != RISK_FREE_PROXY
+            and not _TICKER_RE.fullmatch(self.proxy)
+        ):
+            raise ValueError(f"line {self.id!r} has an invalid proxy {self.proxy!r}")
+        if (self.first_date is None) != (self.proxy is None):
+            raise ValueError(f"line {self.id!r}: first_date is null exactly when proxy is null")
+        return self
+
+
+class AssetClassLibrary(FrozenModel):
+    """The library: lines in the owner's order, grouped by asset class."""
+
+    version: Literal[1]
+    lines: list[LibraryLine]
+
+    @model_validator(mode="after")
+    def _check(self) -> AssetClassLibrary:
+        ids = [line.id for line in self.lines]
+        if len(set(ids)) != len(ids):
+            raise ValueError("library line ids must be unique")
+        return self
+
+
+@lru_cache(maxsize=1)
+def load_library() -> AssetClassLibrary:
+    """The library from ``data/asset_class_library.json`` (read once)."""
+    return AssetClassLibrary.model_validate_json(LIBRARY_PATH.read_text(encoding="utf-8"))
