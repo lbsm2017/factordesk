@@ -6,8 +6,8 @@
 .dd-svg line, .dd-svg path { vector-effect: non-scaling-stroke; }
 .dd-grid { stroke: var(--grid); stroke-width: 1; }
 .dd-zero { stroke: var(--axis); stroke-width: 1; }
-.dd-area { fill: var(--neg-50, #fbe9ec); }
-.dd-line { fill: none; stroke: var(--sign-neg, #c23345); stroke-width: 1.5; stroke-linejoin: round; }
+.dd-area { fill: var(--neg); fill-opacity: 0.12; }
+.dd-line { fill: none; stroke: var(--neg); stroke-width: 1.5; stroke-linejoin: round; }
 .dd-y span, .dd-x span { position: absolute; font-size: var(--fs-1); color: var(--ink-2); white-space: nowrap; line-height: 1; }
 .dd-y span { right: calc(100% + 8px); transform: translateY(-50%); }
 .dd-x span { top: calc(100% + 8px); transform: translateX(-50%); }

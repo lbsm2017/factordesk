@@ -1,10 +1,9 @@
 /* Sign colour of dashboard v2 (prototype v4a): green for a positive signed value, red for a negative
-   one, used only for returns, alpha, Sharpe, drawdown and return contributions. The shell's tokens use
-   the same class names; the literals are the v4a values and the fallback when no token is defined. */
-td.num.num-pos, .num-pos { color: var(--sign-pos, #007862); }
-td.num.num-neg, .num-neg { color: var(--sign-neg, #c23345); }
+   one, used only for returns, alpha, Sharpe, drawdown and return contributions. The colours are the --pos and --neg tokens (green and red in v4a). */
+td.num.num-pos, .num-pos { color: var(--pos); }
+td.num.num-neg, .num-neg { color: var(--neg); }
 tr.is-noise td.num.strong { font-weight: 400; }
-rect.bar-pos.faded { stroke: var(--sign-pos, #007862); }
-rect.bar-neg.faded { stroke: var(--sign-neg, #c23345); }
+rect.bar-pos.faded { stroke: var(--pos); }
+rect.bar-neg.faded { stroke: var(--neg); }
 /* Factor exposures: betas stay neutral ink; only the evidence word carries weight. */
 td.sig.yes { color: var(--ink); font-weight: 600; }
