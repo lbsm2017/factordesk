@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
+import { useShowStats } from "../../state/stats";
 import { EmptyState } from "./EmptyState";
 import { HowComputed } from "./HowComputed";
+
+/** Panels that sit side by side from 1280 px (prototype v4a): Price with Drawdown, Return with Risk sources. */
+const PAIR_CLASS: Readonly<Record<string, string>> = { price: "s-7", performance: "s-5", returns: "s-7", risk: "s-5" };
+/** Risk sources grows three number columns with statistics on; it then takes the full row and Return sources with it. */
+const WIDE_WITH_STATS = new Set(["returns", "risk"]);
 
 export interface PanelProps {
   /** Element id, also the link target (for example "price", "exposures"). */
@@ -29,9 +35,11 @@ export interface PanelProps {
  * reading, the body, and the footnote with "How this is computed".
  */
 export function Panel({ id, title, question, aside, legend, reading, footnote, how, empty, children }: PanelProps) {
+  const stats = useShowStats();
+  const pair = stats && WIDE_WITH_STATS.has(id) ? undefined : PAIR_CLASS[id];
   const headingId = `${id}-title`;
   return (
-    <section className="panel" id={id} aria-labelledby={headingId}>
+    <section className={pair ? `panel ${pair}` : "panel"} id={id} aria-labelledby={headingId}>
       <div className="panel-head">
         <h2 id={headingId}>{title}</h2>
         {aside ? <div className="pm">{aside}</div> : null}

@@ -89,7 +89,7 @@ describe("WorldBetaBody", () => {
       "world-beta-us",
     ]);
     expect(container.querySelectorAll(".reading")).toHaveLength(2);
-    expect(container.querySelectorAll(".reading")[1]?.textContent).toMatch(/^Europe: Lower against Europe/);
+    expect(container.querySelectorAll(".reading")[1]?.textContent).toMatch(/^Lower against Europe/);
   });
 
   it("with statistics on adds the 95% interval and R squared columns", () => {

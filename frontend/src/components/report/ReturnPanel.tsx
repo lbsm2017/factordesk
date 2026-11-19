@@ -81,7 +81,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
     );
   }
 
-  const { lo, hi, ticks } = niceDomain(Math.min(...values, 0, total ?? 0), Math.max(...values, 0, total ?? 0), 5);
+  const { lo, hi, ticks } = niceDomain(Math.min(...values, 0, total ?? 0), Math.max(...values, 0, total ?? 0), 3);
 
   const mkt = finite(rc.factors["Mkt-RF"]);
   let reading: string | undefined;

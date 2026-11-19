@@ -1,7 +1,8 @@
 /* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role --
    DB7 asks for explicit table roles: the narrow-screen CSS restyles rows as grids, which can drop table semantics. */
 import { PLAIN } from "../../text/plain";
-import { describe, factorOrder, finite, IDIO, labelTexts, niceDomain, sci, slotOf } from "../../report/derive";
+import { useShowStats } from "../../state/stats";
+import { describe, factorOrder, finite, IDIO, labelTexts, sci, slotOf } from "../../report/derive";
 import { BarCell } from "../charts/BarCell";
 import { AxisRow, KeySwatch, NameCell, pctN, signedN } from "./barParts";
 import { Panel } from "./Panel";
@@ -11,6 +12,7 @@ const EMPTY_ACTION = "Widen the date range and run the report again.";
 
 /** Panel 7: where the risk comes from (Euler share of variance per factor, stock-specific hatched). */
 export function RiskPanel({ report }: ReportPanelProps) {
+  const stats = useShowStats();
   const rk = report.risk_contribution;
   const title = "Where the risk comes from";
   const question = "What share of the day-to-day variance does each factor drive?";
@@ -45,7 +47,11 @@ export function RiskPanel({ report }: ReportPanelProps) {
 
   const order = factorOrder(report);
   const details = new Map(rk.details.map((d) => [d.name, d]));
-  const { lo, hi, ticks } = niceDomain(Math.min(0, ...values), Math.max(1, ...values), 4);
+  // Shares add to 100%: ticks at 0, 50% and 100% keep the labels apart in the half-width panel; the plot
+  // extends a little to the left of zero when a factor offsets the others.
+  const lo = Math.min(0, ...values) < 0 ? Math.floor(Math.min(...values) * 20) / 20 : 0;
+  const hi = Math.max(1, ...values);
+  const ticks = [0, 0.5, 1];
 
   const top = names.find((n) => n !== IDIO && shares.get(n) != null);
   const vol = finite(rk.total_vol_annual);
@@ -76,7 +82,7 @@ export function RiskPanel({ report }: ReportPanelProps) {
       footnote={`${desc} Shares add to 100% and can be negative when a factor offsets the others.`}
       how={how}
     >
-      <table role="table" className="bars cols-4 risk">
+      <table role="table" className={stats ? "bars cols-4 risk" : "bars risk"}>
         <caption className="vh">
           Share of variance per factor and stock-specific, with exposure, factor volatility and correlation
         </caption>
@@ -91,15 +97,13 @@ export function RiskPanel({ report }: ReportPanelProps) {
             <th role="columnheader" scope="col" className="num">
               Share
             </th>
-            <th role="columnheader" scope="col" className="num">
-              Beta
-            </th>
-            <th role="columnheader" scope="col" className="num">
-              Factor vol
-            </th>
-            <th role="columnheader" scope="col" className="num">
-              Corr.
-            </th>
+            {stats
+              ? ["Beta", "Factor vol", "Corr."].map((h) => (
+                  <th key={h} role="columnheader" scope="col" className="num">
+                    {h}
+                  </th>
+                ))
+              : null}
           </tr>
         </thead>
         <tbody role="rowgroup">
@@ -149,17 +153,19 @@ export function RiskPanel({ report }: ReportPanelProps) {
                 <td role="cell" className="num strong">
                   {pctN(v, 2, negative)}
                 </td>
-                {cells.map((c, i) => (
-                  <td role="cell" key={i} className="num">
-                    {c}
-                  </td>
-                ))}
+                {stats
+                  ? cells.map((c, i) => (
+                      <td role="cell" key={i} className="num">
+                        {c}
+                      </td>
+                    ))
+                  : null}
               </tr>
             );
           })}
         </tbody>
         <tfoot role="rowgroup">
-          <AxisRow ticks={ticks} lo={lo} hi={hi} format={(t) => pctN(t, 0, false)} columns={4} />
+          <AxisRow ticks={ticks} lo={lo} hi={hi} format={(t) => pctN(t, 0, false)} columns={stats ? 4 : 1} />
         </tfoot>
       </table>
     </Panel>

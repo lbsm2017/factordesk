@@ -167,7 +167,7 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
       days: count(europe.n_days),
     });
   }
-  const europeReading = europe?.comparison_text ? `Europe: ${europe.comparison_text}` : null;
+  const europeReading = europe?.comparison_text ?? null;
   const domain = domainOf(rows);
   const numberColumns = stats ? 4 : 2;
   const style = { "--wb-cols": numberColumns } as CSSProperties;

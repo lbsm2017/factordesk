@@ -48,6 +48,9 @@ h2[tabindex="-1"]:focus-visible { outline: 2px solid var(--focus); }
   .report-region > .s-7 { grid-column: span 7; }
   .report-region > .s-5 { grid-column: span 5; }
   .report-region > .s-6 { grid-column: span 6; }
+  /* A half of a pair whose partner is missing (an optional section that is null) takes the row. */
+  .report-region > .s-7:not(:has(+ .s-5)),
+  .report-region > .s-5:not(.s-7 + .s-5) { grid-column: 1 / -1; }
 }
 
 /* ------------------------------------------------------------------ header (v4a) */
@@ -195,7 +198,7 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .edge-r { transform: translateX(-100%) !important; }
 
 /* price */
-.price-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: var(--s-6); margin-top: var(--s-4); align-items: start; }
+.price-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); margin-top: var(--s-4); align-items: start; }
 .price-plot { height: 228px; margin: 28px 0 30px 48px; border-bottom: 1px solid var(--axis); }
 .side { width: 100%; border-collapse: collapse; }
 .side th { text-align: left; font-weight: 500; padding: 8px 0; border-bottom: 1px solid var(--grid); }

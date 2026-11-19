@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cloneReport, mockReport } from "../../test/fixture";
+import { StatsProvider } from "../../state/stats";
 import { ReturnPanel } from "./ReturnPanel";
 import { RiskPanel } from "./RiskPanel";
 import { buildRollingBlock, buildRowOption, ROLLING_GROUP, RollingPanel } from "./RollingPanel";
@@ -132,8 +133,18 @@ describe("ReturnPanel", () => {
 });
 
 describe("RiskPanel", () => {
-  it("lists rows in the report's order with share, beta, factor vol and correlation", () => {
+  it("shows only the share while statistics are off", () => {
     const { container } = render(<RiskPanel report={mockReport} />);
+    const heads = Array.from(container.querySelectorAll("thead th")).map((h) => h.textContent);
+    expect(heads).toEqual(["Source", "Chart", "Share"]);
+  });
+
+  it("lists rows in the report's order with share, beta, factor vol and correlation", () => {
+    const { container } = render(
+      <StatsProvider initial>
+        <RiskPanel report={mockReport} />
+      </StatsProvider>,
+    );
     const rows = Array.from(container.querySelectorAll("tbody tr"));
     expect(rows.map((r) => (r.querySelector("th .fname")?.textContent ?? ""))).toEqual([
       "Mkt-RF",
@@ -167,7 +178,7 @@ describe("RiskPanel", () => {
   it("extends the domain to the left for a negative share", () => {
     const { container } = render(<RiskPanel report={mockReport} />);
     const labels = Array.from(container.querySelectorAll("tr.axis-row .axis span")).map((s) => s.textContent);
-    expect(labels).toEqual(["−50%", "0%", "50%", "100%", "150%"]);
+    expect(labels).toEqual(["0%", "50%", "100%"]);
   });
 
   it("shows an empty state when the statistic is not ok", () => {
