@@ -214,7 +214,7 @@ def _proxy_block(
         audit = audit_prices(history.frame, duplicate_dates=history.duplicate_dates)
         warnings = [f.message for f in audit.findings if f.severity == "warn"]
         errors = [f for f in audit.findings if f.severity == "error"]
-        overlap = align_overlap(ctx.sample, pd.DatetimeIndex(ctx.history.frame.index), history)
+        overlap = align_overlap(ctx.sample, ctx.subject.calendar, history)
         start = overlap.dates[0] if overlap.n else None
         end = overlap.dates[-1] if overlap.n else None
         used = _days_used(pd.DatetimeIndex(history.frame.index), overlap)

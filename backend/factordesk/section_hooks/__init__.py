@@ -9,9 +9,11 @@ One module per feature, each owned by its feature branch:
 * ``residual_alpha.py``: ``build_residual_analysis``
 * ``world_beta.py``: ``build_world_beta`` and ``load_world_benchmark``
 
-``pipeline.assemble_report`` calls every hook with one ``SectionContext``. A hook returns its
-section, or ``None`` when the feature does not run. It does not raise for data reasons: it returns
-the section with ``status = "failed"`` and a reason.
+``pipeline.assemble_subject_report`` calls every hook with one ``SectionContext`` through
+``registry.run_hooks``, which skips a hook whose ``HookSpec`` does not cover the subject's kind,
+frequency or factor model (the field stays ``None``). A hook returns its section, or ``None`` when
+the feature does not run. It does not raise for data reasons: it returns the section with
+``status = "failed"`` and a reason.
 """
 
 from __future__ import annotations

@@ -207,12 +207,12 @@ def test_tp32_the_path_starts_on_the_price_date_before_the_first_return() -> Non
 def test_tp33_hook_leaves_the_core_report_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
     d = dgp_a(rng_for(4001), n=700)
     with_section = assemble_report("SYN", d.history, d.factors, now=NOW, factors_downloaded_at=None)
-    from factordesk import pipeline
+    from factordesk.section_hooks import performance as performance_hook
 
     def none_hook(ctx: SectionContext) -> PerformanceSection | None:
         return None
 
-    monkeypatch.setattr(pipeline.performance_hook, "build_performance", none_hook)
+    monkeypatch.setattr(performance_hook, "build_performance", none_hook)
     without = assemble_report("SYN", d.history, d.factors, now=NOW, factors_downloaded_at=None)
     assert without.performance is None
     assert with_section.model_copy(update={"performance": None}) == without
