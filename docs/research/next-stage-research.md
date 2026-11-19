@@ -18,10 +18,10 @@ This page summarises three desk-research tracks run on 2026-11-19. Each finding 
   - η(q) = q / sqrt(q + 2 Σ_{k=1}^{q−1} (q−k) ρ_k), with q = 12 for monthly data.
   - With all ρ_k = 0 it reduces to √q.
   - Lo reports that ignoring serial correlation can overstate annualised Sharpe ratios by more than 65%.
-  - The IID standard error of the Sharpe ratio, sqrt((1 + SR²/2)/T), is **[unverified]**.
+  - The IID standard error of the Sharpe ratio is SE(SR) = sqrt((1 + SR²/2)/T) (Lo 2002, Eqs. 8-9, p. 39; verified, see V1).
 - **Minimum Track Record Length (MinTRL; Bailey & López de Prado 2012):**
   - n* = 1 + [1 − γ3·SR + ((γ4 − 1)/4)·SR²]·(z_α/(SR − SR*))².
-  - The kurtosis convention (raw or excess) is **[unverified]**.
+  - γ4 is raw kurtosis (3 for a Normal), and SR, SR* are per-observation, not annualised. MinTRL is a number of observations (verified, see V1).
   - It is an optional later addition. The Deflated Sharpe Ratio is for multiple-testing settings and is not needed for a single record.
 
 Sources:
@@ -295,10 +295,58 @@ Sources:
 
 ---
 
+## Verification results (2026-11-19)
+
+### V1. Sharpe-ratio formulas, checked against the primary texts
+
+- Lo (2002), p. 39, Eqs. 8-9: V_IID = 1 + SR²/2 and SE(SR) = sqrt((1 + SR²/2)/T). Verified.
+- Lo (2002), p. 40, Eq. 20: η(q) = q / sqrt(q + 2 Σ_{k=1}^{q−1} (q−k) ρ_k), where ρ_k is the k-th autocorrelation. With all ρ_k = 0 it reduces to Eq. 17, √q. Verified.
+- Bailey & López de Prado (2012), Eq. 13. Verified through the authors' own appendix code, because the typeset equation did not extract cleanly:
+  - MinTRL = 1 + [1 − γ3·SR + ((γ4 − 1)/4)·SR²]·(Z_α/(SR − SR*))².
+  - γ4 is raw kurtosis. With γ3 = 0 and γ4 = 3 the bracket becomes 1 + SR²/2, which matches Lo's Eq. 8.
+  - The leading "1 +" comes from a degrees-of-freedom correction, and some secondary sources omit it.
+  - Preprint: https://www.davidhbailey.com/dhbpapers/sharpe-frontier.pdf
+
+### V2. Proxy ETF histories
+
+Inception dates come from issuer pages; first-trade dates come from Yahoo's chart API (`firstTradeDate`). EPP and QQQ inception dates are from memory, because their issuer pages did not load.
+
+| Ticker | Inception | Yahoo first day |
+|---|---|---|
+| EWJ | 1996-03-12 | 1996-03-18 |
+| QQQ | 1999-03-10 | 1999-03-10 |
+| IVV | 2000-05-15 | 2000-05-19 |
+| IEV | 2000-07-25 | 2000-07-28 |
+| EZU | 2000-07-25 | 2000-07-31 |
+| EPP | 2001-10-25 | 2001-10-26 |
+| IEF | 2002-07-22 | 2002-07-30 |
+| LQD | 2002-07-22 | 2002-07-30 |
+| EEM | 2003-04-07 | 2003-04-14 |
+| AGG | 2003-09-22 | 2003-09-29 |
+| GLD | 2004-11-18 | 2004-11-18 |
+| DBC | 2006-02-03 | 2006-02-06 |
+| HYG | 2007-04-04 | 2007-04-11 |
+| BWX | 2007-10-02 | 2007-10-11 |
+| EMB | 2007-12-17 | 2007-12-19 |
+| ACWI | 2008-03-26 | 2008-03-28 |
+| IGOV | 2009-01-21 | 2009-01-30 |
+
+Bonds Europe proxy:
+
+- No live US-listed ETF holds only euro-area government bonds. The WisdomTree Euro Debt Fund (EU) closed in February 2015.
+- **Recommended: IGOV** (unhedged international treasuries, FTSE WGBI Developed Markets Capped Select).
+  - About 41% of it is in euro members within its top 12 countries: France, Italy, Germany, Spain, Austria, Belgium and the Netherlands (issuer page, 2026-11-17).
+  - The rest includes Japan, the UK, Korea, Canada and Australia.
+  - It keeps EUR exposure, but it is a mixed proxy, and the UI should label it that way.
+- BWX starts about 15 months earlier. Its country weights were not published on its issuer page.
+- BNDX starts in 2013 and holds corporate bonds as well, so it is not suitable.
+
+The holdings that set the common start date are IGOV (2009-01-30), ACWI (2008-03-28), EMB (2007-12-19) and BWX (2007-10-11).
+
+Sources: https://traders.studentorg.berkeley.edu/papers/The-Statistics-of-Sharpe-Ratios.pdf (DOI 10.2469/faj.v58.n4.2453); issuer pages for each ETF (iShares, State Street, Invesco); https://www.etftrends.com/2015/01/euro-debt-etf-to-close/2/
+
 ## Open verification items
 
-1. The Lo (2002) SE formula and the MinTRL kurtosis convention: check against the primary text.
-2. The Fama & French (1993) TERM/DEF wording.
-3. Ken French momentum file header spacing.
-4. ETF inception and history for the default proxy table, and a Bonds Europe proxy (see the spec).
-5. The current status of capital-gains handling for mutual funds on Yahoo.
+1. The Fama & French (1993) TERM/DEF wording.
+2. Ken French momentum file header spacing.
+3. The current status of capital-gains handling for mutual funds on Yahoo.

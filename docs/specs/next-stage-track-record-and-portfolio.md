@@ -143,12 +143,12 @@ US-listed proxies with long histories. Each sub-asset class starts at 0%, and us
 | Asset class | Sub-asset class: proxy ETF |
 |---|---|
 | Cash | USD T-bill (French RF) |
-| Bonds | Global: BWX · Europe: IGOV (to be decided; no long-history US-listed EUR government ETF) · USA: AGG · USA Treasury: IEF · USA Corporate: LQD · High Yield: HYG · Emerging: EMB |
+| Bonds | Global: BWX · Europe: IGOV (mixed proxy) · USA: AGG · USA Treasury: IEF · USA Corporate: LQD · High Yield: HYG · Emerging: EMB |
 | Equities | Europe: IEV / EZU · USA: IVV · APAC: EPP + EWJ · Emerging: EEM · Thematic: QQQ · Global: ACWI |
 | Commodities | Gold: GLD · Diversified: DBC |
 | Alternatives | hidden in v1 (proxies to be researched) |
 
-ACWI (from March 2008) and EMB (from December 2007) would set the common start date when held, and the UI says so.
+Bonds Europe uses IGOV (a mixed proxy with about 41% in euro-area government bonds; no pure US-listed option exists). The common start date is set by the latest-starting holding: IGOV (2009-01-30), ACWI (2008-03-28), EMB (2007-12-19) or BWX (2007-10-11). The UI names it. Dates are in the [research notes, V2](../research/next-stage-research.md).
 
 ## Verification
 - **Every PR:**
