@@ -7,6 +7,7 @@ import { BarCell } from "../charts/BarCell";
 import { AxisRow, Legend, NameCell, pctN, SigHead, Swatch, TotalSwatch } from "./barParts";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
+import "./signColor.css";
 
 type Kind = "factor" | "alpha" | "resid";
 
@@ -22,6 +23,11 @@ interface Item {
 export function returnTick(t: number): string {
   if (!t) return "0%";
   return pct(t, Math.abs(t * 100 - Math.round(t * 100)) < 1e-9 ? 0 : 1);
+}
+
+/** Sign colour of a return value (class names of the v4a sign colour); missing and shown-as-zero stay ink. */
+export function signClass(x: number | null): string {
+  return x === null || pctN(x) === "0.00%" ? "" : x > 0 ? " num-pos" : " num-neg";
 }
 
 const EMPTY_ACTION = "Widen the date range and run the report again.";
@@ -166,7 +172,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
                 key={id}
                 id={id}
                 role="row"
-                className={`${item.notSignificant ? "ns " : ""}${item.kind}`}
+                className={`${item.notSignificant ? "ns is-noise " : ""}${item.kind}`}
                 tabIndex={-1}
               >
                 <NameCell name={item.name} plain={item.plain} />
@@ -181,7 +187,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
                     title={`${item.name}: ${pctN(item.value)} a year`}
                   />
                 </td>
-                <td role="cell" className="num strong">
+                <td role="cell" className={`num strong${item.kind === "resid" ? "" : signClass(item.value)}`}>
                   {pctN(item.value)}
                 </td>
                 <td role="cell" className="num sig">
@@ -206,7 +212,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
                 title={`Total: ${pctN(total)} a year`}
               />
             </td>
-            <td role="cell" className="num strong">
+            <td role="cell" className={`num strong${signClass(total)}`}>
               {pctN(total)}
             </td>
             <td role="cell" className="num" />
