@@ -63,6 +63,7 @@ The owner's decisions from three question rounds are listed below.
 - holdings-based betas
 - European mode
 - Fung-Hsieh factors
+- VaR backtests and conditional (GARCH/EVT) VaR
 
 ## Epics, RICE and MoSCoW
 RICE scale:
@@ -82,6 +83,7 @@ Score = R × I × C / E.
 | E3 | **Track-record diagnostics**: ACWI statistics, smoothing checks, Lo Sharpe. | 6 | 2 | 0.8 | 3 | 3.2 | Should |
 | E6 | **Portfolio attribution tree**: contribution and risk share rolled up per group, plus cost line and data checks. | 7 | 2 | 0.8 | 3 | 3.7 | Should |
 | E4 | **Macro sensitivities**: TERM/DEF/EUR-USD in all modes. | 7 | 1 | 0.6 | 3 | 1.4 | Should |
+| E7 | **VaR and CVaR** (added 2026-11-19) for single names, track records and portfolios: historical, Gaussian and Cornish-Fisher side by side with bootstrap bands; per-holding CVaR for portfolios. | 10 | 2 | 0.8 | 3 | 5.3 | Should |
 | — | Deferred list above | | | | | | Won't (now) |
 
 E0 is pulled to the top despite its lower RICE score, because it is the enabling thin slice: E2, E3 and E5 all depend on its seam. E5 gets a strategic boost because it is the "heavy" headline feature.
@@ -94,8 +96,8 @@ Each release ends the same way:
 
 ```
 NOW   R1  E0 skeleton  ──►  E1 FF6 + alpha strip      (ticker + upload modes)
-NEXT  R2  E2 upload hardening ║ E5 portfolio slice     (parallel lanes)
-      R3  E3 diagnostics     ║ E6 attribution tree     (parallel lanes)
+NEXT  R2  E2 upload hardening ║ E5 portfolio slice ║ E7a VaR/CVaR (ticker + upload)
+      R3  E3 diagnostics     ║ E6 attribution tree ║ E7b per-holding CVaR
 LATER R4  E4 macro sensitivities (all modes)
       R5+ European mode / EUR base, Alternatives proxies, weekly, HTML export
 ```
@@ -112,6 +114,7 @@ LATER R4  E4 macro sensitivities (all modes)
 - E1 can start once E0's regression and `periods` change merges.
 - E5 comes before E6.
 - E4 is independent after E0.
+- E7a needs only E0. E7b (per-holding CVaR) needs E5.
 - The lanes run in parallel only on disjoint file sets:
   - **E2:** `data/upload.py` and the upload UI.
   - **E5:** `analytics/backtest.py` and the portfolio UI.
@@ -135,6 +138,33 @@ LATER R4  E4 macro sensitivities (all modes)
 - The same ETF is allowed in two sleeves.
 - FF6 gets a new sixth hue token.
 - UI review happens on localhost screenshots at each release demo, instead of separate mockups (cheaper).
+
+## E7: VaR and CVaR (decided 2026-11-19)
+
+Research: [research notes, section D](../research/next-stage-research.md).
+
+- **Methods:** historical, Gaussian and Cornish-Fisher (modified) are shown side by side, because the gap between them is a fat-tail signal.
+  - Cornish-Fisher shows "n/a" outside the expansion's valid domain (Maillard 2012). Take the exact bound from the paper before coding it.
+  - The Cornish-Fisher CVaR is floored at its VaR.
+- **Levels:**
+  - The headline in every mode is Basel-style 99% VaR and 97.5% CVaR.
+  - Monthly series also get a 95% VaR/CVaR row.
+  - Results stay at the series' own frequency (1-day or 1-month), with no square-root-of-time scaling.
+  - Losses are positive percentages of value, computed from simple returns.
+- **Uncertainty:**
+  - Each figure shows a bootstrap 90% band and the number of tail observations behind it.
+  - Daily series use a stationary block bootstrap (Politis-Romano 1994); monthly series use an iid bootstrap.
+  - A historical figure with fewer than about 3 expected tail observations shows "n/a" and the reason, e.g. "0.6 expected tail months".
+- **Portfolios (E7b):** historical per-holding CVaR is the mean of w_i·r_i over the portfolio's tail days.
+  - It sums exactly to the portfolio CVaR and rolls up through the SAA tree.
+  - Below about 20 tail observations it falls back to Gaussian per-holding CVaR from the covariance matrix, and the report says so.
+- **Deferred:** Student-t, GARCH/filtered historical, EVT, rolling out-of-sample backtests (Kupiec, Christoffersen, Acerbi-Székely), kernel per-holding VaR, modified per-holding CVaR, and the corrected Cornish-Fisher expansion.
+- **Verification:**
+  - Gaussian VaR equals mean − z·σ.
+  - Cornish-Fisher reduces to Gaussian when skewness and excess kurtosis are 0.
+  - Historical VaR and CVaR match hand-computed order statistics.
+  - Per-holding CVaR sums to the portfolio CVaR within 1e-12.
+  - On simulated normal data, bootstrap-band coverage is about nominal.
 
 ## Draft default proxy template (to be validated in E5)
 

@@ -57,13 +57,14 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 
 ### Next stage: track records and portfolios (2026-11-19)
 
-Spec: [next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md). Status for all five: Decided, not yet built.
+Spec: [next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md). Status for all six: Decided, not yet built.
 
 - [Factor models (FF5 and FF6) and a separate macro section](decision-factor-models-and-macro.md) [Decided]: a five/six-factor switch, alpha under four models side by side, and rates, credit and euro sensitivities in their own section.
 - [Monthly track-record uploads](decision-monthly-track-records.md) [Decided]: uploaded fund records, daily or monthly, checked and analysed in memory; monthly needs 36 months. Amends the daily-returns decision.
 - [Portfolio backtest rules](decision-portfolio-backtest-rules.md) [Decided]: month-end rebalancing with drift, a cost line, cash at the risk-free rate, common start and end dates, and contribution and risk per holding.
 - [SAA tree and default proxies](decision-saa-tree-and-proxies.md) [Decided]: a three-level tree (asset class, sub-asset class, ETF) prefilled with US-listed proxy ETFs; alternatives later.
 - [USD only in version 1](decision-usd-only-v1-portfolios.md) [Decided]: US dollars and US-listed proxies first; a euro base and UCITS funds wait for European mode.
+- [VaR and CVaR](decision-var-and-cvar.md) [Decided]: historical, Gaussian and Cornish-Fisher side by side at 99% VaR / 97.5% CVaR (plus 95% for monthly), with bootstrap bands and per-holding CVaR for portfolios.
 
 ### Open source
 

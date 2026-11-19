@@ -295,6 +295,90 @@ Sources:
 
 ---
 
+## D. VaR and CVaR (expected shortfall)
+
+Researched on 2026-11-19. Venues marked **[from memory]** were not re-checked.
+
+### D1. Methods
+
+| Method | Assumptions | Small samples | Adopted |
+|---|---|---|---|
+| Historical simulation | Stationary; no distribution | Works on daily data. With 36 months, 95% VaR is about the 2nd-worst month and 99% VaR cannot be estimated | Yes |
+| Gaussian | Normal returns | Stable at 36 observations, but understates fat or left-skewed tails | Yes |
+| Cornish-Fisher (modified) | Close to normal; adds skewness and kurtosis | Usable at 36-120 months, but sample skewness and kurtosis are noisy | Yes, with a validity guard |
+| Student-t | Symmetric fat tails | Degrees of freedom poorly identified below about 250 observations | Deferred |
+| Filtered historical / GARCH | Volatility clustering | Needs 500-1000+ daily observations; gives a conditional forecast, not a description | Deferred |
+| EVT / GPD | Tail above a threshold follows a generalised Pareto | Needs 1000+ daily observations; the threshold choice is subjective | Deferred |
+
+- **Cornish-Fisher:**
+  - Zangari (1996), RiskMetrics Monitor Q1 **[from memory]**.
+  - Favre & Galeano (2002), *Journal of Alternative Investments* 5(2) **[from memory]**.
+  - **Validity domain:** Maillard (2012), "A User's Guide to the Cornish Fisher Expansion", SSRN 1997178.
+    - The quantile stops being monotone outside a domain.
+    - The expansion's parameters are not the true skewness and kurtosis.
+    - Failures are worst at 99%.
+    - Take the exact inequality from the paper.
+  - **Corrected expansion:** Amédée-Manesme, Barthélémy & Maillard (2019), *Annals of Operations Research* 281, doi:10.1007/s10479-018-2792-4.
+- **Modified expected shortfall:** Boudt, Peterson & Croux (2008), *Journal of Risk* 11(2), 79-103. Modified ES can come out below modified VaR, which is why it is floored.
+- **Filtered historical simulation:**
+  - Hull & White (1998), *Journal of Risk* 1(1) **[from memory]**.
+  - Barone-Adesi, Giannopoulos & Vosper (1999), *Journal of Futures Markets* 19(5) **[from memory]**.
+- **EVT:** McNeil & Frey (2000), *Journal of Empirical Finance* 7(3-4) **[from memory]**.
+- **Estimation noise:** Danielsson & Zhou, "Why risk is so hard to measure" (https://riskresearch.org/papers/DanielssonZhou2017). At small samples, risk forecasts are close to noise, and expected shortfall is noisier than VaR.
+- **Sample size:** Yamai & Yoshiba (2002, *Monetary and Economic Studies* 20(1); 2005, *Journal of Banking & Finance* 29). Expected shortfall needs larger samples than VaR to reach the same accuracy, but it does not ignore the tail beyond the quantile.
+
+### D2. Levels and horizons
+
+- **Basel FRTB** (BCBS d352, 2016; d457, 2019) moved from 99% VaR to 97.5% expected shortfall. Under normality the two nearly coincide: 2.326σ versus 2.338σ.
+- **Expected tail observations:**
+
+  | Sample | at 99% | at 97.5% |
+  |---|---|---|
+  | 36 months | 0.4 | 0.9 |
+  | 120 months | 1.2 | 3 |
+  | 500 days | 5 | 12.5 |
+
+  This is why monthly series also get a 95% row.
+- **Square-root-of-time scaling** is valid only for iid, zero-mean returns, so results stay at the series' own frequency.
+  - Diebold, Hickman, Inoue & Schuermann (1997), Wharton FIC WP 97-34.
+  - Danielsson & Zigrand (2006), *Journal of Banking & Finance* 30(10), 2701-2713.
+
+### D3. Coherence and elicitability
+
+- VaR can fail subadditivity: Artzner, Delbaen, Eber & Heath (1999), *Mathematical Finance* 9(3).
+- Expected shortfall is coherent: Acerbi & Tasche (2002), *Journal of Banking & Finance* 26(7).
+- Expected shortfall is not elicitable on its own: Gneiting (2011), *JASA* 106(494).
+- VaR and expected shortfall are jointly elicitable: Fissler & Ziegel (2016), *Annals of Statistics* 44(4).
+- Only expected shortfall gives per-holding contributions that add up cleanly.
+
+### D4. Backtesting (deferred)
+
+- **Tests:** Kupiec (1995), *Journal of Derivatives* 3(2); Christoffersen (1998), *International Economic Review* 39(4); Acerbi & Székely (2014), *Risk*, December.
+- **In-sample tests are meaningless:** historical VaR hits its nominal coverage by construction on the sample it was fitted to.
+- **A rolling test needs:** a 250-500 day estimation window plus 250-1000 test days. That is impossible on 36-120 monthly observations.
+
+### D5. Per-holding contributions
+
+- **Euler allocation:**
+  - Tasche (1999, 2000; arXiv math/0104190).
+  - Gourieroux, Laurent & Scaillet (2000), *Journal of Empirical Finance* 7.
+  - Hallerbach (2003), *Journal of Risk* 5(2).
+  - Scaillet (2004), *Mathematical Finance* 14(1).
+- **Per-holding VaR (deferred):** in historical simulation it conditions on a single day, so it is very noisy and needs kernel smoothing.
+- **Per-holding CVaR (adopted):** the mean of w_i·r_i over the portfolio's tail days.
+  - It sums exactly to the portfolio CVaR.
+  - Below about 20 tail days it is anecdotal, so the tool falls back to Gaussian per-holding CVaR.
+
+### D6. Uncertainty
+
+- **Historical VaR:** order-statistic (binomial) intervals, or the asymptotic SE √(p(1−p)/n)/f(q).
+- **Expected shortfall:** bootstrap; Chen (2008), *Journal of Financial Econometrics* 6(1).
+- **Daily data:** use a stationary block bootstrap (Politis & Romano 1994, *JASA*).
+- **What peers show:**
+  - PerformanceAnalytics: historical, Gaussian, modified and kernel methods, plus a per-holding option; no intervals.
+  - Portfolio Visualizer: 95% historical and analytical VaR plus CVaR, one-month horizon; no intervals.
+  - Showing bands goes beyond common practice, and it is the honest answer for short records.
+
 ## Verification results (2026-11-19)
 
 ### V1. Sharpe-ratio formulas, checked against the primary texts
