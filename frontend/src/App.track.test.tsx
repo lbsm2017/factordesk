@@ -44,6 +44,7 @@ interface Seen {
   file: string | null;
   name: string | null;
   grossNet: string | null;
+  model: string | null;
 }
 const seen: Seen[] = [];
 
@@ -59,7 +60,7 @@ function answerUpload(status = 200) {
       const body = await request.text();
       const file = /filename="([^"]*)"/.exec(body)?.[1] ?? null;
       const name = field(body, "name");
-      seen.push({ file, name, grossNet: field(body, "gross_net") });
+      seen.push({ file, name, grossNet: field(body, "gross_net"), model: field(body, "model") });
       if (status === 200) return HttpResponse.json({ ...monthlyReport, ticker: name ?? "Uploaded track record" });
       return HttpResponse.json(
         {
@@ -125,7 +126,7 @@ describe("track-record upload", () => {
     fireEvent.click(screen.getByRole("button", { name: "Factor it" }));
     expect(await screen.findByTestId("report-ticker")).toHaveProperty("textContent", "Example Fund");
     expect(screen.getByTestId("report-download").textContent).toBe("null");
-    expect(seen).toEqual([{ file: "record.csv", name: "Example Fund", grossNet: "net" }]);
+    expect(seen).toEqual([{ file: "record.csv", name: "Example Fund", grossNet: "net", model: "ff6" }]);
     // Nothing is remembered: no recent ticker, no stored report.
     expect(window.localStorage.getItem(RECENT_KEY)).toBeNull();
     expect(window.location.search).toBe("?m=track");
@@ -137,7 +138,17 @@ describe("track-record upload", () => {
     chooseFile(csv());
     fireEvent.click(screen.getByRole("button", { name: "Factor it" }));
     await screen.findByTestId("report-ticker");
-    expect(seen).toEqual([{ file: "record.csv", name: null, grossNet: null }]);
+    expect(seen).toEqual([{ file: "record.csv", name: null, grossNet: null, model: "ff6" }]);
+  });
+
+  it("sends model=ff5 when the URL asks for FF5, and keeps it in the URL", async () => {
+    answerUpload();
+    renderAt("/?m=track&model=ff5");
+    chooseFile(csv());
+    fireEvent.click(screen.getByRole("button", { name: "Factor it" }));
+    await screen.findByTestId("report-ticker");
+    expect(seen).toEqual([{ file: "record.csv", name: null, grossNet: null, model: "ff5" }]);
+    expect(window.location.search).toBe("?m=track&model=ff5");
   });
 
   it("asks for a file before it sends anything", () => {
