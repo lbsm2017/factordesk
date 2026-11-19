@@ -164,8 +164,9 @@ export function regressionOutcome(report: FactorReport): string | null {
   if (reg.status !== "ok") return null;
   const k = reg.factors.filter(isClear).length;
   const kText = NUMBER_WORDS[k] ?? String(k);
+  const all = countWord(reg.factors.length);
   const alpha = reg.alpha_tag === "reliable" ? "distinguishable" : "not distinguishable";
-  let text = `${kText} of the five betas ${k === 1 ? "is" : "are"} significant after allowing for testing five at once; the return beyond the exposures is ${alpha} from zero.`;
+  let text = `${kText} of the ${all} betas ${k === 1 ? "is" : "are"} significant after allowing for testing ${all} at once; the return beyond the exposures is ${alpha} from zero.`;
   if (report.quality_gate.fired) {
     text += " Because the quality gate fired, a term counts as significant only when the 5-day estimate agrees.";
   }
