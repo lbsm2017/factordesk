@@ -31,6 +31,7 @@ from factordesk.data.prices import (
     UnsupportedCurrencyError,
     YFinanceProvider,
     check_currency,
+    exchange_label,
     read_cached_security,
     security_from_info,
     security_of,
@@ -161,9 +162,41 @@ def test_name_is_the_long_name_then_the_short_name() -> None:
 
 def test_exchange_is_the_readable_name_then_the_code() -> None:
     full = security_from_info({"exchange": "NMS", "fullExchangeName": "NasdaqGS"})
-    assert full is not None and full.exchange == "NasdaqGS"
-    code = security_from_info({"exchange": "NMS"})
-    assert code is not None and code.exchange == "NMS"
+    assert full is not None and full.exchange == "NASDAQ"
+    code = security_from_info({"exchange": "NYQ"})
+    assert code is not None and code.exchange == "NYSE"
+    other = security_from_info({"exchange": "LSE"})
+    assert other is not None and other.exchange == "LSE"
+
+
+@pytest.mark.parametrize(
+    ("raw", "label"),
+    [
+        *[(v, "NASDAQ") for v in ("NMS", "NGM", "NCM", "NasdaqGS", "NasdaqGM", "NasdaqCM")],
+        *[(v, "NYSE") for v in ("NYQ", "NYSE")],
+        *[(v, "NYSE American") for v in ("ASE", "NYSE American")],
+        *[(v, "NYSE Arca") for v in ("PCX", "NYSEArca", "NYSE Arca")],
+        *[(v, "Cboe BZX") for v in ("BTS", "Cboe BZX", "BATS")],
+        ("XETRA", "XETRA"),
+    ],
+)
+def test_exchange_label_table(raw: str, label: str) -> None:
+    assert exchange_label(raw) == label
+
+
+def test_exchange_label_keeps_none() -> None:
+    assert exchange_label(None) is None
+
+
+def test_a_cache_file_with_the_raw_exchange_is_mapped_on_read(tmp_path: Path) -> None:
+    rig = make_rig(tmp_path, FakeInfo(ZM_INFO))
+    rig.cache_dir.mkdir(parents=True)
+    rig.path.write_text(
+        json.dumps({"fetched_at": NOW.isoformat(), "name": "Zoom", "exchange": "NasdaqGS"}),
+        encoding="utf-8",
+    )
+    found = read_cached_security(rig.cache_dir, "ZM")
+    assert found is not None and found.exchange == "NASDAQ"
 
 
 def test_missing_currency_stays_none_and_the_rest_is_kept() -> None:
@@ -182,7 +215,7 @@ def test_an_answer_with_none_of_the_fields_is_nothing(info: dict[str, object]) -
 def test_fetch_security_returns_and_caches_the_record(tmp_path: Path) -> None:
     rig = make_rig(tmp_path, FakeInfo(ZM_INFO))
     found = rig.provider.fetch_security("zm")
-    assert found == Security("Zoom Communications, Inc.", "USD", "NasdaqGS", "EQUITY")
+    assert found == Security("Zoom Communications, Inc.", "USD", "NASDAQ", "EQUITY")
     stored = json.loads(rig.path.read_text(encoding="utf-8"))
     assert stored["fetched_at"] == NOW.isoformat()
     assert stored["name"] == "Zoom Communications, Inc." and stored["currency"] == "USD"
@@ -232,7 +265,7 @@ def test_an_unreadable_cache_is_ignored_and_refetched(tmp_path: Path) -> None:
     rig.path.write_text("{not json", encoding="utf-8")
     assert read_cached_security(rig.cache_dir, "ZM") is None
     assert rig.provider.fetch_security("ZM") == Security(
-        "Zoom Communications, Inc.", "USD", "NasdaqGS", "EQUITY"
+        "Zoom Communications, Inc.", "USD", "NASDAQ", "EQUITY"
     )
     assert rig.info.calls == ["ZM"]
 
