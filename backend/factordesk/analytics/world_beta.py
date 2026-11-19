@@ -32,6 +32,15 @@ FloatArray = NDArray[np.float64]
 
 BENCHMARK_TICKER = "ACWI"
 """Yahoo ticker of the proxy: iShares MSCI ACWI ETF, USD, US exchange, history from 2008-03."""
+EUROPE_TICKER = "IEUR"
+"""Yahoo ticker of the Europe proxy: iShares Core MSCI Europe ETF, USD, US exchange, history from
+2014-06. A stand-in for the MSCI Europe index exactly as ``ACWI`` is for MSCI ACWI."""
+PROXIES: tuple[tuple[str, str, str], ...] = (
+    ("world", BENCHMARK_TICKER, "MSCI ACWI"),
+    ("europe", EUROPE_TICKER, "MSCI Europe"),
+)
+"""The proxies of the world beta section as ``(key, Yahoo ticker, index it stands in for)``. The
+hook runs the same computation, cache and refresh for each."""
 MIN_OVERLAP = 252
 """Fewest common days with a result (one trading year); fewer is ``insufficient_data``."""
 EXACT_FIT_RELATIVE_SSR = 1e-20
@@ -60,7 +69,9 @@ class BetaEstimate:
     lags: int
 
 
-def single_factor_beta(y: FloatArray, x: FloatArray) -> BetaEstimate:
+def single_factor_beta(
+    y: FloatArray, x: FloatArray, ticker: str = BENCHMARK_TICKER
+) -> BetaEstimate:
     """OLS of ``y`` on ``x`` with an intercept; HAC lags ``hac_lags(len(y))`` (M0.5).
 
     Raises ``ValueError`` for non-finite input and ``DegenerateInputError`` when ``x`` or ``y``
@@ -73,11 +84,11 @@ def single_factor_beta(y: FloatArray, x: FloatArray) -> BetaEstimate:
         raise ValueError("y and x must be one-dimensional and of equal length")
     if float(np.std(xv, ddof=1)) < MIN_RETURN_SD:
         raise DegenerateInputError(
-            f"the daily excess return of {BENCHMARK_TICKER} does not vary over the sample "
+            f"the daily excess return of {ticker} does not vary over the sample "
             f"(standard deviation below {MIN_RETURN_SD:.0e}), so there is no beta to estimate"
         )
     with np.errstate(divide="ignore", invalid="ignore"):  # an exact fit has a zero standard error
-        fit = ols_hac(yv, xv[:, None], names=(BENCHMARK_TICKER,))
+        fit = ols_hac(yv, xv[:, None], names=(ticker,))
     beta, se = float(fit.params[1]), float(fit.bse[1])
     alpha_se = float(fit.bse[0])
     resid = yv - float(fit.params[0]) - beta * xv
@@ -161,37 +172,52 @@ def intervals_overlap(a: BetaEstimate, b: BetaEstimate) -> bool:
     return max(a.ci_low, b.ci_low) <= min(a.ci_high, b.ci_high)
 
 
-WORDS: dict[Comparison, str] = {
-    "about_the_same": (
-        "About the same: the 95% intervals of the two betas overlap, so these days do not show "
-        "a difference between the US market beta and the world beta."
-    ),
-    "higher": (
-        "Higher against the world: the beta against the world is above the beta against the US "
-        "market, and the two 95% intervals do not overlap."
-    ),
-    "lower": (
-        "Lower against the world: the beta against the world is below the beta against the US "
-        "market, and the two 95% intervals do not overlap."
-    ),
-}
+def _words(where: str, noun: str) -> dict[Comparison, str]:
+    """The three readings for a benchmark region (``where``: "the world", ``noun``: "world")."""
+    return {
+        "about_the_same": (
+            "About the same: the 95% intervals of the two betas overlap, so these days do not "
+            f"show a difference between the US market beta and the {noun} beta."
+        ),
+        "higher": (
+            f"Higher against {where}: the beta against {where} is above the beta against the US "
+            "market, and the two 95% intervals do not overlap."
+        ),
+        "lower": (
+            f"Lower against {where}: the beta against {where} is below the beta against the US "
+            "market, and the two 95% intervals do not overlap."
+        ),
+    }
+
+
+WORDS: dict[Comparison, str] = _words("the world", "world")
 """The plain reading of the comparison; nothing is claimed beyond the intervals."""
+EUROPE_WORDS: dict[Comparison, str] = _words("Europe", "Europe")
+"""The same three readings for the Europe proxy."""
 
 
-def compare_betas(world: BetaEstimate, us: BetaEstimate) -> tuple[Comparison, str]:
-    """``about_the_same`` when the intervals overlap; otherwise which beta is higher."""
+def compare_betas(
+    world: BetaEstimate, us: BetaEstimate, words: dict[Comparison, str] | None = None
+) -> tuple[Comparison, str]:
+    """``about_the_same`` when the intervals overlap; otherwise which beta is higher.
+
+    ``words`` is ``WORDS`` (the world) unless another region's readings are given.
+    """
     if intervals_overlap(world, us):
         key: Comparison = "about_the_same"
     elif world.beta > us.beta:
         key = "higher"
     else:
         key = "lower"
-    return key, WORDS[key]
+    return key, (WORDS if words is None else words)[key]
 
 
 __all__ = [
     "BENCHMARK_TICKER",
+    "EUROPE_TICKER",
+    "EUROPE_WORDS",
     "MIN_OVERLAP",
+    "PROXIES",
     "WORDS",
     "BetaEstimate",
     "Comparison",

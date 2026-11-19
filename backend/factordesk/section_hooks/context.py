@@ -36,9 +36,9 @@ from factordesk.report.schema import (
 
 @dataclass(frozen=True)
 class WorldBenchmarkInput:
-    """The ACWI price history for the world beta, or why there is none (world-beta feature).
+    """The price history of a world beta proxy (ACWI, IEUR), or why there is none.
 
-    ``history`` is ``None`` when ACWI could not be fetched (``unavailable_reason`` says why).
+    ``history`` is ``None`` when the proxy could not be fetched (``unavailable_reason`` says why).
     ``note`` is set when the refresh failed and the cached history was used.
     """
 
@@ -60,6 +60,9 @@ class SectionInputs:
     world_benchmark: WorldBenchmarkInput | None = None
     """ACWI prices for the world beta; ``None``: not fetched, the section does not run.
     Owned by the world-beta feature."""
+    europe_benchmark: WorldBenchmarkInput | None = None
+    """IEUR prices for the Europe block of the world beta; ``None``: not fetched, the block is
+    null. Owned by the world-beta feature."""
 
 
 @dataclass(frozen=True)
