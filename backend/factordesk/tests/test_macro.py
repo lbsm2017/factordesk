@@ -444,6 +444,27 @@ def test_fred_failure_falls_back_to_an_older_cache_then_raises(tmp_path: Path) -
     assert len(old.values) == 4
 
 
+def test_a_failed_download_is_not_tried_again_the_same_day(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def boom(series: str) -> str:
+        calls.append(series)
+        raise FredError("network error")
+
+    for _ in range(3):
+        with pytest.raises(FredError, match="network error"):
+            load_fred_series(data_dir=tmp_path, now=NOW, fetch=boom)
+    assert calls == ["DTWEXBGS"]  # one try; the failure is remembered for the day
+    # The next day tries again.
+    with pytest.raises(FredError):
+        load_fred_series(data_dir=tmp_path, now=datetime(2026, 11, 20, tzinfo=UTC), fetch=boom)
+    assert len(calls) == 2
+    # A remembered failure still serves an older cached copy.
+    load_fred_series(data_dir=tmp_path, now=datetime(2026, 11, 18, tzinfo=UTC), fetch=lambda s: CSV)
+    old = load_fred_series(data_dir=tmp_path, now=NOW, fetch=boom)
+    assert old.note is not None and len(calls) == 2
+
+
 def test_fred_rejects_a_series_id_that_is_not_an_id(tmp_path: Path) -> None:
     with pytest.raises(FredError):
         load_fred_series("../x", data_dir=tmp_path, now=NOW, fetch=lambda s: CSV)

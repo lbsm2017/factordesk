@@ -36,11 +36,17 @@ logger = logging.getLogger(__name__)
 DOLLAR_SERIES = "DTWEXBGS"
 """FRED id of the Federal Reserve nominal broad U.S. dollar index."""
 FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
-TIMEOUT_S = 20.0
+TIMEOUT_S = 8.0
 ATTEMPTS = 2
 _USER_AGENT = "factordesk-fred-loader/0.1"
 _SERIES_RE = re.compile(r"^[A-Z0-9_]{1,32}$")
 _DATE_COLUMNS = ("observation_date", "DATE")
+
+
+_FAILED: dict[tuple[str, str, str], str] = {}
+"""Downloads that failed, by (data folder, series, day), with the reason. In memory only: a failed
+download is not tried again for the rest of the day, so a FRED outage costs one wait, not one per
+report. A new day or a new process tries again."""
 
 
 class FredError(Exception):
@@ -153,14 +159,20 @@ def load_fred_series(
             return FredSeries(series_id, parse_fred_csv(today_file.read_text("utf-8"), series_id))
         except (FredError, OSError):
             logger.warning("Unreadable FRED cache %s; downloading again", today_file.name)
+    memo = (str(fdir), series_id, stamp.isoformat())
+    if memo in _FAILED:
+        return _from_old_cache(fdir, series_id, _FAILED[memo])
     try:
         text = (fetch or _fetch)(series_id)
         values = parse_fred_csv(text, series_id)
     except FredError as exc:
+        _FAILED[memo] = str(exc)
         return _from_old_cache(fdir, series_id, str(exc))
     except Exception as exc:  # a failing injected or network layer must not stop the report
         logger.warning("FRED %s download failed", series_id, exc_info=True)
-        return _from_old_cache(fdir, series_id, f"{type(exc).__name__}: {exc}")
+        reason = f"{type(exc).__name__}: {exc}"
+        _FAILED[memo] = reason
+        return _from_old_cache(fdir, series_id, reason)
     try:
         _atomic_write(today_file, text)
         for old in _cached_files(fdir, series_id):
