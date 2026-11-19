@@ -43,7 +43,7 @@ const METRIC = {
   alpha: ["Alpha (annual)", "Return a year that the five factor exposures do not explain"],
   r2: ["R²", "Share of daily moves explained by the five factors"],
   resid: ["Residual volatility", "Volatility a year of the returns the factors do not explain"],
-  us: ["Beta to US market", "Exposure to the US market factor (Mkt-RF) in the five-factor model"],
+  us: ["Market beta (five-factor)", "Exposure to the US market factor (Mkt-RF) with the other four factors held fixed; the World beta panel shows a one-factor US market beta, which can differ"],
   acwi: ["Beta to ACWI", "One-factor exposure to the ACWI ETF, a stand-in for the MSCI ACWI index"],
 } as const;
 

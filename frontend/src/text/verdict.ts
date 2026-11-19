@@ -235,7 +235,7 @@ export function worldBetaReading(section: WorldBetaSection, report: FactorReport
   if (!w) return NO_TEST;
   const us = section.us_market?.beta;
   const phrase = section.comparison ? COMPARED[section.comparison] : null;
-  const note = phrase && fin(us) ? `${phrase} its US market beta of ${times(us)}` : undefined;
+  const note = phrase && fin(us) ? `${phrase} its one-factor US market beta of ${times(us)}` : undefined;
   return judged(w.ci_low > 0 || w.ci_high < 0, auditErrors(report), note);
 }
 

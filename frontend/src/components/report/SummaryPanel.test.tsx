@@ -43,7 +43,7 @@ describe("SummaryPanel", () => {
     expect(cells("Alpha (annual)")).toEqual(["+0.81%", "Could be noise"]);
     expect(cells("R²")).toEqual(["99.9%", "Probably understated"]);
     expect(cells("Residual volatility")).toEqual(["0.6%", "Probably overstated"]);
-    expect(cells("Beta to US market")).toEqual(["+1.00", "Clear evidence"]);
+    expect(cells("Market beta (five-factor)")).toEqual(["+1.00", "Clear evidence"]);
     expect(cells("Beta to ACWI")).toEqual(["+0.93", "Clear evidence"]);
   });
 
@@ -54,7 +54,7 @@ describe("SummaryPanel", () => {
     expect(valueClass("Sharpe ratio")).toContain("num-neg");
     expect(valueClass("Max drawdown")).toContain("num-neg");
     expect(valueClass("Alpha (annual)")).toContain("num-pos");
-    for (const label of ["Volatility", "R²", "Residual volatility", "Beta to US market", "Beta to ACWI"]) {
+    for (const label of ["Volatility", "R²", "Residual volatility", "Market beta (five-factor)", "Beta to ACWI"]) {
       expect(valueClass(label), label).not.toMatch(/num-(pos|neg)/);
     }
   });
@@ -63,7 +63,14 @@ describe("SummaryPanel", () => {
     const { container } = render(<SummaryPanel report={full} />);
     expect(rowOf(container, "Alpha (annual)").className).toBe("is-noise");
     expect(rowOf(container, "Sharpe ratio").className).toBe("is-noise");
-    expect(rowOf(container, "Beta to US market").className).toBe("");
+    expect(rowOf(container, "Market beta (five-factor)").className).toBe("");
+  });
+
+  it("explains in the title that the market beta here is the five-factor one", () => {
+    const { container } = render(<SummaryPanel report={full} />);
+    const tip = rowOf(container, "Market beta (five-factor)").querySelector(".tip")?.getAttribute("title") ?? "";
+    expect(tip).toContain("one-factor");
+    expect(container.textContent).not.toContain("Beta to US market");
   });
 
   it("gives every metric label a title and the table heads an explanation", () => {

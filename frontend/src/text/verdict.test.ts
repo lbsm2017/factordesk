@@ -223,7 +223,7 @@ describe("reading words", () => {
     const r = withSection(mockReport, "world_beta");
     const wb = r.world_beta;
     if (!wb) throw new Error("fixture");
-    expect(worldBetaReading(wb, r)).toMatchObject({ word: "Clear evidence", note: "lower than its US market beta of 1.00" });
+    expect(worldBetaReading(wb, r)).toMatchObject({ word: "Clear evidence", note: "lower than its one-factor US market beta of 1.00" });
   });
 });
 

@@ -73,6 +73,14 @@ describe("WorldBetaBody", () => {
     expect(container.textContent).not.toContain("8,474");
   });
 
+  it("labels the US market rows one-factor and explains the difference from the summary in a title", () => {
+    const { container } = render(<WorldBetaBody report={reportWith()} />);
+    const head = container.querySelector("#world-beta-us th");
+    expect(head?.textContent).toBe("US market, one-factor, same days");
+    expect(head?.getAttribute("title")).toMatch(/five-factor market beta/);
+    expect(container.textContent).not.toMatch(/US market beta/);
+  });
+
   it("says lower or higher when the intervals are apart", () => {
     const report = reportWith((s) => {
       if (s.world) Object.assign(s.world, { beta: 0.7, ci_low: 0.6, ci_high: 0.8 });
@@ -93,7 +101,7 @@ describe("WorldBetaBody", () => {
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     expect(heads(container)).toEqual(["Against", "Chart", "Beta", "Days"]);
     expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "540"]);
-    expect(cells(container, "us")).toEqual(["US market", "+1.00", "540"]);
+    expect(cells(container, "us")).toEqual(["US market, one-factor, same days", "+1.00", "540"]);
     expect(cells(container, "europe")).toEqual(["Europe IEUR, MSCI Europe stand-in", "+0.80", "540"]);
     expect(Array.from(container.querySelectorAll("tbody tr")).map((r) => r.id)).toEqual([
       "world-beta-acwi",
@@ -109,7 +117,7 @@ describe("WorldBetaBody", () => {
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     expect(heads(container)).toEqual(["Against", "Chart", "Beta", "95% interval", "R²", "Days"]);
     expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "0.85 to 1.01", "0.81", "540"]);
-    expect(cells(container, "us")).toEqual(["US market", "+1.00", "0.96 to 1.04", "0.97", "540"]);
+    expect(cells(container, "us")).toEqual(["US market, one-factor, same days", "+1.00", "0.96 to 1.04", "0.97", "540"]);
   });
 
   it("draws every beta as a neutral ink dot with its interval on one shared axis, never green or red", () => {
@@ -143,7 +151,7 @@ describe("WorldBetaBody", () => {
       "world-beta-us",
       "world-beta-us-europe",
     ]);
-    expect(cells(container, "us-europe")).toEqual(["US market, same days as Europe", "+0.98", "540"]);
+    expect(cells(container, "us-europe")).toEqual(["US market, one-factor, same days as Europe", "+0.98", "540"]);
   });
 
   it("leaves the Europe row out when the block is absent, null or not ok", () => {

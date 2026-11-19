@@ -156,13 +156,13 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
     });
   }
   if (world && s.us_market !== null) {
-    rows.push({ key: "us", label: "US market", tip: "Fama-French market factor, Mkt-RF", fit: s.us_market, days: count(s.sample.n) });
+    rows.push({ key: "us", label: "US market, one-factor, same days", tip: "Fama-French market factor, Mkt-RF, alone in the regression, so it can differ from the five-factor market beta in the summary", fit: s.us_market, days: count(s.sample.n) });
   }
   if (europe?.us_market && !(s.us_market && sameFit(europe.us_market, s.us_market))) {
     rows.push({
       key: "us-europe",
-      label: "US market, same days as Europe",
-      tip: "Fama-French market factor, Mkt-RF, on the days Europe has",
+      label: "US market, one-factor, same days as Europe",
+      tip: "Fama-French market factor, Mkt-RF, alone in the regression, on the days Europe has; it can differ from the five-factor market beta",
       fit: europe.us_market,
       days: count(europe.n_days),
     });
