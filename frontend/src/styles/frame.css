@@ -1,0 +1,30 @@
+/* Loading frame and busy placeholders (dashboard spec DB6.4). Colours come from tokens.css.
+   One set of panel heights for every width: the frame is a placeholder, not a measurement, so a
+   panel that arrives taller or shorter only moves what is below it. */
+
+.sk-panel { display: flex; flex-direction: column; }
+.sk-body { flex: 1; margin-top: var(--s-4); background: var(--sunk); }
+.sk-summary { min-height: 380px; }
+.sk-price { min-height: 420px; }
+.sk-exposures { min-height: 520px; }
+.sk-returns { min-height: 560px; }
+.sk-risk { min-height: 520px; }
+.sk-rolling { min-height: 600px; }
+.sk-data { min-height: 560px; }
+.sk-regression { min-height: 900px; }
+
+/* Busy placeholders (spec DB6.4, review S3): while a request runs, the figures that belong to the
+   report on screen are blanked so old numbers never sit beside a new request. The fill is --border,
+   not --grid (review S4: --grid is barely visible on --page). */
+[aria-busy="true"] .ticker,
+[aria-busy="true"] .abar dd,
+[aria-busy="true"] #summary .verdict,
+[aria-busy="true"] #summary .tbl td.v,
+[aria-busy="true"] #summary .tbl td.rd {
+  color: transparent;
+  background: var(--border);
+  border-radius: var(--r-mark);
+}
+
+/* A lazy panel while its chunk loads (Kalman and shrunk betas). */
+.sk-lazy { min-height: 480px; }

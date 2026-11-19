@@ -1,0 +1,194 @@
+{
+  "_note": "Words both residual panels must print, read by pytest and vitest. Whitespace is ignored when comparing.",
+  "headings": [
+    "In-sample against point-in-time",
+    "Cumulative residual return",
+    "In-sample against point-in-time, same days",
+    "Is the alpha stable?",
+    "Rolling one-year alpha",
+    "Separate one-year windows",
+    "First half against second half",
+    "Calendar years",
+    "Checks on the residual returns",
+    "What to keep in mind"
+  ],
+  "column_heads": [
+    "In-sample (static betas)",
+    "Point-in-time (trailing 252-day betas)",
+    "Cumulative at the end",
+    "Residual return, a year",
+    "t-statistic",
+    "Alpha, a year",
+    "Adjusted p",
+    "In-sample sum",
+    "Point-in-time sum",
+    "First half",
+    "Second half"
+  ],
+  "row_labels": [
+    "Period",
+    "Residual return, a year",
+    "t-statistic",
+    "Residual volatility, a year",
+    "Residual Sharpe (information ratio)",
+    "Cumulative (compounded)",
+    "Compound growth, a year",
+    "Hit rate",
+    "Max drawdown",
+    "Skew",
+    "Excess kurtosis"
+  ],
+  "gap_rows": [
+    "Days compared",
+    "In-sample betas, same days",
+    "Point-in-time betas",
+    "Gap",
+    "Share of the full-period alpha earned on these days",
+    "Kept with point-in-time betas"
+  ],
+  "rolling_rows": [
+    "Latest one-year alpha",
+    "Lowest and highest",
+    "Windows whose 95% band excludes zero"
+  ],
+  "legend": [
+    "In-sample, same days as point-in-time",
+    "Point-in-time",
+    "In-sample, whole period"
+  ],
+  "sentences": [
+    "The halves and calendar years are fixed in advance. If you search for the year or split date that looks best, the p-values stop meaning what they say: with 10 years to choose from, the best year has a nominal p below 0.05 about 40% of the time even when nothing changed.",
+    "A year within two noise standard deviations of zero is ordinary for a stock with no alpha.",
+    "With thousands of days these tests detect even small departures. A rejection makes intervals approximate, not wrong.",
+    "A descriptive count, not a test.",
+    "Approximate: z 0.42, p 0.675.",
+    "95% interval 15.4% to 39.1%",
+    "Pure noise with this volatility typically falls about −17.5%.",
+    "Peak 22 Dec 2025, trough 12 Jan 2026, recovered 19 May 2026.",
+    "Second-half alpha minus first-half alpha: −8.7% a year (p = 0.477).",
+    "2 of 2 separate one-year windows show an alpha different from zero, after correcting for testing 2 windows.",
+    "The line compounds daily. It sits below the residual return in the table by about half the residual variance a year (0.6% here).",
+    "(Jarque-Bera, p = 0.013)",
+    "(ARCH, p = 0.978)",
+    "std. error 9.4%",
+    "noise 6.6%",
+    "No point-in-time days.",
+    "partial year",
+    "+17.0%"
+  ],
+  "tooltips": {
+    "Residual return, a year": "What the stock earned per year beyond its factor exposures, alpha included. In-sample it equals the regression alpha exactly.",
+    "t-statistic": "Distance of the residual return from zero in standard errors. Between −2 and 2 (p above 0.05), you cannot tell it from zero.",
+    "Residual volatility, a year": "How much the stock moves for reasons the five factors do not explain. Higher volatility makes alpha harder to measure.",
+    "Residual Sharpe (information ratio)": "Residual return per unit of residual risk. Do not compare it with a total-return Sharpe. 0.5 for 10 years is only about 1.6 standard errors.",
+    "Cumulative (compounded)": "What the daily-rebalanced paper hedge compounded to, before costs.",
+    "Compound growth, a year": "Lower than the residual return by about half the residual variance a year. Shown beside the arithmetic values, never added to them.",
+    "Hit rate": "Share of days the residual was positive. Near 50% is normal; it says how often, not how much.",
+    "Max drawdown": "Worst fall of the cumulative residual line from a previous high.",
+    "Skew": "Below 0: rare large residual losses. Above 0: rare large gains, often earnings days.",
+    "Excess kurtosis": "Above 0: more extreme days than a normal distribution. Intervals here are then approximate."
+  },
+  "year_tooltip": "Sum 0.1703, noise standard deviation 0.0658",
+  "severity_words": {
+    "info": "Note",
+    "warning": "Warning",
+    "error": "Error"
+  },
+  "next_step": "Choose a longer date range or another ticker, then run the report again.",
+  "pit_next_step": "Choose a shorter beta window or a longer period.",
+  "not_available": {
+    "compare": "Not available.",
+    "chart": "The chart is not available.",
+    "rolling": "The rolling alpha is not available.",
+    "windows": "The one-year windows are not available.",
+    "split": "The split-half alphas are not available.",
+    "years": "The calendar-year sums are not available.",
+    "checks": "Not available.",
+    "panel": "Residual analysis is unavailable."
+  },
+  "survival": [
+    [
+      0.9837,
+      "100% kept"
+    ],
+    [
+      0.47,
+      "45% kept"
+    ],
+    [
+      0.025,
+      "5% kept"
+    ],
+    [
+      -0.36,
+      "−35% kept (the sign reversed)"
+    ],
+    [
+      -0.01,
+      "0% kept"
+    ],
+    [
+      2.0,
+      "200% kept"
+    ],
+    [
+      2.4,
+      "more than 200% kept"
+    ],
+    [
+      0.125,
+      "15% kept"
+    ],
+    [
+      0.375,
+      "40% kept"
+    ],
+    [
+      0.575,
+      "60% kept"
+    ],
+    [
+      0.4749999999999999,
+      "50% kept"
+    ],
+    [
+      -0.125,
+      "−15% kept (the sign reversed)"
+    ],
+    [
+      1.0,
+      "100% kept"
+    ],
+    [
+      1.0000000001,
+      "100% kept"
+    ],
+    [
+      2.00001,
+      "more than 200% kept"
+    ],
+    [
+      null,
+      "n/a"
+    ]
+  ],
+  "share": [
+    [
+      0.95,
+      "95%"
+    ],
+    [
+      -0.4,
+      "−40%"
+    ],
+    [
+      2.5,
+      "more than 200%"
+    ],
+    [
+      null,
+      "n/a"
+    ]
+  ],
+  "not_distinguishable": "n/a, the in-sample alpha is not distinguishable from zero"
+}

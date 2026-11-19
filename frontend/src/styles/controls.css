@@ -1,0 +1,100 @@
+/* Controls in the navy sidebar (prototype v4a, design J.2 and K), the landing page and the request
+   error. Colours come from tokens.css only.
+
+   Control boundaries (WCAG 1.4.11): on the rail, fields are white boxes (--surface on --rail) and
+   the range track is drawn in --rail-track; both are at least 3:1 against --rail. On light
+   surfaces, controls use --control-line, at least 3:1 against --surface. */
+
+.controls { display: flex; flex-direction: column; gap: 18px; }
+
+/* ticker search */
+.ctl-ticker { min-width: 0; }
+.ctl-search { display: flex; flex-wrap: wrap; gap: 8px; }
+.ctl-search .side-label { flex-basis: 100%; }
+.ctl-combo { position: relative; flex: 1; min-width: 0; }
+.controls input[type="text"], .controls input[type="date"] {
+  height: 36px; min-width: 0; padding: 0 10px; border: 1px solid var(--surface); border-radius: var(--r-control);
+  background: var(--surface); color: var(--rail);
+}
+.controls input[type="text"] { width: 100%; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.controls input:focus-visible { outline: 2px solid var(--rail-cyan); outline-offset: 2px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px;
+  border: 1px solid var(--accent); border-radius: var(--r-control); background: var(--accent); color: var(--on-accent);
+  font-size: var(--fs-body); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.controls .btn { background: var(--rail-cyan); border-color: var(--rail-cyan); color: var(--rail); }
+.controls .btn:hover { background: var(--rail-cyan-hover); border-color: var(--rail-cyan-hover); }
+.controls .btn:focus-visible { outline: 2px solid var(--rail-cyan); outline-offset: 2px; }
+
+.ctl-list {
+  position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: 220px;
+  margin: 0; padding: var(--s-1) 0; list-style: none; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--control-line); border-radius: var(--r-control);
+}
+.ctl-list[hidden] { display: none; }
+.ctl-opt { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); min-height: 36px; padding: 0 var(--s-3); cursor: pointer; }
+.ctl-opt.on { background: var(--accent-50); box-shadow: inset 2px 0 0 var(--accent); }
+.ctl-sym { font-weight: 600; letter-spacing: 0.02em; }
+.ctl-note { font-size: var(--fs-cap); color: var(--ink-2); }
+.ctl-err { padding-left: var(--s-2); border-left: 2px solid var(--rail-cyan); font-size: var(--fs-cap); color: var(--rail-text); }
+.ctl-ticker .ctl-err { margin-top: var(--s-2); }
+
+/* range: a segmented control on the rail, then From and To side by side */
+.ctl-range { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.seg-range { display: flex; padding: 2px; gap: 2px; border: 1px solid var(--rail-track); border-radius: var(--r-control); }
+.seg-opt { position: relative; display: flex; flex: 1 1 auto; }
+.seg-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg-opt span {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 30px; padding: 0 6px;
+  border-radius: var(--r-inner); font-size: var(--fs-cap); font-weight: 500; color: var(--rail-2); white-space: nowrap;
+}
+.seg-opt input:not(:disabled):not(:checked):hover + span { background: var(--rail-hover); color: var(--rail-text); }
+.seg-opt input:checked + span { background: var(--rail-cyan); color: var(--rail); font-weight: 600; }
+.seg-opt input:focus-visible + span { outline: 2px solid var(--rail-cyan); outline-offset: 1px; }
+.seg-opt.off span { opacity: 0.5; }
+.seg-opt.off input { cursor: not-allowed; }
+
+.ctl-custom-wrap { min-width: 0; }
+.ctl-custom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.ctl-custom label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: var(--fs-cap); color: var(--rail-2); }
+.controls .ctl-custom input[type="date"] { width: 100%; padding: 0 6px; font-size: var(--fs-cap); }
+.controls .ctl-custom input:disabled { opacity: 0.6; cursor: not-allowed; }
+.ctl-custom-wrap .ctl-err { margin-top: var(--s-2); }
+.ctl-why p + p { margin-top: var(--s-1); }
+
+/* factor data */
+.ctl-factors { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.linkbtn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0; border: 0; background: none;
+  color: var(--rail-cyan); font-size: var(--fs-cap); font-weight: 600; cursor: pointer;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+}
+.linkbtn .icon { width: 16px; height: 16px; }
+.linkbtn:hover { color: var(--rail-text); }
+.linkbtn:disabled { color: var(--rail-2); cursor: default; }
+.linkbtn:focus-visible { outline: 2px solid var(--rail-cyan); outline-offset: 2px; }
+.ctl-msg { color: var(--rail-text); }
+
+/* landing */
+.landing { display: flex; flex-direction: column; gap: var(--s-4); max-width: var(--canvas-max); padding: 40px var(--page-x); }
+.landing h1 { font-size: var(--fs-title); line-height: 1.2; }
+.landing-recent { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); color: var(--ink-2); font-size: var(--fs-cap); }
+.landing button.chip { border-color: var(--control-line); cursor: pointer; font: inherit; font-size: var(--fs-cap); font-weight: 600; color: var(--ink); }
+.landing button.chip:hover { background: var(--soft); }
+
+/* request error: the notice style with a square glyph */
+.req-error { display: flex; flex-direction: column; gap: var(--gap); max-width: var(--canvas-max); padding: 20px var(--page-x) 40px; }
+.req-error .notice { color: var(--ink); }
+.req-error .notice-do { margin-top: var(--s-1); color: var(--ink-2); }
+.glyph-square { fill: none; }
+
+@media (max-width: 899px) {
+  .controls input[type="text"], .controls input[type="date"], .btn, .seg-opt span { min-height: 44px; }
+  .ctl-opt, .linkbtn, .landing button.chip { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .controls * { transition: none; }
+}

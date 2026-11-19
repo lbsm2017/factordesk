@@ -1,0 +1,45 @@
+{
+  "title": "Kalman-filter betas",
+  "question": "How did the exposures move, using only data up to each date?",
+  "reading": "Each day's estimate combines the previous day's estimate with that day's return, so every point uses only data up to its date. Compare the lines with the rolling betas.",
+  "legend": ["Kalman-filter beta", "Model-based 95% band", "Yearly re-estimate"],
+  "table_caption": "Kalman-filter beta per factor with a model-based 95% band, latest at {last}: latest beta, standard deviation, and the band from low to high",
+  "beta_heads": {
+    "factor": "Factor",
+    "chart": "Chart",
+    "latest": "Latest",
+    "sd": "sd",
+    "band": "95% band"
+  },
+  "sd_title": "Model standard deviation of the latest beta",
+  "footnote": "The chart starts at {first}, the first date with {rows} trading days of history; latest is stamped {last}. Dashed lines mark the yearly re-estimates, where a line can jump.",
+  "vintage_title": "Yearly re-estimates of the drift rate",
+  "vintage_heads": [
+    "Rows used",
+    "Drift rate",
+    "Equivalent window, days",
+    "Residual volatility, a year",
+    "Valid from",
+    "Valid to"
+  ],
+  "window_none": "All data so far",
+  "bound": {
+    "zero": "At zero: no drift found.",
+    "upper": "At the upper limit: the filter follows daily noise."
+  },
+  "empty": {
+    "not_computed": "The Kalman-filter betas were not computed.",
+    "insufficient_data": "This view needs a longer history. Choose an earlier start date so the sample has at least {rows} trading days.",
+    "failed": "Check the price and factor data for gaps or constant values, or choose a different date range.",
+    "warm_up_reason": "No estimate yet: every date is still in warm-up.",
+    "warm_up_step": "Choose an earlier start date so the sample is longer."
+  },
+  "fold": {
+    "span": "Every row uses the same vertical span, centred on its own band, so wiggles compare across factors.",
+    "thinning": "The chart draws a thinned copy of the daily series that keeps every high and low; the numbers use all of it.",
+    "drift_rate": "The drift rate says how fast the model lets the betas wander, compared with the day-to-day noise in returns. A higher rate lets the betas move faster, gives a new day more weight and gives a shorter equivalent window. The weight of a new day is not the rate itself but roughly its square root: a rate of 0.0001 gives a new day a weight of about 0.01, or 1 percent. The rate is re-estimated each year from the data up to that date. The equivalent window is the rolling window that smooths about as much. Each table row gives the estimate in force between its two dates."
+  },
+  "warnings": {
+    "kalman_lambda_at_upper_bound": "For at least one yearly re-estimate the filter follows daily noise; the estimate is not meaningful."
+  }
+}

@@ -317,7 +317,7 @@ Inputs: M3 alpha p-value `p_is` and `alpha_ann`; `a_c`, `a_pit`, `q`, `s`; point
 | # | Condition | `verdict` | Severity | Message (exact copy; `{}` are filled, percentages to 1 decimal, ratios to 5 points) |
 | --- | --- | --- | --- | --- |
 | G1 | `p_is >= 0.05` and `p_pit >= 0.05` | `no_reliable_alpha` | info | "Neither residual return can be told apart from zero. Read both lines as noise." |
-| G2 | `p_is >= 0.05` and `p_pit < 0.05` | `point_in_time_only` | info | "The point-in-time residual return is reliably {positive/negative} ({a_pit} a year), but the full-period alpha is not. This usually means the betas moved; check the Exposures tab." |
+| G2 | `p_is >= 0.05` and `p_pit < 0.05` | `point_in_time_only` | info | "The point-in-time residual return is reliably {positive/negative} ({a_pit} a year), but the full-period alpha is not. This usually means the betas moved; check the Exposures section." |
 | G3 | `alpha_ann * a_c <= 0` or `q < 0.5` | `concentrated_in_warmup` | info | "Most of the in-sample alpha comes from the first {W} trading days ({start} to {end}), before any point-in-time residual exists. You cannot check it here." |
 | G4 | `s < 0` | `reversed` | warning | "In-sample alpha does not survive out-of-sample: with point-in-time betas the residual return has the opposite sign ({a_pit} a year against {a_c} on the same days)." |
 | G5 | `s < 0.5` | `mostly_disappears` | warning | "In-sample alpha mostly disappears out-of-sample: point-in-time betas keep {s} of it ({a_pit} a year against {a_c} on the same days)." |
@@ -738,3 +738,10 @@ Resolving the four open questions from the specification:
 3. **Warning placement:** the "in-sample alpha mostly disappears out-of-sample" warning appears only
    in the residual panel, not in the KPI strip.
 4. **Wording:** use "holds up out-of-sample" instead of "survives" in every user-facing string.
+
+## Owner decisions (2026-11-19)
+
+5. **Wording of rule G2 (R4.8):** "check the Exposures tab" becomes "check the Exposures section",
+   because the dashboard is one scrolling page with no tabs. Only the last words of the message
+   change; the rule, its threshold and its code are unchanged. The test oracle (TR line for G2),
+   the verdict message and its test carry the same wording.

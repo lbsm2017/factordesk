@@ -11,12 +11,13 @@ Last updated 2026-11-18. This is the project's knowledge base. Its main purpose 
 
 ## Decisions
 
-Status in brackets: Decided, Proposed, or Decided-pending-implementation.
+Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implemented, not yet validated.
 
 ### Data
 
 - [Factor data source: the Ken French Data Library](decision-factor-data-source-french-library.md) [Decided]: one public library is the single source of truth for factors.
 - [Prices from Yahoo, with adjusted-close care](decision-prices-from-yahoo-with-adjusted-close-care.md) [Decided]: raw bars, total return from adjusted close, independent recomputation, same-day cache.
+- [Parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) [Decided-pending-implementation]: a few tickers at a time, spaced requests, slow retries and a stop switch, because Yahoo publishes no rate limit.
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md) [Proposed]: regional factor files, US dollar conversion and an optional currency regressor.
 
 ### Statistics
@@ -26,13 +27,20 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [No look-ahead rule](decision-no-look-ahead-rule.md) [Decided]: every dated result uses only data up to that date.
 - [Return and risk attribution](decision-return-and-risk-attribution.md) [Decided]: pieces that add up exactly to the total and to 100%.
 - [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) [Decided-pending-implementation]: why SPY's R-squared was 0.967 and the pre-set gate that flags it.
-- [Residual alpha analysis](decision-residual-alpha-analysis.md) [Decided-pending-implementation]: an in-sample and a point-in-time line, with the owner's four choices.
+- [Residual alpha analysis](decision-residual-alpha-analysis.md) [Built and validated on 2026-11-18]: an in-sample and a point-in-time line, with the owner's four choices.
+- [Historical performance block](decision-performance-metrics.md) [Built, not yet validated]: the stock's own yearly growth, volatility, Sharpe ratio and worst fall over the analysed window, next to the factor numbers.
 - [Cointegration design](decision-cointegration-design.md) [Decided-pending-implementation]: an exploratory long-run link test that must hold on unseen data.
 - [Drift alerts and regime betas](decision-drift-alerts-and-regime-betas.md) [Decided-pending-implementation]: alerts when two of three conditions agree, and betas by market regime.
+- [Shrunk betas](decision-shrunk-betas.md) [Decided-pending-implementation]: a second beta pulled toward a typical stock by how noisy it is, plus power statements; the ordinary betas stay primary.
+- [Kalman-filter betas](decision-kalman-betas.md) [Decided-pending-implementation]: an extra time-varying beta line with a band, from a filter that learns its own drift rate; the rolling betas stay.
+- [World beta](decision-world-beta.md) [Decided-pending-implementation]: a quick beta against the iShares MSCI ACWI ETF as a stand-in for the MSCI ACWI index, next to the US market beta on the same days; ACWI is cached and refreshed incrementally.
 
 ### Product and design
 
 - [Report design: colour is evidence](decision-report-design-colour-is-evidence.md) [Decided]: colour only encodes data, every chart is also a table, and the equation is the one bold element.
+- [Report density, width cap and range controls](decision-report-density-and-range-controls.md) [Decided-pending-implementation]: a narrow, less dense report; range and ticker pickers belong to the dashboard.
+- [Dashboard server and interface](decision-dashboard-server-and-interface.md) [Decided-pending-implementation]: FastAPI server plus one scrolling React page with ticker search and range chips; plain CSS tokens; static report stays as export.
+- [Dashboard v2: outcome first with a sidebar](decision-dashboard-v2.md) [Decided-pending-implementation]: navy sidebar with controls and section links, a plain verdict sentence instead of the formula, a Show statistics switch, company name, performance and a quick world beta (specified 2026-11-18, not built).
 
 ### Engineering and process
 
@@ -42,6 +50,10 @@ Status in brackets: Decided, Proposed, or Decided-pending-implementation.
 - [No data and no secrets in the repository](decision-no-data-and-no-secrets-in-the-repo.md) [Decided]: data downloaded at run time, keys only in `.env`.
 - [Branches and pull requests](decision-branches-and-pull-requests.md) [Decided]: `prod`, `dev`, feature and fix branches, maintainer merges.
 - [Independent validation and mutation testing](decision-independent-validation-and-mutation-testing.md) [Decided]: a second recomputation plus deliberately injected bugs.
+- [No citation without verification](decision-citations-and-verification.md) [Decided]: every source is looked up and checked by a script, and what we cannot check is listed as unverified.
+- [Precision of the fast rolling regression](decision-rolling-fast-path-precision.md) [Decided-pending-implementation]: the fast path is about 1e-12 from the exact one on real data; its safety check is tighter and costs no speed.
+- [One contract for the five new report sections](decision-schema-v3-contract.md) [Decided-pending-implementation]: optional sections, one file per feature and layer, panel registries, report format version 4.
+- [Nightly run of the slow and live tests](decision-nightly-slow-tests.md) [Decided-pending-implementation]: a daily workflow for the statistical tests CI skips; the live job may fail.
 
 ### Open source
 

@@ -27,7 +27,7 @@ Every test below is automatable with `pytest`. Each states its **target module**
 | Kind | Tolerance | Why |
 | --- | --- | --- |
 | Algebraic identity on values of order 0.01-1 | `1e-10` absolute | Float error in these sums is around `1e-15`; `1e-10` leaves room for summation order, not for a wrong formula. |
-| Same computation two ways (ours vs statsmodels reference call) | `1e-10` relative (`1e-8` for our vectorised rolling HAC) | Same maths, different summation order. |
+| Same computation two ways (ours vs statsmodels reference call) | `1e-10` relative (`1e-8` for our vectorised rolling HAC) | Same maths, different summation order. The rolling fast path (cumulative-sum Gram matrices) measures `1e-12` absolute on real data and at most `1e-11` on adversarial designs its guard admits, so `1e-8` leaves three orders of margin; the earlier thresholds reached `2e-8` on betas. |
 | Recovery of a true parameter from a DGP | `4 * SE` (HAC SE from the fit, or the theoretical SE when stated) | See 0.2. |
 | Labels, counts, dates, statuses | exact | - |
 
@@ -151,7 +151,7 @@ Fixture construction (CRSP method): build a split-adjusted `Close` path (geometr
 
 - **T48 Exact window length (pyfolio off-by-one).** On DGP-A with `W = 252`: number of stamps `n - W + 1 = 2269`; first stamp at row 252 (1-based); each stamp's window has exactly 252 rows, first row `t - 251`. The estimate at stamp `t` equals `sm.OLS` on rows `t-251..t` (`1e-10`) and differs from OLS on rows `t-252..t` (253 rows) by more than `1e-6`. Same for `W = 126`. Also compare with `RollingOLS(window=W)` params (`1e-10`).
 - **T49 Structural break recovery.** DGP-A with `beta_mkt = 0.5` on rows 1-1260 and `1.5` after. Stamp 1260 equals OLS on rows 1009-1260 exactly (`1e-10`) and `|beta_hat - 0.5| <= 4 se`; stamp 1512 has `|beta_hat - 1.5| <= 4 se`.
-- **T50 Vectorised rolling HAC.** Five stamps drawn with the test rng, for `W = 126` and `252`: our se equals the reference statsmodels call on that window (`maxlags = L(W) = 4`) to `1e-8` relative.
+- **T50 Vectorised rolling HAC.** Five stamps drawn with the test rng, for `W = 126` and `252`: our se equals the reference statsmodels call on that window (`maxlags = L(W) = 4`) to `1e-8` relative (measured `5e-12` on DGP-A and `1e-11` on SPY; T129 bounds the guard-edge designs).
 - **T51 Ex-ante beta.** `beta_tilde_t` equals `beta_hat_{t-1}` bitwise; multiplying `f_t` and `y_t` on one row `t` by 10 leaves `beta_tilde_t` unchanged.
 - **T52 Average beta statistics.** Mean, sd (`ddof=1`), p10, p90, min, max, share positive equal numpy on the rolling series (`1e-12`); stamp count equals `n - W_p + 1`.
 
@@ -168,7 +168,7 @@ Fixture construction (CRSP method): build a split-adjusted `Close` path (geometr
 - **T58 Variance identities.** DGP-A: `V == var(y, ddof=1)` (`1e-12` relative); `sum RC_i + RC_idio == 1` (`1e-10`); `1 - RC_idio == R^2` (`1e-10`).
 - **T59 Exposure x volatility x correlation.** `RC_i V == beta_i sigma_i rho_i,sys sigma_sys` for every factor (`1e-12` relative).
 - **T60 Euler property.** `sigma(b, s_e) = sqrt(b' Sigma_f b + s_e^2)`. Central finite difference with `h = 1e-6`: `beta_i * d sigma / d beta_i == RC_i * sigma` within `1e-6` relative.
-- **T61 Negative contribution.** Pure inputs (no randomness): sds `0.010` (mkt), `0.006` (smb), `corr = 0.8`, `beta = (1, -1, 0, 0, 0)`, `sigma_e = 0.01`. `(Sigma_f b)_smb = 0.8*0.010*0.006 - 0.006^2 = 1.2e-5`, so `RC_smb = -1.2e-5 / V < 0`. Assert `RC_smb < 0`, that SMB is the last factor bar in the descending sort, that the shares still sum to 1, and that the "reduces total risk" sentence fires only when SMB is tagged reliable (tags passed in).
+- **T61 Negative contribution.** Pure inputs (no randomness): sds `0.010` (mkt), `0.006` (smb), `corr = 0.8`, `beta = (1, -1, 0, 0, 0)`, `sigma_e = 0.01`. `(Sigma_f b)_smb = 0.8*0.010*0.006 - 0.006^2 = 1.2e-5`, so `RC_smb = -1.2e-5 / V < 0`. Assert `RC_smb < 0`, that SMB is the last factor bar in the descending sort, that the shares still sum to 1, and that the negative-share sentence fires only when SMB is tagged reliable (tags passed in).
 - **T62 Disagreement sentence.** Pure inputs: reliable betas with `|beta|` ranks `(1, 2, 3, 4, 5)` and RC ranks `(1, 4, 2, 3, 5)` (factor ranked 3 by beta is 2 by RC: gap 1, no sentence); change to RC ranks `(2, 3, 4, 1, 5)` (factor 4: gap 3): exactly one sentence, naming factor 4. Boundary (`rank_RC <= rank_beta - 2`): RC ranks `(2, 3, 1, 4, 5)` (factor 3: gap exactly 2): exactly one sentence, naming factor 3.
 
 ## 10. Dominant-factor shading (`analytics/dominance.py`, M8)
@@ -244,6 +244,8 @@ Each is a named test so a reviewer can find it.
 - **T107 Identities in the payload.** From the JSON of a DGP-A report: return identity (T53) and risk identity (T58) hold within `1e-10` after a round trip.
 - **T108 Refusal.** `POST /api/factor-it` on 503 aligned rows returns the typed error `insufficient_history` with `n` and `required`, HTTP 422.
 - **T128 JSON size and precision (D31).** `dump_report` writes no indentation (no line starts with a space). Every rolling beta and se in the written JSON equals its value rounded to 6 significant digits, and differs from the unrounded analytics value by at most `5e-6` relative (half a unit in the sixth significant digit when the leading digit is 1); all other floats (regression, attribution, diagnostics) equal the analytics values exactly. `load_report(dump_report(r)) == r`. The number of stamps per window is unchanged.
+- **T129 Fast-path guard, adversarial designs (D32).** `test_rolling_adversarial.py`, 1,500 rows of DGP-A, `W = 126` and `252`, each compared with the previous per-window QR implementation on every window and with the statsmodels HAC fit on 7 spot windows (errors in reference standard errors for betas, relative for standard errors), with the routing observed through a recording wrapper of `_exact_windows`. Factor pair at correlation 0.999 and 0.9999: every window reaches QR, drift `1e-10` at most. Correlation 0.99: at most 5% reach QR, drift `1e-10`. Factor means of 5 and 8 standard deviations: no window reaches QR, betas `4e-10`, standard errors `1e-10`; means of 30: every window reaches QR. One `+10` return, or one `+5` market day, at row 400: windows after it reach QR, drift `3e-10`. Factor scales `1e-8` to `1e4`: no window reaches QR, `1e-11` against QR and `1e-8` against statsmodels. Measured errors are in the test's docstrings; bounds are about ten times the measurement. Restoring the earlier thresholds, or a pivot share of `1e-5`, makes the test fail.
+- **T130 Start-date effect on rolling values (D32).** DGP-A and DGP-G with `n = 4000`, `W = 126` and `252`: the rolling betas and standard errors of the sample starting at row 1, 500, 2000 or 3000 equal the full sample's on every shared stamp to `1e-11` absolute (measured `1e-13` at most; exactly 0 was the old per-window behaviour and is not required). The 60-fold volatility regime with factor means of 20 standard deviations: `1e-10` (measured `3e-11`).
 
 ## 18. Live smoke tests (`live`, non-blocking; data/prices.py, data/factors.py, data/audit.py, analytics/regression.py)
 

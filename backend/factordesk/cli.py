@@ -3,22 +3,29 @@
 Usage::
 
     factordesk report TICKER [--out DIR] [--open] [--json]
-    factordesk factors refresh
+    factordesk factors refresh        (factor file and the portfolio files of the shrunk betas)
     factordesk factors status
+    factordesk serve [--host HOST] [--port PORT] [--static DIR] [--dev] [--open]
 
 Exit codes: 0 success; 1 data problem (unknown ticker, too little history, invalid factor
-file, inputs that cannot support a regression); 2 usage error; 3 network failure; 4 output
-location refused or not writable. Every failure prints exactly one line on stderr.
+file, inputs that cannot support a regression); 2 usage error (for serve also: the dashboard
+is not built, or the port is busy); 3 network failure; 4 output location refused or not
+writable. Every failure prints exactly one line on stderr.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib
+import ipaddress
 import logging
+import socket
 import sys
+import threading
+import time
 import webbrowser
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import httpx
@@ -33,7 +40,13 @@ from factordesk.data.factors import (
     factor_status,
     load_ff5_daily,
 )
-from factordesk.data.prices import PriceDataError, PriceProvider, validate_ticker
+from factordesk.data.portfolios import PortfolioError, refresh_portfolio_frames
+from factordesk.data.prices import (
+    PriceDataError,
+    PriceProvider,
+    UnsupportedCurrencyError,
+    validate_ticker,
+)
 
 EXIT_OK = 0
 EXIT_DATA = 1
@@ -43,11 +56,53 @@ EXIT_OUTPUT = 4
 
 PROG = "factordesk"
 
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 8000
+_PACKAGE_DIR = Path(__file__).resolve().parent
+DEFAULT_STATIC_DIR = _PACKAGE_DIR.parents[1] / "frontend" / "dist"
+"""The built page in a source checkout, found from the package location."""
+PACKAGED_STATIC_DIR = _PACKAGE_DIR / "web"
+"""The built page copied into the package; this is where a wheel carries it."""
+_IN_CHECKOUT = (
+    _PACKAGE_DIR.parent.name == "backend" and (_PACKAGE_DIR.parents[1] / "pyproject.toml").is_file()
+)
+"""True when running from the repository (``backend/factordesk`` beside ``pyproject.toml``)."""
+_BUILD_COMMAND = "npm --prefix frontend run build"
+_OPEN_WAIT_SECONDS = 15.0
+_PRELOAD_MODULES = ("factordesk.pipeline", "yfinance")
+"""Slow to import and needed only by the first report; loaded in the background by serve."""
+
 logger = logging.getLogger(__name__)
+
+
+def resolve_static_dir(checkout_dist: Path, packaged: Path) -> Path:
+    """The folder ``serve`` uses when ``--static`` is not given.
+
+    A built ``frontend/dist`` in a checkout wins (a developer's latest build). Otherwise the
+    copy inside the package is used, which is the only one in a wheel. When neither holds an
+    ``index.html`` the checkout path is returned, so the error names the folder to build.
+    """
+    for candidate in (checkout_dist, packaged):
+        if (candidate / "index.html").is_file():
+            return candidate
+    return checkout_dist
+
+
+def default_static_dir() -> Path:
+    """``resolve_static_dir`` applied to this install's own folders."""
+    return resolve_static_dir(DEFAULT_STATIC_DIR, PACKAGED_STATIC_DIR)
 
 
 def _err(message: str) -> None:
     print(f"{PROG}: error: {message}", file=sys.stderr)
+
+
+def _iso_date(text: str) -> date:
+    """argparse type for ``--start`` and ``--end``: a calendar date written YYYY-MM-DD."""
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a date in the form YYYY-MM-DD") from None
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -68,11 +123,47 @@ def _parser() -> argparse.ArgumentParser:
     )
     rep.add_argument("--open", action="store_true", help="open the HTML report in a browser")
     rep.add_argument("--json", action="store_true", help="also write the report as JSON")
+    rep.add_argument(
+        "--start",
+        type=_iso_date,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="first requested date (default: the start of the price history)",
+    )
+    rep.add_argument(
+        "--end",
+        type=_iso_date,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="last requested date (default: the end of the price history)",
+    )
 
     fac = sub.add_parser("factors", help="manage the cached Fama-French factor file")
     fac_sub = fac.add_subparsers(dest="factors_command", required=True, metavar="ACTION")
-    fac_sub.add_parser("refresh", help="download the latest factor file now")
+    fac_sub.add_parser("refresh", help="download the latest factor file and portfolio files now")
     fac_sub.add_parser("status", help="show the cached factor file's coverage and age")
+
+    srv = sub.add_parser("serve", help="serve the local dashboard (API and built web page)")
+    srv.add_argument(
+        "--host", default=DEFAULT_HOST, help=f"address to listen on (default: {DEFAULT_HOST})"
+    )
+    srv.add_argument(
+        "--port", type=int, default=DEFAULT_PORT, help=f"port (default: {DEFAULT_PORT})"
+    )
+    srv.add_argument(
+        "--static",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="folder with the built page (default: frontend/dist in a checkout, else the page "
+        "shipped in the package)",
+    )
+    srv.add_argument(
+        "--dev",
+        action="store_true",
+        help="API only, restarting on code changes; the page comes from the Vite dev server",
+    )
+    srv.add_argument("--open", action="store_true", help="open the dashboard in a browser")
     return parser
 
 
@@ -113,6 +204,12 @@ def _cmd_factors(action: str, now: datetime) -> int:
         return EXIT_DATA
     print("Factor file refreshed.")
     _print_status(status)
+    try:  # the prior of the shrunk betas follows the factor data (one action refreshes both)
+        refresh_portfolio_frames(Path(get_settings().data_dir), now)
+    except PortfolioError as exc:
+        _err(f"{exc} The factor file was refreshed.")
+        return EXIT_NETWORK
+    print("Portfolio files for the shrunk betas refreshed.")
     return EXIT_OK
 
 
@@ -136,6 +233,11 @@ def _cmd_report(
             "(for example SPY or BRK-B)"
         )
         return EXIT_DATA
+    start: date | None = args.start
+    end: date | None = args.end
+    if start is not None and end is not None and start > end:
+        _err(f"--start {start} is after --end {end}")
+        return EXIT_USAGE
 
     out_dir: Path = args.out if args.out is not None else Path.cwd()
     data_dir = Path(get_settings().data_dir)
@@ -144,15 +246,21 @@ def _cmd_report(
         return EXIT_OUTPUT
 
     try:
-        report = build_report(symbol, price_provider=price_provider, factors=factors, now=now)
+        report = build_report(
+            symbol, price_provider=price_provider, factors=factors, now=now, start=start, end=end
+        )
     except InsufficientHistoryError as exc:
         _err(
             f"{symbol} has {exc.n} daily returns that line up with the factor data; at least "
             f"{exc.required} (about two years) are required"
+            + (f": {exc.detail}" if exc.detail else "")
         )
         return EXIT_DATA
     except DegenerateInputError as exc:
         _err(f"cannot analyse {symbol}: {exc.reason}")
+        return EXIT_DATA
+    except UnsupportedCurrencyError as exc:
+        _err(str(exc))
         return EXIT_DATA
     except PriceDataError as exc:
         _err(f"{exc}. Check the symbol; if it is right, check your network connection")
@@ -199,6 +307,146 @@ def _cmd_report(
     return EXIT_OK
 
 
+def _is_loopback(host: str) -> bool:
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def _reachable_host(host: str) -> str:
+    """A host a client can connect to: a wildcard bind address is reached through loopback."""
+    bare = host.strip("[]")
+    if bare in ("0.0.0.0", ""):
+        return "127.0.0.1"
+    if bare in ("::", "0:0:0:0:0:0:0:0"):
+        return "::1"
+    return bare
+
+
+def _browser_url(host: str, port: int) -> str:
+    reachable = _reachable_host(host)
+    return f"http://[{reachable}]:{port}/" if ":" in reachable else f"http://{reachable}:{port}/"
+
+
+def _port_problem(host: str, port: int) -> str | None:
+    """Why ``host:port`` cannot be listened on, or None when it can (bind, then release)."""
+    bare = host.strip("[]")
+    try:
+        infos = socket.getaddrinfo(bare, port, type=socket.SOCK_STREAM, flags=socket.AI_PASSIVE)
+    except socket.gaierror:
+        return f"cannot resolve the host {host!r}"
+    family, kind, proto, _, address = infos[0]
+    with socket.socket(family, kind, proto) as probe:
+        if sys.platform != "win32":  # uvicorn sets this too; on Windows it would hide a busy port
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(address)
+        except OSError:
+            return f"port {port} on {host} is already in use; stop the other program or pass --port"
+    return None
+
+
+def _wait_until_listening(probe_host: str, port: int) -> bool:
+    """Poll until ``probe_host:port`` accepts a connection; False after the wait limit."""
+    deadline = time.monotonic() + _OPEN_WAIT_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((probe_host, port), timeout=0.5):
+                return True
+        except OSError:
+            time.sleep(0.2)
+    return False
+
+
+def _open_when_ready(host: str, port: int) -> None:
+    """Open the browser once the server accepts connections (in a daemon thread)."""
+    url = _browser_url(host, port)
+    probe_host = _reachable_host(host)
+
+    def wait_then_open() -> None:
+        _wait_until_listening(probe_host, port)
+        webbrowser.open(url)
+
+    threading.Thread(target=wait_then_open, name="open-browser", daemon=True).start()
+
+
+def _preload_when_ready(host: str, port: int) -> None:
+    """Load the report code once the server is listening (in a daemon thread).
+
+    The statistics stack (statsmodels, scipy) and yfinance take seconds to import and are
+    needed only by the first report, so the server starts without them. Importing them in the
+    background means a first report does not wait for them. No network call is made.
+    """
+    probe_host = _reachable_host(host)
+
+    def preload() -> None:
+        if not _wait_until_listening(probe_host, port):
+            return
+        try:
+            for name in _PRELOAD_MODULES:
+                importlib.import_module(name)
+        except Exception:  # a failed import surfaces on the first report instead
+            logger.debug("background preload failed", exc_info=True)
+
+    threading.Thread(target=preload, name="preload-report-code", daemon=True).start()
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    # Imported here: the web stack is heavy and only this command needs it.
+    import uvicorn
+
+    host = str(args.host)
+    port = int(args.port)
+    if not 1 <= port <= 65535:
+        _err(f"invalid port {port}: use a number from 1 to 65535")
+        return EXIT_USAGE
+    static_dir: Path = args.static if args.static is not None else default_static_dir()
+    if not args.dev and not (static_dir / "index.html").is_file():
+        if args.static is None and not _IN_CHECKOUT:
+            _err("this install has no dashboard files; reinstall factordesk, or use --static DIR")
+        elif args.static is None:
+            _err(
+                f"the dashboard is not built; run '{_BUILD_COMMAND}' first, or use --dev (API only)"
+            )
+        else:
+            _err(f"no built dashboard in {static_dir} (index.html is missing); check --static")
+        return EXIT_USAGE
+    problem = _port_problem(host, port)
+    if problem is not None:
+        _err(problem)
+        return EXIT_USAGE
+    if not _is_loopback(host):
+        print(
+            f"{PROG}: warning: {host} is not a loopback address and the dashboard has no "
+            "login; anyone who can reach it can use it",
+            file=sys.stderr,
+        )
+
+    print(f"Dashboard: {_browser_url(host, port)}" + (" (API only, dev)" if args.dev else ""))
+    if args.open:
+        _open_when_ready(host, port)
+    if not args.dev:
+        _preload_when_ready(host, port)
+    if args.dev:
+        uvicorn.run(
+            "factordesk.api.main:create_dev_app",
+            factory=True,
+            reload=True,
+            reload_dirs=[str(Path(__file__).resolve().parent)],
+            host=host,
+            port=port,
+        )
+    else:
+        from factordesk.api.deps import default_deps
+        from factordesk.api.main import create_app
+
+        uvicorn.run(create_app(default_deps(static_dir)), host=host, port=port)
+    return EXIT_OK
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -214,6 +462,8 @@ def main(
         args = parser.parse_args(argv)
     except SystemExit as exc:  # argparse exits on --help (0) and on usage errors (2)
         return int(exc.code) if isinstance(exc.code, int) else EXIT_USAGE
+    if args.command == "serve":
+        return _cmd_serve(args)
     when = now if now is not None else datetime.now(UTC)
     if args.command == "factors":
         return _cmd_factors(str(args.factors_command), when)

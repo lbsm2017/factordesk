@@ -150,3 +150,68 @@ def residual_reference(e: FloatArray, f: FloatArray, bg_lags: int = 10) -> RefDi
         robust_bg_stat=float(wald.statistic),
         robust_bg_p=float(wald.pvalue),
     )
+
+
+def rolling_ols_hac_previous(
+    y: FloatArray, factors: FloatArray, window: int, chunk: int = 512
+) -> tuple[FloatArray, FloatArray, FloatArray]:
+    """The first batched ``rolling_ols_hac`` (per-window QR for every window), kept verbatim.
+
+    Reference for the equivalence tests of the faster implementation: the same estimator, with
+    the design guard and the Newey-West sum evaluated window by window on QR factors.
+    """
+    from numpy.lib.stride_tricks import sliding_window_view
+
+    from factordesk.analytics.regression import (
+        MIN_UNEXPLAINED_SHARE,
+        ZERO_SD_RELATIVE,
+        bartlett_weights,
+        hac_lags,
+        unexplained_shares,
+        with_intercept,
+    )
+
+    yv = np.asarray(y, dtype=np.float64)
+    x = with_intercept(factors)
+    n, k = x.shape
+    params = np.full((n, k), np.nan)
+    bse = np.full((n, k), np.nan)
+    r2 = np.full(n, np.nan)
+    if n < window:
+        return params, bse, r2
+    lags = hac_lags(window)
+    weights = bartlett_weights(lags)
+    eye = np.eye(k)
+    x_win = sliding_window_view(x, window, axis=0).transpose(0, 2, 1)
+    y_win = sliding_window_view(yv, window)
+    n_stamps = n - window + 1
+    for c0 in range(0, n_stamps, chunk):
+        c1 = min(c0 + chunk, n_stamps)
+        constant, share = unexplained_shares(x_win[c0:c1])
+        ok = ~(constant.any(axis=1) | (share < MIN_UNEXPLAINED_SHARE).any(axis=1))
+        if not ok.any():
+            continue
+        xc = np.ascontiguousarray(x_win[c0:c1][ok])
+        yc = np.ascontiguousarray(y_win[c0:c1][ok])
+        q, r = np.linalg.qr(xc)
+        r_inv = np.linalg.solve(r, np.broadcast_to(eye, r.shape))
+        theta = np.einsum("cij,cj->ci", r_inv, np.einsum("cwi,cw->ci", q, yc))
+        resid = yc - np.einsum("cwi,ci->cw", xc, theta)
+        scores = xc * resid[:, :, None]
+        meat = np.einsum("cwi,cwj->cij", scores, scores)
+        for lag in range(1, lags + 1):
+            gamma = np.einsum("cwi,cwj->cij", scores[:, lag:], scores[:, :-lag])
+            meat += weights[lag] * (gamma + gamma.transpose(0, 2, 1))
+        bread = r_inv @ r_inv.transpose(0, 2, 1)
+        cov = bread @ meat @ bread.transpose(0, 2, 1)
+        rows = np.arange(c0 + window - 1, c1 + window - 1)[ok]
+        params[rows] = theta
+        bse[rows] = np.sqrt(np.diagonal(cov, axis1=1, axis2=2))
+        centred = yc - yc.mean(axis=1, keepdims=True)
+        tss = np.einsum("cw,cw->c", centred, centred)
+        ssr = np.einsum("cw,cw->c", resid, resid)
+        varies = tss > window * (ZERO_SD_RELATIVE * np.max(np.abs(yc), axis=1)) ** 2
+        r2_chunk = np.full(len(tss), np.nan)
+        np.divide(ssr, tss, out=r2_chunk, where=varies)
+        r2[rows] = np.where(varies, 1.0 - r2_chunk, np.nan)
+    return params, bse, r2

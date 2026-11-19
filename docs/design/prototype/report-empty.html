@@ -135,14 +135,25 @@ var { font-family: var(--math); font-style: italic; }
 .report { max-width: 1216px; margin: 0 auto; padding: var(--s-7) var(--s-6) 64px; }
 
 /* ------------------------------------------------------------------ masthead */
-.mast-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-4); flex-wrap: wrap; }
+.mast-top { display: flex; justify-content: space-between; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
 h1 { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--s-4); font-weight: 400; }
 .ticker { font-size: var(--fs-6); font-weight: 640; letter-spacing: -0.025em; line-height: 1; }
 .what { font-size: var(--fs-3); color: var(--ink-2); }
-.gen { font-size: var(--fs-1); color: var(--ink-3); }
+.mast-meta { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+.chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); font-size: var(--fs-1); color: var(--ink-2); text-decoration: none; }
+a.chip { color: var(--ink); font-weight: 560; }
+a.chip:hover { background: var(--sunk); }
 .coverage { margin-top: var(--s-3); max-width: 76ch; color: var(--ink-2); }
-.warnings { margin-top: var(--s-3); display: grid; gap: var(--s-1); }
-.warnings li { display: flex; gap: var(--s-2); align-items: baseline; }
+.notice { margin-top: var(--s-3); display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: var(--s-3); align-items: start; padding: var(--s-3) var(--s-4); background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--ink-2); border-radius: 4px; scroll-margin-top: var(--s-4); }
+.notice .glyph { transform: translateY(4px); }
+.notice-sum { max-width: 76ch; }
+details.how { margin-top: var(--s-1); }
+details.how > summary { display: inline-block; cursor: pointer; color: var(--ink); font-size: var(--fs-1); font-weight: 560; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; padding: 4px 0; list-style: none; }
+details.how > summary::-webkit-details-marker { display: none; }
+details.how > summary::before { content: "+"; display: inline-block; width: 1em; text-decoration: none; }
+details.how[open] > summary::before { content: "\2212"; }
+details.how > p, details.how > ul { margin-top: var(--s-1); font-size: var(--fs-1); color: var(--ink-2); max-width: 76ch; line-height: 1.45; }
+details.how li { padding: 2px 0; }
 .glyph { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--ink-2); stroke-width: 1.4; stroke-linejoin: round; transform: translateY(3px); }
 .glyph .cut { stroke-linecap: round; stroke-width: 1.6; }
 
@@ -174,7 +185,7 @@ a.term:hover .m { text-decoration: underline; text-decoration-thickness: 1px; te
 
 /* ------------------------------------------------------------------ KPI strip */
 .kpis { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
-.kpis dl { display: grid; grid-template-columns: 1.25fr repeat(3, 0.8fr) 1.25fr 0.95fr; }
+.kpis dl { display: grid; grid-template-columns: 1.25fr 1fr 1fr 0.9fr 1.3fr; }
 .kpi { padding: var(--s-4) 18px 18px; border-left: 1px solid var(--grid); min-width: 0; }
 .kpi:first-child { border-left: 0; }
 .kpi dt { font-size: var(--fs-1); color: var(--ink-2); font-weight: 500; }
@@ -188,11 +199,12 @@ a.term:hover .m { text-decoration: underline; text-decoration-thickness: 1px; te
 .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-3) var(--s-5); flex-wrap: wrap; }
 .panel-head h2 { font-size: var(--fs-3); font-weight: 600; letter-spacing: -0.005em; line-height: 1.3; }
 .panel-head .q { color: var(--ink-2); margin-top: 2px; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px var(--s-4); font-size: var(--fs-1); color: var(--ink-2); max-width: 520px; justify-content: flex-end; padding-top: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px var(--s-4); font-size: var(--fs-1); color: var(--ink-2); max-width: 640px; justify-content: flex-end; padding-top: 4px; }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
 .sw { width: 16px; height: 10px; overflow: visible; }
 .reading { margin: var(--s-3) 0 var(--s-2); max-width: 76ch; }
 .foot { margin-top: var(--s-3); padding-top: 10px; border-top: 1px solid var(--grid); font-size: var(--fs-1); color: var(--ink-3); line-height: 1.45; }
+.foot > p + details { margin-top: var(--s-1); }
 .panel h3 { font-size: var(--fs-2); font-weight: 600; margin: var(--s-5) 0 var(--s-2); }
 
 /* bar tables: the chart is a table; one row per factor */
@@ -230,6 +242,8 @@ rect.faded { fill-opacity: 0.3; stroke-width: 1; }
 rect.pos.faded { stroke: var(--pos); }
 rect.neg.faded { stroke: var(--neg); }
 .ci { stroke: var(--ink); stroke-width: 1.5; }
+.avgm path { fill: var(--ink); stroke: var(--surface); stroke-width: 0.75; stroke-linejoin: round; }
+.avgm-sw { fill: var(--ink); stroke: var(--surface); stroke-width: 1; }
 rect.hatch { fill: url(#hatch); stroke: var(--ink-3); stroke-width: 1; }
 .hatch-bg { fill: var(--surface); }
 .hatch-ink { fill: var(--ink-3); }
@@ -243,7 +257,8 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .line-svg path { vector-effect: non-scaling-stroke; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .price-line { stroke: var(--ink); stroke-width: 1.5; }
 .price-tail { stroke: var(--ink-3); stroke-width: 1.5; }
-.tailzone { fill: var(--sunk); }
+.tailzone { fill: var(--grid); }
+.cutline { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
 .line-svg path.band { stroke: none; fill-opacity: 0.16; }
 .band.c1 { fill: var(--f1); } .band.c2 { fill: var(--f2); } .band.c3 { fill: var(--f3); } .band.c4 { fill: var(--f4); } .band.c5 { fill: var(--f5); }
 .rline { stroke-width: 1.75; }
@@ -256,6 +271,7 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .xl { position: absolute; top: 8px; transform: translateX(-50%); font-size: var(--fs-1); color: var(--ink-3); white-space: nowrap; }
 .axis.time .xl, .axis.time span { top: 6px; }
 .zone-label { position: absolute; bottom: 100%; right: 0; margin-bottom: 6px; font-size: var(--fs-1); color: var(--ink-2); white-space: nowrap; }
+.zone-label.l { right: auto; left: 0; }
 .edge-l { transform: none !important; }
 .edge-r { transform: translateX(-100%) !important; }
 
@@ -314,13 +330,42 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 .reg tr.ns td { color: var(--ink-2); }
 .colophon { margin-top: var(--s-5); font-size: var(--fs-1); color: var(--ink-3); }
 
+/* ------------------------------------------------------------------ dashboard controls (mock) */
+.controls { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4) var(--s-5); margin-bottom: var(--s-6); }
+.ctl-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-5); }
+.ctl-search { display: flex; gap: var(--s-2); }
+.controls input[type="text"], .controls input[type="date"] { height: 36px; padding: 0 var(--s-3); border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--ink); font: inherit; }
+.controls input[type="text"] { width: 148px; font-weight: 640; letter-spacing: 0.02em; text-transform: uppercase; }
+.controls input[type="date"] { font-size: var(--fs-1); }
+.btn { height: 36px; padding: 0 var(--s-4); border: 1px solid var(--ink); border-radius: 4px; background: var(--ink); color: var(--surface); font: inherit; font-weight: 560; cursor: pointer; }
+.btn:hover { opacity: 0.9; }
+.ctl-range { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-4); border: 0; padding: 0; margin: 0; min-width: 0; }
+.chips { display: inline-flex; flex-wrap: wrap; }
+.chip-opt { position: relative; }
+.chip-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip-opt span { display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border: 1px solid var(--border); margin-left: -1px; background: var(--surface); color: var(--ink); font-size: var(--fs-1); font-weight: 520; }
+.chip-opt:first-child span { margin-left: 0; border-radius: 4px 0 0 4px; }
+.chip-opt:last-child span { border-radius: 0 4px 4px 0; }
+.chip-opt input:checked + span { background: var(--ink); color: var(--surface); border-color: var(--ink); position: relative; z-index: 1; }
+.chip-opt input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; position: relative; z-index: 2; }
+.chip-opt input:not(:disabled):not(:checked):hover + span { background: var(--sunk); }
+.chip-opt.off span { color: var(--ink-3); background: var(--sunk); }
+.chip-opt.off input { cursor: not-allowed; }
+.ctl-custom { display: inline-flex; flex-wrap: wrap; gap: var(--s-3); font-size: var(--fs-1); color: var(--ink-2); }
+.ctl-custom label { display: inline-flex; align-items: center; gap: 6px; }
+.ctl-label { margin-top: var(--s-3); color: var(--ink-2); max-width: 76ch; }
+.ctl-label b { color: var(--ink); font-weight: 560; }
+.ctl-why { margin-top: var(--s-1); font-size: var(--fs-1); color: var(--ink-3); }
+.controls[aria-busy="true"] ~ .masthead .ticker, [aria-busy="true"] .kpi .v { color: transparent; background: var(--grid); border-radius: 2px; }
+
 /* ------------------------------------------------------------------ narrow screens */
 @media screen and (max-width: 719px) {
   :root { --fs-5: 24px; --fs-6: 37px; --num-w: auto; }
   .report { padding: var(--s-6) var(--s-4) var(--s-7); }
   h1 { display: block; }
   .what { display: block; margin-top: 6px; font-size: var(--fs-2); }
-  .gen { width: 100%; }
+  .mast-meta { margin-top: var(--s-2); }
+  .mast-top { align-items: flex-start; }
   .model { margin: var(--s-6) 0 var(--s-5); }
   .eq { grid-template-columns: 1fr; row-gap: 10px; }
   .terms { column-gap: 16px; row-gap: 14px; }
@@ -328,6 +373,15 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
   .kpi { border-left: 0; border-top: 1px solid var(--grid); padding: var(--s-3) 14px 14px; }
   .kpi:nth-child(-n+2) { border-top: 0; }
   .kpi:nth-child(even) { border-left: 1px solid var(--grid); }
+  .kpi:last-child { grid-column: 1 / -1; border-left: 0; }
+  .controls { padding: var(--s-3) var(--s-4); }
+  .ctl-search { width: 100%; }
+  .controls input[type="text"] { flex: 1; width: auto; min-height: 44px; }
+  .btn, .chip-opt span, .controls input[type="date"] { min-height: 44px; }
+  .chips { width: 100%; }
+  .chip-opt { flex: 1 1 auto; }
+  .chip-opt span { width: 100%; justify-content: center; padding: 0 8px; }
+  details.how > summary { min-height: 44px; display: inline-flex; align-items: center; }
   .panel { padding: 18px var(--s-4) var(--s-3); }
   .legend { justify-content: flex-start; }
   .price-wrap { grid-template-columns: 1fr; gap: var(--s-2); }
@@ -400,6 +454,11 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
   .print-only { display: block; }
   .win-cap { font-weight: 600; margin-top: var(--s-4); }
   .scroll-x { overflow: visible; }
+  .controls { display: none; }
+  details.how > summary { display: none; }
+  details.how::details-content { content-visibility: visible; display: block; }
+  details.how { margin-top: 0; }
+  .notice { break-inside: avoid; }
   .reg { min-width: 0; }
   a.term { color: inherit; }
 }
@@ -414,29 +473,27 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
 <svg class="defs" width="0" height="0" aria-hidden="true" focusable="false"><defs><pattern id="hatch" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)"><rect class="hatch-bg" width="5" height="5"/><rect class="hatch-ink" width="1.6" height="5"/></pattern></defs></svg>
 <main class="report">
 
+
 <header class="masthead">
-  <div class="mast-top">
-    <h1><span class="ticker">SPY</span><span class="what">Fama&#8211;French five-factor profile</span></h1>
-    <p class="gen">Generated 18 Nov 2026, 09:30 UTC</p>
-  </div>
-  <p class="coverage">Daily returns from 8 Aug 2024 to 30 Sep 2026, 559 trading days. Factor data ends 30 Sep 2026, 49 days before this report; the last 32 price days are shown but not analysed.</p>
-  <ul class="warnings" aria-label="Report warnings"><li><svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 1.5 15 14.5H1z"/><path class="cut" d="M8 6v4M8 11.6v1"/></svg><span><span class="vh">Warning: </span>MOCK: short history.</span></li></ul>
+  <div class="mast-top"><h1><span class="ticker">SPY</span><span class="what">Fama&#8211;French five-factor profile</span></h1><p class="mast-meta"><span class="chip">Factor data ends 30 Sep 2026 (49 days ago)</span><a class="chip warn" href="#notice">2 warnings</a></p></div>
+  <p class="coverage">Analysed 8 Aug 2024 to 30 Sep 2026, 559 trading days. The last 32 price days are charted but not analysed.</p>
+  <aside class="notice" id="notice" aria-label="Data quality"><svg class="glyph" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 1.5 15 14.5H1z"/><path class="cut" d="M8 6v4M8 11.6v1"/></svg><div><p class="notice-sum"><span class="vh">Warning: </span>Prices look out of step with the factor data, so R² is probably understated and residual volatility overstated. The history is short, so the betas rest on a small sample.</p><details class="how"><summary>Details</summary><ul><li>MOCK: Daily price changes partly reverse the next day: the lag-1 autocorrelation of the regression residuals is -0.31 (robust z -6.2).</li><li>MOCK: short history.</li></ul></details></div></aside>
 </header>
 
-<section class="kpis" aria-label="Headline statistics"><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 60.</p><p class="empty-do">Widen the date range to at least 60 trading days and run the report again.</p></div></section>
+<section class="kpis" aria-label="Headline statistics"><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 504.</p><p class="empty-do">Widen the date range and run the report again.</p></div></section>
 
 <section class="panel" id="price" aria-labelledby="price-t">
-  <header class="panel-head"><div><h2 id="price-t">Price</h2><p class="q">How has the price moved over the window?</p></div></header>
+  <header class="panel-head"><div><h2 id="price-t">Price</h2><p class="q">How has the price moved over the window? Shaded days are not in the analysis.</p></div></header>
   <div class="price-wrap">
-    <div class="plot price-plot"><svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><rect class="tailzone" x="945.9" y="0" width="54.1" height="100"/><line class="grid" x1="0" x2="1000" y1="100.00" y2="100.00"/><line class="grid" x1="0" x2="1000" y1="66.67" y2="66.67"/><line class="grid" x1="0" x2="1000" y1="33.33" y2="33.33"/><line class="grid" x1="0" x2="1000" y1="0.00" y2="0.00"/><path class="price-line" d="M0.0,71.0 L1.7,72.5 L3.4,72.7 L5.1,72.2 L6.8,70.7 L8.5,70.4 L10.2,71.9 L11.8,71.7 L13.5,70.5 L15.2,68.5 L16.9,63.9 L18.6,63.7 L20.3,63.4 L22.0,63.3 L23.7,63.6 L25.4,61.0 L27.1,64.0 L28.8,65.4 L30.5,65.1 L32.1,64.1 L33.8,64.7 L35.5,64.9 L37.2,65.3 L38.9,65.0 L40.6,64.1 L42.3,64.5 L44.0,63.6 L45.7,65.3 L47.4,64.4 L49.1,64.7 L50.8,65.8 L52.5,64.8 L54.1,64.8 L55.8,65.3 L57.5,65.4 L59.2,66.5 L60.9,68.3 L62.6,69.5 L64.3,70.9 L66.0,69.3 L67.7,70.2 L69.4,69.4 L71.1,70.1 L72.8,72.5 L74.5,72.3 L76.1,72.9 L77.8,72.2 L79.5,70.3 L81.2,69.4 L82.9,70.7 L84.6,69.1 L86.3,70.4 L88.0,70.8 L89.7,70.9 L91.4,70.9 L93.1,71.9 L94.8,73.5 L96.4,73.1 L98.1,73.6 L99.8,70.0 L101.5,69.1 L103.2,68.4 L104.9,67.9 L106.6,67.7 L108.3,66.6 L110.0,65.8 L111.7,67.2 L113.4,67.4 L115.1,68.2 L116.8,70.4 L118.4,68.0 L120.1,66.3 L121.8,64.9 L123.5,62.4 L125.2,60.6 L126.9,60.0 L128.6,59.2 L130.3,59.7 L132.0,60.4 L133.7,60.0 L135.4,56.1 L137.1,56.3 L138.7,57.1 L140.4,54.2 L142.1,54.3 L143.8,52.7 L145.5,51.4 L147.2,53.7 L148.9,52.1 L150.6,51.8 L152.3,53.5 L154.0,54.4 L155.7,55.3 L157.4,55.0 L159.1,55.5 L160.7,54.5 L162.4,53.6 L164.1,52.5 L165.8,54.2 L167.5,55.7 L169.2,57.3 L170.9,57.5 L172.6,58.7 L174.3,59.8 L176.0,57.8 L177.7,61.2 L179.4,59.2 L181.0,56.5 L182.7,59.4 L184.4,60.4 L186.1,59.5 L187.8,58.0 L189.5,58.0 L191.2,55.7 L192.9,56.6 L194.6,55.5 L196.3,59.0 L198.0,59.8 L199.7,60.8 L201.4,58.7 L203.0,57.9 L204.7,57.9 L206.4,58.9 L208.1,58.6 L209.8,55.5 L211.5,56.8 L213.2,56.1 L214.9,53.6 L216.6,54.3 L218.3,54.3 L220.0,55.9 L221.7,54.5 L223.4,56.1 L225.0,55.1 L226.7,56.3 L228.4,59.2 L230.1,57.6 L231.8,58.5 L233.5,59.3 L235.2,59.2 L236.9,57.7 L238.6,54.7 L240.3,56.4 L242.0,57.6 L243.7,57.6 L245.3,59.6 L247.0,57.5 L248.7,55.5 L250.4,52.8 L252.1,53.0 L253.8,51.6 L255.5,50.5 L257.2,52.4 L258.9,54.5 L260.6,55.9 L262.3,56.2 L264.0,55.8 L265.7,55.1 L267.3,57.4 L269.0,56.7 L270.7,56.6 L272.4,56.4 L274.1,57.1 L275.8,59.1 L277.5,58.7 L279.2,58.0 L280.9,59.3 L282.6,59.6 L284.3,57.9 L286.0,57.4 L287.6,57.1 L289.3,56.9 L291.0,56.4 L292.7,58.8 L294.4,58.7 L296.1,62.1 L297.8,59.9 L299.5,58.6 L301.2,57.6 L302.9,57.5 L304.6,58.2 L306.3,58.4 L308.0,60.9 L309.6,60.9 L311.3,62.3 L313.0,63.0 L314.7,62.4 L316.4,62.7 L318.1,60.6 L319.8,59.5 L321.5,59.7 L323.2,59.0 L324.9,57.6 L326.6,57.2 L328.3,54.8 L329.9,56.8 L331.6,56.4 L333.3,52.4 L335.0,52.3 L336.7,52.8 L338.4,54.3 L340.1,54.3 L341.8,52.7 L343.5,51.6 L345.2,50.1 L346.9,51.0 L348.6,48.5 L350.3,45.2 L351.9,45.3 L353.6,45.1 L355.3,45.3 L357.0,44.2 L358.7,42.2 L360.4,41.5 L362.1,42.3 L363.8,44.7 L365.5,43.7 L367.2,41.6 L368.9,43.2 L370.6,39.7 L372.3,40.1 L373.9,43.7 L375.6,44.1 L377.3,45.6 L379.0,48.5 L380.7,49.3 L382.4,46.0 L384.1,45.8 L385.8,43.2 L387.5,43.8 L389.2,43.0 L390.9,43.6 L392.6,42.8 L394.2,44.3 L395.9,43.9 L397.6,43.9 L399.3,43.6 L401.0,42.6 L402.7,43.5 L404.4,43.3 L406.1,40.3 L407.8,40.4 L409.5,38.8 L411.2,41.0 L412.9,41.4 L414.6,41.9 L416.2,39.9 L417.9,40.6 L419.6,41.4 L421.3,41.7 L423.0,44.4 L424.7,43.9 L426.4,44.6 L428.1,43.5 L429.8,47.1 L431.5,45.5 L433.2,44.0 L434.9,45.7 L436.5,44.3 L438.2,44.8 L439.9,45.9 L441.6,43.1 L443.3,45.0 L445.0,45.9 L446.7,47.7 L448.4,45.1 L450.1,46.1 L451.8,47.6 L453.5,47.9 L455.2,48.3 L456.9,47.7 L458.5,46.0 L460.2,44.1 L461.9,47.1 L463.6,46.8 L465.3,47.4 L467.0,48.5 L468.7,46.9 L470.4,45.9 L472.1,46.8 L473.8,49.2 L475.5,48.2 L477.2,46.6 L478.8,46.4 L480.5,49.2 L482.2,48.4 L483.9,47.2 L485.6,46.2 L487.3,43.5 L489.0,42.2 L490.7,43.3 L492.4,42.5 L494.1,40.2 L495.8,41.9 L497.5,45.5 L499.2,47.1 L500.8,47.8 L502.5,44.4 L504.2,43.1 L505.9,44.4 L507.6,44.5 L509.3,43.4 L511.0,43.5 L512.7,43.9 L514.4,46.5 L516.1,48.2 L517.8,48.8 L519.5,50.1 L521.2,50.7 L522.8,49.8 L524.5,47.1 L526.2,45.5 L527.9,46.1 L529.6,48.8 L531.3,51.8 L533.0,49.8 L534.7,50.6 L536.4,53.5 L538.1,52.2 L539.8,51.2 L541.5,54.0 L543.1,55.1 L544.8,56.6 L546.5,54.1 L548.2,54.8 L549.9,53.1 L551.6,54.0 L553.3,53.9 L555.0,52.0 L556.7,52.8 L558.4,56.1 L560.1,56.4 L561.8,58.0 L563.5,57.2 L565.1,56.7 L566.8,56.8 L568.5,57.2 L570.2,55.8 L571.9,57.6 L573.6,55.2 L575.3,55.3 L577.0,54.1 L578.7,53.4 L580.4,49.5 L582.1,49.5 L583.8,49.7 L585.4,49.9 L587.1,47.5 L588.8,46.0 L590.5,46.0 L592.2,44.3 L593.9,47.2 L595.6,49.9 L597.3,48.3 L599.0,50.6 L600.7,50.1 L602.4,49.9 L604.1,49.2 L605.8,49.1 L607.4,47.0 L609.1,48.5 L610.8,49.6 L612.5,48.3 L614.2,45.5 L615.9,46.0 L617.6,48.7 L619.3,48.1 L621.0,51.7 L622.7,51.2 L624.4,53.1 L626.1,55.1 L627.7,56.8 L629.4,59.5 L631.1,61.3 L632.8,60.9 L634.5,61.3 L636.2,61.9 L637.9,60.1 L639.6,58.5 L641.3,58.9 L643.0,58.4 L644.7,56.5 L646.4,56.6 L648.1,59.8 L649.7,59.0 L651.4,60.0 L653.1,61.2 L654.8,60.0 L656.5,60.1 L658.2,61.2 L659.9,60.9 L661.6,60.3 L663.3,65.3 L665.0,64.0 L666.7,63.9 L668.4,61.8 L670.1,60.2 L671.7,60.1 L673.4,56.7 L675.1,55.4 L676.8,53.7 L678.5,50.9 L680.2,50.3 L681.9,48.1 L683.6,49.7 L685.3,50.4 L687.0,50.1 L688.7,50.6 L690.4,51.0 L692.0,50.0 L693.7,52.9 L695.4,52.8 L697.1,50.4 L698.8,50.0 L700.5,54.2 L702.2,54.7 L703.9,58.9 L705.6,59.2 L707.3,57.9 L709.0,60.1 L710.7,61.0 L712.4,63.0 L714.0,60.0 L715.7,60.9 L717.4,60.6 L719.1,59.2 L720.8,58.3 L722.5,59.6 L724.2,59.3 L725.9,59.7 L727.6,62.0 L729.3,61.8 L731.0,64.8 L732.7,64.1 L734.3,63.6 L736.0,63.5 L737.7,64.6 L739.4,62.6 L741.1,64.1 L742.8,63.2 L744.5,64.4 L746.2,63.6 L747.9,63.8 L749.6,63.5 L751.3,63.1 L753.0,62.6 L754.7,62.9 L756.3,61.9 L758.0,63.1 L759.7,64.8 L761.4,62.9 L763.1,61.6 L764.8,62.0 L766.5,61.3 L768.2,62.6 L769.9,62.4 L771.6,64.0 L773.3,64.9 L775.0,65.2 L776.6,65.3 L778.3,67.0 L780.0,67.7 L781.7,68.9 L783.4,70.8 L785.1,67.9 L786.8,69.1 L788.5,69.4 L790.2,69.3 L791.9,68.6 L793.6,67.2 L795.3,66.7 L797.0,66.0 L798.6,66.1 L800.3,66.1 L802.0,66.3 L803.7,68.9 L805.4,70.0 L807.1,68.1 L808.8,68.2 L810.5,66.7 L812.2,69.0 L813.9,70.7 L815.6,70.8 L817.3,70.7 L819.0,70.1 L820.6,71.4 L822.3,69.3 L824.0,66.1 L825.7,66.8 L827.4,68.0 L829.1,67.0 L830.8,65.2 L832.5,66.0 L834.2,65.8 L835.9,65.0 L837.6,65.2 L839.3,62.8 L840.9,61.9 L842.6,62.0 L844.3,57.4 L846.0,55.9 L847.7,54.7 L849.4,54.8 L851.1,54.5 L852.8,55.9 L854.5,54.8 L856.2,53.1 L857.9,52.7 L859.6,54.2 L861.3,52.1 L862.9,47.5 L864.6,45.5 L866.3,45.9 L868.0,47.0 L869.7,46.4 L871.4,43.5 L873.1,41.3 L874.8,38.7 L876.5,39.3 L878.2,41.7 L879.9,41.8 L881.6,42.7 L883.2,41.4 L884.9,43.2 L886.6,40.9 L888.3,40.6 L890.0,40.7 L891.7,39.8 L893.4,39.7 L895.1,38.1 L896.8,37.5 L898.5,35.6 L900.2,34.5 L901.9,32.3 L903.6,34.1 L905.2,30.9 L906.9,29.0 L908.6,30.0 L910.3,29.8 L912.0,32.6 L913.7,33.7 L915.4,32.4 L917.1,32.9 L918.8,33.3 L920.5,35.1 L922.2,34.1 L923.9,33.5 L925.5,30.0 L927.2,31.1 L928.9,29.0 L930.6,30.7 L932.3,28.4 L934.0,28.8 L935.7,24.0 L937.4,26.1 L939.1,25.4 L940.8,25.8 L942.5,24.5 L944.2,23.7 L945.9,21.6"/><path class="price-tail" d="M945.9,21.6 L947.5,21.1 L949.2,21.2 L950.9,22.7 L952.6,26.3 L954.3,29.5 L956.0,29.5 L957.7,31.7 L959.4,32.2 L961.1,30.8 L962.8,28.7 L964.5,25.2 L966.2,22.7 L967.9,16.5 L969.5,15.7 L971.2,17.3 L972.9,14.9 L974.6,14.4 L976.3,15.8 L978.0,16.6 L979.7,16.3 L981.4,16.4 L983.1,14.0 L984.8,12.8 L986.5,12.9 L988.2,12.6 L989.8,12.2 L991.5,7.1 L993.2,7.1 L994.9,7.1 L996.6,5.2 L998.3,8.0 L1000.0,8.3"/></svg><div class="ylabels" aria-hidden="true"><span class="yl" style="top:100.00%">400</span><span class="yl" style="top:66.67%">500</span><span class="yl" style="top:33.33%">600</span><span class="yl" style="top:0.00%">700</span></div><span class="zone-label">Shaded: no factor data</span><div class="xlabels" aria-hidden="true"><span class="xl minor " style="left:6.43%">Oct 2024</span><span class="xl " style="left:17.60%">Jan 2025</span><span class="xl minor " style="left:28.43%">Apr 2025</span><span class="xl minor " style="left:39.42%">Jul 2025</span><span class="xl minor " style="left:50.59%">Oct 2025</span><span class="xl " style="left:61.76%">Jan 2026</span><span class="xl minor " style="left:72.59%">Apr 2026</span><span class="xl minor " style="left:83.59%">Jul 2026</span><span class="xl minor " style="left:94.75%">Oct 2026</span></div></div>
+    <div class="plot price-plot"><svg class="line-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><rect class="tailzone" x="945.9" y="0" width="54.1" height="100"/><line class="cutline" x1="945.9" x2="945.9" y1="0" y2="100"/><line class="grid" x1="0" x2="1000" y1="100.00" y2="100.00"/><line class="grid" x1="0" x2="1000" y1="66.67" y2="66.67"/><line class="grid" x1="0" x2="1000" y1="33.33" y2="33.33"/><line class="grid" x1="0" x2="1000" y1="0.00" y2="0.00"/><path class="price-line" d="M0.0,71.0 L1.7,72.5 L3.4,72.7 L5.1,72.2 L6.8,70.7 L8.5,70.4 L10.2,71.9 L11.8,71.7 L13.5,70.5 L15.2,68.5 L16.9,63.9 L18.6,63.7 L20.3,63.4 L22.0,63.3 L23.7,63.6 L25.4,61.0 L27.1,64.0 L28.8,65.4 L30.5,65.1 L32.1,64.1 L33.8,64.7 L35.5,64.9 L37.2,65.3 L38.9,65.0 L40.6,64.1 L42.3,64.5 L44.0,63.6 L45.7,65.3 L47.4,64.4 L49.1,64.7 L50.8,65.8 L52.5,64.8 L54.1,64.8 L55.8,65.3 L57.5,65.4 L59.2,66.5 L60.9,68.3 L62.6,69.5 L64.3,70.9 L66.0,69.3 L67.7,70.2 L69.4,69.4 L71.1,70.1 L72.8,72.5 L74.5,72.3 L76.1,72.9 L77.8,72.2 L79.5,70.3 L81.2,69.4 L82.9,70.7 L84.6,69.1 L86.3,70.4 L88.0,70.8 L89.7,70.9 L91.4,70.9 L93.1,71.9 L94.8,73.5 L96.4,73.1 L98.1,73.6 L99.8,70.0 L101.5,69.1 L103.2,68.4 L104.9,67.9 L106.6,67.7 L108.3,66.6 L110.0,65.8 L111.7,67.2 L113.4,67.4 L115.1,68.2 L116.8,70.4 L118.4,68.0 L120.1,66.3 L121.8,64.9 L123.5,62.4 L125.2,60.6 L126.9,60.0 L128.6,59.2 L130.3,59.7 L132.0,60.4 L133.7,60.0 L135.4,56.1 L137.1,56.3 L138.7,57.1 L140.4,54.2 L142.1,54.3 L143.8,52.7 L145.5,51.4 L147.2,53.7 L148.9,52.1 L150.6,51.8 L152.3,53.5 L154.0,54.4 L155.7,55.3 L157.4,55.0 L159.1,55.5 L160.7,54.5 L162.4,53.6 L164.1,52.5 L165.8,54.2 L167.5,55.7 L169.2,57.3 L170.9,57.5 L172.6,58.7 L174.3,59.8 L176.0,57.8 L177.7,61.2 L179.4,59.2 L181.0,56.5 L182.7,59.4 L184.4,60.4 L186.1,59.5 L187.8,58.0 L189.5,58.0 L191.2,55.7 L192.9,56.6 L194.6,55.5 L196.3,59.0 L198.0,59.8 L199.7,60.8 L201.4,58.7 L203.0,57.9 L204.7,57.9 L206.4,58.9 L208.1,58.6 L209.8,55.5 L211.5,56.8 L213.2,56.1 L214.9,53.6 L216.6,54.3 L218.3,54.3 L220.0,55.9 L221.7,54.5 L223.4,56.1 L225.0,55.1 L226.7,56.3 L228.4,59.2 L230.1,57.6 L231.8,58.5 L233.5,59.3 L235.2,59.2 L236.9,57.7 L238.6,54.7 L240.3,56.4 L242.0,57.6 L243.7,57.6 L245.3,59.6 L247.0,57.5 L248.7,55.5 L250.4,52.8 L252.1,53.0 L253.8,51.6 L255.5,50.5 L257.2,52.4 L258.9,54.5 L260.6,55.9 L262.3,56.2 L264.0,55.8 L265.7,55.1 L267.3,57.4 L269.0,56.7 L270.7,56.6 L272.4,56.4 L274.1,57.1 L275.8,59.1 L277.5,58.7 L279.2,58.0 L280.9,59.3 L282.6,59.6 L284.3,57.9 L286.0,57.4 L287.6,57.1 L289.3,56.9 L291.0,56.4 L292.7,58.8 L294.4,58.7 L296.1,62.1 L297.8,59.9 L299.5,58.6 L301.2,57.6 L302.9,57.5 L304.6,58.2 L306.3,58.4 L308.0,60.9 L309.6,60.9 L311.3,62.3 L313.0,63.0 L314.7,62.4 L316.4,62.7 L318.1,60.6 L319.8,59.5 L321.5,59.7 L323.2,59.0 L324.9,57.6 L326.6,57.2 L328.3,54.8 L329.9,56.8 L331.6,56.4 L333.3,52.4 L335.0,52.3 L336.7,52.8 L338.4,54.3 L340.1,54.3 L341.8,52.7 L343.5,51.6 L345.2,50.1 L346.9,51.0 L348.6,48.5 L350.3,45.2 L351.9,45.3 L353.6,45.1 L355.3,45.3 L357.0,44.2 L358.7,42.2 L360.4,41.5 L362.1,42.3 L363.8,44.7 L365.5,43.7 L367.2,41.6 L368.9,43.2 L370.6,39.7 L372.3,40.1 L373.9,43.7 L375.6,44.1 L377.3,45.6 L379.0,48.5 L380.7,49.3 L382.4,46.0 L384.1,45.8 L385.8,43.2 L387.5,43.8 L389.2,43.0 L390.9,43.6 L392.6,42.8 L394.2,44.3 L395.9,43.9 L397.6,43.9 L399.3,43.6 L401.0,42.6 L402.7,43.5 L404.4,43.3 L406.1,40.3 L407.8,40.4 L409.5,38.8 L411.2,41.0 L412.9,41.4 L414.6,41.9 L416.2,39.9 L417.9,40.6 L419.6,41.4 L421.3,41.7 L423.0,44.4 L424.7,43.9 L426.4,44.6 L428.1,43.5 L429.8,47.1 L431.5,45.5 L433.2,44.0 L434.9,45.7 L436.5,44.3 L438.2,44.8 L439.9,45.9 L441.6,43.1 L443.3,45.0 L445.0,45.9 L446.7,47.7 L448.4,45.1 L450.1,46.1 L451.8,47.6 L453.5,47.9 L455.2,48.3 L456.9,47.7 L458.5,46.0 L460.2,44.1 L461.9,47.1 L463.6,46.8 L465.3,47.4 L467.0,48.5 L468.7,46.9 L470.4,45.9 L472.1,46.8 L473.8,49.2 L475.5,48.2 L477.2,46.6 L478.8,46.4 L480.5,49.2 L482.2,48.4 L483.9,47.2 L485.6,46.2 L487.3,43.5 L489.0,42.2 L490.7,43.3 L492.4,42.5 L494.1,40.2 L495.8,41.9 L497.5,45.5 L499.2,47.1 L500.8,47.8 L502.5,44.4 L504.2,43.1 L505.9,44.4 L507.6,44.5 L509.3,43.4 L511.0,43.5 L512.7,43.9 L514.4,46.5 L516.1,48.2 L517.8,48.8 L519.5,50.1 L521.2,50.7 L522.8,49.8 L524.5,47.1 L526.2,45.5 L527.9,46.1 L529.6,48.8 L531.3,51.8 L533.0,49.8 L534.7,50.6 L536.4,53.5 L538.1,52.2 L539.8,51.2 L541.5,54.0 L543.1,55.1 L544.8,56.6 L546.5,54.1 L548.2,54.8 L549.9,53.1 L551.6,54.0 L553.3,53.9 L555.0,52.0 L556.7,52.8 L558.4,56.1 L560.1,56.4 L561.8,58.0 L563.5,57.2 L565.1,56.7 L566.8,56.8 L568.5,57.2 L570.2,55.8 L571.9,57.6 L573.6,55.2 L575.3,55.3 L577.0,54.1 L578.7,53.4 L580.4,49.5 L582.1,49.5 L583.8,49.7 L585.4,49.9 L587.1,47.5 L588.8,46.0 L590.5,46.0 L592.2,44.3 L593.9,47.2 L595.6,49.9 L597.3,48.3 L599.0,50.6 L600.7,50.1 L602.4,49.9 L604.1,49.2 L605.8,49.1 L607.4,47.0 L609.1,48.5 L610.8,49.6 L612.5,48.3 L614.2,45.5 L615.9,46.0 L617.6,48.7 L619.3,48.1 L621.0,51.7 L622.7,51.2 L624.4,53.1 L626.1,55.1 L627.7,56.8 L629.4,59.5 L631.1,61.3 L632.8,60.9 L634.5,61.3 L636.2,61.9 L637.9,60.1 L639.6,58.5 L641.3,58.9 L643.0,58.4 L644.7,56.5 L646.4,56.6 L648.1,59.8 L649.7,59.0 L651.4,60.0 L653.1,61.2 L654.8,60.0 L656.5,60.1 L658.2,61.2 L659.9,60.9 L661.6,60.3 L663.3,65.3 L665.0,64.0 L666.7,63.9 L668.4,61.8 L670.1,60.2 L671.7,60.1 L673.4,56.7 L675.1,55.4 L676.8,53.7 L678.5,50.9 L680.2,50.3 L681.9,48.1 L683.6,49.7 L685.3,50.4 L687.0,50.1 L688.7,50.6 L690.4,51.0 L692.0,50.0 L693.7,52.9 L695.4,52.8 L697.1,50.4 L698.8,50.0 L700.5,54.2 L702.2,54.7 L703.9,58.9 L705.6,59.2 L707.3,57.9 L709.0,60.1 L710.7,61.0 L712.4,63.0 L714.0,60.0 L715.7,60.9 L717.4,60.6 L719.1,59.2 L720.8,58.3 L722.5,59.6 L724.2,59.3 L725.9,59.7 L727.6,62.0 L729.3,61.8 L731.0,64.8 L732.7,64.1 L734.3,63.6 L736.0,63.5 L737.7,64.6 L739.4,62.6 L741.1,64.1 L742.8,63.2 L744.5,64.4 L746.2,63.6 L747.9,63.8 L749.6,63.5 L751.3,63.1 L753.0,62.6 L754.7,62.9 L756.3,61.9 L758.0,63.1 L759.7,64.8 L761.4,62.9 L763.1,61.6 L764.8,62.0 L766.5,61.3 L768.2,62.6 L769.9,62.4 L771.6,64.0 L773.3,64.9 L775.0,65.2 L776.6,65.3 L778.3,67.0 L780.0,67.7 L781.7,68.9 L783.4,70.8 L785.1,67.9 L786.8,69.1 L788.5,69.4 L790.2,69.3 L791.9,68.6 L793.6,67.2 L795.3,66.7 L797.0,66.0 L798.6,66.1 L800.3,66.1 L802.0,66.3 L803.7,68.9 L805.4,70.0 L807.1,68.1 L808.8,68.2 L810.5,66.7 L812.2,69.0 L813.9,70.7 L815.6,70.8 L817.3,70.7 L819.0,70.1 L820.6,71.4 L822.3,69.3 L824.0,66.1 L825.7,66.8 L827.4,68.0 L829.1,67.0 L830.8,65.2 L832.5,66.0 L834.2,65.8 L835.9,65.0 L837.6,65.2 L839.3,62.8 L840.9,61.9 L842.6,62.0 L844.3,57.4 L846.0,55.9 L847.7,54.7 L849.4,54.8 L851.1,54.5 L852.8,55.9 L854.5,54.8 L856.2,53.1 L857.9,52.7 L859.6,54.2 L861.3,52.1 L862.9,47.5 L864.6,45.5 L866.3,45.9 L868.0,47.0 L869.7,46.4 L871.4,43.5 L873.1,41.3 L874.8,38.7 L876.5,39.3 L878.2,41.7 L879.9,41.8 L881.6,42.7 L883.2,41.4 L884.9,43.2 L886.6,40.9 L888.3,40.6 L890.0,40.7 L891.7,39.8 L893.4,39.7 L895.1,38.1 L896.8,37.5 L898.5,35.6 L900.2,34.5 L901.9,32.3 L903.6,34.1 L905.2,30.9 L906.9,29.0 L908.6,30.0 L910.3,29.8 L912.0,32.6 L913.7,33.7 L915.4,32.4 L917.1,32.9 L918.8,33.3 L920.5,35.1 L922.2,34.1 L923.9,33.5 L925.5,30.0 L927.2,31.1 L928.9,29.0 L930.6,30.7 L932.3,28.4 L934.0,28.8 L935.7,24.0 L937.4,26.1 L939.1,25.4 L940.8,25.8 L942.5,24.5 L944.2,23.7 L945.9,21.6"/><path class="price-tail" d="M945.9,21.6 L947.5,21.1 L949.2,21.2 L950.9,22.7 L952.6,26.3 L954.3,29.5 L956.0,29.5 L957.7,31.7 L959.4,32.2 L961.1,30.8 L962.8,28.7 L964.5,25.2 L966.2,22.7 L967.9,16.5 L969.5,15.7 L971.2,17.3 L972.9,14.9 L974.6,14.4 L976.3,15.8 L978.0,16.6 L979.7,16.3 L981.4,16.4 L983.1,14.0 L984.8,12.8 L986.5,12.9 L988.2,12.6 L989.8,12.2 L991.5,7.1 L993.2,7.1 L994.9,7.1 L996.6,5.2 L998.3,8.0 L1000.0,8.3"/></svg><div class="ylabels" aria-hidden="true"><span class="yl" style="top:100.00%">400</span><span class="yl" style="top:66.67%">500</span><span class="yl" style="top:33.33%">600</span><span class="yl" style="top:0.00%">700</span></div><span class="zone-label">Not analysed: factor data ends 30 Sep 2026</span><div class="xlabels" aria-hidden="true"><span class="xl minor " style="left:6.43%">Oct 2024</span><span class="xl " style="left:17.60%">Jan 2025</span><span class="xl minor " style="left:28.43%">Apr 2025</span><span class="xl minor " style="left:39.42%">Jul 2025</span><span class="xl minor " style="left:50.59%">Oct 2025</span><span class="xl " style="left:61.76%">Jan 2026</span><span class="xl minor " style="left:72.59%">Apr 2026</span><span class="xl minor " style="left:83.59%">Jul 2026</span><span class="xl minor " style="left:94.75%">Oct 2026</span></div></div>
     <table class="side"><caption class="vh">Price points</caption>
       <thead class="vh"><tr><th scope="col">Point</th><th scope="col">Adjusted close</th></tr></thead><tbody><tr><th scope="row">First<span class="sub">8 Aug 2024</span></th><td class="num">486.91</td></tr><tr><th scope="row">End of factor data<span class="sub">30 Sep 2026</span></th><td class="num">635.22</td></tr><tr><th scope="row">Latest<span class="sub">13 Nov 2026</span></th><td class="num">675.16</td></tr><tr class="muted-row"><th scope="row">After factor data<span class="sub">32 days, raw, not analysed</span></th><td class="num">+1.23%</td></tr></tbody></table>
   </div>
-  <p class="foot">Adjusted close from MOCK price source (Adj Close), for context only; no statistic uses the price line. The shaded tail after 30 Sep 2026 has no factor data.</p>
+  <p class="foot">Adjusted close from MOCK price source (Adj Close), for context only; no statistic uses the price line.</p>
 </section>
-<section class="panel" id="exposures" aria-labelledby="beta-t"><header class="panel-head"><div><h2 id="beta-t">Factor exposures</h2><p class="q">What is this stock exposed to, and how sure are we?</p></div></header><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 60.</p><p class="empty-do">Widen the date range and run the report again.</p></div></section>
-<section class="panel" id="returns" aria-labelledby="ret-t"><header class="panel-head"><div><h2 id="ret-t">Where the return came from</h2><p class="q">How much of the average yearly return does each factor explain?</p></div></header><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 60.</p><p class="empty-do">Widen the date range and run the report again.</p></div></section>
-<section class="panel" id="risk" aria-labelledby="risk-t"><header class="panel-head"><div><h2 id="risk-t">Where the risk comes from</h2><p class="q">What share of the day-to-day variance does each factor drive?</p></div></header><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 60.</p><p class="empty-do">Widen the date range and run the report again.</p></div></section>
+<section class="panel" id="exposures" aria-labelledby="beta-t"><header class="panel-head"><div><h2 id="beta-t">Factor exposures</h2><p class="q">What is this stock exposed to, and how sure are we?</p></div></header><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 504.</p><p class="empty-do">Widen the date range and run the report again.</p></div></section>
+<section class="panel" id="returns" aria-labelledby="ret-t"><header class="panel-head"><div><h2 id="ret-t">Where the return came from</h2><p class="q">How much of the average yearly return does each factor explain?</p></div></header><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 504.</p><p class="empty-do">Widen the date range and run the report again.</p></div></section>
+<section class="panel" id="risk" aria-labelledby="risk-t"><header class="panel-head"><div><h2 id="risk-t">Where the risk comes from</h2><p class="q">What share of the day-to-day variance does each factor drive?</p></div></header><div class="empty" role="note"><p class="empty-what">Not enough data: the sample has 41 trading days and this needs at least 504.</p><p class="empty-do">Widen the date range and run the report again.</p></div></section>
 <section class="panel" id="rolling" aria-labelledby="roll-t"><header class="panel-head"><div><h2 id="roll-t">Exposure over time</h2><p class="q">Have the exposures been stable, or did they drift?</p></div></header><div class="empty" role="note"><p class="empty-what">Not enough data: a 126-day window needs at least 126 trading days; the sample has 41.</p><p class="empty-do">Rolling betas need more trading days than the window length. Choose an earlier start date.</p></div></section>
 
 <section class="panel data" id="data" aria-labelledby="data-t">
@@ -451,7 +508,7 @@ rect.c1 { fill: var(--f1); } rect.c2 { fill: var(--f2); } rect.c3 { fill: var(--
   
   <p class="foot">Audit findings are reported, never acted on: no price is changed or removed because of them.</p>
 </section>
-<footer class="colophon"><p>factordesk report, schema v2. Descriptive statistics on past data; nothing here is a forecast or advice.</p></footer>
+<footer class="colophon"><p>factordesk report, schema v3, generated 18 Nov 2026, 09:30 UTC. Descriptive statistics on past data; nothing here is a forecast or advice.</p></footer>
 </main>
 </body>
 </html>

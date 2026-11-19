@@ -1,0 +1,10 @@
+/* Fonts ship in the bundle (src/assets/fonts); nothing loads from a network host.
+   IBM Plex Sans, weights 400 to 700 in one variable WOFF2 file. Licence: IBMPlexSans-OFL.txt
+   beside the file. */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/ibm-plex-sans.woff2") format("woff2");
+}
