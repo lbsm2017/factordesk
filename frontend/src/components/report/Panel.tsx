@@ -3,10 +3,17 @@ import { useShowStats } from "../../state/stats";
 import { EmptyState } from "./EmptyState";
 import { HowComputed } from "./HowComputed";
 
-/** Panels that sit side by side from 1280 px (prototype v4a): Price with Drawdown, Return with Risk sources. */
-const PAIR_CLASS: Readonly<Record<string, string>> = { price: "s-7", performance: "s-5", returns: "s-7", risk: "s-5" };
-/** Risk sources grows three number columns with statistics on; it then takes the full row and Return sources with it. */
-const WIDE_WITH_STATS = new Set(["returns", "risk"]);
+/** Panels that sit side by side from 1280 px (prototype v4a): Price with Drawdown, Return with Risk sources, Alpha across models with World beta. */
+const PAIR_CLASS: Readonly<Record<string, string>> = {
+  price: "s-7",
+  performance: "s-5",
+  returns: "s-7",
+  risk: "s-5",
+  "alpha-strip": "s-6",
+  "world-beta": "s-6",
+};
+/** Risk sources and World beta grow number columns with statistics on; they then take the full row, and the partner of each (Return sources, Alpha across models) with them. */
+const WIDE_WITH_STATS = new Set(["returns", "risk", "world-beta"]);
 
 export interface PanelProps {
   /** Element id, also the link target (for example "price", "exposures"). */

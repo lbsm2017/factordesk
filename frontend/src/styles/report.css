@@ -51,6 +51,7 @@ h2[tabindex="-1"]:focus-visible { outline: 2px solid var(--focus); }
   /* A half of a pair whose partner is missing (an optional section that is null) takes the row. */
   .report-region > .s-7:not(:has(+ .s-5)),
   .report-region > .s-5:not(.s-7 + .s-5) { grid-column: 1 / -1; }
+  .report-region > .s-6:not(:has(+ .s-6)):not(.s-6 + .s-6) { grid-column: 1 / -1; }
 }
 
 /* ------------------------------------------------------------------ header (v4a) */

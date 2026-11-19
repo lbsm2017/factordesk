@@ -52,6 +52,12 @@ A URL without `range` opens on 10Y and a URL without `model` opens on FF6. The U
 
 On 2026-11-19 the owner asked for a more compact range summary in the sidebar. The paragraph under the From and To fields is now a thin timeline of the whole price history: a muted part before the analysed window, a solid cyan part for the window, and a hatched part for the price days after the factor data end. One line below it gives the dates and the size of the window ("3 Oct 2016 → 30 Sep 2026 · 2,512 days"; months for a track record, which now shows the same summary). The full sentences, and the reasons a preset cannot be chosen, sit in a "Details" disclosure, and a one-line note names the presets that need more history. Nothing was removed and the backend is unchanged.
 
+## Update, 2026-11-19: Alpha across models and World beta share a row
+
+The owner found the two panels too spread out across the full width. From 1280 px they now sit side by side in two equal halves, the same way Price and Drawdown do; under 1280 px they stack. With "Show statistics" on, World beta takes the full row because it then has six columns.
+
+Both panels are compact. Alpha across models shows Model, Alpha a year, t and adjusted R², with a dot per row and an approximate 95% range (alpha plus or minus 1.96 times |alpha / t|) on one shared scale with a line at zero. Plain R², the long model note and the dropped-row count moved into "How this is computed". World beta keeps its forest plot with a narrower label column and axis; the stand-in notes, the data end dates and the shorter-span sentence moved into "How this is computed". Nothing was removed.
+
 ## Sources
 
 - [docs/design/report-design.md](../docs/design/report-design.md), sections C, D (panels 1, 3, 4, 5, 8), H.9 to H.12 and I.
