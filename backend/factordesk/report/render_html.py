@@ -941,7 +941,6 @@ def _return_panel(report: FactorReport) -> str:
     ]
     alpha_ns = g.alpha_tag != "reliable"
     items.append(("Alpha", "Unexplained average", _fin(rc.alpha), alpha_ns, "alpha"))
-    items.append(("Residual", "Zero by construction", _fin(rc.residual), False, "resid"))
     total = _fin(rc.total_annualised_mean_excess_return)
     finite = [v for _, _, v, _, _ in items if v is not None]
     if rc.status != "ok" or (not finite and total is None):
@@ -958,11 +957,9 @@ def _return_panel(report: FactorReport) -> str:
         marks = ""
         if v is not None:
             cls = ("pos" if v >= 0 else "neg") + (" faded" if ns else "")
-            if kind == "resid":
-                cls = "hatch"
             marks = _bar(v, lo, hi, cls)
         rid = "ret-alpha" if kind == "alpha" else f"ret-{esc(n)}"
-        sig = "&#8211;" if kind == "resid" else ("No" if ns else "Yes")
+        sig = "No" if ns else "Yes"
         rows.append(
             f'<tr id="{rid}" class="{"ns" if ns else ""} {kind}" tabindex="-1">'
             f"{_name_cell(n, plain)}"
@@ -995,8 +992,6 @@ def _return_panel(report: FactorReport) -> str:
             _sw_rect("pos") + "Adds",
             _sw_rect("neg") + "Subtracts",
             _sw_rect("pos", True) + "Faded: not significant",
-            '<svg class="sw" aria-hidden="true"><rect class="hatch" width="14" height="10" '
-            'rx="2"/></svg>Residual',
             '<svg class="sw" aria-hidden="true"><line class="total-line" x1="0" x2="13" y1="5" '
             'y2="5"/><line class="total-cap" x1="13" x2="13" y1="0" y2="10"/></svg>Total',
         ]
@@ -1020,14 +1015,18 @@ def _return_panel(report: FactorReport) -> str:
         f'<section class="panel" id="returns" aria-labelledby="ret-t">'
         f"{_panel_head('ret', 'Where the return came from', q, legend)}"
         + (f'<p class="reading">{esc(reading)}</p>' if reading else "")
-        + '<table class="bars cols-2"><caption class="vh">Return contribution per factor, alpha '
-        "and residual, percent a year, with the total</caption>"
+        + '<table class="bars cols-2"><caption class="vh">Return contribution per factor and '
+        "alpha, percent a year, with the total</caption>"
         '<thead><tr><th scope="col">Component</th><th scope="col" class="plot-h">'
         '<span class="vh">Chart</span></th><th scope="col" class="num">% a year</th>'
         f"{_sig_head()}</tr></thead><tbody>{''.join(rows)}</tbody>"
         f"<tfoot>{_axis_row(ticks, lo, hi, _return_tick, 2)}</tfoot></table>"
         + (f'<div class="memo"><h3>Not in the sum</h3><ul>{memo}</ul></div>' if memo else "")
-        + _footnote(f"{_desc(report)} The rows add up exactly to the total.", fold)
+        + _footnote(
+            f"{_desc(report)} Residuals average zero by construction (regression with an "
+            "intercept), so the rows add up to the total.",
+            fold,
+        )
         + "</section>"
     )
 

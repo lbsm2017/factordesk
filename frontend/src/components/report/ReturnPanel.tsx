@@ -10,7 +10,7 @@ import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
 import "./signColor.css";
 
-type Kind = "factor" | "alpha" | "resid";
+type Kind = "factor" | "alpha";
 
 interface Item {
   name: string;
@@ -33,7 +33,7 @@ export function signClass(x: number | null): string {
 
 const EMPTY_ACTION = "Widen the date range and run the report again.";
 
-/** Panel 6: where the return came from. Bars add up to the total; residual is hatched. */
+/** Panel 6: where the return came from. Bars add up to the total; the residual is zero by construction and is not shown as a row. */
 export function ReturnPanel({ report }: ReportPanelProps) {
   const rc = report.return_contribution;
   const reg = report.regression;
@@ -56,7 +56,6 @@ export function ReturnPanel({ report }: ReportPanelProps) {
       notSignificant: reg.alpha_tag !== "reliable",
       kind: "alpha",
     },
-    { name: "Residual", plain: "Zero by construction", value: finite(rc.residual), notSignificant: false, kind: "resid" },
   ];
   const total = finite(rc.total_annualised_mean_excess_return);
   const values = items.flatMap((i) => (i.value === null ? [] : [i.value]));
@@ -121,10 +120,6 @@ export function ReturnPanel({ report }: ReportPanelProps) {
               Faded: not significant
             </>,
             <>
-              <Swatch kind="hatch" />
-              Residual
-            </>,
-            <>
               <TotalSwatch />
               Total
             </>,
@@ -132,12 +127,12 @@ export function ReturnPanel({ report }: ReportPanelProps) {
         />
       }
       outcome={returnsOutcome(report)}
-      footnote={`${desc} The rows add up exactly to the total.`}
+      footnote={`${desc} Residuals average zero by construction (regression with an intercept), so the rows add up to the total.`}
       how={how}
     >
       <table role="table" className="bars cols-2">
         <caption className="vh">
-          Return contribution per factor, alpha and residual, percent a year, with the total
+          Return contribution per factor and alpha, percent a year, with the total
         </caption>
         <thead role="rowgroup">
           <tr role="row">
@@ -158,7 +153,7 @@ export function ReturnPanel({ report }: ReportPanelProps) {
         <tbody role="rowgroup">
           {items.map((item) => {
             const id = item.kind === "alpha" ? "ret-alpha" : `ret-${item.name}`;
-            const sig = item.kind === "resid" ? "–" : item.notSignificant ? "No" : "Yes";
+            const sig = item.notSignificant ? "No" : "Yes";
             return (
               <tr
                 key={id}
@@ -174,12 +169,12 @@ export function ReturnPanel({ report }: ReportPanelProps) {
                     hi={hi}
                     ticks={ticks}
                     value={item.value}
-                    fill={item.kind === "resid" ? "hatch" : "sign"}
+                    fill="sign"
                     faded={item.notSignificant}
                     title={`${item.name}: ${pctN(item.value)} a year`}
                   />
                 </td>
-                <td role="cell" className={`num strong${item.kind === "resid" ? "" : signClass(item.value)}`}>
+                <td role="cell" className={`num strong${signClass(item.value)}`}>
                   {pctN(item.value)}
                 </td>
                 <td role="cell" className="num sig">
