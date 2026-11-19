@@ -43,6 +43,7 @@ from factordesk.report.render_html import render_report_html
 from factordesk.report.schema import FactorModel, FactorReport, RangeOptions, RangePreset
 
 if TYPE_CHECKING:
+    from factordesk.api.portfolio_models import PortfolioTree
     from factordesk.section_hooks.context import SectionInputs
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,9 @@ type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
 type RangesKey = tuple[str, Vintage, date]
 type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel]
+type PortfolioKey = tuple[
+    str, FactorModel, RangePreset | None, date | None, date | None, Vintage, date
+]
 
 
 def _range_text(preset: RangePreset | None, start: date | None, end: date | None) -> str:
@@ -223,6 +227,9 @@ class ReportService:
             self.deps.report_cache_size
         )
         self.reports: SingleFlight[ReportKey, FactorReport] = SingleFlight(
+            self.deps.report_cache_size
+        )
+        self.portfolios: SingleFlight[PortfolioKey, FactorReport] = SingleFlight(
             self.deps.report_cache_size
         )
         self.securities: SingleFlight[SecurityKey, Security] = SingleFlight(PRICE_CACHE_SIZE * 4)
@@ -312,6 +319,70 @@ class ReportService:
 
         return await self.reports.get(key, make)
 
+    async def portfolio_report(
+        self,
+        tree: PortfolioTree,
+        preset: RangePreset | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        model: FactorModel = "ff6",
+    ) -> FactorReport:
+        """The report of a portfolio tree (``api.portfolio_report``): in-memory cache only.
+
+        The key is the SHA-256 of the canonical tree JSON, the model, the range as asked, the
+        factor vintage and the day, so a new price day or factor file never serves an old result.
+        Nothing about the portfolio is written to disk or logged beyond counts.
+        """
+        from factordesk.api import portfolio_report as pr
+
+        started = time.perf_counter()
+        ranges.check_request(preset, start, end)
+        plan = pr.plan_of(tree)
+        logger.info(
+            "Portfolio report start: %d instruments, model %s, range %s",
+            len(plan.rows),
+            model,
+            _range_text(preset, start, end),
+        )
+        now = self._now()
+        loaded = await self._factors()
+        key: PortfolioKey = (plan.digest, model, preset, start, end, loaded.vintage, now.date())
+        if key in self.portfolios:
+            logger.info("Portfolio report cache hit")
+
+        async def make() -> FactorReport:
+            for ticker in plan.tickers:
+                await self._security(ticker, now.date())  # refuses a currency other than USD
+            histories = await self.runtime.run(
+                pr.fetch_histories, self.deps.price_provider, plan.tickers
+            )
+            frame = await self._model_frame(loaded, now, model)
+            inputs = await self._with_world_benchmark(None)
+
+            def build() -> FactorReport:
+                return pr.build_portfolio_report(
+                    plan,
+                    histories,
+                    frame,
+                    model,
+                    now=now,
+                    factors_downloaded_at=loaded.vintage.downloaded_at,
+                    preset=preset,
+                    start=start,
+                    end=end,
+                    inputs=inputs,
+                )
+
+            report = await self.runtime.run(build)
+            logger.info("Portfolio report built in %.1f s", time.perf_counter() - started)
+            return report
+
+        try:
+            return await self.portfolios.get(key, make)
+        except Exception as exc:
+            logger.info("Portfolio report refused: reason %s", to_api_exception(exc).code)
+            raise
+
     async def range_options(self, ticker: str) -> RangeOptions:
         """Availability of every preset for an already validated ticker."""
         now = self._now()
@@ -352,6 +423,7 @@ class ReportService:
             current = loaded.vintage
             self.reports.discard(lambda key: key[3] == current)
             self.ranges.discard(lambda key: key[1] == current)
+            self.portfolios.discard(lambda key: key[5] == current)
         return loaded
 
     async def _load_factors(self) -> LoadedFactors:
