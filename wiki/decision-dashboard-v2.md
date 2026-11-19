@@ -56,6 +56,10 @@ All decisions below were given by the owner on 2026-11-18, after testing the das
   and red in the Factor exposures chart: bars above zero are green, below zero red, not-significant
   bars faded in the same hue, and beta values coloured only when significant. This supersedes
   "betas neutral" for that panel only; shrunk betas and the Summary table keep neutral ink.
+- **Shrunk beta colours (2026-11-19, after the release PR opened).** The owner asked for the same
+  green and red on the Adjusted for noise (shrunk betas) panel. Bars follow the sign of the OLS beta;
+  a beta whose 95% credible interval includes zero is faded and its values stay grey. The Summary
+  table keeps neutral ink.
 
 ## Why
 

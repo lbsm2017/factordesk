@@ -11,6 +11,7 @@ import { AxisRow, Legend, Swatch } from "../barParts";
 import { EmptyState } from "../EmptyState";
 import { Panel } from "../Panel";
 import type { ReportPanelProps } from "../types";
+import "../signColor.css";
 import "./ShrunkBetasPanel.css";
 
 const QUESTION = "How far would a stated prior move each beta, and how much data would detect a small one?";
@@ -39,6 +40,8 @@ interface Row {
   /** The shrunk beta sits on the far side of the OLS beta from the prior centre. */
   movedAway: boolean;
   cred: { low: number; high: number } | null;
+  /** The 95% credible interval includes zero (or is missing): bar faded, values left grey. */
+  unclear: boolean;
 }
 
 function finite(x: number | null | undefined): number | null {
@@ -58,7 +61,14 @@ function rowOf(beta: ShrunkBeta): Row {
     pull,
     movedAway: marked && beta.moved_away === true,
     cred: low !== null && high !== null ? { low, high } : null,
+    unclear: low === null || high === null || (low <= 0 && high >= 0),
   };
+}
+
+/** Sign colour (owner, 2026-11-19): green above zero, red below, grey when the credible interval includes zero. */
+function signClassOf(x: number | null, unclear: boolean): string {
+  if (x === null || unclear || x === 0) return "";
+  return x > 0 ? " num-pos" : " num-neg";
 }
 
 function domainOf(rows: readonly Row[]): NiceDomain {
@@ -117,7 +127,7 @@ function ShrunkPlot({ row, domain }: { row: Row; domain: NiceDomain }) {
         const x = `${position(t, lo, hi)}%`;
         return <line key={t} className={Math.abs(t) < 1e-12 ? "zero" : "grid"} x1={x} x2={x} y1="0" y2="100%" />;
       })}
-      <rect className={ols >= 0 ? "pos" : "neg"} x={`${a}%`} y="32%" width={`${Math.max(b - a, 0)}%`} height="36%" rx="2" />
+      <rect className={`${ols >= 0 ? "pos" : "neg"}${row.unclear ? " faded" : ""}`} x={`${a}%`} y="32%" width={`${Math.max(b - a, 0)}%`} height="36%" rx="2" />
       {row.marked && row.cred ? (
         <>
           <line className="cred" x1={credLo} x2={credHi} y1="50%" y2="50%" />
@@ -176,7 +186,7 @@ function ShrunkTable({ id, rows, domain }: { id: string; rows: readonly Row[]; d
         {rows.map((r) => {
           const f = r.beta.factor;
           return (
-            <tr key={f} role="row" id={`${id}-${f}`} tabIndex={-1}>
+            <tr key={f} role="row" id={`${id}-${f}`} className={r.unclear ? "ns" : undefined} tabIndex={-1}>
               <th role="rowheader" scope="row">
                 <span className="fname">{f}</span>
                 {plainName(f) !== f ? <span className="sub">{plainName(f)}</span> : null}
@@ -186,13 +196,13 @@ function ShrunkTable({ id, rows, domain }: { id: string; rows: readonly Row[]; d
                 <ShrunkPlot row={r} domain={domain} />
                 {r.marked ? <span className="vh">{markerText(r)}</span> : null}
               </td>
-              <td role="cell" className="num strong ols" data-label="OLS">
+              <td role="cell" className={`num strong ols${signClassOf(finite(r.beta.beta_ols), r.unclear)}`} data-label="OLS">
                 {signed(r.beta.beta_ols)}
               </td>
               <td role="cell" className="num se" data-label="se">
                 {num(r.beta.se_hac)}
               </td>
-              <td role="cell" className="num strong shr" data-label="Shrunk">
+              <td role="cell" className={`num strong shr${signClassOf(finite(r.beta.beta_shrunk), r.unclear)}`} data-label="Shrunk">
                 {sgn(finite(r.beta.beta_shrunk))}
               </td>
               <td role="cell" className="num range ci-text" data-label="95% credible interval">
@@ -310,7 +320,15 @@ export function ShrunkBetasPanel({ report }: ReportPanelProps) {
         items={[
           <>
             <Swatch kind="pos" />
-            OLS beta
+            Positive OLS beta
+          </>,
+          <>
+            <Swatch kind="neg" />
+            Negative OLS beta
+          </>,
+          <>
+            <Swatch kind="neg" faded />
+            Faded: interval includes zero
           </>,
           ...(anyMark
             ? [
