@@ -195,7 +195,7 @@
 .sbox { position: relative; }
 .sbox .icon { position: absolute; left: 10px; top: 11px; color: var(--ink-2); pointer-events: none; }
 .sbox input { width: 100%; height: 40px; padding: 0 12px 0 36px; border: 1px solid var(--control-line); border-radius: var(--r-control); background: var(--surface); }
-.pick-list { overflow-y: auto; overscroll-behavior: contain; padding: 0 0 8px; }
+.pick-list { overflow-y: auto; overscroll-behavior: contain; padding: 0 0 8px; min-height: 0; }
 .pick-grp { position: sticky; top: 0; z-index: 2; display: flex; align-items: baseline; gap: 8px; padding: 10px 20px 6px; background: var(--soft); border-bottom: 1px solid var(--grid); border-top: 1px solid var(--grid); font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); }
 .pick-grp .key-sq { align-self: center; }
 .pick-grp b { color: var(--ink); font-size: var(--fs-body); font-weight: 600; }
@@ -379,7 +379,6 @@
 .pick-search input[type="search"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .pick-row.off { color: var(--ink-2); }
 .pick-row .add:focus-visible, .pick-head .ib:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.pick-list { min-height: 0; }
 .pick-grp b, .pick-grp .pn { color: var(--ink); }
 
 @media (min-width: 1100px) {
@@ -401,3 +400,4 @@
 .pick-row .sb .tag.warn { border-color: var(--caution); color: var(--caution); }
 .checks .errc { color: var(--neg); }
 .pf-rename .row { flex-direction: row; }
+.run-dock .dock-tot span.ok { color: var(--pos); }

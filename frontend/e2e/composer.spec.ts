@@ -112,7 +112,7 @@ test("build a 2-holding portfolio and run it on the fake backend", async ({ page
 
 test("the composer at 1440 and 390 px, before and after a run @shots", async ({ page }) => {
   mkdirSync(SHOTS, { recursive: true });
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 1440, height: 1400 });
   await page.goto("/?m=portfolio");
   await create(page, "Balanced SAA", "Balanced SAA");
   await expect(page.locator(".tree-panel")).toContainText("Equity N. America - Large Cap");
