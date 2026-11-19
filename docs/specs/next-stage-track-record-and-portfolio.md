@@ -189,6 +189,12 @@ Research: [research notes, section D](../research/next-stage-research.md).
   - Each figure shows a bootstrap 90% band and the number of tail observations behind it.
   - Daily series use a stationary block bootstrap (Politis-Romano 1994); monthly series use an iid bootstrap.
   - A historical figure with fewer than about 3 expected tail observations shows "n/a" and the reason, e.g. "0.6 expected tail months".
+- **Decisions during E7a build (2026-11-19):**
+  - The Cornish-Fisher guard checks monotonicity only on the range each figure uses: from z_level to 0 for VaR, and from −4 to z_level for CVaR.
+  - A figure that passes locally but fails the global condition is shown and labelled "indicative".
+  - A Cornish-Fisher band is hidden when fewer than 80% of resamples pass the guard.
+  - For the monthly 95% row the tail rule is 2 expected observations, so the historical figure shows from 40 months. All other levels keep 3.
+  - Bands for historical CVaR and for Cornish-Fisher are labelled "approximate". On simulated normal data their 90% bands covered only 75-85%. Gaussian and historical VaR bands are "validated".
 - **Portfolios (E7b):** historical per-holding CVaR is the mean of w_i·r_i over the portfolio's tail days.
   - It sums exactly to the portfolio CVaR and rolls up through the SAA tree.
   - Below about 20 tail observations it falls back to Gaussian per-holding CVaR from the covariance matrix, and the report says so.
