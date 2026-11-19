@@ -3,7 +3,7 @@
 import { riskOutcome } from "../../text/outcome";
 import { PLAIN } from "../../text/plain";
 import { useShowStats } from "../../state/stats";
-import { stepWord } from "../../report/subject";
+import { isSubjectReport, stepWord } from "../../report/subject";
 import { describe, factorOrder, finite, IDIO, labelTexts, sci, slotOf } from "../../report/derive";
 import { BarCell } from "../charts/BarCell";
 import { AxisRow, KeySwatch, NameCell, pctN, signedN } from "./barParts";
@@ -47,6 +47,9 @@ export function RiskPanel({ report }: ReportPanelProps) {
     );
   }
 
+  // Subject-neutral words for an uploaded record or a portfolio; a ticker keeps the stock wording.
+  const specific = isSubjectReport(report) ? "specific to this record" : "stock-specific";
+  const specificLabel = isSubjectReport(report) ? "Specific to this record" : "Stock-specific";
   const order = factorOrder(report);
   const details = new Map(rk.details.map((d) => [d.name, d]));
   // Shares add to 100%: ticks at 0, 50% and 100% keep the labels apart in the half-width panel; the plot
@@ -83,7 +86,7 @@ export function RiskPanel({ report }: ReportPanelProps) {
     >
       <table role="table" className={stats ? "bars cols-4 risk" : "bars risk"}>
         <caption className="vh">
-          Share of variance per factor and stock-specific, with exposure, factor volatility and correlation
+          Share of variance per factor and {specific}, with exposure, factor volatility and correlation
         </caption>
         <thead role="rowgroup">
           <tr role="row">
@@ -134,7 +137,7 @@ export function RiskPanel({ report }: ReportPanelProps) {
               <tr key={name} role="row" className={idio ? "idio" : undefined}>
                 <NameCell
                   name={name}
-                  plain={idio ? "Stock-specific" : (PLAIN[name] ?? "")}
+                  plain={idio ? specificLabel : (PLAIN[name] ?? "")}
                   keySwatch={<KeySwatch className={key} />}
                   mobile={mobile}
                 />

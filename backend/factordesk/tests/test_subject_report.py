@@ -215,6 +215,16 @@ def test_uncovered_months_are_named_in_months() -> None:
     assert lag and "3 later months are not analysed" in lag[0].message
 
 
+def test_no_lag_warning_when_no_month_is_cut_off() -> None:
+    returns, factors, _ = monthly_case(70, 15)
+    subject = subject_from_monthly_returns(returns, label="Example Fund")
+    late = datetime(2027, 3, 1, 12, 0, tzinfo=UTC)
+    report = assemble_subject_report(subject, factors, now=late, factors_downloaded_at=None)
+    assert report.data.uncovered.n == 0
+    assert report.data.factors_days_behind > 40
+    assert not any(w.code == "factor_data_lag" for w in report.warnings)
+
+
 def test_non_usd_subject_and_unknown_model_are_refused() -> None:
     returns, factors, _ = monthly_case(40, 16)
     eur = subject_from_monthly_returns(returns, label="Euro Fund", currency="EUR")

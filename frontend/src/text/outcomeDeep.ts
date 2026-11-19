@@ -4,7 +4,7 @@
  */
 import type { FactorReport, PerformanceSection } from "../api/types";
 import { dateLong, num, pct } from "../format";
-import { finite, isoMs } from "../report/derive";
+import { countWord, factorCount, finite, isoMs } from "../report/derive";
 import { compareFits } from "../components/report/sections/worldBetaModel";
 import { plural } from "./outcome";
 
@@ -71,7 +71,7 @@ export function worldBetaOutcome(report: FactorReport): string | null {
       first !== null && gapDays >= 0 && gapDays <= 7
         ? `the fund's history starts in ${monthYear(first)}`
         : `the two price histories overlap only from ${dateLong(s.sample.start)}`;
-    text += ` This covers a shorter span than the five-factor model, because ${reason}.`;
+    text += ` This covers a shorter span than the ${countWord(factorCount(report))}-factor model, because ${reason}.`;
   }
   return text;
 }

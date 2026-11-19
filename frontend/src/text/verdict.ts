@@ -5,6 +5,7 @@
  */
 import type { FactorReport, FactorStat, PerformanceSection, WorldBetaSection } from "../api/types";
 import { dateLong, num, pct, signed } from "../format";
+import { countWord, factorCount } from "../report/derive";
 import { TILT } from "./plain";
 
 const STYLE_ORDER = ["SMB", "HML", "RMW", "CMA"] as const;
@@ -123,7 +124,7 @@ export function verdict(report: FactorReport): Verdict {
   const reg = report.regression;
   if (reg.status !== "ok") {
     const reason = (reg.reason ?? "no reason was given").replace(/\.+$/, "");
-    return done(`factordesk could not fit the five-factor model for ${t} over this range: ${reason}.`, null);
+    return done(`factordesk could not fit the ${countWord(factorCount(report))}-factor model for ${t} over this range: ${reason}.`, null);
   }
   const mkt = factorOf(report, "Mkt-RF");
   const m = marketPhrase(mkt?.beta ?? null, mkt?.tag ?? null);
