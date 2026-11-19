@@ -58,6 +58,10 @@ The owner found the two panels too spread out across the full width. From 1280 p
 
 Both panels are compact. Alpha across models shows Model, Alpha a year, t and adjusted R², with a dot per row and an approximate 95% range (alpha plus or minus 1.96 times |alpha / t|) on one shared scale with a line at zero. Plain R², the long model note and the dropped-row count moved into "How this is computed". World beta keeps its forest plot with a narrower label column and axis; the stand-in notes, the data end dates and the shorter-span sentence moved into "How this is computed". Nothing was removed.
 
+## Update, 2026-11-19: the model selector is gone
+
+On 2026-11-19 the owner removed the FF5/FF6 selector from the sidebar. The dashboard uses FF6. A `model=ff5` URL still opens FF5. A Settings module will hold the choice later.
+
 ## Sources
 
 - [docs/design/report-design.md](../docs/design/report-design.md), sections C, D (panels 1, 3, 4, 5, 8), H.9 to H.12 and I.

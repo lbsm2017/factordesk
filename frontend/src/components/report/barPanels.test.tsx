@@ -47,7 +47,7 @@ function cells(row: Element): string[] {
 }
 
 describe("ReturnPanel", () => {
-  it("shows every contribution, the hatched residual, the total and the memo list", () => {
+  it("shows every contribution, the total and the memo list, and no residual row", () => {
     const { container } = render(<ReturnPanel report={mockReport} />);
     expect(screen.getByRole("heading", { level: 2, name: "Return sources" })).toBeTruthy();
     const rows = Array.from(container.querySelectorAll("tbody tr"));
@@ -58,12 +58,12 @@ describe("ReturnPanel", () => {
       ["RMWProfitability", "+0.08%", "Yes"],
       ["CMAInvestment", "0.00%", "No"],
       ["AlphaUnexplained average", "+0.81%", "No"],
-      ["ResidualZero by construction", "0.00%", "–"],
       ["TotalMean excess return", "+12.64%", ""],
     ]);
     expect(container.querySelector("#ret-alpha")).not.toBeNull();
     expect(container.querySelector("#ret-Mkt-RF")?.getAttribute("tabindex")).toBe("-1");
-    expect(container.querySelector("tr.resid rect.hatch")).not.toBeNull();
+    expect(container.querySelector("tr.resid")).toBeNull();
+    expect(container.querySelector("rect.hatch")).toBeNull();
     expect(container.querySelector("tr.alpha rect.faded")).not.toBeNull();
     expect(container.querySelector("tr.total line.total-cap")).not.toBeNull();
     expect(screen.getByText("Not in the sum")).toBeTruthy();
@@ -86,7 +86,6 @@ describe("ReturnPanel", () => {
     expect(container.querySelector("#ret-alpha")?.classList.contains("is-noise")).toBe(true);
     expect(container.querySelector("#ret-Mkt-RF")?.classList.contains("is-noise")).toBe(false);
     expect(value("ret-CMA")?.className).toBe("num strong");
-    expect(container.querySelector("tr.resid td.num.strong")?.className).toBe("num strong");
     expect(container.querySelector("tr.total td.num.strong")?.classList.contains("num-pos")).toBe(true);
   });
 
@@ -102,7 +101,9 @@ describe("ReturnPanel", () => {
 
   it("keeps the footnote to one sentence plus a folded method note", () => {
     const { container } = render(<ReturnPanel report={mockReport} />);
-    expect(container.querySelector(".foot > p")?.textContent).toMatch(/The rows add up exactly to the total\.$/);
+    expect(container.querySelector(".foot > p")?.textContent).toMatch(
+      /Residuals average zero by construction \(regression with an intercept\), so the rows add up to the total\.$/,
+    );
     expect(container.querySelector("details.how")?.textContent).toContain("Arithmetic, not compounded");
     expect(container.querySelector("details.how")?.textContent).toContain("Identity check 0.0e+00.");
   });
@@ -113,7 +114,7 @@ describe("ReturnPanel", () => {
     expect(table?.getAttribute("role")).toBe("table");
     expect(table?.className).toContain("bars");
     expect(container.querySelector("tbody th")?.getAttribute("role")).toBe("rowheader");
-    expect(container.querySelectorAll("td.plot-cell > svg.bar-svg").length).toBe(8);
+    expect(container.querySelectorAll("td.plot-cell > svg.bar-svg").length).toBe(7);
     expect(container.querySelector("tr.axis-row")?.getAttribute("aria-hidden")).toBe("true");
     expect(within(container.querySelector("tr.axis-row") as HTMLElement).getByText("0%")).toBeTruthy();
   });

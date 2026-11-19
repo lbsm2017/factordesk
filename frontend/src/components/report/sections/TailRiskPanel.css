@@ -1,5 +1,5 @@
 /* Tail risk panel: a plain table in the style of the drawdown table; tokens only. */
-.tr-wrap { overflow-x: auto; }
+.tr-wrap { overflow-x: auto; overflow-y: hidden; }
 .tr-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .tr-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-3) 6px 0; border-bottom: 1px solid var(--border); }
 .tr-table tbody th { font-size: var(--fs-2); font-weight: 560; color: var(--ink); padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: top; }
