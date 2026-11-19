@@ -2,9 +2,10 @@
 
 Each file is described by a ``FrenchDataset`` entry in ``DATASETS`` (zip name, frequency, the
 exact column header, row floor and plausibility bounds), so a new factor file is one entry, not
-new code. Today: the Fama-French five factors, monthly. The momentum factor (``Mom``, daily and
-monthly) and others are added the same way. The daily five-factor file keeps its own loader
-(``data.factors.load_ff5_daily``), which this module does not change.
+new code. Today: the Fama-French five factors, monthly, and the momentum factor (``Mom``), daily
+and monthly. The daily five-factor file keeps its own loader (``data.factors.load_ff5_daily``),
+which this module does not change. ``load_ff6`` joins ``Mom`` to the five factors of either
+frequency (``join_momentum``).
 
 File layout (all factor files of the library share it): a free-text preamble; a header line that
 starts with a comma (``,Mkt-RF,SMB,HML,RMW,CMA,RF``); one block of data rows whose first field is
@@ -49,7 +50,15 @@ import numpy as np
 import pandas as pd
 
 from factordesk.config import get_settings
-from factordesk.data.factors import FactorDataError, FactorDownloadError, FactorError
+from factordesk.data.factors import (
+    ALL_COLUMNS,
+    SOURCE_URL,
+    FactorDataError,
+    FactorDownloadError,
+    FactorError,
+    factor_status,
+    load_ff5_daily,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +73,7 @@ DOWNLOAD_RETRIES = 3
 DOWNLOAD_TIMEOUT_S = 30.0
 
 _ZIP_MAGIC = b"PK\x03\x04"
+_UTF8_BOM = b"\xef\xbb\xbf"
 _ROW_PATTERN: dict[Frequency, re.Pattern[str]] = {
     "daily": re.compile(r"^\s*\d{8}\s*,"),
     "monthly": re.compile(r"^\s*\d{6}\s*,"),
@@ -99,6 +109,13 @@ class FrenchDataset:
         return BASE_URL + self.filename
 
 
+MOM = "Mom"
+"""Column name of the momentum factor in the library's files and in the frames returned here."""
+_MOM_ALIASES: Mapping[str, str] = {"MOM": MOM, "UMD": MOM, "Momentum": MOM}
+"""Header spellings accepted for ``Mom`` (the preamble of the daily file says "MOM"; other
+sources say "UMD"). Every token is stripped of blanks first, so ``",Mom   "`` also
+matches."""
+
 DATASETS: dict[str, FrenchDataset] = {
     "ff5_monthly": FrenchDataset(
         key="ff5_monthly",
@@ -108,10 +125,29 @@ DATASETS: dict[str, FrenchDataset] = {
         min_rows=600,
         max_abs_factor=1.0,
     ),
+    # Momentum (research C1). Mom is a long-short spread with no RF column, so nothing is ever
+    # subtracted from it. The daily file starts 1926-11-03, the monthly one 1927-01; the worst
+    # values on record are about -18.5% (daily) and -52.6% (monthly, 1932), inside the bounds.
+    "mom_daily": FrenchDataset(
+        key="mom_daily",
+        filename="F-F_Momentum_Factor_daily_CSV.zip",
+        frequency="daily",
+        columns=(MOM,),
+        min_rows=20_000,
+        max_abs_factor=0.5,
+        aliases=_MOM_ALIASES,
+    ),
+    "mom_monthly": FrenchDataset(
+        key="mom_monthly",
+        filename="F-F_Momentum_Factor_CSV.zip",
+        frequency="monthly",
+        columns=(MOM,),
+        min_rows=1_000,
+        max_abs_factor=1.0,
+        aliases=_MOM_ALIASES,
+    ),
 }
-"""Every factor file this module can load, by key. Momentum is meant to join as
-``"mom_daily"`` (``F-F_Momentum_Factor_daily_CSV.zip``, columns ``("Mom",)``) and
-``"mom_monthly"`` (``F-F_Momentum_Factor_CSV.zip``): one entry each, no code change."""
+"""Every factor file this module can load, by key."""
 
 Fetcher = Callable[[str], tuple[bytes, str | None]]
 """``fetch(url) -> (content, Last-Modified header)``; raises ``FactorDownloadError``."""
@@ -165,6 +201,7 @@ def parse_french_block(
     floor = dataset.min_rows if min_rows is None else min_rows
     if raw.startswith(_ZIP_MAGIC):
         raw = extract_csv(raw)
+    raw = raw.removeprefix(_UTF8_BOM)
     lines = raw.decode("latin-1").splitlines()
     stamp_match = next((m for ln in lines[:20] if (m := _STAMP.search(ln))), None)
 
@@ -173,7 +210,11 @@ def parse_french_block(
         raise FactorDataError(
             f"{dataset.key}: no header row (a line starting with a comma) in the factor file"
         )
-    tokens = [c.strip() for c in lines[header_idx].split(",")][1:]
+    tokens = [c.strip() for c in lines[header_idx].split(",")][1:]  # also strips no-break spaces
+    trailing_empty = 0
+    while tokens and not tokens[-1]:  # a header that ends in a comma
+        tokens.pop()
+        trailing_empty += 1
     tokens = [dataset.aliases.get(t, t) for t in tokens]
     if tokens != list(dataset.columns):
         raise FactorDataError(
@@ -192,6 +233,12 @@ def parse_french_block(
                     f"(line {line_no})"
                 )
             parts = [p.strip() for p in ln.split(",")]
+            if (
+                trailing_empty
+                and len(parts) > len(dataset.columns) + 1
+                and not any(parts[len(dataset.columns) + 1 :])
+            ):  # rows that end in the same trailing comma as the header
+                parts = parts[: len(dataset.columns) + 1]
             if len(parts) != len(dataset.columns) + 1:
                 raise FactorDataError(
                     f"{dataset.key}: row on line {line_no} has {len(parts)} fields, expected "
@@ -429,3 +476,130 @@ def load_ff5_monthly(
 ) -> pd.DataFrame:
     """Fama-French five factors and RF, monthly (decimals, stamped at calendar month-ends)."""
     return load_french("ff5_monthly", refresh=refresh, data_dir=data_dir, now=now, fetch=fetch)
+
+
+# --------------------------------------------------------------------------- FF6 (FF5 + Mom)
+def _month_end_dates(index: pd.DatetimeIndex) -> bool:
+    days = np.asarray(index.day, dtype=np.int64)
+    return bool((days == np.asarray(index.days_in_month, dtype=np.int64)).all())
+
+
+def _check_index(frame: pd.DataFrame, what: str) -> pd.DatetimeIndex:
+    index = frame.index
+    if not isinstance(index, pd.DatetimeIndex) or len(index) == 0:
+        raise ValueError(f"{what}: needs a non-empty DatetimeIndex")
+    if not index.is_unique or not index.is_monotonic_increasing:
+        raise ValueError(f"{what}: dates must be unique and increasing")
+    return index
+
+
+def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
+    """The FF6 factor frame: the five factors and RF of ``ff5`` with ``Mom`` joined on date.
+
+    Pure. Both frames have one frequency (daily, or monthly stamped at calendar month-ends) and
+    the library's column names. ``Mom`` is a long-short spread and is copied as published: RF is
+    never subtracted from it. The result covers the common window, from the later first date to
+    the earlier last date of the two files, on the dates of the five-factor file. A five-factor
+    date without a ``Mom`` value keeps ``Mom`` as NaN (never filled), so the sample builder
+    excludes it with the reason "factor value missing".
+
+    ``attrs`` records both vintages (``"ff5"``, ``"mom"``: the input frames' ``attrs``), the window
+    (``"first_date"``, ``"last_date"``), which file ends it (``"ends_with"``: ``"ff5"``,
+    ``"mom"`` or ``"both"``), ``"mom_missing_rows"`` (window dates of the five-factor file with
+    no ``Mom`` value) and ``"mom_rows_without_ff5"`` (``Mom`` dates in the window that the
+    five-factor file does not have; they are dropped).
+    """
+    ff5_index = _check_index(ff5, "five-factor frame")
+    mom_index = _check_index(mom, "momentum frame")
+    missing = [c for c in ALL_COLUMNS if c not in ff5.columns]
+    if missing:
+        raise ValueError(f"five-factor frame is missing columns {missing}")
+    if MOM in ff5.columns:
+        raise ValueError("the five-factor frame already has a Mom column")
+    if MOM not in mom.columns:
+        raise ValueError(f"momentum frame has no {MOM!r} column")
+    monthly = _month_end_dates(ff5_index)
+    if len(ff5_index) > 2 and len(mom_index) > 2 and monthly != _month_end_dates(mom_index):
+        raise ValueError("the five-factor and momentum frames have different frequencies")
+
+    first = max(ff5_index[0], mom_index[0])
+    ff5_last, mom_last = ff5_index[-1], mom_index[-1]
+    last = min(ff5_last, mom_last)
+    if first > last:
+        raise FactorDataError(
+            f"the five-factor ({ff5_index[0].date()} to {ff5_last.date()}) and momentum "
+            f"({mom_index[0].date()} to {mom_last.date()}) files do not overlap"
+        )
+    window = ff5.loc[(ff5_index >= first) & (ff5_index <= last), list(ALL_COLUMNS)]
+    window = window.astype("float64")
+    mom_values = mom[MOM].astype("float64")
+    out = window.copy()
+    out[MOM] = mom_values.reindex(window.index)
+    out.index = pd.DatetimeIndex(out.index, name="date")
+
+    in_window = mom_index[(mom_index >= first) & (mom_index <= last)]
+    mom_only = int(len(in_window.difference(pd.DatetimeIndex(window.index))))
+    n_missing = int(out[MOM].isna().sum())
+    if mom_only or n_missing:
+        logger.warning(
+            "FF6 join: %d five-factor dates without Mom (kept as NaN), %d Mom dates without "
+            "five-factor data (dropped)",
+            n_missing,
+            mom_only,
+        )
+    ends_with = "both" if ff5_last == mom_last else ("ff5" if ff5_last < mom_last else "mom")
+    out.attrs = {
+        "key": "ff6_monthly" if monthly else "ff6_daily",
+        "ff5": dict(ff5.attrs),
+        "mom": dict(mom.attrs),
+        "first_date": pd.Timestamp(out.index[0]).date().isoformat(),
+        "last_date": pd.Timestamp(out.index[-1]).date().isoformat(),
+        "ends_with": ends_with,
+        "mom_missing_rows": n_missing,
+        "mom_rows_without_ff5": mom_only,
+    }
+    return out
+
+
+def _ff5_daily_vintage(data_dir: Path | None, now: datetime | None) -> dict[str, Any]:
+    status = factor_status(data_dir, now)
+    if status is None:
+        return {"key": "ff5_daily", "source_url": SOURCE_URL}
+    return {
+        "key": "ff5_daily",
+        "source_url": status.source_url,
+        "downloaded_at": (
+            status.last_download_at.isoformat() if status.last_download_at is not None else None
+        ),
+        "first_date": status.first_date.isoformat(),
+        "last_date": status.last_date.isoformat(),
+    }
+
+
+def load_ff6(
+    frequency: Frequency,
+    *,
+    refresh: bool = False,
+    data_dir: Path | None = None,
+    now: datetime | None = None,
+    fetch: Fetcher | None = None,
+) -> pd.DataFrame:
+    """FF5 + RF + ``Mom`` at ``frequency`` (decimals), from the caches (``join_momentum``).
+
+    Daily: the five factors come from ``data.factors.load_ff5_daily`` (its own download path;
+    ``fetch`` is not used for it) and ``Mom`` from ``"mom_daily"``. Monthly: ``"ff5_monthly"`` and
+    ``"mom_monthly"``. Each file follows its own cache policy. The frame ends at the earlier last
+    date of the two files; both vintages are in ``attrs`` (see ``join_momentum``).
+    """
+    if frequency == "daily":
+        ff5 = load_ff5_daily(refresh=refresh, data_dir=data_dir, now=now).copy(deep=False)
+        ff5.attrs.clear()
+        ff5.attrs.update(_ff5_daily_vintage(data_dir, now))
+        mom_key = "mom_daily"
+    elif frequency == "monthly":
+        ff5 = load_ff5_monthly(refresh=refresh, data_dir=data_dir, now=now, fetch=fetch)
+        mom_key = "mom_monthly"
+    else:
+        raise ValueError(f"unknown frequency {frequency!r}; use 'daily' or 'monthly'")
+    mom = load_french(mom_key, refresh=refresh, data_dir=data_dir, now=now, fetch=fetch)
+    return join_momentum(ff5, mom)
