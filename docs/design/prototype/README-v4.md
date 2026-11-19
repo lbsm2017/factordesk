@@ -4,6 +4,45 @@ Written 2026-11-19, after the owner's review of rev 3: the layout looked templat
 and feel should be more professional and less dispersed. Two variants from one generator so the
 owner can choose. Rev 3 files (`*-v3*`) are unchanged.
 
+## Decision, 2026-11-19: v4a with sign colour
+
+The owner chose v4a and asked for red and green back ("I still want red/green colours"). v4a now:
+
+- **Price | Drawdown pair** (from v4b) directly below the Summary. To avoid charting the price
+  twice, the Summary drops its own price chart and sets the key metrics as two side-by-side tables,
+  Performance and Factor model (stacked under 1280 px, and under 1680 px when statistics are on).
+  The first screen at 1440 x 900 still shows the verdict, every key metric and the top of both
+  charts.
+- **Sign colour.** Signed returns and estimates are green #007862 when positive and red #C23345
+  when negative, always with an explicit + or minus: key metrics Annualised return, Sharpe ratio,
+  Max drawdown, Alpha (annual), Beta to US market and Beta to ACWI; the after-factor-data change in
+  Price; Largest falls; Factor exposures bars and betas; World beta values and dots; Return sources
+  bars, values and total; the residual figures; Regression detail estimates. The colour follows the
+  printed sign, so a value that rounds to 0.00% stays ink.
+- **Evidence weight.** Clear evidence: full-hue bar, value at weight 600. Could be noise: the
+  value keeps the full hue at weight 400, and the bar is a 38% tint (#9ECCC3, #E8B1B8) outlined
+  1 px in the full hue, because the tint alone is under 3:1 on white. Reading words stay ink, so
+  colour is never the only signal. Bars are 12 px with a 2 px radius; the zero line is drawn above
+  them.
+- **Kept neutral on purpose:** volatility, residual volatility, R², observations, risk-source
+  shares (shares are not good or bad), standard errors, t and p, and the diagnostic panels
+  (exposure over time, Kalman, shrunk), which compare estimates rather than report a signed return.
+- **Checks** (`python docs/design/prototype/colour_v4.py`, Machado 2009 at severity 1.0, OKLab x100):
+
+| Pair | Normal | Protanopia | Deuteranopia | Tritanopia | Floor |
+|---|---|---|---|---|---|
+| #007862 / #C23345 (text, full bars, tint outlines) | 27.2 | 8.9 | 8.5 | 31.3 | 15 / 8 |
+| #9ECCC3 / #E8B1B8 (tint fills, information only) | 11.4 | 4.2 | 2.3 | 14.5 | carried by the outlines |
+
+| Text or mark | On white | On page #F4F6FA | On row hover #F7F8FB |
+|---|---|---|---|
+| Green #007862 | 5.44 | 5.02 | 5.12 |
+| Red #C23345 | 5.45 | 5.04 | 5.13 |
+| Tint bars #9ECCC3, #E8B1B8 | 1.77, 1.84 (outlined at 5.44, 5.45) | | |
+
+v4b is unchanged in design (its colours are scoped out); it regenerates from the same code, so its
+world-beta values now carry a + sign. Its screenshots are from the first v4 round.
+
 | File | What it is |
 |---|---|
 | `build_prototype_v4.py` | Generator. `--variant a` or `b` (default both), `--on stats,menu,win126`, `--out PATH` |
@@ -12,6 +51,7 @@ owner can choose. Rev 3 files (`*-v3*`) are unchanged.
 | `report-v4b.html` | Variant b, compact dashboard |
 | `shoot_v4.py` | Screenshots (`shot_v4a_*`, `shot_v4b_*`) and `measure` (horizontal overflow check) |
 | `preflight_v4.py` | Mechanical slop and contrast pre-flight over the CSS and both pages |
+| `colour_v4.py` | Sign-colour contrast and colour-blind separation check |
 | `PRODUCT-v4.md` | Product context this round was built against (inferred, see the last section) |
 
 ```
@@ -23,6 +63,8 @@ python docs/design/prototype/preflight_v4.py
 Same mock fixture, same plain-language rules and demo values as rev 3 (imported, not copied).
 
 ## The two variants
+
+The descriptions below are the first v4 round; v4a has since changed as recorded above.
 
 **v4a, tearsheet.** Title row (ticker, name, type badge, Download report), then an analysis bar
 (analysis period, observations, factor data date, benchmark ACWI), then one Summary panel: the
