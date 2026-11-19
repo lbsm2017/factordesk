@@ -1,12 +1,18 @@
-/* Alpha strip: a plain table in the style of the tail risk table; every row looks the same (no ranking). Tokens only. */
+/* Alpha strip: a compact table in the style of the tail risk table, with one dot and approximate 95% range per row on a shared scale. Every row looks the same (no ranking). Tokens only. */
 .as-wrap { overflow-x: auto; }
-.as-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.as-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-3) 6px 0; border-bottom: 1px solid var(--border); }
+.as-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; margin-top: var(--s-2); }
+.as-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-2) 6px 0; border-bottom: 1px solid var(--border); vertical-align: bottom; }
 .as-table th.num, .as-table td.num { text-align: right; }
-.as-table tbody th { font-size: var(--fs-2); font-weight: 560; color: var(--ink); padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--grid); white-space: nowrap; }
-.as-table td { font-size: var(--fs-2); color: var(--ink); padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--grid); }
-.as-note { margin: var(--s-3) 0 0; max-width: 76ch; font-size: var(--fs-2); color: var(--ink-2); }
-
-@media screen and (max-width: 719px) {
-  .as-table td, .as-table tbody th { padding-right: var(--s-2); }
-}
+.as-table thead th:nth-child(1) { width: 60px; }
+.as-table thead th:nth-child(2) { width: 84px; }
+.as-table thead th:nth-child(4) { width: 40px; }
+.as-table thead th:nth-child(5) { width: 76px; }
+.as-table tbody th { font-size: var(--fs-2); font-weight: 560; color: var(--ink); padding: var(--s-2) var(--s-2) var(--s-2) 0; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+.as-table td { font-size: var(--fs-2); color: var(--ink); padding: var(--s-2) 0 var(--s-2) var(--s-2); border-bottom: 1px solid var(--grid); }
+.as-table td.num { padding-right: 0; }
+.as-table td.as-plot { padding: 0 var(--s-2); }
+.as-table .bar-svg { height: 28px; }
+.as-table .as-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 1; }
+.as-table tfoot td { padding: 0; border: 0; }
+.as-table .axis { height: 22px; }
+.as-table .axis span { top: 4px; }

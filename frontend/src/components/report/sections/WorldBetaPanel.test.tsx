@@ -60,7 +60,20 @@ describe("WorldBetaBody", () => {
     expect(container.querySelector(".q")?.textContent).toBe(
       "Against world stocks, SPY's beta was 0.93 over 8 Aug 2024 to 30 Sep 2026 (540 days), about the same as its beta against the US market on the same days (1.00).",
     );
+    expect(container.querySelector("details.how")?.textContent).not.toContain("shorter span");
     expect(container.querySelector(".pm")?.textContent).toBe("Quick estimate, 540 days, one-factor");
+  });
+
+  it("keeps the lead to one sentence and moves the shorter-span note into the fold", () => {
+    const report = reportWith((s) => {
+      s.sample.start = "2024-09-03";
+      s.acwi_first_date = "2024-08-30";
+    });
+    const { container } = render(<WorldBetaBody report={report} />);
+    expect(container.querySelector(".q")?.textContent).not.toContain("shorter span");
+    expect(container.querySelector("details.how")?.textContent).toContain(
+      "This covers a shorter span than the five-factor model, because the fund's history starts in August 2024.",
+    );
   });
 
   it("counts the days of the fit, not the analysis-wide sample, in the aside and the rows", () => {
@@ -105,7 +118,7 @@ describe("WorldBetaBody", () => {
     expect(heads(container)).toEqual(["Against", "Chart", "Beta", "Days"]);
     expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "540"]);
     expect(cells(container, "us")).toEqual(["US market, one-factor, same days", "+1.00", "540"]);
-    expect(cells(container, "europe")).toEqual(["Europe IEUR, MSCI Europe stand-in", "+0.80", "540"]);
+    expect(cells(container, "europe")).toEqual(["Europe IEUR stand-in", "+0.80", "540"]);
     expect(Array.from(container.querySelectorAll("tbody tr")).map((r) => r.id)).toEqual([
       "world-beta-acwi",
       "world-beta-europe",
@@ -139,7 +152,7 @@ describe("WorldBetaBody", () => {
   it("shows the Europe row on the same axis with its interval and R squared when statistics are on", () => {
     state.stats = true;
     const { container } = render(<WorldBetaBody report={reportWith()} />);
-    expect(cells(container, "europe")).toEqual(["Europe IEUR, MSCI Europe stand-in", "+0.80", "0.72 to 0.88", "0.64", "540"]);
+    expect(cells(container, "europe")).toEqual(["Europe IEUR stand-in", "+0.80", "0.72 to 0.88", "0.64", "540"]);
     expect(container.querySelector("details.how")?.textContent).toContain("IEUR");
   });
 
@@ -176,13 +189,15 @@ describe("WorldBetaBody", () => {
     }
   });
 
-  it("carries the quick-estimate footnote with the stand-in notes and the fold", () => {
+  it("keeps the footnote short and puts the stand-in notes and data dates in the fold", () => {
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     const foot = container.querySelector(".foot > p")?.textContent ?? "";
-    expect(foot).toContain("A quick estimate.");
-    expect(foot).toContain("stand-in for the MSCI ACWI index");
-    expect(foot).toContain("ACWI data ends 30 Sep 2026.");
+    expect(foot).toBe("Descriptive, in-sample, not predictive. A quick estimate.");
     const how = container.querySelector("details.how")?.textContent ?? "";
+    expect(how).toContain("stand-in for the MSCI ACWI index");
+    expect(how).toContain("iShares Core MSCI Europe ETF");
+    expect(how).toContain("ACWI data ends 30 Sep 2026.");
+    expect(how).toContain("IEUR data ends 30 Sep 2026.");
     expect(how).toContain("not a test of the difference");
     expect(how).toContain("Newey-West with 6 lags");
     expect(how).toContain("19 days of the analysed sample were left out");

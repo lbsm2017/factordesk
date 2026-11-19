@@ -11,7 +11,7 @@ import type { NiceDomain } from "../exposureModel";
 import { AxisRow } from "../barParts";
 import { Panel } from "../Panel";
 import type { ReportPanelProps } from "../types";
-import { worldBetaOutcome } from "../../../text/outcomeDeep";
+import { worldBetaLead, worldBetaSpanNote } from "../../../text/outcomeDeep";
 import { europeOk, sameFit } from "./worldBetaModel";
 import type { BetaFit, ProxyBeta } from "./worldBetaModel";
 import "./WorldBetaPanel.css";
@@ -22,7 +22,7 @@ const DEFAULT_DESC = "Descriptive, in-sample, not predictive.";
 const QUICK = "A quick estimate.";
 const PROXY_SHORT = "ACWI is an ETF used as a stand-in for the MSCI ACWI index.";
 const EUROPE_PROXY = "Europe uses IEUR, the iShares Core MSCI Europe ETF, as a stand-in for the MSCI Europe index.";
-const EUROPE_SUB = "IEUR, MSCI Europe stand-in";
+const EUROPE_SUB = "IEUR stand-in";
 
 interface Row {
   key: string;
@@ -42,7 +42,7 @@ function nextStep(s: WorldBetaSection): string {
 function domainOf(rows: readonly Row[]): NiceDomain {
   const values = [0, 1];
   for (const r of rows) values.push(r.fit.ci_low, r.fit.ci_high, r.fit.beta);
-  return niceDomain(Math.min(...values), Math.max(...values), 4);
+  return niceDomain(Math.min(...values), Math.max(...values), 3);
 }
 
 function interval(fit: BetaFit): string {
@@ -76,20 +76,23 @@ function BetaPlot({ row, domain }: { row: Row; domain: NiceDomain }) {
   );
 }
 
-function footnote(report: ReportPanelProps["report"], s: WorldBetaSection): string {
+/** The short footnote under the plot; the stand-in notes and data dates are in "How this is computed". */
+function footnote(report: ReportPanelProps["report"]): string {
+  return [report.label_text["L-DESC"] ?? DEFAULT_DESC, QUICK].join(" ");
+}
+
+/** What the footnote used to carry: the stand-in notes and the last data dates. */
+function standIns(report: ReportPanelProps["report"], s: WorldBetaSection): string[] {
   const texts = report.label_text;
   const e = s.europe ?? null;
-  const parts = [
-    texts["L-DESC"] ?? DEFAULT_DESC,
-    QUICK,
+  return [
     texts["L-WORLD-PROXY"] ?? PROXY_SHORT,
     e ? EUROPE_PROXY : "",
     s.acwi_last_date ? `ACWI data ends ${dateLong(s.acwi_last_date)}.` : "",
     s.acwi_note ?? "",
     e?.last_date ? `IEUR data ends ${dateLong(e.last_date)}.` : "",
     e?.note ?? "",
-  ];
-  return parts.filter(Boolean).join(" ");
+  ].filter(Boolean);
 }
 
 function howEurope(e: ProxyBeta): string[] {
@@ -123,7 +126,8 @@ function how(report: ReportPanelProps["report"], s: WorldBetaSection, europe: Pr
     : "";
   const timing = report.label_text["L-WORLD-ASYNC"] ?? "";
   const more = europe ? howEurope(europe) : [];
-  return [method, reading, extra, timing, ...s.audit_warnings, ...more].filter(Boolean).join(" ");
+  const span = worldBetaSpanNote(report) ?? "";
+  return [method, reading, extra, span, ...standIns(report, s), timing, ...s.audit_warnings, ...more].filter(Boolean).join(" ");
 }
 
 /** Body of the World beta panel (section `world_beta`). Renders nothing while the section is null. */
@@ -177,8 +181,8 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
       id="world-beta"
       title={TITLE}
       legend={<div className="pm">{`Quick estimate, ${count(world ? s.sample.n : (europe?.n_days ?? 0))} days, one-factor`}</div>}
-      outcome={world ? worldBetaOutcome(report) : null}
-      footnote={footnote(report, s)}
+      outcome={world ? worldBetaLead(report) : null}
+      footnote={footnote(report)}
       how={how(report, s, europe)}
     >
       {europeReading ? <p className="reading">{europeReading}</p> : null}
@@ -245,7 +249,7 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
             ticks={domain.ticks}
             lo={domain.lo}
             hi={domain.hi}
-            format={(t) => (Math.abs(t) < 1e-12 ? "0" : signed(t, 2))}
+            format={(t) => (Math.abs(t) < 1e-12 ? "0" : num(t, 1))}
             columns={numberColumns}
           />
         </tfoot>

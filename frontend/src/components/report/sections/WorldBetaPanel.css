@@ -1,5 +1,6 @@
 /* World beta panel (prototype v4a): one row per index, beta as a neutral ink dot with its 95% interval. */
-.bars.wb thead th:first-child { width: 168px; }
+.bars.wb thead th:first-child { width: 112px; }
+.bars.wb thead th.num { width: 56px; }
 .bars.wb thead th.num.wide { width: 128px; }
 .bars.wb td.num.wide { white-space: nowrap; }
 .bars.wb .wb-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 1; }
