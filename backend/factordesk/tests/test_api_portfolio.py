@@ -599,3 +599,18 @@ def test_an_explicit_cash_line_and_the_remainder_add_up_to_one(client: ApiClient
     assert section.unallocated_weight == pytest.approx(0.15)
     assert sum(w.weight for w in section.weights) + section.unallocated_weight == pytest.approx(1.0)
     assert section.end_limited_by == ["USD cash (risk-free rate)"]
+
+
+# --------------------------------------------------------------------------- wording
+def test_the_wording_fits_a_portfolio(client: ApiClient) -> None:
+    from factordesk.section_hooks.residual_alpha import caveats
+
+    assert caveats(252)[0].startswith("You see the stock's return")
+    assert caveats(252, "portfolio")[0].startswith("You see the return after removing")
+    report = report_of(
+        post(client, tree([holding(0, "AAA", 0.5), holding(1, "BBB", 0.5)]), "?model=ff5")
+    )
+    assert report.residual is not None and report.kalman_betas is not None
+    assert not any("stock" in line for line in report.residual.caveats)
+    assert "this series" in report.label_text["L-KTAIL"]
+    assert "ticker" not in report.label_text["L-KTAIL"]

@@ -47,6 +47,11 @@ L_KTAIL = (
     "Daily price changes for this ticker partly reverse the next day (see the data-quality "
     "check). The filter ignores that, so the band is too narrow for this ticker."
 )
+L_KTAIL_SERIES = (
+    "Daily changes in this series partly reverse the next day (see the data-quality check). "
+    "The filter ignores that, so the band is too narrow for this series."
+)
+"""``L_KTAIL`` for a portfolio or an uploaded record: the series is not a ticker."""
 
 _BAND_SLACK = 1e-5
 """Rounding to 6 significant digits may move a value by 5e-6 relative; bands tolerate that."""

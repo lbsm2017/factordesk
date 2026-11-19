@@ -313,6 +313,12 @@ def test_daily_upload_subject_matches_the_ticker_statistics() -> None:
             b = report.return_contribution.model_copy(update={"memo": []})
             assert a == b
             continue
+        if field == "residual":  # only the caveat wording differs: "the return", not "the stock's"
+            assert ticker.residual is not None and report.residual is not None
+            assert report.residual.model_copy(update={"caveats": []}) == ticker.residual.model_copy(
+                update={"caveats": []}
+            )
+            continue
         assert getattr(report, field) == getattr(ticker, field), field
     assert report.world_beta is not None and report.kalman_betas is not None
     assert report.data.price_source == "upload (daily returns)"

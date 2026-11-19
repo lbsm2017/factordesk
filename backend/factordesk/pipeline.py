@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, date, datetime
 
 import numpy as np
@@ -117,6 +117,7 @@ from factordesk.report.schema import (
     UncoveredTail,
     report_label_text,
 )
+from factordesk.report.sections.kalman import L_KTAIL_SERIES
 from factordesk.section_hooks import load_section_inputs
 from factordesk.section_hooks.context import (
     FACTOR_MODELS,
@@ -988,6 +989,15 @@ def _model_frame(factor_frame: pd.DataFrame, model: FactorModel) -> pd.DataFrame
     return out
 
 
+def _label_text(present: Mapping[str, object | None], subject: ReturnSubject) -> dict[str, str]:
+    """``report_label_text``, with the footnotes worded for the subject: a ticker keeps its own
+    wording, a portfolio or an uploaded record says "series"."""
+    texts = report_label_text(present)
+    if subject.kind != "ticker" and "L-KTAIL" in texts:
+        texts["L-KTAIL"] = L_KTAIL_SERIES
+    return texts
+
+
 def assemble_subject_report(
     subject: ReturnSubject,
     factor_frame: pd.DataFrame,
@@ -1172,7 +1182,7 @@ def assemble_subject_report(
             "price_series": core.price_series,
             "warnings": _warnings(sample, reg, audit, days_behind, gate),
             "notes": notes,
-            "label_text": report_label_text(present),
+            "label_text": _label_text(present, subject),
             **present,
         }
     )
