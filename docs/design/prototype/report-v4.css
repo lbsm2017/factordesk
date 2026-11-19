@@ -33,6 +33,9 @@
   --pos: #007862;
   --neg: #C23345;
   --neg-50: #FBE9EC;
+  /* sign tints for bars that could be noise: 38% of the hue on white, outlined in the full hue */
+  --pos-t: #9ECCC3;
+  --neg-t: #E8B1B8;
   --caution: #8A5A00;
   /* navy rail */
   --rail: #141A33;
@@ -248,7 +251,8 @@ details.how li::before { content: ""; position: absolute; left: 2px; top: 0.7em;
 .tbl .v { font-weight: 600; }
 .tbl tr.total > * { border-top: 1px solid var(--rule); border-bottom: 0; font-weight: 600; }
 .tbl tr.grp > th { height: 30px; padding-top: 10px; vertical-align: bottom; padding-bottom: 2px; font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); border-bottom: 0; }
-.tbl tr.ns .v { font-weight: 400; color: var(--ink-2); }
+.tbl tr.ns .v { font-weight: 400; }
+.v-b .tbl tr.ns .v { color: var(--ink-2); }
 .tbl .na { color: var(--ink-2); }
 .tbl tbody tr:hover > * { background: var(--soft); }
 .tbl tbody tr.grp:hover > * { background: none; }
@@ -260,7 +264,7 @@ details.how li::before { content: ""; position: absolute; left: 2px; top: 0.7em;
 .bsvg .gl { stroke: var(--grid); stroke-width: 1; }
 .bsvg .z { stroke: var(--axis); stroke-width: 1; }
 .bsvg .b { fill: var(--ink-2); }
-.bsvg .b.ns { fill: var(--mark-ns); }
+.bsvg .b.t { fill: var(--mark-ns); }
 .bsvg .b.idio { fill: var(--mark-ns); }
 .bsvg .ci { stroke: var(--ink); stroke-width: 1.25; }
 .bsvg .dot { fill: var(--ink); }
@@ -277,7 +281,7 @@ details.how li::before { content: ""; position: absolute; left: 2px; top: 0.7em;
 .key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-cap); color: var(--ink-2); }
 .key li { display: inline-flex; align-items: center; gap: 6px; }
 .sw { width: 14px; height: 10px; flex: none; overflow: visible; }
-.sw .b { fill: var(--ink-2); } .sw .b.ns { fill: var(--mark-ns); }
+.sw .b { fill: var(--ink-2); } .sw .b.t { fill: var(--mark-ns); }
 .sw .ci { stroke: var(--ink); stroke-width: 1.25; }
 .sw .dot { fill: var(--ink); } .sw .ring { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
 .sw .avg { fill: var(--accent); } .sw .prior { stroke: var(--accent); stroke-width: 2; }
@@ -341,6 +345,28 @@ details.how li::before { content: ""; position: absolute; left: 2px; top: 0.7em;
 .colophon { margin-top: 20px; font-size: var(--fs-cap); color: var(--ink-2); }
 
 /* ------------------------------------------------------------------ variant a: tearsheet */
+/* sign colour (owner, 2026-11-19): signed returns and estimates are green when positive and red
+   when negative, always with an explicit + or minus; clear evidence in the full hue at weight 600,
+   could be noise in the full hue at weight 400 with a tint bar outlined in the full hue. Reading
+   words, magnitudes (volatility, R-squared, shares, standard errors) and diagnostics stay ink. */
+.v-a .sp { color: var(--pos); }
+.v-a .sn { color: var(--neg); }
+.v-a .rd.ok, .v-a .rd.bad { color: var(--ink); }
+.v-a .bsvg .b.p, .v-a .sw .b.p { fill: var(--pos); }
+.v-a .bsvg .b.n, .v-a .sw .b.n { fill: var(--neg); }
+.v-a .bsvg .b.p.t, .v-a .sw .b.p.t { fill: var(--pos-t); stroke: var(--pos); stroke-width: 1; }
+.v-a .bsvg .b.n.t, .v-a .sw .b.n.t { fill: var(--neg-t); stroke: var(--neg); stroke-width: 1; }
+.v-a .bsvg .dot.p { fill: var(--pos); }
+.v-a .bsvg .zt { stroke: var(--ink-2); stroke-width: 1; }
+.sum-tables { margin-top: 16px; }
+.kv-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px 32px; }
+.kv-split h3 { margin-bottom: 2px; }
+@media (min-width: 1280px) {
+  .kv-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (min-width: 1280px) and (max-width: 1679px) {
+  :root:has(#sw-stats:checked) .kv-split { grid-template-columns: minmax(0, 1fr); }
+}
 .verdict { font-size: var(--fs-sub); line-height: 1.5; max-width: 96ch; }
 .notes-line { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; font-size: var(--fs-cap); color: var(--caution); }
 .notes-line .icon { width: 16px; height: 16px; margin-top: 1px; }

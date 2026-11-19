@@ -20,7 +20,7 @@ HERE = Path(__file__).resolve().parent
 CSS = (HERE / "report-v4.css").read_text(encoding="utf-8")
 PAGES = {v: (HERE / f"report-v4{v}.html").read_text(encoding="utf-8").split("<body", 1)[1] for v in ("a", "b")}
 
-EVIDENCE = {"pos", "neg", "neg-50", "caution"}
+EVIDENCE = {"pos", "neg", "neg-50", "caution", "pos-t", "neg-t"}  # evidence hues and their tints, not accents
 FACTOR = {"f1", "f2", "f3", "f4", "f5"}
 RADII_RULE = {"8px", "6px", "4px", "2px", "999px"}
 SVG_RX_RULE = {"2", "6"}

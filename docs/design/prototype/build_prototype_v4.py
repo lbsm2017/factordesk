@@ -18,6 +18,7 @@ unchanged.
 from __future__ import annotations
 
 import html
+import re
 import json
 import math
 import sys
@@ -98,6 +99,22 @@ def gridlines_v(ticks: list[float], lo: float, hi: float) -> str:
     return "".join(f'<line class="{"z" if abs(t) < 1e-12 else "gl"}" x1="{pos(t, lo, hi)}%" x2="{pos(t, lo, hi)}%" y1="-4" y2="24"/>' for t in ticks)
 
 
+def sc(v: float) -> str:
+    """Sign class for a signed return or estimate: sp positive, sn negative (coloured in v4a only)."""
+    return "sp" if v > 0 else "sn" if v < 0 else ""
+
+
+def sct(text: str) -> str:
+    """Sign class from the printed number, so a value that rounds to zero stays ink."""
+    t = re.sub(r"<[^>]+>", "", text).strip()
+    return "sp" if t.startswith("+") else "sn" if t.startswith(MINUS) else ""
+
+
+def sbar(v: float, lo: float, hi: float, ok: bool = True) -> str:
+    """A signed bar: the hue follows the sign; a tint outlined in the hue when it could be noise."""
+    return hbar(v, lo, hi, f"b {'p' if v >= 0 else 'n'}{'' if ok else ' t'}")
+
+
 def hbar(v: float, lo: float, hi: float, cls: str = "b") -> str:
     a, b = sorted((pos(0.0, lo, hi), pos(v, lo, hi)))
     return f'<rect class="{cls}" x="{a}%" y="4" width="{max(b - a, 0.3)}%" height="12" rx="2"/>'
@@ -113,7 +130,8 @@ def whisker(l: float, h: float, lo: float, hi: float) -> str:
 
 def bsvg(inner: str, ticks: list[float], lo: float, hi: float, tip: str = "") -> str:
     t = f"<title>{e(tip)}</title>" if tip else ""
-    return f'<td class="bc"><svg class="bsvg" aria-hidden="true">{t}{gridlines_v(ticks, lo, hi)}{inner}</svg></td>'
+    z = f'<line class="z zt" x1="{pos(0.0, lo, hi)}%" x2="{pos(0.0, lo, hi)}%" y1="-4" y2="24"/>' if lo < 0 < hi or lo == 0 else ""
+    return f'<td class="bc"><svg class="bsvg" aria-hidden="true">{t}{gridlines_v(ticks, lo, hi)}{inner}{z}</svg></td>'
 
 
 def tick(t: float) -> str:
@@ -301,9 +319,9 @@ def analysis_bar(r: dict) -> str:
 </dl>"""
 
 
-def kv_row(label: str, tip: str, value: str, read: str, t: str = "", ci: str = "", vcls: str = "") -> str:
+def kv_row(label: str, tip: str, value: str, read: str, t: str = "", ci: str = "", vcls: str = "", ns: bool = False) -> str:
     na = '<span class="na">&#8211;</span>'
-    return (f'<tr><th scope="row"><span class="tip" title="{e(TIP[tip])}">{label}</span></th>'
+    return (f'<tr{' class="ns"' if ns else ""}><th scope="row"><span class="tip" title="{e(TIP[tip])}">{label}</span></th>'
             f'<td class="num v{" " + vcls if vcls else ""}">{value}</td>{read}'
             f'<td class="num stat">{t or na}</td><td class="num stat">{ci or na}</td></tr>')
 
@@ -313,25 +331,30 @@ def key_metrics_table(r: dict) -> str:
     rec_read = (f'<td class="rd ok" title="{e(dd_text(m))}">Recovered</td>' if m["rec"]
                 else f'<td class="rd bad" title="{e(dd_text(m))}">Not recovered</td>')
     word = lambda s: f'<td class="rd no">{s}</td>'  # noqa: E731
-    rows = [
-        '<tr class="grp"><th scope="rowgroup" colspan="5">Performance</th></tr>',
-        kv_row("Annualised return", "ret", pct(m["ret"], 1), reading(None)),
+    perf = [
+        kv_row("Annualised return", "ret", pct(m["ret"], 1), reading(None), vcls=sc(m["ret"])),
         kv_row("Volatility", "vol", pct(m["vol"], 1, False), reading(None)),
-        kv_row("Sharpe ratio", "sharpe", num(m["sharpe"], 2), reading(m["s_ok"]), "", f"{num(m['s_lo'], 2)} to {num(m['s_hi'], 2)}"),
-        kv_row("Max drawdown", "mdd", pct(m["mdd"], 1), rec_read, vcls="neg-v"),
-        '<tr class="grp"><th scope="rowgroup" colspan="5">Factor model</th></tr>',
-        kv_row("Alpha (annual)", "alpha", pct(m["alpha"]), reading(m["a_ok"]), tstat(m["a_t"]), f"{pct(m['a_lo'], 1)} to {pct(m['a_hi'], 1)}"),
+        kv_row("Sharpe ratio", "sharpe", sgn(m["sharpe"], 2), reading(m["s_ok"]), "", f"{sgn(m['s_lo'], 2)} to {sgn(m['s_hi'], 2)}",
+               vcls=sc(m["sharpe"]), ns=not m["s_ok"]),
+        kv_row("Max drawdown", "mdd", pct(m["mdd"], 1), rec_read, vcls="neg-v sn"),
+    ]
+    model = [
+        kv_row("Alpha (annual)", "alpha", pct(m["alpha"]), reading(m["a_ok"]), tstat(m["a_t"]), f"{pct(m['a_lo'], 1)} to {pct(m['a_hi'], 1)}",
+               vcls=sc(m["alpha"]), ns=not m["a_ok"]),
         kv_row("R&#178;", "r2", share(m["r2"]), word(r2_word(m["r2"]))),
         kv_row("Residual volatility", "resid", pct(m["resid"], 1, False), word(resid_word(m["idio"]))),
-        kv_row("Beta to US market", "bmkt", num(m["bm"], 2), reading(m["bm_ok"]), tstat(m["bm_t"]), f"{num(m['bm_lo'], 2)} to {num(m['bm_hi'], 2)}"),
-        kv_row("Beta to ACWI", "bacwi", num(m["bw"], 2), reading(m["bw_ok"]), tstat(m["bw_t"]), f"{num(m['bw_lo'], 2)} to {num(m['bw_hi'], 2)}"),
+        kv_row("Beta to US market", "bmkt", sgn(m["bm"], 2), reading(m["bm_ok"]), tstat(m["bm_t"]), f"{sgn(m['bm_lo'], 2)} to {sgn(m['bm_hi'], 2)}",
+               vcls=sc(m["bm"]), ns=not m["bm_ok"]),
+        kv_row("Beta to ACWI", "bacwi", sgn(m["bw"], 2), reading(m["bw_ok"]), tstat(m["bw_t"]), f"{sgn(m['bw_lo'], 2)} to {sgn(m['bw_hi'], 2)}",
+               vcls=sc(m["bw"]), ns=not m["bw_ok"]),
     ]
+    head = f'<thead><tr>{th("Metric")}{th("Value", "value", "num")}{th("Reading", "reading")}{th("t", "t", "num stat")}{th("95% interval", "ci", "num stat")}</tr></thead>'
+    tables = "".join(
+        f'<div><h3 id="km-{k}">{t}</h3><div class="tw"><table class="tbl kv" aria-labelledby="km-{k}">{head}<tbody>{"".join(rows)}</tbody></table></div></div>'
+        for k, t, rows in (("perf", "Performance", perf), ("model", "Factor model", model))
+    )
     return f"""
-<div class="tw"><table class="tbl kv">
-  <caption class="vh">Key metrics over the analysed range</caption>
-  <thead><tr>{th("Metric")}{th("Value", "value", "num")}{th("Reading", "reading")}{th("t", "t", "num stat")}{th("95% interval", "ci", "num stat")}</tr></thead>
-  <tbody>{''.join(rows)}</tbody>
-</table></div>
+<div class="kv-split">{tables}</div>
 <p class="tnote">Annualised from daily data. ACWI is an ETF used as a stand-in for the MSCI ACWI index. Performance and ACWI figures are demo values.</p>"""
 
 
@@ -371,18 +394,10 @@ def price_key(shade: bool) -> str:
 
 def summary_a(r: dict) -> str:
     d = r["data"]
-    ch, note = price_chart(r, True)
     body = f"""
 <p class="verdict">{e(v3.verdict_sentence(r))}</p>
 {notes_line(r)}
-<div class="sum-grid">
-  <div><h3>Key metrics</h3>{key_metrics_table(r)}</div>
-  <figure class="sum-chart" id="price" aria-labelledby="price-t">
-    <div class="chart-head"><h3 id="price-t">Price</h3>{price_key(True)}</div>
-    {ch}
-    <figcaption class="chart-note">{e(note)}</figcaption>
-  </figure>
-</div>"""
+<div class="sum-tables">{key_metrics_table(r)}</div>"""
     return panel("summary", "Summary", body, meta=f"{d_long(d['actual_start'])} to {d_long(d['actual_end'])}. Past data, not a forecast.")
 
 
@@ -433,7 +448,7 @@ def price_panel_b(r: dict, span: str) -> str:
     ]
     body_rows = "".join(f'<tr><th scope="row">{a}</th><td>{b}</td><td class="num v">{c}</td></tr>' for a, b, c in rows)
     if u["n"] and u["compounded_return"] is not None:
-        body_rows += f'<tr><th scope="row">After factor data</th><td>{u["n"]} days, not analysed</td><td class="num">{pct(u["compounded_return"], 1)}</td></tr>'
+        body_rows += f'<tr><th scope="row">After factor data</th><td>{u["n"]} days, not analysed</td><td class="num {sc(u["compounded_return"])}">{pct(u["compounded_return"], 1)}</td></tr>'
     tbl = (f'<div class="tw"><table class="tbl pts"><caption class="vh">Price points</caption><thead><tr>{th("Point")}{th("Date")}'
            f'{th("Close, USD", "", "num")}</tr></thead><tbody>{body_rows}</tbody></table></div>')
     body = f'<div class="chart-head">{price_key(True)}</div>{ch}{tbl}'
@@ -495,6 +510,15 @@ def drawdown_panel(r: dict, span: str, split: bool) -> str:
 
 
 # ----------------------------------------------------------------------------- factor exposures
+def sign_key() -> str:
+    """Legend items for signed bars: hue by sign in v4a, ink and grey in v4b."""
+    sw = lambda c: f'<svg class="sw" aria-hidden="true"><rect class="{c}" x="0.5" y="0.5" width="13" height="9" rx="2"/></svg>'  # noqa: E731
+    if VARIANT == "a":
+        return (f'<li>{sw("b p")}Positive</li><li>{sw("b n")}Negative</li>'
+                f'<li>{sw("b p t")}{sw("b n t")}Paler: could be noise</li>')
+    return f'<li>{sw("b p")}Clear evidence</li><li>{sw("b p t")}Could be noise</li>'
+
+
 def exposures_panel(r: dict, span: str) -> str:
     g, ab = r["regression"], r["average_beta"]
     avg = {f["name"]: f["mean"] for f in ab["factors"]} if ab["status"] == "ok" else {}
@@ -503,7 +527,7 @@ def exposures_panel(r: dict, span: str) -> str:
     rows = []
     for f in g["factors"]:
         ok, b = f["tag"] == "reliable", f["beta"]
-        inner = hbar(b, lo, hi, "b" if ok else "b ns") + whisker(f["ci_low"], f["ci_high"], lo, hi)
+        inner = sbar(b, lo, hi, ok) + whisker(f["ci_low"], f["ci_high"], lo, hi)
         a = avg.get(f["name"])
         if a is not None:
             inner += f'<rect class="avg stat" x="{pos(a, lo, hi)}%" y="2" width="2" height="16" transform="translate(-1 0)"/>'
@@ -511,15 +535,14 @@ def exposures_panel(r: dict, span: str) -> str:
         tip = f"{PLAIN[f['name']]}: beta {sgn(b)}, 95% interval {sgn(f['ci_low'])} to {sgn(f['ci_high'])}"
         rows.append(
             f'<tr id="beta-{f["name"]}" class="{"" if ok else "ns"}"><th scope="row">{fname(f["name"])}</th>'
-            f'{bsvg(inner, ticks, lo, hi, tip)}<td class="num v">{sgn(b, 2)}</td>{reading(ok)}'
+            f'{bsvg(inner, ticks, lo, hi, tip)}<td class="num v {sct(sgn(b, 2))}">{sgn(b, 2)}</td>{reading(ok)}'
             f'<td class="hide-s">{e(meaning)}</td>'
             f'<td class="num stat">{tstat(f["z"])}</td><td class="num stat">{pval(f["p_adj_bh"])}</td>'
             f'<td class="num stat">{sgn(f["ci_low"], 2)} to {sgn(f["ci_high"], 2)}</td>'
             f'<td class="num stat">{sgn(a, 2) if a is not None else "&#8211;"}</td></tr>'
         )
     win = ab.get("window", 252)
-    key = ('<ul class="key bkey" aria-label="Legend"><li><svg class="sw" aria-hidden="true"><rect class="b" width="14" height="10" rx="2"/></svg>Clear evidence</li>'
-           '<li><svg class="sw" aria-hidden="true"><rect class="b ns" width="14" height="10" rx="2"/></svg>Could be noise</li>'
+    key = (f'<ul class="key bkey" aria-label="Legend">{sign_key()}'
            '<li><svg class="sw" aria-hidden="true"><line class="ci" x1="0" x2="14" y1="5" y2="5"/><line class="ci" x1="0" x2="0" y1="2" y2="8"/><line class="ci" x1="14" x2="14" y1="2" y2="8"/></svg>95% interval</li>'
            f'<li class="stat"><svg class="sw" aria-hidden="true"><rect class="avg" x="6" y="0" width="2" height="10"/></svg>Average over {win}-day windows</li></ul>')
     body = f"""
@@ -546,8 +569,8 @@ def world_panel(r: dict, span: str) -> str:
     lo, hi, ticks = nice_domain(min(vals), max(vals), 4)
     rows = "".join(
         f'<tr><th scope="row"><span class="tip" title="{sub}">{lab}</span></th>'
-        f'{bsvg(whisker(l, h, lo, hi) + f"<circle class=\"dot\" cx=\"{pos(b, lo, hi)}%\" cy=\"10\" r=\"4.5\"/>", ticks, lo, hi)}'
-        f'<td class="num v">{num(b, 2)}</td><td class="num stat">{num(l, 2)} to {num(h, 2)}</td><td class="num">{r2:.2f}</td></tr>'
+        f'{bsvg(whisker(l, h, lo, hi) + f"<circle class=\"dot {'p' if b > 0 else 'n'}\" cx=\"{pos(b, lo, hi)}%\" cy=\"10\" r=\"4.5\"/>", ticks, lo, hi)}'
+        f'<td class="num v {sc(b)}">{sgn(b, 2)}</td><td class="num stat">{num(l, 2)} to {num(h, 2)}</td><td class="num">{r2:.2f}</td></tr>'
         for lab, sub, (b, l, h), r2 in rows_in
     )
     (bw, lw, hw), (bu, lu, hu) = w["acwi"], w["us"]
@@ -577,12 +600,12 @@ def returns_panel(r: dict, span: str) -> str:
     vals = [x[1] for x in items] + [total, 0.0]
     lo, hi, ticks = nice_domain(min(vals), max(vals), 5)
     rows = "".join(
-        f'<tr class="{"" if ok else "ns"}"><th scope="row">{lab}</th>{bsvg(hbar(v, lo, hi, "b" if ok else "b ns"), ticks, lo, hi)}'
-        f'<td class="num v">{pct(v)}</td>{reading(ok)}</tr>'
+        f'<tr class="{"" if ok else "ns"}"><th scope="row">{lab}</th>{bsvg(sbar(v, lo, hi, ok), ticks, lo, hi)}'
+        f'<td class="num v {sct(pct(v))}">{pct(v)}</td>{reading(ok)}</tr>'
         for lab, v, ok in items
     )
-    rows += (f'<tr class="total"><th scope="row">Total above cash</th>{bsvg(hbar(total, lo, hi), ticks, lo, hi)}'
-             f'<td class="num">{pct(total)}</td><td></td></tr>')
+    rows += (f'<tr class="total"><th scope="row">Total above cash</th>{bsvg(sbar(total, lo, hi), ticks, lo, hi)}'
+             f'<td class="num {sct(pct(total))}">{pct(total)}</td><td></td></tr>')
     memo = "".join(f"<li>{e(x)}</li>" for x in rc["memo"])
     mkt = rc["factors"]["Mkt-RF"]
     take = f"Market exposure accounts for {pct(mkt, 1)} of the {pct(total, 1)} average yearly return above cash."
@@ -723,10 +746,10 @@ def residual_panel(r: dict, span: str) -> str:
     xlab = v3.time_labels(xt, lambda k: X(k) / 10)
     facts = [
         ("Windows clear of zero", f"{clear * 100:.0f}%", "Share of 252-day windows whose band excludes zero; about 5% is expected by chance", reading(False)),
-        ("First half, second half", "+1.4%, +0.2%", "Leftover return a year in each half of the sample", reading(False)),
-        ("Best calendar year", "2024, +0.6%", "Partial year; no year is clear of noise", reading(False)),
+        ("First half, second half", '<span class="sp">+1.4%</span>, <span class="sp">+0.2%</span>', "Leftover return a year in each half of the sample", reading(False)),
+        ("Best calendar year", '2024, <span class="sp">+0.6%</span>', "Partial year; no year is clear of noise", reading(False)),
     ]
-    rows = "".join(f'<tr><th scope="row"><span class="tip" title="{e(t)}">{a_}</span></th><td class="num v">{b}</td>{rd}</tr>' for a_, b, t, rd in facts)
+    rows = "".join(f'<tr class="ns"><th scope="row"><span class="tip" title="{e(t)}">{a_}</span></th><td class="num v">{b}</td>{rd}</tr>' for a_, b, t, rd in facts)
     tbl = (f'<div class="tw"><table class="tbl"><caption class="vh">Return beyond the factors over time, in figures</caption>'
            f'<thead><tr>{th("Measure")}{th("Value", "", "num")}{th("Reading", "reading")}</tr></thead><tbody>{rows}</tbody></table></div>')
     body = f'<div class="split c84"><div>{chart(svg, ylab, xlab)}</div><div>{tbl}</div></div>'
@@ -839,7 +862,7 @@ def detail_panel(r: dict, span: str) -> str:
     na = '<span class="na">&#8211;</span>'
     rows = [
         f'<tr class="{"" if g["alpha_tag"] == "reliable" else "ns"}"><th scope="row">Alpha<span class="code">a year</span></th>'
-        f'<td class="num v">{pct(g["alpha_annual"])}</td>{reading(g["alpha_tag"] == "reliable")}<td class="num stat">{pct(g["alpha_se_annual"], 2, False)}</td>'
+        f'<td class="num v {sct(pct(g["alpha_annual"]))}">{pct(g["alpha_annual"])}</td>{reading(g["alpha_tag"] == "reliable")}<td class="num stat">{pct(g["alpha_se_annual"], 2, False)}</td>'
         f'<td class="num stat">{tstat(g["alpha_z"])}</td><td class="num stat">{pval(g["alpha_p"])}</td><td class="num stat">{na}</td>'
         f'<td class="num stat">{pct(g["alpha_ci_low_annual"])} to {pct(g["alpha_ci_high_annual"])}</td><td class="num stat">{na}</td></tr>'
     ]
@@ -847,7 +870,7 @@ def detail_panel(r: dict, span: str) -> str:
         ok = f["tag"] == "reliable"
         rows.append(
             f'<tr class="{"" if ok else "ns"}"><th scope="row">{fname(f["name"])}</th>'
-            f'<td class="num v">{sgn(f["beta"])}</td>{reading(ok)}<td class="num stat">{num(f["se"], 4)}</td><td class="num stat">{tstat(f["z"])}</td>'
+            f'<td class="num v {sct(sgn(f["beta"]))}">{sgn(f["beta"])}</td>{reading(ok)}<td class="num stat">{num(f["se"], 4)}</td><td class="num stat">{tstat(f["z"])}</td>'
             f'<td class="num stat">{pval(f["p"])}</td><td class="num stat">{pval(f["p_adj_bh"])}</td>'
             f'<td class="num stat">{sgn(f["ci_low"])} to {sgn(f["ci_high"])}</td><td class="num stat">{vif.get(f["name"], 0):.2f}</td></tr>'
         )
@@ -878,7 +901,7 @@ def content(r: dict, variant: str, on: set[str]) -> tuple[str, list[str]]:
     if variant == "a":
         parts = [
             page_head(r), analysis_bar(r), '<div class="grid">', summary_a(r),
-            drawdown_panel(r, "", split=True),
+            price_panel_b(r, "s-6"), drawdown_panel(r, "s-6", split=False),
             exposures_panel(r, ""), world_panel(r, ""),
             returns_panel(r, "s-6"), risk_panel(r, "s-6"),
             rolling_panel(r, "", w126),
@@ -903,7 +926,12 @@ def content(r: dict, variant: str, on: set[str]) -> tuple[str, list[str]]:
     return "\n".join(parts), order
 
 
+VARIANT = "a"
+
+
 def page(r: dict, variant: str, on: set[str]) -> str:
+    global VARIANT
+    VARIANT = variant
     main, order = content(r, variant, on)
     colophon = (f'<footer class="colophon"><p>factordesk report, schema v{e(str(r["schema_version"]))}, generated {gen_stamp(r)}. '
                 "Descriptive statistics on past data; nothing here is a forecast or advice. Demo values are marked where they appear.</p></footer>")
