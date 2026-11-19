@@ -377,7 +377,7 @@ export interface components {
             audit_status: "clean" | "warnings" | "errors";
             /** Audit Findings */
             audit_findings: components["schemas"]["AuditFinding"][];
-            /** @description Company name, currency and exchange from Yahoo metadata; None when the read failed or the report is older than schema version 5. */
+            /** @description Company name, currency and exchange from Yahoo metadata; None when the read failed or the report was written before the field existed. */
             security: components["schemas"]["SecurityInfo"] | null;
         };
         /**
@@ -479,7 +479,7 @@ export interface components {
         FactorReport: {
             /**
              * Schema Version
-             * @default 5
+             * @default 4
              */
             schema_version: string;
             /** Ticker */

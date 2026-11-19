@@ -20,7 +20,6 @@ import pandas as pd
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
 from factordesk import cli
 from factordesk.api.deps import AppDeps
@@ -340,8 +339,8 @@ def test_a_known_other_currency_is_refused_with_a_plain_message(currency: str) -
 # ------------------------------------------------------------------------------------------ schema
 def test_the_mock_report_carries_the_demo_security() -> None:
     rep = load_report(MOCK)
-    assert rep.schema_version == SCHEMA_VERSION == "5"
-    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4", "5")
+    assert rep.schema_version == SCHEMA_VERSION == "4"
+    assert SUPPORTED_SCHEMA_VERSIONS == ("3", "4")
     assert rep.data.security == SecurityInfo(name="Example Corp", currency="USD", exchange="NASDAQ")
     assert FactorReport.model_validate_json(rep.model_dump_json()) == rep
 
@@ -370,15 +369,6 @@ def test_older_fixtures_without_the_field_still_load(fixture: Path) -> None:
     assert old == stripped
 
 
-@pytest.mark.parametrize("version", ["3", "4"])
-def test_an_old_version_cannot_hold_the_security(version: str) -> None:
-    text = MOCK.read_text(encoding="utf-8").replace(
-        '"schema_version":"5"', f'"schema_version":"{version}"'
-    )
-    with pytest.raises(ValidationError, match="data.security"):
-        FactorReport.model_validate_json(text)
-
-
 # ------------------------------------------------------------------------------------- pipeline
 @pytest.fixture(scope="module")
 def synthetic() -> tuple[PriceHistory, pd.DataFrame]:
@@ -400,7 +390,7 @@ def test_assemble_report_records_the_security(synthetic: tuple[PriceHistory, pd.
     assert rep.data.security == SecurityInfo(
         name="Zoom Communications, Inc.", currency="USD", exchange="NasdaqGS"
     )
-    assert rep.schema_version == "5"
+    assert rep.schema_version == "4"
 
 
 @pytest.mark.parametrize("security", [None, Security(quote_type="EQUITY")])

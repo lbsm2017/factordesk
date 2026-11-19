@@ -3,7 +3,7 @@
   "info": {
     "title": "factordesk",
     "summary": "Local Fama-French 5-factor analysis API.",
-    "version": "5"
+    "version": "4"
   },
   "paths": {
     "/api/health": {
@@ -1052,7 +1052,7 @@
                 "type": "null"
               }
             ],
-            "description": "Company name, currency and exchange from Yahoo metadata; None when the read failed or the report is older than schema version 5."
+            "description": "Company name, currency and exchange from Yahoo metadata; None when the read failed or the report was written before the field existed."
           }
         },
         "additionalProperties": false,
@@ -1322,7 +1322,7 @@
           "schema_version": {
             "type": "string",
             "title": "Schema Version",
-            "default": "5"
+            "default": "4"
           },
           "ticker": {
             "type": "string",

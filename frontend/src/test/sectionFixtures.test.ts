@@ -3,8 +3,8 @@ import { cloneReport, mockReport } from "./fixture";
 import { SECTION_FIELDS, withSection } from "./sectionFixtures";
 
 describe("schema v3 contract fixtures", () => {
-  it("the mock report is version 5 with every optional section null", () => {
-    expect(mockReport.schema_version).toBe("5");
+  it("the mock report is version 4 with every optional section null", () => {
+    expect(mockReport.schema_version).toBe("4");
     for (const field of SECTION_FIELDS) {
       expect(mockReport[field]).toBeNull();
     }

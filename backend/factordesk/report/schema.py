@@ -57,12 +57,13 @@ from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, ResidualAnalysis
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
 
-SCHEMA_VERSION = "5"
-"""Version written by this code: 4 plus the optional ``data.security`` (contract SC5)."""
+SCHEMA_VERSION = "4"
+"""Version written by this code (the schema v3 contract; contract SC5). Additive optional fields
+such as ``data.security`` do not change it."""
 
-SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4", "5")
-"""Versions this code reads. Version 3 files have no optional sections and version 3 and 4 files
-have no ``data.security``; they load unchanged (the new fields are absent, so ``None``)."""
+SUPPORTED_SCHEMA_VERSIONS: tuple[str, ...] = ("3", "4")
+"""Versions this code reads. Version 3 files have no optional sections; they load unchanged. A
+version 4 file written before ``data.security`` existed loads with it absent (``None``)."""
 
 AuditStatus = Literal["clean", "warnings", "errors"]
 
@@ -140,7 +141,7 @@ class DataInfo(FrozenModel):
     security: SecurityInfo | None = Field(
         default=None,
         description="Company name, currency and exchange from Yahoo metadata; None when the "
-        "read failed or the report is older than schema version 5.",
+        "read failed or the report was written before the field existed.",
     )
 
 
@@ -460,13 +461,6 @@ class FactorReport(FrozenModel):
             present = [s.report_field for s in SECTIONS if getattr(self, s.report_field)]
             if present:
                 raise ValueError(f"a version 3 report cannot hold {', '.join(present)}")
-        return self
-
-    @model_validator(mode="after")
-    def _security_needs_version_5(self) -> FactorReport:
-        """A version 3 or 4 file has no ``data.security``."""
-        if self.schema_version in ("3", "4") and self.data.security is not None:
-            raise ValueError(f"a version {self.schema_version} report cannot hold data.security")
         return self
 
     @model_validator(mode="after")
