@@ -88,3 +88,13 @@ The validator recomputed every number from the definitions and agreed (verdict: 
 - **One bad ACWI row far from the stock's days no longer removes the section.** Only audit errors dated inside the days the beta uses fail it; others become a note.
 - **The wording "many non-US stocks" stays.** The validator found the MSCI ACWI factsheet of 30 October 2026 (United States 64.63% of the index), which makes "mostly non-US" false today.
 - Still open for the owner: the amendment of the dashboard spec (nested shape, extra fields, how a non-fetch failure is shown), the caveat wording for the ETF's timing (F6), and the React placeholder body (F7).
+
+## Update 2026-11-19: a Europe row
+
+The owner asked for a Europe benchmark next to the world one. Same idea as before: there is no free daily MSCI Europe index, so the quick beta uses IEUR, the iShares Core MSCI Europe ETF (US dollars, US-listed, history from June 2014), as a stand-in.
+
+- **Same machinery.** One list of proxies (ACWI and IEUR) drives one computation: the same regression, the same price audit, the same cache and the same refresh rules. Nothing was copied.
+- **Each proxy stands alone.** The Europe result sits in its own block with its own status and reason. If IEUR fails, the world beta is shown as before; if ACWI fails, the Europe row can still show. The section status stays that of ACWI.
+- **Fewer days.** IEUR starts in June 2014, so for a long analysis the Europe row covers fewer days than the world row. When the days differ, the panel shows a second US-market beta on the Europe days, so every comparison is like for like.
+- **Two small changes in the same piece of work.** The static panel now sits right after Factor exposures (position 505), and the static header writes the company line as a sentence ("Listed on NYSE Arca, priced in US dollars").
+- Details, field names and live numbers: section 10 of `docs/validation/world-beta-handoff-2026-11-18.md`.

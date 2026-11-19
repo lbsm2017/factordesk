@@ -371,10 +371,10 @@ def test_twb36_load_section_inputs_fetches_acwi_through_the_given_provider(
     monkeypatch.setattr("factordesk.section_hooks.load_shrinkage_inputs", no_portfolios)
     fake = Fake(make_case(736).bench)
     inputs = load_section_inputs(NOW, offline=False, price_provider=fake)
-    assert fake.calls == ["ACWI"] and inputs.world_benchmark is not None
+    assert fake.calls == ["ACWI", "IEUR"] and inputs.world_benchmark is not None
     # Offline (factors injected) or without a provider: nothing is fetched.
     offline = load_section_inputs(NOW, offline=True, price_provider=fake)
-    assert offline.world_benchmark is None and fake.calls == ["ACWI"]
+    assert offline.world_benchmark is None and fake.calls == ["ACWI", "IEUR"]
     assert load_section_inputs(NOW, offline=False).world_benchmark is None
 
 
@@ -404,7 +404,7 @@ def test_twb37_build_report_fills_the_section_through_the_pipeline_provider(
 
     provider = Two()
     report = build_report("STK", provider, now=NOW)
-    assert provider.calls == ["STK", "ACWI"]  # one extra fetch per run
+    assert provider.calls == ["STK", "ACWI", "IEUR"]  # one extra fetch per proxy and run
     assert report.world_beta is not None and report.world_beta.status == "ok"
 
 
@@ -467,12 +467,12 @@ def test_twb42_absent_section_renders_nothing() -> None:
     assert 'id="world-beta"' not in render_report_html(load_report(MOCK))
 
 
-def test_twb43_ok_panel_shows_two_rows_the_sentence_and_the_footnotes() -> None:
+def test_twb43_ok_panel_shows_three_rows_the_sentence_and_the_footnotes() -> None:
     report = report_with_section(load_report(MOCK), "world_beta")
     html = render_world_beta_panel(report)
     assert html is not None and 'id="world-beta"' in html
     assert "World beta (quick estimate)" in html
-    assert html.count("<tbody><tr>") == 1 and html.count('<tr><th scope="row">') == 2
+    assert html.count("<tbody><tr>") == 1 and html.count('<tr><th scope="row">') == 3
     assert "Against the world (ACWI)" in html and "Against the US market, same days" in html
     assert "R squared" in html and "95% interval" in html and "Days" in html
     assert report.world_beta is not None
@@ -485,10 +485,10 @@ def test_twb43_ok_panel_shows_two_rows_the_sentence_and_the_footnotes() -> None:
     assert "<style" not in html and "color:" not in html  # existing classes only
 
 
-def test_twb44_panel_sits_after_the_headline_strip_and_before_the_price_chart() -> None:
+def test_twb44_panel_sits_right_after_the_factor_exposures() -> None:
     page = render_report_html(report_with_section(load_report(MOCK), "world_beta"))
     ids = [m for m in __import__("re").findall(r'<section class="panel[^"]*" id="([^"]+)"', page)]
-    assert ids.index("world-beta") + 1 == ids.index("price")
+    assert ids.index("world-beta") == ids.index("exposures") + 1
 
 
 def test_twb45_panel_shows_the_stale_note_and_the_reason_of_a_failed_section() -> None:
@@ -516,6 +516,7 @@ def test_twb45_panel_shows_the_stale_note_and_the_reason_of_a_failed_section() -
         acwi_first_date=None,
         acwi_last_date=None,
         acwi_note="Could not reach Yahoo for ACWI.",
+        europe=None,
     )
     section = WorldBetaSection.model_validate_json(json.dumps(failed))
     report = base.model_copy(update={"world_beta": section})

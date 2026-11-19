@@ -127,10 +127,10 @@ def test_all_sections_keep_their_footnote_texts() -> None:
 
 
 EXPECTED_ORDER = [
-    "world-beta",
     "price",
     "performance",
     "exposures",
+    "world-beta",
     "shrunk",
     "returns",
     "risk",
@@ -139,7 +139,7 @@ EXPECTED_ORDER = [
     "kalman",
     "data",
 ]
-"""Registry positions: world beta 350, price 400, performance 450, exposures 500, shrunk 520,
+"""Registry positions: price 400, performance 450, exposures 500, world beta 505, shrunk 520,
 returns 600, risk 700, residual 710, rolling 800, Kalman 810, data 900."""
 
 

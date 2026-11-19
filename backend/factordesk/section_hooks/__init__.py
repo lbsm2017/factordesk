@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from factordesk.analytics.world_beta import EUROPE_TICKER
 from factordesk.data.prices import PriceProvider
 from factordesk.section_hooks.context import SectionInputs
 from factordesk.section_hooks.shrunk import load_shrinkage_inputs
@@ -44,5 +45,10 @@ def load_section_inputs(
         ),
         world_benchmark=(
             None if offline or price_provider is None else load_world_benchmark(price_provider)
+        ),
+        europe_benchmark=(
+            None
+            if offline or price_provider is None
+            else load_world_benchmark(price_provider, EUROPE_TICKER)
         ),
     )

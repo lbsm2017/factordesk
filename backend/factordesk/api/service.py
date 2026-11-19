@@ -315,7 +315,7 @@ class ReportService:
         return security
 
     async def _with_world_benchmark(self, inputs: SectionInputs | None) -> SectionInputs | None:
-        """``inputs`` plus the ACWI history, refreshed now (None: the world beta is not wired)."""
+        """``inputs`` plus the ACWI and IEUR histories, refreshed now (None: not wired)."""
         loader = self.deps.load_world_benchmark
         if loader is None:
             return inputs
@@ -324,7 +324,11 @@ class ReportService:
         from factordesk.section_hooks.context import SectionInputs
 
         benchmark = await self.runtime.run(loader)
-        return dataclasses.replace(inputs or SectionInputs(), world_benchmark=benchmark)
+        europe_loader = self.deps.load_europe_benchmark
+        europe = None if europe_loader is None else await self.runtime.run(europe_loader)
+        return dataclasses.replace(
+            inputs or SectionInputs(), world_benchmark=benchmark, europe_benchmark=europe
+        )
 
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:

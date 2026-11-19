@@ -61,6 +61,9 @@ class AppDeps:
     """The ACWI history of the world beta, refreshed by the new days on every report build (the
     refresh makes no network call while the cache holds the latest completed trading day).
     Never raises. ``None``: not wired, so the world beta is not computed."""
+    load_europe_benchmark: Callable[[], WorldBenchmarkInput] | None = None
+    """The IEUR history of the Europe block of the world beta, refreshed like the ACWI one.
+    Never raises. ``None``: not wired, so the Europe block is null."""
 
     def __post_init__(self) -> None:
         if self.max_workers < 1:
@@ -110,6 +113,12 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
 
         return load_world_benchmark(price_provider)
 
+    def europe_benchmark() -> WorldBenchmarkInput:
+        from factordesk.analytics.world_beta import EUROPE_TICKER
+        from factordesk.section_hooks.world_beta import load_world_benchmark
+
+        return load_world_benchmark(price_provider, EUROPE_TICKER)
+
     return AppDeps(
         price_provider=price_provider,
         load_factors=load_factors,
@@ -120,4 +129,5 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         refresh_portfolios=refresh_portfolios,
         load_section_inputs=section_inputs,
         load_world_benchmark=world_benchmark,
+        load_europe_benchmark=europe_benchmark,
     )

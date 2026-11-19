@@ -20,10 +20,10 @@ ORDER = [
     ("header", 100),
     ("equation", 200),
     ("kpis", 300),
-    ("world_beta", 350),
     ("price", 400),
     ("performance", 450),
     ("exposures", 500),
+    ("world_beta", 505),
     ("lead_lag", 510),
     ("shrunk", 520),
     ("fragility", 530),
@@ -40,19 +40,16 @@ ORDER = [
 
 SECTION_PANELS = {
     "performance": ("performance", "price"),
-    "lead_lag": ("lead-lag", "exposures"),
+    "lead_lag": ("lead-lag", "world-beta"),
     "shrunk_betas": ("shrunk", "lead-lag"),
     "fragility": ("fragility", "shrunk"),
-    "world_beta": ("world-beta", ""),
+    "world_beta": ("world-beta", "exposures"),
     "residual": ("residual", "risk"),
     "kalman_betas": ("kalman", "rolling"),
 }
 """Element id of each optional section's panel, and the panel it follows.
 
-The world beta panel (350) follows the headline strip, which the static page draws without a
-panel id, so it is placed by the panel it precedes (``BEFORE``)."""
-
-BEFORE = {"world-beta": "price"}
+The world beta panel (505) follows the exposures (500); lead-lag (510) follows it."""
 
 
 def _panel_ids(page: str) -> list[str]:
@@ -101,10 +98,7 @@ def test_present_sections_draw_their_frame_in_place() -> None:
     page = render_report_html(report)
     ids = _panel_ids(page)
     for pid, after in SECTION_PANELS.values():
-        if pid in BEFORE:
-            assert ids.index(pid) + 1 == ids.index(BEFORE[pid]), (pid, ids)
-        else:
-            assert ids.index(pid) == ids.index(after) + 1, (pid, ids)
+        assert ids.index(pid) == ids.index(after) + 1, (pid, ids)
     # Sections whose fixture is still a contract placeholder draw the placeholder reason; a
     # feature that fills its fixture in drops out of the count (shrunk has two scopes).
     placeholder = "Placeholder (schema v3 contract)"

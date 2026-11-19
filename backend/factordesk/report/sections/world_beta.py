@@ -16,6 +16,10 @@ cached history that is stale because the refresh failed is still ``ok``; ``acwi_
 it ends.
 A section that is not ``ok`` carries no float, so ``world`` and ``us_market`` are then ``None``.
 
+``europe`` (additive, 2026-11-19) repeats the computation for the Europe proxy IEUR (iShares Core
+MSCI Europe ETF, USD, history from June 2014) as a nested ``ProxyBeta`` with its own status and
+reason. It does not change the status of the section, which stays that of the ACWI fields.
+
 ``sample`` describes the common days: ``n``, ``start`` and ``end`` are the overlap with ACWI;
 the requested range and the exclusions are those of the analysis sample.
 """
@@ -27,7 +31,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from factordesk.report.base import FrozenModel, SectionModel, SectionSpec
+from factordesk.report.base import FrozenModel, SectionModel, SectionSpec, Status
 
 WorldBetaLabel = Literal["L-DESC", "L-WORLD-PROXY", "L-WORLD-ASYNC"]
 ComparisonKey = Literal["about_the_same", "higher", "lower"]
@@ -69,6 +73,71 @@ class BetaFit(FrozenModel):
         return self
 
 
+class ProxyBeta(FrozenModel):
+    """The quick beta against one more proxy (Europe: IEUR), with its own status.
+
+    Holds what the ACWI fields of ``WorldBetaSection`` hold, for one proxy: the beta against the
+    proxy and against the US market on the same days, the comparison, the days and the price
+    history it rests on. It answers for its own numbers: a block that is not ``ok`` has no fit.
+    """
+
+    status: Status
+    reason: str | None = Field(description="Human-readable reason when status is not 'ok'.")
+    label: str = Field(description="Index the proxy stands in for, for example 'MSCI Europe'.")
+    proxy: str = Field(description="Yahoo ticker of the proxy fund, for example 'IEUR'.")
+    n_days: int = Field(ge=0, description="Days common to the analysis sample and the proxy.")
+    start: date | None = Field(description="First of those common days.")
+    end: date | None = Field(description="Last of those common days.")
+    hac_lags: int | None = Field(description="Newey-West lags of both regressions; null if none.")
+    n_not_in_benchmark: int = Field(
+        ge=0, description="Rows of the analysis sample with no usable proxy return."
+    )
+    first_date: date | None = Field(
+        description="First date of the proxy price history used; null if there is none."
+    )
+    last_date: date | None = Field(
+        description="Last date of the proxy price history used; null if there is none."
+    )
+    note: str | None = Field(
+        description="Set when the proxy refresh failed: where the cached history ends, or why "
+        "there is none."
+    )
+    audit_warnings: list[str] = Field(description="Warnings of the proxy price audit (M1.4).")
+    benchmark: BetaFit | None = Field(description="Against the proxy fund, excess of RF.")
+    us_market: BetaFit | None = Field(description="Against the US market, same days.")
+    comparison: ComparisonKey | None = Field(
+        description="Proxy beta against the US market beta: about_the_same when the two 95% "
+        "intervals overlap, otherwise higher or lower (a reading of the intervals, not a test)."
+    )
+    comparison_text: str | None = Field(description="The plain reading of the comparison.")
+
+    @model_validator(mode="after")
+    def _shape(self) -> ProxyBeta:
+        if (self.status == "ok") != (self.reason is None):
+            raise ValueError("reason must be None exactly when status is 'ok'")
+        parts = (
+            self.benchmark,
+            self.us_market,
+            self.comparison,
+            self.comparison_text,
+            self.hac_lags,
+        )
+        if self.status == "ok":
+            if any(p is None for p in parts) or self.last_date is None:
+                raise ValueError("an ok block fills both fits, the comparison, the lags and dates")
+        elif any(p is not None for p in parts):
+            raise ValueError("a block that is not ok carries no fits or comparison")
+        if (self.first_date is None) != (self.last_date is None):
+            raise ValueError("the first and last proxy date are both set or both null")
+        if (
+            self.first_date is not None
+            and self.last_date is not None
+            and self.first_date > self.last_date
+        ):
+            raise ValueError("first_date is after last_date")
+        return self
+
+
 class WorldBetaSection(SectionModel):
     """The quick beta against ACWI next to the beta against the US market, on the same days."""
 
@@ -96,6 +165,12 @@ class WorldBetaSection(SectionModel):
         "intervals overlap, otherwise higher or lower (a reading of the intervals, not a test)."
     )
     comparison_text: str | None = Field(description="The plain reading of the comparison.")
+    europe: ProxyBeta | None = Field(
+        default=None,
+        description="The same quick beta against the Europe proxy (IEUR, stand-in for MSCI "
+        "Europe), with its own status and reason; null when it was not computed. The section "
+        "status is that of the ACWI fields above, so a failed Europe block never changes it.",
+    )
     labels: list[WorldBetaLabel]
 
     @model_validator(mode="after")
