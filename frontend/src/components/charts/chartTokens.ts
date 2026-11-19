@@ -11,8 +11,8 @@ export interface ChartTokens {
   ink3: string;
   pos: string;
   neg: string;
-  /** Factor hues f1 to f5 in canonical order (Mkt-RF, SMB, HML, RMW, CMA). */
-  factors: readonly [string, string, string, string, string];
+  /** Factor hues f1 to f6 in canonical order (Mkt-RF, SMB, HML, RMW, CMA, then Mom of FF6). */
+  factors: readonly [string, string, string, string, string, string];
   sans: string;
 }
 
@@ -35,7 +35,7 @@ export function readChartTokens(element: Element = document.documentElement): Ch
     ink3: get("--ink-3"),
     pos: get("--pos"),
     neg: get("--neg"),
-    factors: [get("--f1"), get("--f2"), get("--f3"), get("--f4"), get("--f5")],
+    factors: [get("--f1"), get("--f2"), get("--f3"), get("--f4"), get("--f5"), get("--f6")],
     sans: get("--sans"),
   };
 }

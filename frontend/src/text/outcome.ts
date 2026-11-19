@@ -6,11 +6,11 @@
  */
 import type { FactorReport, FactorStat } from "../api/types";
 import { count, dateLong, num, pct } from "../format";
-import { factorOrder, finite, IDIO, windowStats } from "../report/derive";
+import { countWord, factorOrder, finite, IDIO, windowStats } from "../report/derive";
 import { auditWord, isMonthly, isSubjectReport, observations, stepWord } from "../report/subject";
 import { PLAIN } from "./plain";
 
-const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five"] as const;
+const NUMBER_WORDS = ["None", "One", "Two", "Three", "Four", "Five", "Six"] as const;
 
 function pct1(x: number): string {
   return pct(Math.abs(x), 1, false);
@@ -63,15 +63,16 @@ function isClear(f: FactorStat): boolean {
   return f.tag === "reliable";
 }
 
-/** Factor exposures: how many of the five betas are clear, and which. */
+/** Factor exposures: how many of the betas (five, or six under FF6) are clear, and which. */
 export function exposuresOutcome(report: FactorReport): string | null {
   const fs = report.regression.factors;
   if (report.regression.status !== "ok" || fs.length === 0) return null;
   const clear = fs.filter(isClear).map((f) => plain(f.name).toLowerCase());
   const rest = fs.filter((f) => !isClear(f)).map((f) => plain(f.name).toLowerCase());
-  if (clear.length === 0) return "None of the five exposures is distinguishable from zero over this range.";
+  const all = countWord(fs.length);
+  if (clear.length === 0) return `None of the ${all} exposures is distinguishable from zero over this range.`;
   const k = clear.length;
-  let text = `${NUMBER_WORDS[k] ?? String(k)} of the five exposures ${k === 1 ? "is" : "are"} clear (${list(clear)})`;
+  let text = `${NUMBER_WORDS[k] ?? String(k)} of the ${all} exposures ${k === 1 ? "is" : "are"} clear (${list(clear)})`;
   text += rest.length > 0 ? `; ${list(rest)} ${rest.length === 1 ? "is" : "are"} not distinguishable from zero.` : ".";
   return text;
 }

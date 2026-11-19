@@ -14,6 +14,7 @@ import {
   worldBetaReading,
 } from "../../text/verdict";
 import type { Reading } from "../../text/verdict";
+import { countWord, factorCount } from "../../report/derive";
 import { frequencyWord, isSubjectReport } from "../../report/subject";
 import { DataNotes } from "./DataNotes";
 import { Panel } from "./Panel";
@@ -98,7 +99,7 @@ function modelRows(report: FactorReport): { rows: Row[]; reasons: string[] } {
   const wb = report.world_beta;
   const w = wb?.status === "ok" ? wb.world : null;
   const reasons: string[] = [];
-  if (!rg) reasons.push(reg.reason ?? "The five-factor model could not be fitted.");
+  if (!rg) reasons.push(reg.reason ?? `The ${countWord(factorCount(report))}-factor model could not be fitted.`);
   if (!w && !isSubjectReport(report)) {
     reasons.push(wb ? (wb.reason ?? "The ACWI beta could not be computed.") : "The ACWI beta is not in this report.");
   }
@@ -154,7 +155,7 @@ function KvTable({ id, title, rows, stats }: { id: string; title: string; rows: 
               </th>
               <th
                 scope="col"
-                title="Clear evidence: the 95% interval excludes zero after correcting for testing five betas at once. Could be noise: it does not."
+                title="Clear evidence: the 95% interval excludes zero after correcting for testing all the betas at once. Could be noise: it does not. The test protects against noise only; it does not show that a factor caused the returns."
               >
                 Reading
               </th>
@@ -204,7 +205,17 @@ export function SummaryPanel({ report }: ReportPanelProps) {
   const perf = performanceRows(report);
   const model = modelRows(report);
   // The one-line explanations name the frequency of the returns.
-  const worded = (rows: Row[]): Row[] => rows.map((r) => ({ ...r, tip: r.tip.replace("daily", frequencyWord(report)) }));
+  // and the number of factors of the model (five for FF5, six for FF6).
+  const k = factorCount(report);
+  const worded = (rows: Row[]): Row[] =>
+    rows.map((r) => ({
+      ...r,
+      tip: r.tip
+        .replace("daily", frequencyWord(report))
+        .replace("five", countWord(k))
+        .replace("other four", `other ${countWord(k - 1)}`),
+      label: r.label.replace("five-factor", `${countWord(k)}-factor`),
+    }));
   const { actual_start: start, actual_end: end } = report.data;
   const period = start && end ? `${dateLong(start)} to ${dateLong(end)}. ` : "";
   const reasons = [...(perf.reason ? [perf.reason] : []), ...model.reasons];

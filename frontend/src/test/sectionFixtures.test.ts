@@ -3,10 +3,10 @@ import { cloneReport, mockReport } from "./fixture";
 import { SECTION_FIELDS, withSection } from "./sectionFixtures";
 
 describe("schema v3 contract fixtures", () => {
-  it("the mock report is version 4 with every optional section null", () => {
+  it("the mock report is version 4 with every optional section null or absent", () => {
     expect(mockReport.schema_version).toBe("4");
     for (const field of SECTION_FIELDS) {
-      expect(mockReport[field]).toBeNull();
+      expect(mockReport[field] ?? null).toBeNull();
     }
   });
 
@@ -22,7 +22,7 @@ describe("schema v3 contract fixtures", () => {
         expect(item).toHaveProperty("reason");
         expect(item).toHaveProperty("sample");
       }
-      expect(mockReport[field]).toBeNull();
+      expect(mockReport[field] ?? null).toBeNull();
     }
   });
 

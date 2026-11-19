@@ -56,6 +56,7 @@
   --f3: #C25078; /* HML */
   --f4: #1995BA; /* RMW */
   --f5: #A18A21; /* CMA */
+  --f6: #7048B8; /* Mom (FF6) */
   /* names kept from rev 2 so the panel stylesheets read the new values */
   --border: var(--line);
   --focus: var(--accent);

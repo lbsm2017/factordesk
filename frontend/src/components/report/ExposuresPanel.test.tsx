@@ -164,7 +164,7 @@ describe("ExposuresPanel table", () => {
   it("shows the reading line, the footnote and the folded method detail", () => {
     const { container } = render(<ExposuresPanel report={report} />, statsOn);
     expect(container.querySelector(".reading")?.textContent).toMatch(/^Over this window the stock moves roughly one-for-one with the market/);
-    expect(container.querySelector(".foot > p")?.textContent).toMatch(/Significant means the adjusted p is below 0\.05\.$/);
+    expect(container.querySelector(".foot > p")?.textContent).toMatch(/Significant means the adjusted p is below 0.05. The tag protects against reading noise as a pattern, and nothing more: it does not show that a factor caused the returns or that the model is the right one.$/);
     expect(container.querySelector("details.how")?.textContent).toContain("Benjamini-Hochberg");
   });
 

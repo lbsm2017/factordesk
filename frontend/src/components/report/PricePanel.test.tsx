@@ -34,7 +34,7 @@ const tokens: ChartTokens = {
   ink3: "INK3",
   pos: "p",
   neg: "n",
-  factors: ["1", "2", "3", "4", "5"],
+  factors: ["1", "2", "3", "4", "5", "6"],
   sans: "sans",
 };
 
