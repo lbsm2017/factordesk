@@ -3,7 +3,8 @@ import type { RangePreset } from "../api/types";
 
 /**
  * URL state contract (dashboard spec DB6.1). Shapes: `/?t=SPY&range=3Y`,
- * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126` and `stats=1`. Panels
+ * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126`, `stats=1` and `m=track` (the
+ * track-record mode; no `m` means ticker mode, so every older URL keeps its meaning). Panels
  * read `win` through props and `stats` through `useShowStats()`, never from `location`.
  */
 
@@ -26,9 +27,13 @@ export interface UrlState {
   win: RollingWindowDays | null;
   /** The "Show statistics" switch (dashboard spec DV6): `stats=1` when on, absent when off. */
   stats: boolean;
+  /** The sidebar mode: a ticker report (no `m` in the URL) or an uploaded track record (`m=track`). */
+  mode: Mode;
 }
 
-export const EMPTY_URL_STATE: UrlState = { ticker: null, range: null, start: null, end: null, win: null, stats: false };
+export type Mode = "ticker" | "track";
+
+export const EMPTY_URL_STATE: UrlState = { ticker: null, range: null, start: null, end: null, win: null, stats: false, mode: "ticker" };
 
 /** The server's ticker pattern (`validate_ticker`): 1 to 12 of letters, digits and . ^ = -, not starting with a dot. */
 const TICKER_PATTERN = /^[A-Za-z0-9.^=-]{1,12}$/;
@@ -84,6 +89,7 @@ export function parseUrl(search: string): UrlState {
     end,
     win: parseWin(params.get("win")),
     stats: params.get("stats") === "1",
+    mode: params.get("m") === "track" ? "track" : "ticker",
   };
 }
 
@@ -99,6 +105,7 @@ export function toSearch(state: UrlState): string {
   }
   if (state.win !== null) params.set("win", String(state.win));
   if (state.stats) params.set("stats", "1");
+  if (state.mode === "track") params.set("m", "track");
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
 }

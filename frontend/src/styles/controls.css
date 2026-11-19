@@ -98,3 +98,17 @@
 @media (prefers-reduced-motion: reduce) {
   .controls * { transition: none; }
 }
+
+/* track record: the drop zone is a dashed box on the rail; the file input lies over it */
+.ctl-drop {
+  position: relative; display: flex; align-items: center; justify-content: center; padding: var(--s-5) var(--s-3);
+  border: 1px dashed var(--rail-track); border-radius: var(--r-control); color: var(--rail-2);
+  font-size: var(--fs-cap); text-align: center; overflow-wrap: anywhere; cursor: pointer;
+}
+.ctl-drop input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.ctl-drop:hover, .ctl-drop.over { border-color: var(--rail-cyan); background: var(--rail-hover); color: var(--rail-text); }
+.ctl-drop.chosen { border-style: solid; color: var(--rail-text); }
+.ctl-drop:focus-within { outline: 2px solid var(--rail-cyan); outline-offset: 2px; }
+.ctl-name { display: flex; flex-direction: column; gap: 8px; }
+.controls .ctl-name input[type="text"] { text-transform: none; letter-spacing: normal; }
+.controls .btn:disabled { opacity: 0.5; cursor: default; }

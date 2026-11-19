@@ -18,7 +18,13 @@ from factordesk.analytics.regression import (
     significance_tags,
     vif,
 )
-from factordesk.analytics.sample import DegenerateInputError, build_sample
+from factordesk.analytics.sample import (
+    FACTOR_CODES,
+    DegenerateInputError,
+    build_sample,
+    build_subject_sample,
+)
+from factordesk.analytics.subject import subject_from_monthly_returns
 from factordesk.tests.fixtures.dgp import (
     BETA,
     Synthetic,
@@ -31,9 +37,12 @@ from factordesk.tests.fixtures.reference import (
     RefFit,
     hac_fit,
     hac_fit_missing_raise,
+    hac_fit_small_sample,
     ols_fit,
     vif_with_constant,
 )
+from factordesk.tests.test_subject import monthly_case
+from factordesk.tests.test_subject_report import monthly_report
 
 SWEEP = [None, *[pytest.param(s, marks=pytest.mark.slow, id=f"seed{s}") for s in range(1, 51)]]
 
@@ -301,3 +310,64 @@ def test_tags_and_interpretation_only_for_reliable() -> None:
     for tag, text in zip(reg.beta_tags, reg.interpretations, strict=True):
         assert (text is not None) == (tag == "reliable")
     assert reg.beta_tags[0] == "reliable"
+
+
+# ----------------------------------------------------------------------------- monthly inference
+def _close(a: object, b: object) -> None:
+    np.testing.assert_allclose(
+        np.asarray(a, dtype=np.float64), np.asarray(b, dtype=np.float64), rtol=1e-10, atol=0
+    )
+
+
+@pytest.mark.parametrize(("n", "seed"), [(36, 3801), (48, 3802), (120, 3803)])
+def test_monthly_small_sample_matches_statsmodels(n: int, seed: int) -> None:
+    returns, factors, _ = monthly_case(n, seed)
+    sample = build_subject_sample(
+        subject_from_monthly_returns(returns, label="Fund"), factors, None, None
+    )
+    y = sample.xret.to_numpy()
+    f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy()
+    lags = hac_lags(n)
+    ours = ols_hac(y, f, small_sample=True)
+    ref = hac_fit_small_sample(y, f, lags)
+    assert ours.lags == lags and ours.t_df == n - 6
+    _close(ours.params, ref.params)
+    _close(ours.cov, ref.cov)
+    _close(ours.bse, ref.bse)
+    _close(ours.pvalues, ref.pvalues)
+    _close(ours.ci_low, ref.conf_int[:, 0])
+    _close(ours.ci_high, ref.conf_int[:, 1])
+    # The correction widens the asymptotic covariance by exactly n / (n - k).
+    plain = ols_hac(y, f)
+    assert plain.t_df is None
+    _close(ours.cov, plain.cov * n / (n - 6))
+    assert (ours.pvalues > plain.pvalues).all()
+
+    reg = run_regression(sample, periods=12, small_sample=True)
+    _close(reg.fit.pvalues, ref.pvalues)
+    assert list(reg.beta_tags) == significance_tags(list(ref.pvalues[1:]))
+    assert reg.alpha_tag == ("reliable" if ref.pvalues[0] < 0.05 else "noise")
+    _close(reg.alpha_ci_ann, 12 * ref.conf_int[0])
+
+
+def test_monthly_report_uses_student_t() -> None:
+    n = 48
+    returns, factors, _ = monthly_case(n, 11)
+    report = monthly_report(n, 11)
+    reg = report.regression
+    rf = factors["RF"].to_numpy()[:n]
+    f = factors.loc[:, ["Mkt-RF", "SMB", "HML", "RMW", "CMA"]].to_numpy()[:n]
+    ref = hac_fit_small_sample(returns.to_numpy() - rf, f, hac_lags(n))
+    assert reg.alpha_p == pytest.approx(float(ref.pvalues[0]), rel=1e-9)
+    for i, stat in enumerate(reg.factors):
+        assert stat.p == pytest.approx(float(ref.pvalues[i + 1]), rel=1e-9)
+        assert stat.ci_low == pytest.approx(float(ref.conf_int[i + 1, 0]), rel=1e-9)
+        assert stat.se == pytest.approx(float(ref.bse[i + 1]), rel=1e-9)
+    assert [s.tag for s in reg.factors] == significance_tags(list(ref.pvalues[1:]))
+    assert "Student-t reference with 42 degrees of freedom" in reg.caption
+
+
+def test_daily_regression_keeps_the_normal_reference() -> None:
+    d = dgp_a(rng_for(38))
+    fit = run_regression(build_sample(d.history, d.factors)).fit
+    assert fit.t_df is None

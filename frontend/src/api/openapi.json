@@ -137,6 +137,85 @@
         }
       }
     },
+    "/api/report/upload": {
+      "post": {
+        "summary": "Upload Report",
+        "description": "The factor report of an uploaded monthly track record (kept in memory, never stored).",
+        "operationId": "upload_report_api_report_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_report_api_report_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactorReport"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is larger than 1 MB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The file or a form field cannot be used, or the record is too short.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The report could not be computed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The downloaded factor file failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A data source could not be reached or refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/report/{ticker}/ranges": {
       "get": {
         "summary": "Get Ranges",
@@ -653,7 +732,9 @@
               "upstream_refused",
               "not_found",
               "internal",
-              "bad_request"
+              "bad_request",
+              "invalid_upload",
+              "upload_too_large"
             ],
             "title": "Code"
           },
@@ -981,6 +1062,45 @@
         ],
         "title": "BetaFit",
         "description": "One single-factor regression of the stock's excess return, with Newey-West inference."
+      },
+      "Body_upload_report_api_report_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "CSV with a date and a return column."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name of the record."
+          },
+          "gross_net": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Net",
+            "description": "gross or net of fees; empty when unknown."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_report_api_report_upload_post"
       },
       "CorrPair": {
         "properties": {
@@ -1311,7 +1431,7 @@
             "type": "integer",
             "minimum": 1.0,
             "title": "Days Peak To Trough",
-            "description": "Trading days from peak to trough."
+            "description": "Periods from peak to trough (trading days, or months when subject.periods = 12)."
           },
           "days_trough_to_recovery": {
             "anyOf": [
@@ -1323,7 +1443,7 @@
               }
             ],
             "title": "Days Trough To Recovery",
-            "description": "Trading days from trough to recovery; None when not recovered."
+            "description": "Periods from trough to recovery (trading days, or months when subject.periods = 12); None when not recovered."
           }
         },
         "additionalProperties": false,
@@ -1366,7 +1486,7 @@
           "values"
         ],
         "title": "DrawdownSeries",
-        "description": "The fall from the running peak on every day of the compounded return path, for a chart."
+        "description": "The fall from the running peak at every date of the compounded return path, for a chart."
       },
       "ExcludedRow": {
         "properties": {
@@ -1488,7 +1608,19 @@
           },
           "ticker": {
             "type": "string",
-            "title": "Ticker"
+            "title": "Ticker",
+            "description": "The ticker symbol, or the subject's label (subject.label)."
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubjectInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the report is about when it is not a daily ticker; absent (not null) for a ticker report, which is daily and annualised with 252."
           },
           "generated_at": {
             "type": "string",
@@ -1664,7 +1796,7 @@
           "kalman_betas"
         ],
         "title": "FactorReport",
-        "description": "Everything the UI or an exported file needs to describe one ticker's factor exposures."
+        "description": "Everything the UI or an exported file needs to describe one subject's factor exposures."
       },
       "FactorStat": {
         "properties": {
@@ -1705,7 +1837,7 @@
               }
             ],
             "title": "Z",
-            "description": "HAC z-statistic (normal reference distribution)."
+            "description": "HAC test statistic: a z-statistic (normal reference) for daily subjects, a t-statistic (Student-t, n - 6 degrees of freedom) for monthly subjects."
           },
           "p": {
             "anyOf": [
@@ -2673,7 +2805,8 @@
                 "type": "null"
               }
             ],
-            "title": "Days Peak To Trough"
+            "title": "Days Peak To Trough",
+            "description": "Periods from peak to trough (trading days, or months when subject.periods = 12); None when there was no drawdown."
           },
           "days_trough_to_recovery": {
             "anyOf": [
@@ -2684,7 +2817,8 @@
                 "type": "null"
               }
             ],
-            "title": "Days Trough To Recovery"
+            "title": "Days Trough To Recovery",
+            "description": "Periods from trough to recovery (trading days, or months when subject.periods = 12); None when not recovered or no drawdown."
           },
           "episodes": {
             "items": {
@@ -2696,7 +2830,7 @@
           },
           "series": {
             "$ref": "#/components/schemas/DrawdownSeries",
-            "description": "Daily drawdown over the analysed window."
+            "description": "Drawdown at each analysed date (trading days, or month-ends when subject.periods = 12)."
           }
         },
         "additionalProperties": false,
@@ -2720,7 +2854,7 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "N Days",
-            "description": "Daily observations of the analysed sample."
+            "description": "Periods of the analysed sample (trading days, or months when subject.periods = 12)."
           },
           "start": {
             "type": "string",
@@ -2737,7 +2871,7 @@
           "years": {
             "type": "number",
             "title": "Years",
-            "description": "n_days / 252."
+            "description": "n_days / P, with P the observations a year (252, or subject.periods)."
           }
         },
         "additionalProperties": false,
@@ -2756,7 +2890,7 @@
           "cagr": {
             "type": "number",
             "title": "Cagr",
-            "description": "Compound annual growth rate: prod(1 + r)^(252 / n) - 1."
+            "description": "Compound annual growth rate: prod(1 + r)^(P / n) - 1, with P the observations a year (252, or subject.periods)."
           },
           "cumulative_return": {
             "type": "number",
@@ -2766,7 +2900,7 @@
           "mean_return_annual": {
             "type": "number",
             "title": "Mean Return Annual",
-            "description": "Arithmetic mean of daily returns times 252; ignores compounding."
+            "description": "Arithmetic mean of the periodic returns times P (252, or subject.periods); ignores compounding."
           }
         },
         "additionalProperties": false,
@@ -2777,7 +2911,7 @@
           "mean_return_annual"
         ],
         "title": "PerformanceReturns",
-        "description": "Growth of the stock over the window (simple daily total returns, M1.3)."
+        "description": "Growth of the subject over the window (simple total returns per period, M1.3)."
       },
       "PerformanceSection": {
         "properties": {
@@ -2836,7 +2970,7 @@
               }
             ],
             "title": "Volatility Annual",
-            "description": "sqrt(252) x sample sd (ddof 1) of daily simple returns."
+            "description": "sqrt(P) x sample sd (ddof 1) of the periodic simple returns, with P the observations a year (252, or subject.periods)."
           },
           "sharpe": {
             "anyOf": [
@@ -2872,7 +3006,7 @@
           "drawdown"
         ],
         "title": "PerformanceSection",
-        "description": "Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed stock.\n\nDescriptive and in-sample: it says what happened over the window, not what will happen.\nStatuses: ``ok``; ``insufficient_data`` (fewer than 60 daily observations); ``failed``."
+        "description": "Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed subject.\n\nDescriptive and in-sample: it says what happened over the window, not what will happen.\nStatuses: ``ok``; ``insufficient_data`` (fewer than 60 observations); ``failed``."
       },
       "PerformanceSharpe": {
         "properties": {
@@ -2886,7 +3020,7 @@
               }
             ],
             "title": "Ratio Annual",
-            "description": "sqrt(252) x mean(excess) / sd(excess), ddof 1; None when the excess returns do not vary (the ratio is not defined)."
+            "description": "sqrt(P) x mean(excess) / sd(excess), ddof 1, with P the observations a year (252, or subject.periods); None when the excess returns do not vary (the ratio is not defined)."
           },
           "ratio_daily": {
             "anyOf": [
@@ -2898,12 +3032,12 @@
               }
             ],
             "title": "Ratio Daily",
-            "description": "mean(excess) / sd(excess); None as above."
+            "description": "Ratio per period, mean(excess) / sd(excess): per trading day, or per month when subject.periods = 12 (the name is kept for compatibility); None as above."
           },
           "mean_excess_annual": {
             "type": "number",
             "title": "Mean Excess Annual",
-            "description": "252 x mean of daily excess returns."
+            "description": "P x mean of the periodic excess returns (P = 252, or subject.periods)."
           },
           "sharpe_se_iid": {
             "anyOf": [
@@ -2915,7 +3049,7 @@
               }
             ],
             "title": "Sharpe Se Iid",
-            "description": "Approximate standard error of the annual ratio, sqrt(252) x sqrt((1 + SR_daily^2 / 2) / n) (Lo 2002). Assumes independent, identically distributed returns."
+            "description": "Approximate standard error of the annual ratio, sqrt(P) x sqrt((1 + ratio_daily^2 / 2) / n) (Lo 2002), P = 252 or subject.periods. Assumes independent, identically distributed returns."
           },
           "ci95_low": {
             "anyOf": [
@@ -2966,7 +3100,7 @@
           "ci_includes_zero"
         ],
         "title": "PerformanceSharpe",
-        "description": "Sharpe ratio of the daily excess returns (stock return minus the factor file's RF)."
+        "description": "Sharpe ratio of the periodic excess returns (subject return minus the factor file's RF)."
       },
       "PowerStatement": {
         "properties": {
@@ -3599,7 +3733,7 @@
               }
             ],
             "title": "Alpha Annual",
-            "description": "Annualised alpha, decimal per year (x252)."
+            "description": "Annualised alpha, decimal per year: P x intercept, with P the observations a year (252, or subject.periods)."
           },
           "alpha_se_annual": {
             "anyOf": [
@@ -3716,7 +3850,7 @@
               }
             ],
             "title": "Sigma E Annual",
-            "description": "Residual volatility, sqrt(252) x sd."
+            "description": "Residual volatility, sqrt(P) x sd, P = 252 or subject.periods."
           },
           "hac_lags": {
             "type": "integer",
@@ -5200,7 +5334,7 @@
             },
             "type": "object",
             "title": "Factors",
-            "description": "252 x beta_i x mean(f_i) per factor."
+            "description": "P x beta_i x mean(f_i) per factor, with P the observations a year (252, or subject.periods)."
           },
           "alpha": {
             "anyOf": [
@@ -5212,7 +5346,7 @@
               }
             ],
             "title": "Alpha",
-            "description": "252 x alpha (daily intercept)."
+            "description": "P x alpha (the intercept per period: trading day, or month when subject.periods = 12)."
           },
           "residual": {
             "anyOf": [
@@ -5224,7 +5358,7 @@
               }
             ],
             "title": "Residual",
-            "description": "252 x mean(residual); 0 by construction."
+            "description": "P x mean(residual); 0 by construction."
           },
           "total_annualised_mean_excess_return": {
             "anyOf": [
@@ -5374,7 +5508,7 @@
               }
             ],
             "title": "Total Vol Annual",
-            "description": "sqrt(252 x V)."
+            "description": "sqrt(P x V), P = 252 or subject.periods."
           },
           "order": {
             "items": {
@@ -5458,7 +5592,7 @@
               }
             ],
             "title": "Sigma Annual",
-            "description": "Factor volatility, sqrt(252) x sd."
+            "description": "Factor volatility, sqrt(P) x sd, with P the observations a year (252, or subject.periods)."
           },
           "rho_sys": {
             "anyOf": [
@@ -6489,6 +6623,84 @@
         ],
         "title": "SplitHalfAlpha",
         "description": "One prespecified split at the middle of S (R5.3)."
+      },
+      "SubjectInfo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ticker",
+              "upload",
+              "portfolio"
+            ],
+            "title": "Kind",
+            "description": "ticker, upload (track record) or portfolio."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Display name: the fund or portfolio name, or the ticker."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Frequency"
+          },
+          "periods": {
+            "type": "integer",
+            "title": "Periods",
+            "description": "Observations a year used to annualise: 252 for daily data, 12 for monthly."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Where the returns come from, e.g. 'upload'."
+          },
+          "gross_net": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "gross",
+                  "net"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Net",
+            "description": "Whether the returns are before or after fees; None: unknown."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Currency of the returns (USD only for now); None: unknown."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "frequency",
+          "periods",
+          "source",
+          "gross_net",
+          "currency"
+        ],
+        "title": "SubjectInfo",
+        "description": "What the report is about when it is not a daily ticker (written only for those subjects).\n\nCounts that the report names in days (``n_days``, ``days_peak_to_trough``) are counts of\nobservations at ``frequency``: months for a monthly subject."
       },
       "TickerSuggestion": {
         "properties": {

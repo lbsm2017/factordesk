@@ -64,6 +64,14 @@ def hac_fit(y: FloatArray, f: FloatArray, lags: int) -> RefFit:
     return _fit(res)
 
 
+def hac_fit_small_sample(y: FloatArray, f: FloatArray, lags: int) -> RefFit:
+    """HAC with the n / (n - k) correction and Student-t inference (monthly subjects)."""
+    res = _sm.OLS(np.asarray(y, dtype=np.float64), add_constant(f)).fit(
+        cov_type="HAC", cov_kwds={"maxlags": lags, "use_correction": True}, use_t=True
+    )
+    return _fit(res)
+
+
 def ols_fit(y: FloatArray, f: FloatArray) -> RefFit:
     """Plain OLS with the default (nonrobust) covariance."""
     return _fit(_sm.OLS(np.asarray(y, dtype=np.float64), add_constant(f)).fit())

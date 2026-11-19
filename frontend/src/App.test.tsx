@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -217,7 +217,9 @@ describe("committing changes", () => {
     expect(window.location.search).toBe("?t=SPY&range=3Y");
     fireEvent.blur(screen.getByLabelText("From"));
     expect(window.location.search).toBe("?t=SPY&start=2025-01-02&end=2026-09-30");
-    for (const radio of screen.getAllByRole("radio")) expect((radio as HTMLInputElement).checked).toBe(false);
+    for (const radio of within(screen.getByRole("group", { name: "Date range" })).getAllByRole("radio")) {
+      expect((radio as HTMLInputElement).checked).toBe(false);
+    }
     await waitFor(() => expect(requests).toContain("/api/report/SPY?start=2025-01-02&end=2026-09-30"));
   });
 

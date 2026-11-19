@@ -85,6 +85,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/report/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Report
+         * @description The factor report of an uploaded monthly track record (kept in memory, never stored).
+         */
+        post: operations["upload_report_api_report_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/report/{ticker}/ranges": {
         parameters: {
             query?: never;
@@ -188,7 +208,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request";
+            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request" | "invalid_upload" | "upload_too_large";
             /** Message */
             message: string;
             /** Action */
@@ -325,6 +345,24 @@ export interface components {
              * @description HAC t of the intercept; null on an exact fit.
              */
             alpha_t: number | null;
+        };
+        /** Body_upload_report_api_report_upload_post */
+        Body_upload_report_api_report_upload_post: {
+            /**
+             * File
+             * @description CSV with a date and a return column.
+             */
+            file: string;
+            /**
+             * Name
+             * @description Display name of the record.
+             */
+            name?: string | null;
+            /**
+             * Gross Net
+             * @description gross or net of fees; empty when unknown.
+             */
+            gross_net?: string | null;
         };
         /**
          * CorrPair
@@ -506,18 +544,18 @@ export interface components {
             recovery_date: string | null;
             /**
              * Days Peak To Trough
-             * @description Trading days from peak to trough.
+             * @description Periods from peak to trough (trading days, or months when subject.periods = 12).
              */
             days_peak_to_trough: number;
             /**
              * Days Trough To Recovery
-             * @description Trading days from trough to recovery; None when not recovered.
+             * @description Periods from trough to recovery (trading days, or months when subject.periods = 12); None when not recovered.
              */
             days_trough_to_recovery: number | null;
         };
         /**
          * DrawdownSeries
-         * @description The fall from the running peak on every day of the compounded return path, for a chart.
+         * @description The fall from the running peak at every date of the compounded return path, for a chart.
          */
         DrawdownSeries: {
             /**
@@ -569,7 +607,7 @@ export interface components {
         };
         /**
          * FactorReport
-         * @description Everything the UI or an exported file needs to describe one ticker's factor exposures.
+         * @description Everything the UI or an exported file needs to describe one subject's factor exposures.
          */
         FactorReport: {
             /**
@@ -577,8 +615,13 @@ export interface components {
              * @default 4
              */
             schema_version: string;
-            /** Ticker */
+            /**
+             * Ticker
+             * @description The ticker symbol, or the subject's label (subject.label).
+             */
             ticker: string;
+            /** @description What the report is about when it is not a daily ticker; absent (not null) for a ticker report, which is daily and annualised with 252. */
+            subject?: components["schemas"]["SubjectInfo"] | null;
             /**
              * Generated At
              * Format: date-time
@@ -647,7 +690,7 @@ export interface components {
             se: number | null;
             /**
              * Z
-             * @description HAC z-statistic (normal reference distribution).
+             * @description HAC test statistic: a z-statistic (normal reference) for daily subjects, a t-statistic (Student-t, n - 6 degrees of freedom) for monthly subjects.
              */
             z: number | null;
             /**
@@ -1060,16 +1103,22 @@ export interface components {
              * @description None when not recovered or no drawdown.
              */
             recovery_date: string | null;
-            /** Days Peak To Trough */
+            /**
+             * Days Peak To Trough
+             * @description Periods from peak to trough (trading days, or months when subject.periods = 12); None when there was no drawdown.
+             */
             days_peak_to_trough: number | null;
-            /** Days Trough To Recovery */
+            /**
+             * Days Trough To Recovery
+             * @description Periods from trough to recovery (trading days, or months when subject.periods = 12); None when not recovered or no drawdown.
+             */
             days_trough_to_recovery: number | null;
             /**
              * Episodes
              * @description Up to five distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown.
              */
             episodes: components["schemas"]["DrawdownEpisodeInfo"][];
-            /** @description Daily drawdown over the analysed window. */
+            /** @description Drawdown at each analysed date (trading days, or month-ends when subject.periods = 12). */
             series: components["schemas"]["DrawdownSeries"];
         };
         /**
@@ -1079,7 +1128,7 @@ export interface components {
         PerformancePeriods: {
             /**
              * N Days
-             * @description Daily observations of the analysed sample.
+             * @description Periods of the analysed sample (trading days, or months when subject.periods = 12).
              */
             n_days: number;
             /**
@@ -1096,18 +1145,18 @@ export interface components {
             end: string;
             /**
              * Years
-             * @description n_days / 252.
+             * @description n_days / P, with P the observations a year (252, or subject.periods).
              */
             years: number;
         };
         /**
          * PerformanceReturns
-         * @description Growth of the stock over the window (simple daily total returns, M1.3).
+         * @description Growth of the subject over the window (simple total returns per period, M1.3).
          */
         PerformanceReturns: {
             /**
              * Cagr
-             * @description Compound annual growth rate: prod(1 + r)^(252 / n) - 1.
+             * @description Compound annual growth rate: prod(1 + r)^(P / n) - 1, with P the observations a year (252, or subject.periods).
              */
             cagr: number;
             /**
@@ -1117,16 +1166,16 @@ export interface components {
             cumulative_return: number;
             /**
              * Mean Return Annual
-             * @description Arithmetic mean of daily returns times 252; ignores compounding.
+             * @description Arithmetic mean of the periodic returns times P (252, or subject.periods); ignores compounding.
              */
             mean_return_annual: number;
         };
         /**
          * PerformanceSection
-         * @description Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed stock.
+         * @description Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed subject.
          *
          *     Descriptive and in-sample: it says what happened over the window, not what will happen.
-         *     Statuses: ``ok``; ``insufficient_data`` (fewer than 60 daily observations); ``failed``.
+         *     Statuses: ``ok``; ``insufficient_data`` (fewer than 60 observations); ``failed``.
          */
         PerformanceSection: {
             /**
@@ -1144,7 +1193,7 @@ export interface components {
             returns: components["schemas"]["PerformanceReturns"] | null;
             /**
              * Volatility Annual
-             * @description sqrt(252) x sample sd (ddof 1) of daily simple returns.
+             * @description sqrt(P) x sample sd (ddof 1) of the periodic simple returns, with P the observations a year (252, or subject.periods).
              */
             volatility_annual: number | null;
             sharpe: components["schemas"]["PerformanceSharpe"] | null;
@@ -1152,27 +1201,27 @@ export interface components {
         };
         /**
          * PerformanceSharpe
-         * @description Sharpe ratio of the daily excess returns (stock return minus the factor file's RF).
+         * @description Sharpe ratio of the periodic excess returns (subject return minus the factor file's RF).
          */
         PerformanceSharpe: {
             /**
              * Ratio Annual
-             * @description sqrt(252) x mean(excess) / sd(excess), ddof 1; None when the excess returns do not vary (the ratio is not defined).
+             * @description sqrt(P) x mean(excess) / sd(excess), ddof 1, with P the observations a year (252, or subject.periods); None when the excess returns do not vary (the ratio is not defined).
              */
             ratio_annual: number | null;
             /**
              * Ratio Daily
-             * @description mean(excess) / sd(excess); None as above.
+             * @description Ratio per period, mean(excess) / sd(excess): per trading day, or per month when subject.periods = 12 (the name is kept for compatibility); None as above.
              */
             ratio_daily: number | null;
             /**
              * Mean Excess Annual
-             * @description 252 x mean of daily excess returns.
+             * @description P x mean of the periodic excess returns (P = 252, or subject.periods).
              */
             mean_excess_annual: number;
             /**
              * Sharpe Se Iid
-             * @description Approximate standard error of the annual ratio, sqrt(252) x sqrt((1 + SR_daily^2 / 2) / n) (Lo 2002). Assumes independent, identically distributed returns.
+             * @description Approximate standard error of the annual ratio, sqrt(P) x sqrt((1 + ratio_daily^2 / 2) / n) (Lo 2002), P = 252 or subject.periods. Assumes independent, identically distributed returns.
              */
             sharpe_se_iid: number | null;
             /**
@@ -1459,7 +1508,7 @@ export interface components {
             caption: string;
             /**
              * Alpha Annual
-             * @description Annualised alpha, decimal per year (x252).
+             * @description Annualised alpha, decimal per year: P x intercept, with P the observations a year (252, or subject.periods).
              */
             alpha_annual: number | null;
             /** Alpha Se Annual */
@@ -1488,7 +1537,7 @@ export interface components {
             adj_r2: number | null;
             /**
              * Sigma E Annual
-             * @description Residual volatility, sqrt(252) x sd.
+             * @description Residual volatility, sqrt(P) x sd, P = 252 or subject.periods.
              */
             sigma_e_annual: number | null;
             /**
@@ -1994,19 +2043,19 @@ export interface components {
             caption: string;
             /**
              * Factors
-             * @description 252 x beta_i x mean(f_i) per factor.
+             * @description P x beta_i x mean(f_i) per factor, with P the observations a year (252, or subject.periods).
              */
             factors: {
                 [key: string]: number | null;
             };
             /**
              * Alpha
-             * @description 252 x alpha (daily intercept).
+             * @description P x alpha (the intercept per period: trading day, or month when subject.periods = 12).
              */
             alpha: number | null;
             /**
              * Residual
-             * @description 252 x mean(residual); 0 by construction.
+             * @description P x mean(residual); 0 by construction.
              */
             residual: number | null;
             /** Total Annualised Mean Excess Return */
@@ -2067,7 +2116,7 @@ export interface components {
             sums_to_one_residual: number | null;
             /**
              * Total Vol Annual
-             * @description sqrt(252 x V).
+             * @description sqrt(P x V), P = 252 or subject.periods.
              */
             total_vol_annual: number | null;
             /**
@@ -2099,7 +2148,7 @@ export interface components {
             beta: number | null;
             /**
              * Sigma Annual
-             * @description Factor volatility, sqrt(252) x sd.
+             * @description Factor volatility, sqrt(P) x sd, with P the observations a year (252, or subject.periods).
              */
             sigma_annual: number | null;
             /**
@@ -2492,6 +2541,51 @@ export interface components {
             /** Difference P */
             difference_p: number | null;
         };
+        /**
+         * SubjectInfo
+         * @description What the report is about when it is not a daily ticker (written only for those subjects).
+         *
+         *     Counts that the report names in days (``n_days``, ``days_peak_to_trough``) are counts of
+         *     observations at ``frequency``: months for a monthly subject.
+         */
+        SubjectInfo: {
+            /**
+             * Kind
+             * @description ticker, upload (track record) or portfolio.
+             * @enum {string}
+             */
+            kind: "ticker" | "upload" | "portfolio";
+            /**
+             * Label
+             * @description Display name: the fund or portfolio name, or the ticker.
+             */
+            label: string;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "monthly";
+            /**
+             * Periods
+             * @description Observations a year used to annualise: 252 for daily data, 12 for monthly.
+             */
+            periods: number;
+            /**
+             * Source
+             * @description Where the returns come from, e.g. 'upload'.
+             */
+            source: string;
+            /**
+             * Gross Net
+             * @description Whether the returns are before or after fees; None: unknown.
+             */
+            gross_net: ("gross" | "net") | null;
+            /**
+             * Currency
+             * @description Currency of the returns (USD only for now); None: unknown.
+             */
+            currency: string | null;
+        };
         /** TickerSuggestion */
         TickerSuggestion: {
             /** Ticker */
@@ -2741,6 +2835,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_report_api_report_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_report_api_report_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorReport"];
+                };
+            };
+            /** @description The file is larger than 1 MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The file or a form field cannot be used, or the record is too short. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The report could not be computed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The downloaded factor file failed validation. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description A data source could not be reached or refused. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };

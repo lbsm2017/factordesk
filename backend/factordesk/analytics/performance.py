@@ -1,8 +1,10 @@
 """Historical performance of the analysed stock: growth, volatility, Sharpe ratio, drawdowns.
 
 Pure functions, no I/O. Every statistic is computed over the analysed sample ``S`` (methodology
-M2): the same trading days as the factor regression, so the numbers move with the date range.
-Annualisation uses ``A = 252`` (M0).
+M2): the same rows as the factor regression, so the numbers move with the date range.
+Annualisation uses ``A = periods``, the number of observations a year: 252 for daily data (M0),
+12 for monthly data. Every formula below holds for either frequency; "daily" reads "per period"
+for a monthly series, and day counts of the drawdown are then month counts.
 
 Inputs and definitions (owner-approved wording of 2026-11-18; they are proposals for
 ``docs/methodology.md`` until the owner folds them in, see the hand-off document):
@@ -73,11 +75,12 @@ real price move (a one-cent move on a 100 price is 1e-4)."""
 
 
 class InsufficientObservations(ValueError):
-    """Fewer than ``MIN_OBS`` daily returns."""
+    """Fewer returns than the minimum the caller asked for (``MIN_OBS`` by default)."""
 
-    def __init__(self, n: int) -> None:
-        super().__init__(f"{n} daily observations, at least {MIN_OBS} required")
+    def __init__(self, n: int, required: int = MIN_OBS, unit: str = "daily") -> None:
+        super().__init__(f"{n} {unit} observations, at least {required} required")
         self.n = n
+        self.required = required
 
 
 @dataclass(frozen=True)
@@ -100,14 +103,14 @@ class PerformanceResult:
     start: date
     end: date
     years: float
-    """``n / A``."""
+    """``n / periods``."""
     cagr: float
     cumulative_return: float
     mean_return_annual: float
-    """``A * mean(r_t)``: arithmetic, ignores compounding."""
+    """``periods * mean(r_t)``: arithmetic, ignores compounding."""
     volatility_annual: float
     mean_excess_annual: float
-    """``A * mean(x_t)``."""
+    """``periods * mean(x_t)``."""
     sharpe_daily: float | None
     sharpe_annual: float | None
     sharpe_se_iid: float | None
@@ -187,23 +190,31 @@ def top_episodes(episodes: list[DrawdownEpisode], k: int = TOP_EPISODES) -> list
 
 
 def performance_stats(
-    ret: pd.Series, rf: pd.Series, origin: date | pd.Timestamp | None = None
+    ret: pd.Series,
+    rf: pd.Series,
+    origin: date | pd.Timestamp | None = None,
+    *,
+    periods: int = A,
+    min_obs: int = MIN_OBS,
 ) -> PerformanceResult:
     """Growth, volatility, Sharpe ratio and drawdowns over the sample (module docstring).
 
-    ``ret`` and ``rf`` are daily simple returns and risk-free rates (decimals) on one strictly
-    increasing date index. ``origin`` dates the starting point of the return path; ``None`` uses
-    the first date of ``ret``.
+    ``ret`` and ``rf`` are simple returns and risk-free rates per period (decimals) on one
+    strictly increasing date index. ``origin`` dates the starting point of the return path;
+    ``None`` uses the first date of ``ret``. ``periods`` is the number of observations a year
+    (252 daily, 12 monthly); fewer than ``min_obs`` rows raise ``InsufficientObservations``.
     """
+    if periods <= 0:
+        raise ValueError("periods must be positive")
     if len(ret) != len(rf) or not ret.index.equals(rf.index):
         raise ValueError("ret and rf must share one index")
     n = len(ret)
-    if n < MIN_OBS:
-        raise InsufficientObservations(n)
+    if n < min_obs:
+        raise InsufficientObservations(n, min_obs)
     r = _values("ret", ret)
     f = _values("rf", rf)
     if bool((r < -1.0).any()):
-        raise ValueError("a daily return is below -100%")
+        raise ValueError("a return is below -100%")
     index = pd.DatetimeIndex(ret.index)
     if not index.is_monotonic_increasing or not index.is_unique:
         raise ValueError("the index must be strictly increasing")
@@ -211,7 +222,7 @@ def performance_stats(
     x = r - f
     path = compound_path(r)
     final = float(path[-1])
-    cagr = final ** (A / n) - 1.0
+    cagr = final ** (periods / n) - 1.0
     sd_ret = float(np.std(r, ddof=1))
     sd_x = float(np.std(x, ddof=1))
     mean_x = float(np.mean(x))
@@ -219,8 +230,8 @@ def performance_stats(
     ci: tuple[float, float] | None = None
     if sd_x >= SD_FLOOR and sd_ret >= SD_FLOOR:
         sharpe_d = mean_x / sd_x
-        sharpe_a = math.sqrt(A) * sharpe_d
-        se = math.sqrt(A) * math.sqrt((1.0 + 0.5 * sharpe_d * sharpe_d) / n)
+        sharpe_a = math.sqrt(periods) * sharpe_d
+        se = math.sqrt(periods) * math.sqrt((1.0 + 0.5 * sharpe_d * sharpe_d) / n)
         ci = (sharpe_a - Z95 * se, sharpe_a + Z95 * se)
 
     start_point = index[0] if origin is None else pd.Timestamp(origin)
@@ -233,12 +244,12 @@ def performance_stats(
         n=n,
         start=_as_date(index[0]),
         end=_as_date(index[-1]),
-        years=n / A,
+        years=n / periods,
         cagr=cagr,
         cumulative_return=final - 1.0,
-        mean_return_annual=A * float(np.mean(r)),
-        volatility_annual=math.sqrt(A) * sd_ret,
-        mean_excess_annual=A * mean_x,
+        mean_return_annual=periods * float(np.mean(r)),
+        volatility_annual=math.sqrt(periods) * sd_ret,
+        mean_excess_annual=periods * mean_x,
         sharpe_daily=sharpe_d,
         sharpe_annual=sharpe_a,
         sharpe_se_iid=se,

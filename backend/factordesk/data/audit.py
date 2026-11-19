@@ -600,3 +600,93 @@ def audit_prices(frame: pd.DataFrame, *, duplicate_dates: Sequence[date] = ()) -
         last_date=last_date,
         ok=not any(f.severity == "error" for f in findings),
     )
+
+
+# --------------------------------------------------------------------------- level series
+LevelFrequency = Literal["daily", "monthly"]
+_LEVEL_UNIT: dict[LevelFrequency, str] = {"daily": "days", "monthly": "months"}
+
+
+def audit_levels(levels: pd.Series, frequency: LevelFrequency) -> AuditReport:
+    """Audit the level series of a return subject that has no price frame (an upload, a backtest).
+
+    The series is a NAV or a growth index built from returns, so there is no Close/Adj Close
+    pair, no distribution and no split to check (A5-A8 do not apply). What is checked, findings
+    only, nothing repaired or dropped:
+
+    * A1: duplicate or decreasing dates (error), missing or non-positive levels (error);
+    * A2: gaps. Daily: the business-day rule of D25; monthly: a calendar month with no level
+      between two that have one (warning);
+    * A3: five or more identical consecutive levels, i.e. four or more returns of exactly zero
+      in a row (warning: with no volume to explain it, a frozen value is a data-quality flag);
+    * A4: a return of more than 40% in absolute value in one period (warning, kept).
+    """
+    findings: list[AuditFinding] = []
+    n_obs = len(levels)
+    if not isinstance(levels.index, pd.DatetimeIndex) or n_obs == 0:
+        reason = "empty series" if n_obs == 0 else "index is not a DatetimeIndex"
+        findings.append(AuditFinding("invalid_frame", "error", f"Cannot audit: {reason}", ()))
+        return AuditReport(tuple(findings), n_obs, date.min, date.min, False)
+    unit = _LEVEL_UNIT[frequency]
+    frame = pd.DataFrame({"close": levels.astype("float64")})
+    findings += _check_index(frame, ())
+    work = _clean_copy(frame)
+    value = work["close"]
+    for code, mask, what in (
+        ("nan_price", value.isna(), "missing"),
+        ("non_positive_price", value <= 0, "zero or negative"),
+    ):
+        idx = value.index[mask.to_numpy(dtype=bool)]
+        if len(idx):
+            findings.append(
+                AuditFinding(code, "error", f"{len(idx)} {what} level value(s)", _dates(idx))
+            )
+    if frequency == "daily":
+        findings += _check_gaps(work)
+    else:
+        months = pd.DatetimeIndex(work.index).to_period("M").asi8
+        jumps = np.flatnonzero(np.diff(months) > 1)
+        if jumps.size:
+            starts = pd.DatetimeIndex(work.index[jumps])
+            findings.append(
+                AuditFinding(
+                    "gap_run",
+                    "warn",
+                    f"{jumps.size} gap(s) of at least one calendar month with no level",
+                    _dates(starts),
+                )
+            )
+    positive = value.where(value > 0)
+    run_id = (positive != positive.shift(1)).cumsum()
+    sizes = positive.groupby(run_id).transform("size")
+    long_run = (sizes >= STALE_RUN_LEN) & positive.notna()
+    if bool(long_run.any()):
+        starts = positive.index[(long_run & (positive != positive.shift(1))).to_numpy(dtype=bool)]
+        findings.append(
+            AuditFinding(
+                "stale_run",
+                "warn",
+                f"{len(starts)} run(s) of {STALE_RUN_LEN}+ identical consecutive levels "
+                f"(returns of exactly zero for {STALE_RUN_LEN - 1}+ {unit} in a row)",
+                _dates(starts),
+            )
+        )
+    ratio = positive / positive.shift(1)
+    large = ((ratio - 1.0).abs() > LARGE_RETURN).to_numpy(dtype=bool)
+    if bool(large.any()):
+        idx = positive.index[large]
+        findings.append(
+            AuditFinding(
+                "large_return",
+                "warn",
+                f"{len(idx)} {unit} with |return| > {LARGE_RETURN:.0%} (kept, not dropped)",
+                _dates(idx),
+            )
+        )
+    return AuditReport(
+        findings=tuple(findings),
+        n_obs=n_obs,
+        first_date=pd.Timestamp(work.index[0]).date(),
+        last_date=pd.Timestamp(work.index[-1]).date(),
+        ok=not any(f.severity == "error" for f in findings),
+    )

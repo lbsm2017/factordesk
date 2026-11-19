@@ -6,7 +6,8 @@
 
 It builds the real application (``create_app``) with fake collaborators: a price provider that
 serves one synthetic history (``dgp_a``) for any ticker except ``XYZ``, a factor frame cut 30
-rows before the price end, a fixed clock and an empty temporary data directory. It serves the
+rows before the price end, a monthly factor frame for the upload route, a fixed clock and an
+empty temporary data directory. It serves the
 built page from ``frontend/dist``. Nothing here reads the real data directory or the network, and
 the output is the same on every run.
 """
@@ -21,12 +22,14 @@ from pathlib import Path
 import pandas as pd
 from fastapi import FastAPI
 
+from factordesk.api import routes_upload
 from factordesk.api.deps import AppDeps
 from factordesk.api.main import create_app
 from factordesk.data import factors as factors_module
 from factordesk.data.factors import FactorStatus
 from factordesk.data.prices import PriceDataError, PriceHistory
 from factordesk.tests.fixtures.dgp import dgp_a, rng_for
+from factordesk.tests.test_subject import monthly_case
 
 UNKNOWN_TICKER = "XYZ"
 """The one ticker the fake provider refuses, as Yahoo does for an unknown symbol."""
@@ -35,6 +38,10 @@ N_PRICES = 2520
 FACTOR_CUT = 30
 TEST_NUMBER = 1000
 DOWNLOADED = datetime(2020, 1, 20, 8, 30, tzinfo=UTC)
+MONTHLY_START = "2015-01-31"
+MONTHLY_MONTHS = 96
+"""The fake monthly factor file covers January 2015 to December 2022; the upload e2e test sends
+84 months from January 2015."""
 FRONTEND_DIST = Path(__file__).resolve().parents[4] / "frontend" / "dist"
 
 
@@ -71,6 +78,13 @@ def create() -> FastAPI:
         stale=behind > factors_module.STALE_AFTER_DAYS,
     )
     data_dir = Path(tempfile.mkdtemp(prefix="factordesk-fake-"))
+    _, monthly, _ = monthly_case(MONTHLY_MONTHS, 21, start=MONTHLY_START)
+    monthly.attrs = {"downloaded_at": DOWNLOADED.isoformat()}
+
+    def load_monthly(**_kwargs: object) -> pd.DataFrame:
+        return monthly
+
+    routes_upload.load_ff5_monthly = load_monthly  # the upload route never reaches the network
     deps = AppDeps(
         price_provider=FakeProvider(d.history),
         load_factors=lambda refresh, at: factors,

@@ -47,6 +47,11 @@ const SECTION_FIELD: Readonly<Record<string, keyof FactorReport>> = {
   fragility: "fragility",
 };
 
+/** The label of an item: the price item reads "Growth of 100" for a report with a subject (an uploaded record). */
+export function navLabel(item: NavItem, report: FactorReport | undefined): string {
+  return item.id === "price" && report?.subject != null ? "Growth of 100" : item.label;
+}
+
 /** True when the item's section has data in `report` (always true for items with no optional field). */
 export function sectionHasData(report: FactorReport | undefined, id: string): boolean {
   const field = SECTION_FIELD[id];
@@ -186,7 +191,7 @@ export function SectionNav({ root, report, onNavigate }: SectionNavProps) {
               onClick={(event) => go(event, item.id)}
             >
               <Icon name={item.icon} />
-              <span className="nav-label">{item.label}</span>
+              <span className="nav-label">{navLabel(item, report)}</span>
               {item.id === "data" && badge.count > 0 ? (
                 <span className={badge.error ? "nav-badge error" : "nav-badge"}>
                   {badge.count}

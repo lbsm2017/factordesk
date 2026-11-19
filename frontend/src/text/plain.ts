@@ -43,17 +43,23 @@ export function plainName(name: string): string {
   return PLAIN[name] ?? name;
 }
 
-export function warningText(warning: ReportWarning): string {
-  return WARN_PLAIN[warning.code] ?? warning.message;
+/** Summaries reworded for a monthly report (an uploaded record counts months, not days). */
+export const WARN_PLAIN_MONTHLY: Record<string, string> = {
+  factor_data_lag:
+    "The factor data stops before the latest returns, so the newest months are charted but not analysed.",
+};
+
+export function warningText(warning: ReportWarning, monthly = false): string {
+  return (monthly ? WARN_PLAIN_MONTHLY[warning.code] : undefined) ?? WARN_PLAIN[warning.code] ?? warning.message;
 }
 
 /** Summary of up to the first two warnings, joined by a space. */
 export function warningSummary(warnings: readonly ReportWarning[]): string {
-  return warnings.slice(0, 2).map(warningText).join(" ");
+  return warnings.slice(0, 2).map((w) => warningText(w)).join(" ");
 }
 
 /** The reading line of the exposures panel (H.2). */
-export function exposureReading(factors: readonly FactorStat[]): string {
+export function exposureReading(factors: readonly FactorStat[], subject = "the stock"): string {
   const parts: string[] = [];
   const quiet: string[] = [];
   for (const f of factors) {
@@ -74,7 +80,7 @@ export function exposureReading(factors: readonly FactorStat[]): string {
   let s = "";
   if (parts.length) {
     const body = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
-    s = `Over this window the stock ${body}.`;
+    s = `Over this window ${subject} ${body}.`;
   }
   if (quiet.length) {
     const q = quiet.length > 1 ? `${quiet.slice(0, -1).join(", ")} or ${quiet[quiet.length - 1]}` : quiet[0];

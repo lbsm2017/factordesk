@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import type { FactorReport } from "../../api/types";
+import { isMonthly } from "../../report/subject";
 import { warningText } from "../../text/plain";
 import { noticeItems, plural } from "./leadHelpers";
 
@@ -13,9 +14,9 @@ const GLYPH_WARN = (
   </svg>
 );
 
-/** Plain summary of the first two distinct warnings, with a count of the rest. */
-export function summaryOf(items: { code: string; message: string }[]): string {
-  const plain = [...new Set(items.map(warningText))];
+/** Plain summary of the first two distinct warnings, with a count of the rest (month wording when `monthly`). */
+export function summaryOf(items: { code: string; message: string }[], monthly = false): string {
+  const plain = [...new Set(items.map((item) => warningText(item, monthly)))];
   const summary = plain.slice(0, 2).join(" ");
   return plain.length > 2 ? `${summary} ${plain.length - 2} more are listed under Details.` : summary;
 }
@@ -33,7 +34,7 @@ export function DataNotes({ report }: { report: FactorReport }) {
       <p className="notes-line" role="note">
         {GLYPH_WARN}
         <span>
-          <b>{plural(items.length, "data note", "data notes")}:</b> {summaryOf(items)}{" "}
+          <b>{plural(items.length, "data note", "data notes")}:</b> {summaryOf(items, isMonthly(report))}{" "}
           <button type="button" className="notes-link" aria-expanded={open} aria-controls="notice-details" onClick={() => setOpen(!open)}>
             Details
           </button>

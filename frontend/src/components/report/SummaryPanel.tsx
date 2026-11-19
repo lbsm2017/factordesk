@@ -14,6 +14,7 @@ import {
   worldBetaReading,
 } from "../../text/verdict";
 import type { Reading } from "../../text/verdict";
+import { frequencyWord, isSubjectReport } from "../../report/subject";
 import { DataNotes } from "./DataNotes";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
@@ -98,7 +99,9 @@ function modelRows(report: FactorReport): { rows: Row[]; reasons: string[] } {
   const w = wb?.status === "ok" ? wb.world : null;
   const reasons: string[] = [];
   if (!rg) reasons.push(reg.reason ?? "The five-factor model could not be fitted.");
-  if (!w) reasons.push(wb ? (wb.reason ?? "The ACWI beta could not be computed.") : "The ACWI beta is not in this report.");
+  if (!w && !isSubjectReport(report)) {
+    reasons.push(wb ? (wb.reason ?? "The ACWI beta could not be computed.") : "The ACWI beta is not in this report.");
+  }
   return {
     reasons,
     rows: [
@@ -117,12 +120,17 @@ function modelRows(report: FactorReport): { rows: Row[]; reasons: string[] } {
         t: show(mkt?.z, tstat),
         interval: range(mkt?.ci_low, mkt?.ci_high, signedRange),
       }),
-      row("acwi", {
-        value: show(w?.beta, (n) => signed(n, 2)),
-        reading: wb && w ? worldBetaReading(wb, report) : NO_TEST,
-        t: w && w.se > 0 ? tstat(w.beta / w.se) : null,
-        interval: range(w?.ci_low, w?.ci_high, signedRange),
-      }),
+      // An uploaded record has no ACWI beta (daily data only): the row is left out, not shown as a dash.
+      ...(isSubjectReport(report)
+        ? []
+        : [
+            row("acwi", {
+              value: show(w?.beta, (n) => signed(n, 2)),
+              reading: wb && w ? worldBetaReading(wb, report) : NO_TEST,
+              t: w && w.se > 0 ? tstat(w.beta / w.se) : null,
+              interval: range(w?.ci_low, w?.ci_high, signedRange),
+            }),
+          ]),
     ],
   };
 }
@@ -195,6 +203,8 @@ export function SummaryPanel({ report }: ReportPanelProps) {
   const v = verdict(report);
   const perf = performanceRows(report);
   const model = modelRows(report);
+  // The one-line explanations name the frequency of the returns.
+  const worded = (rows: Row[]): Row[] => rows.map((r) => ({ ...r, tip: r.tip.replace("daily", frequencyWord(report)) }));
   const { actual_start: start, actual_end: end } = report.data;
   const period = start && end ? `${dateLong(start)} to ${dateLong(end)}. ` : "";
   const reasons = [...(perf.reason ? [perf.reason] : []), ...model.reasons];
@@ -203,7 +213,7 @@ export function SummaryPanel({ report }: ReportPanelProps) {
       id="summary"
       title="Summary"
       legend={<div className="pm">{period}Past data, not a forecast.</div>}
-      footnote="Annualised from daily data. ACWI is an ETF used as a stand-in for the MSCI ACWI index."
+      footnote={`Annualised from ${frequencyWord(report)} data.${isSubjectReport(report) ? "" : " ACWI is an ETF used as a stand-in for the MSCI ACWI index."}`}
     >
       <p className="verdict">
         {v.headline}
@@ -211,8 +221,8 @@ export function SummaryPanel({ report }: ReportPanelProps) {
       </p>
       <DataNotes report={report} />
       <div className="sum-tables">
-        <KvTable id="sum-perf" title="Performance" rows={perf.rows} stats={stats} />
-        <KvTable id="sum-model" title="Factor model" rows={model.rows} stats={stats} />
+        <KvTable id="sum-perf" title="Performance" rows={worded(perf.rows)} stats={stats} />
+        <KvTable id="sum-model" title="Factor model" rows={worded(model.rows)} stats={stats} />
       </div>
       {reasons.length > 0 ? (
         <p className="sum-reason" role="note">

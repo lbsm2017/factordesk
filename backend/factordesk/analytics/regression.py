@@ -7,6 +7,10 @@ implementation is plain linear algebra and is cross-checked against the statsmod
 call ``OLS(y, X).fit(cov_type="HAC", cov_kwds={"maxlags": L, "use_correction": False},
 use_t=False)`` in the tests.
 
+Monthly subjects (owner decision) use the small-sample variant: the HAC covariance is scaled
+by ``m / (m - k)`` and p-values, intervals and tags use Student-t with ``m - k`` degrees of
+freedom, as statsmodels does with ``use_correction=True, use_t=True``. Daily output is unchanged.
+
 Pure: no I/O, no clock, no randomness. Inputs are not mutated.
 """
 
@@ -21,6 +25,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.stats import t as student_t  # pyright: ignore[reportMissingTypeStubs]
 from statsmodels.stats.multitest import (  # pyright: ignore[reportMissingTypeStubs]
     multipletests,  # pyright: ignore[reportUnknownVariableType]
 )
@@ -36,7 +41,8 @@ FloatArray = NDArray[np.float64]
 Tag = Literal["reliable", "noise"]
 
 A = 252
-"""Annualisation constant, trading days per year (M0.4)."""
+"""Annualisation constant, trading days per year (M0.4). It is the default of every
+``periods`` argument (observations per year): a daily series uses 252, a monthly one 12."""
 BH_Q = 0.05
 """Benjamini-Hochberg level, fixed (M0.6)."""
 ALPHA_LEVEL = 0.05
@@ -45,12 +51,23 @@ Z_975: float = NormalDist().inv_cdf(0.975)
 """Two-sided 95% normal quantile (1.959964...)."""
 
 _multipletests = cast(Callable[..., tuple[Any, Any, Any, Any]], multipletests)
+_student_t = cast(Any, student_t)
 _erfc = np.frompyfunc(math.erfc, 1, 1)
 
 
 def two_sided_p(z: FloatArray) -> FloatArray:
     """``p = 2 (1 - Phi(|z|)) = erfc(|z| / sqrt 2)``, accurate in the far tail (M0.5)."""
     return np.asarray(_erfc(np.abs(z) / math.sqrt(2.0)), dtype=np.float64)
+
+
+def two_sided_t_p(t: FloatArray, df: int) -> FloatArray:
+    """Two-sided Student-t p-value ``2 (1 - F_df(|t|))``, from the survival function."""
+    return np.asarray(2.0 * _student_t.sf(np.abs(t), df), dtype=np.float64)
+
+
+def t_975(df: int) -> float:
+    """Two-sided 95% Student-t quantile with ``df`` degrees of freedom."""
+    return float(_student_t.ppf(0.975, df))
 
 
 LARGE_ALPHA = 0.03
@@ -157,6 +174,9 @@ class OLSHACFit:
     rsquared_adj: float
     nobs: int
     lags: int
+    t_df: int | None = None
+    """Student-t degrees of freedom of the small-sample variant; None for the normal reference.
+    ``zvalues`` then holds t-statistics."""
 
 
 def ols_hac(
@@ -164,6 +184,8 @@ def ols_hac(
     factors: FloatArray,
     lags: int | None = None,
     names: Sequence[str] = _DEFAULT_NAMES,
+    *,
+    small_sample: bool = False,
 ) -> OLSHACFit:
     """Fit ``y = alpha + beta' f + e`` by OLS with Newey-West HAC covariance (M0.5).
 
@@ -171,6 +193,9 @@ def ols_hac(
     matrix (no normal equations), so precision does not depend on the scale of the columns.
     Raises ``DegenerateInputError`` when the design is singular or nearly so, or ``y`` is
     constant (M3.1, D30); ``names`` label the factors in that message.
+
+    ``small_sample`` (monthly subjects) scales the covariance by ``m / (m - k)`` and uses
+    Student-t with ``m - k`` degrees of freedom for the p-values and the 95% intervals.
     """
     yv = np.asarray(y, dtype=np.float64)
     x = with_intercept(factors)
@@ -197,9 +222,13 @@ def ols_hac(
     bread = r_inv @ r_inv.T  # (X'X)^-1
     resid: FloatArray = yv - x @ params
     cov: FloatArray = bread @ hac_meat(x * resid[:, None], n_lags) @ bread
+    t_df = m - k if small_sample else None
+    if t_df is not None:
+        cov = cov * (m / t_df)
     bse: FloatArray = np.sqrt(np.diag(cov))
     z = params / bse
-    pvalues = two_sided_p(z)
+    pvalues = two_sided_p(z) if t_df is None else two_sided_t_p(z, t_df)
+    q975 = Z_975 if t_df is None else t_975(t_df)
 
     ssr = float(resid @ resid)
     centred = yv - yv.mean()
@@ -212,13 +241,14 @@ def ols_hac(
         bse=bse,
         zvalues=z,
         pvalues=pvalues,
-        ci_low=params - Z_975 * bse,
-        ci_high=params + Z_975 * bse,
+        ci_low=params - q975 * bse,
+        ci_high=params + q975 * bse,
         resid=resid,
         rsquared=r2,
         rsquared_adj=r2_adj,
         nobs=m,
         lags=n_lags,
+        t_df=t_df,
     )
 
 
@@ -250,14 +280,18 @@ def _pct(x: float) -> str:
 
 
 def alpha_sentence(
-    alpha_ann: float, p: float, sigma_e_ann: float, n: int, se_ann: float
+    alpha_ann: float, p: float, sigma_e_ann: float, n: int, se_ann: float, periods: int = A
 ) -> str | None:
-    """Explain a large but insignificant alpha (M3.2); None when it does not apply."""
+    """Explain a large but insignificant alpha (M3.2); None when it does not apply.
+
+    ``n`` observations at ``periods`` a year span ``n / periods`` years.
+    """
     if abs(alpha_ann) < LARGE_ALPHA or p < ALPHA_LEVEL:
         return None
+    years = n / periods
     return (
         f"Alpha of {_pct(alpha_ann)} a year cannot be told apart from zero: residual volatility "
-        f"is {sigma_e_ann * 100:.2f}% a year over {n / A:.1f} years, so the standard error of "
+        f"is {sigma_e_ann * 100:.2f}% a year over {years:.1f} years, so the standard error of "
         f"annual alpha is {se_ann * 100:.2f}%."
     )
 
@@ -361,6 +395,8 @@ class FullSampleRegression:
     sigma_e_ann: float
     collinearity: Collinearity
     end: date
+    periods: int = A
+    """Observations a year used for the annualised figures (252 daily, 12 monthly)."""
 
     @property
     def betas(self) -> FloatArray:
@@ -371,29 +407,40 @@ class FullSampleRegression:
         return float(self.fit.params[0])
 
 
-def run_regression(sample: AnalysisSample) -> FullSampleRegression:
-    """Full-sample OLS of ``y`` on the five factors with HAC ``L(n)`` (M3.1-M3.4)."""
+def run_regression(
+    sample: AnalysisSample, periods: int = A, *, small_sample: bool = False
+) -> FullSampleRegression:
+    """Full-sample OLS of ``y`` on the five factors with HAC ``L(n)`` (M3.1-M3.4).
+
+    ``periods`` is the number of observations a year (252 daily, 12 monthly). It scales the
+    annualised figures only: alpha and its standard error and interval by ``periods`` (arithmetic,
+    M0.4) and the residual volatility by ``sqrt(periods)``. The fit itself does not depend on it.
+    ``small_sample`` (monthly subjects) selects the corrected covariance and Student-t inference
+    of ``ols_hac``; the tags follow from those p-values.
+    """
+    if periods <= 0:
+        raise ValueError("periods must be positive")
     y = sample.xret.to_numpy(dtype=np.float64)
     f = sample.factors.loc[:, list(FACTOR_CODES)].to_numpy(dtype=np.float64)
     names = tuple(DISPLAY_NAMES[c] for c in FACTOR_CODES)
-    fit = ols_hac(y, f, names=names)
+    fit = ols_hac(y, f, names=names, small_sample=small_sample)
 
     beta_p = [float(p) for p in fit.pvalues[1:]]
     _, p_adj = bh_adjust(beta_p)
     tags = significance_tags(beta_p)
-    alpha_ann = A * float(fit.params[0])
-    alpha_se_ann = A * float(fit.bse[0])
-    sigma_e_ann = math.sqrt(A) * float(np.std(fit.resid, ddof=1))
+    alpha_ann = periods * float(fit.params[0])
+    alpha_se_ann = periods * float(fit.bse[0])
+    sigma_e_ann = math.sqrt(periods) * float(np.std(fit.resid, ddof=1))
     a_tag = alpha_tag(float(fit.pvalues[0]))
     return FullSampleRegression(
         fit=fit,
         names=names,
         alpha_ann=alpha_ann,
         alpha_se_ann=alpha_se_ann,
-        alpha_ci_ann=(A * float(fit.ci_low[0]), A * float(fit.ci_high[0])),
+        alpha_ci_ann=(periods * float(fit.ci_low[0]), periods * float(fit.ci_high[0])),
         alpha_tag=a_tag,
         alpha_sentence=alpha_sentence(
-            alpha_ann, float(fit.pvalues[0]), sigma_e_ann, fit.nobs, alpha_se_ann
+            alpha_ann, float(fit.pvalues[0]), sigma_e_ann, fit.nobs, alpha_se_ann, periods
         ),
         beta_p_adj=tuple(p_adj),
         beta_tags=tuple(tags),
@@ -404,4 +451,5 @@ def run_regression(sample: AnalysisSample) -> FullSampleRegression:
         sigma_e_ann=sigma_e_ann,
         collinearity=collinearity(f, names),
         end=sample.end,
+        periods=periods,
     )

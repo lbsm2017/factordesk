@@ -135,3 +135,25 @@ describe("checkTicker", () => {
     expect(isSuggestQuery("")).toBe(false);
   });
 });
+
+describe("mode", () => {
+  it("is the ticker mode unless the URL says m=track, so old URLs keep their meaning", () => {
+    expect(parseUrl("").mode).toBe("ticker");
+    expect(parseUrl("?t=SPY&range=3Y").mode).toBe("ticker");
+    expect(parseUrl("?m=track").mode).toBe("track");
+    expect(parseUrl("?m=TRACK").mode).toBe("ticker");
+    expect(parseUrl("?m=portfolio").mode).toBe("ticker");
+  });
+
+  it("writes m=track only for the track-record mode", () => {
+    expect(toSearch(state({ mode: "track" }))).toBe("?m=track");
+    expect(toSearch(state({ ticker: "SPY", range: "3Y", mode: "track" }))).toBe("?t=SPY&range=3Y&m=track");
+    expect(toSearch(state({ ticker: "SPY", range: "3Y" }))).toBe("?t=SPY&range=3Y");
+  });
+
+  it("round-trips and patches", () => {
+    const text = "?t=SPY&m=track";
+    expect(toSearch(parseUrl(text))).toBe(text);
+    expect(applyPatch(state({ ticker: "SPY" }), { mode: "track" }).mode).toBe("track");
+  });
+});

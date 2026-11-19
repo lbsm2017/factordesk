@@ -3,6 +3,7 @@
 import { riskOutcome } from "../../text/outcome";
 import { PLAIN } from "../../text/plain";
 import { useShowStats } from "../../state/stats";
+import { stepWord } from "../../report/subject";
 import { describe, factorOrder, finite, IDIO, labelTexts, sci, slotOf } from "../../report/derive";
 import { BarCell } from "../charts/BarCell";
 import { AxisRow, KeySwatch, NameCell, pctN, signedN } from "./barParts";
@@ -16,7 +17,7 @@ export function RiskPanel({ report }: ReportPanelProps) {
   const stats = useShowStats();
   const rk = report.risk_contribution;
   const title = "Risk sources";
-  const question = "What share of the day-to-day variance does each factor drive?";
+  const question = `What share of the ${stepWord(report)} variance does each factor drive?`;
 
   const shares = new Map<string, number | null>(Object.entries(rk.factors).map(([n, v]) => [n, finite(v)]));
   shares.set(IDIO, finite(rk.idiosyncratic));

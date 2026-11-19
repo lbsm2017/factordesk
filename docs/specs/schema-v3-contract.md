@@ -322,6 +322,17 @@ later panels.
     (`LoyoRow.alpha_ann`, `se_ann`) and LL6.6 (`alpha_ann`, `se_ann`, `ci95_ann`, `edge_term_ann`,
     `r2_adj`) become `alpha_annual`, `se_annual`, `ci95_annual`, `edge_term_annual`, `adj_r2`,
     matching the existing schema and R7 (residual P11 notes the same split).
+13. **Monthly reports keep version `"4"`.** Monthly subjects (uploaded track records, E0) give
+    some fields a frequency-dependent meaning: `n_days`, `days_peak_to_trough` and
+    `days_trough_to_recovery` count months, `ratio_daily` is a ratio per month, `years` and every
+    `*_annual` figure use `subject.periods` = 12 instead of 252, and `FactorStat.z` and `alpha_z`
+    hold Student-t statistics. SC5 calls a changed meaning a reason to bump; the version stays
+    `"4"` because no existing file can be misread: monthly reports are new (no earlier report has
+    a `subject` block or monthly data), uploads are never stored (the upload route returns the
+    report and keeps no file), and ticker JSON is unchanged (no `subject` block, the same values;
+    only the field descriptions were rewritten so that they do not depend on the frequency, for
+    example "periods of the subject (trading days, or months when subject.periods = 12)"). A
+    reader tells the two apart by the presence of `subject`.
 
 ## SC7. File ownership
 
