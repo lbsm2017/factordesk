@@ -11,10 +11,13 @@ Leaves and cash
     targets sum to 1. Weights below always include cash and sum to 1.
 
 Common window (B6)
-    The backtest runs only on dates where every leaf, cash included, has a return: from the latest
-    first date to the earliest last date. ``start_leaves`` and ``end_leaves`` name the leaves that
-    set those two dates (several on a tie). A missing value inside the window is an error, never
-    a dropped or filled row. History is never backfilled with proxies.
+    The backtest runs only on dates where every leaf has a return: from the latest first date to
+    the earliest last date. ``start_leaves`` and ``end_leaves`` name the leaves that set those two
+    dates (several on a tie). Cash takes part (as ``rf``) only when its target weight is above 0;
+    with a zero cash target ``rf`` is not used, does not limit the window, and the cash column
+    holds 0.0 (a zero weight never earns anything and drift keeps it at zero). A missing value
+    inside the window is an error, never a dropped or filled row. History is never backfilled
+    with proxies.
 
 Daily mechanics (B1)
     ``w_{t-1}`` are the weights at the close of day ``t - 1`` after any rebalance
@@ -86,7 +89,8 @@ class BacktestResult:
     """Target weight of every leaf, cash included; sums to 1."""
     cost_bps: float
     leaf_ret: pd.DataFrame
-    """Daily simple return of every leaf over the window; the cash column is ``rf``."""
+    """Daily simple return of every leaf over the window; the cash column is ``rf``, or 0.0 when
+    the cash target is 0."""
     gross_ret: pd.Series
     """``g_t``: portfolio return before cost."""
     ret: pd.Series
@@ -192,9 +196,9 @@ def run_backtest(
 
     ``leaf_ret`` holds one column of daily simple total returns per leaf id; leading and trailing
     NaN mark dates before a leaf's history starts or after it ends. ``rf`` is the daily
-    risk-free rate in decimals; it is the return of the cash leaf and limits the window like any
-    other leaf. ``cost_bps`` is charged on one-way turnover at each rebalance; the initial
-    purchase is free.
+    risk-free rate in decimals; when cash has a target weight above 0 it is the return of the cash
+    leaf and limits the window like any other leaf, otherwise it is not used. ``cost_bps`` is
+    charged on one-way turnover at each rebalance; the initial purchase is free.
     """
     validate_date_index(leaf_ret.index, "leaf returns")
     validate_date_index(rf.index, "risk-free rate")
@@ -212,8 +216,13 @@ def run_backtest(
 
     frame = leaf_ret.astype("float64").copy()
     frame.columns = pd.Index(leaf_ids)
-    frame[CASH_ID] = rf.astype("float64").reindex(frame.index)
+    cash_held = targets[CASH_ID] > 0.0
+    if cash_held:
+        frame[CASH_ID] = rf.astype("float64").reindex(frame.index)
     window, start_leaves, end_leaves = _window(frame)
+    if not cash_held:
+        window = window.copy()
+        window[CASH_ID] = 0.0
     values = window.to_numpy(dtype=np.float64)
     if not bool(np.isfinite(values).all()):
         raise ValueError("a return in the common window is not finite")

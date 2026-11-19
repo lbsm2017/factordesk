@@ -169,14 +169,32 @@ def test_tb07_common_window_names_limiting_leaves() -> None:
     assert res.n == 6
 
 
-def test_tb08_risk_free_limits_the_window_as_cash() -> None:
+def test_tb08_risk_free_limits_the_window_only_when_cash_is_held() -> None:
     idx = pd.bdate_range("2024-01-02", periods=10, name="date")
     frame = pd.DataFrame({"A": [0.01] * 10}, index=idx)
     rf = _rf(pd.DatetimeIndex(idx[:7]), 0.0001)
-    res = run_backtest(frame, {"A": 1.0}, rf)
+    res = run_backtest(frame, {"A": 0.8}, rf)
     assert res.end == idx[6].date()
     assert res.end_leaves == (CASH_ID,)
     assert res.start_leaves == ("A", CASH_ID)
+    # Fully invested: cash has no weight, so the short rf does not limit the window.
+    full = run_backtest(frame, {"A": 1.0}, rf)
+    assert full.end == idx[-1].date()
+    assert full.start_leaves == ("A",)
+    assert full.end_leaves == ("A",)
+
+
+def test_tb08b_fully_invested_ignores_short_risk_free() -> None:
+    base = _random(300, 2, seed=12)
+    idx = pd.DatetimeIndex(base.index)
+    rf = _rf(pd.DatetimeIndex(idx[:-40]), 0.0001)
+    res = run_backtest(base, {"L0": 0.7, "L1": 0.3}, rf, cost_bps=10.0)
+    assert res.n == 300
+    assert res.start == idx[0].date()
+    assert res.end == idx[-1].date()
+    assert res.end_leaves == ("L0", "L1")
+    assert (res.leaf_ret[CASH_ID] == 0.0).all()
+    assert (res.applied_weights[CASH_ID] == 0.0).all()
 
 
 def test_tb09_gap_inside_window_is_an_error() -> None:
