@@ -143,7 +143,7 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
   }
   const rows: Row[] = [];
   if (s.world !== null && s.us_market !== null && world) {
-    rows.push({ key: "acwi", label: "ACWI", tip: "ACWI ETF, a stand-in for the MSCI ACWI index", fit: s.world, days: count(s.n_sample) });
+    rows.push({ key: "acwi", label: "ACWI", tip: "ACWI ETF, a stand-in for the MSCI ACWI index", fit: s.world, days: count(s.sample.n) });
   }
   if (europe?.benchmark) {
     rows.push({
@@ -156,7 +156,7 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
     });
   }
   if (world && s.us_market !== null) {
-    rows.push({ key: "us", label: "US market", tip: "Fama-French market factor, Mkt-RF", fit: s.us_market, days: "same" });
+    rows.push({ key: "us", label: "US market", tip: "Fama-French market factor, Mkt-RF", fit: s.us_market, days: count(s.sample.n) });
   }
   if (europe?.us_market && !(s.us_market && sameFit(europe.us_market, s.us_market))) {
     rows.push({
@@ -175,7 +175,7 @@ export function WorldBetaBody({ report }: ReportPanelProps) {
     <Panel
       id="world-beta"
       title={TITLE}
-      legend={<div className="pm">{`Quick estimate, ${count(world ? s.n_sample : (europe?.n_days ?? 0))} days, one-factor`}</div>}
+      legend={<div className="pm">{`Quick estimate, ${count(world ? s.sample.n : (europe?.n_days ?? 0))} days, one-factor`}</div>}
       reading={world ? (outcomeLine(s) ?? undefined) : undefined}
       footnote={footnote(report, s)}
       how={how(report, s, europe)}

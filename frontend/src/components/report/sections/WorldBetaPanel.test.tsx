@@ -58,7 +58,19 @@ describe("WorldBetaBody", () => {
     expect(screen.getByRole("heading", { level: 2, name: "World beta" })).not.toBeNull();
     // the fixture's two intervals overlap, so the line is about the same whatever its category says
     expect(container.querySelector(".reading")?.textContent).toBe("About the same against the world as against the US market.");
-    expect(container.querySelector(".pm")?.textContent).toBe("Quick estimate, 559 days, one-factor");
+    expect(container.querySelector(".pm")?.textContent).toBe("Quick estimate, 540 days, one-factor");
+  });
+
+  it("counts the days of the fit, not the analysis-wide sample, in the aside and the rows", () => {
+    const report = reportWith((s) => {
+      s.n_sample = 8474;
+      s.sample.n = 4656;
+    });
+    const { container } = render(<WorldBetaBody report={report} />);
+    expect(container.querySelector(".pm")?.textContent).toBe("Quick estimate, 4,656 days, one-factor");
+    expect(cells(container, "acwi")[2]).toBe("4,656");
+    expect(cells(container, "us")[2]).toBe("4,656");
+    expect(container.textContent).not.toContain("8,474");
   });
 
   it("says lower or higher when the intervals are apart", () => {
@@ -80,8 +92,8 @@ describe("WorldBetaBody", () => {
   it("with statistics off shows Against, chart, Beta and Days only, on three rows with Europe in the middle", () => {
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     expect(heads(container)).toEqual(["Against", "Chart", "Beta", "Days"]);
-    expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "559"]);
-    expect(cells(container, "us")).toEqual(["US market", "+1.00", "same"]);
+    expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "540"]);
+    expect(cells(container, "us")).toEqual(["US market", "+1.00", "540"]);
     expect(cells(container, "europe")).toEqual(["Europe IEUR, MSCI Europe stand-in", "+0.80", "540"]);
     expect(Array.from(container.querySelectorAll("tbody tr")).map((r) => r.id)).toEqual([
       "world-beta-acwi",
@@ -96,8 +108,8 @@ describe("WorldBetaBody", () => {
     state.stats = true;
     const { container } = render(<WorldBetaBody report={reportWith()} />);
     expect(heads(container)).toEqual(["Against", "Chart", "Beta", "95% interval", "R²", "Days"]);
-    expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "0.85 to 1.01", "0.81", "559"]);
-    expect(cells(container, "us")).toEqual(["US market", "+1.00", "0.96 to 1.04", "0.97", "same"]);
+    expect(cells(container, "acwi")).toEqual(["ACWI", "+0.93", "0.85 to 1.01", "0.81", "540"]);
+    expect(cells(container, "us")).toEqual(["US market", "+1.00", "0.96 to 1.04", "0.97", "540"]);
   });
 
   it("draws every beta as a neutral ink dot with its interval on one shared axis, never green or red", () => {
