@@ -92,6 +92,10 @@ export function PricePanel({ report }: ReportPanelProps) {
 
   const full = fullFor === model;
   const record = isSubjectReport(report);
+  const recordFootnote =
+    report.subject?.kind === "portfolio"
+      ? "Built from the backtested daily portfolio returns, for context only; no statistic uses this line."
+      : "Built from the uploaded monthly returns, for context only; no statistic uses this line.";
   const toggle = model.canShowFull ? (
     <button type="button" className="zoom-toggle" onClick={() => setFullFor(full ? null : model)}>
       {full ? "Show analysed range" : "Show full history"}
@@ -107,7 +111,7 @@ export function PricePanel({ report }: ReportPanelProps) {
       legend={toggle}
       footnote={
         record
-          ? "Built from the uploaded monthly returns, for context only; no statistic uses this line."
+          ? recordFootnote
           : `Adjusted close from ${report.data.price_source}, for context only; no statistic uses the price line.`
       }
     >
