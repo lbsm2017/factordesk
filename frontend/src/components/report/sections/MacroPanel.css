@@ -1,0 +1,22 @@
+/* Macro sensitivities: a compact table in the style of the alpha strip, with one dot and approximate 95% range per row on a shared scale. Every row looks the same (betas stay ink). Tokens only. */
+.mc-wrap { overflow-x: auto; overflow-y: hidden; } /* sideways scroll only: a vertical scrollbar never shows */
+.mc-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; margin-top: var(--s-2); }
+.mc-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-2) 6px 0; border-bottom: 1px solid var(--border); vertical-align: bottom; }
+.mc-table th.num, .mc-table td.num { text-align: right; }
+.mc-table thead th:nth-child(1) { width: 150px; }
+.mc-table thead th:nth-child(2) { width: 60px; }
+.mc-table thead th:nth-child(4) { width: 44px; }
+.mc-table thead th:nth-child(5) { width: 84px; }
+.mc-table tbody th { font-size: var(--fs-2); font-weight: 560; color: var(--ink); padding: var(--s-2) var(--s-2) var(--s-2) 0; border-bottom: 1px solid var(--grid); }
+.mc-table .mc-label { display: block; }
+.mc-table .mc-note { display: block; font-size: var(--fs-1); font-weight: 400; color: var(--ink-2); line-height: 1.3; }
+.mc-table td { font-size: var(--fs-2); color: var(--ink); padding: var(--s-2) 0 var(--s-2) var(--s-2); border-bottom: 1px solid var(--grid); }
+.mc-table td.num { padding-right: 0; }
+.mc-table td.mc-plot { padding: 0 var(--s-2); }
+.mc-table .bar-svg { height: 28px; }
+.mc-table .mc-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 1; }
+.mc-table td.mc-vif-cell { text-align: right; padding-right: 0; }
+.mc-vif { display: inline-flex; align-items: center; height: 24px; padding: 0 6px; border: 1px solid var(--caution); border-radius: var(--r-inner); background: var(--caution-50); color: var(--caution); font-size: var(--fs-cap); font-weight: 600; white-space: nowrap; }
+.mc-table tfoot td { padding: 0; border: 0; }
+.mc-table .axis { height: 26px; } /* tall enough for the tick labels, which sit 4px down */
+.mc-table .axis span { top: 4px; }

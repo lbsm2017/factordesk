@@ -9,6 +9,7 @@ import fragility from "@fixtures/sections/fragility.json";
 import labels from "@fixtures/sections/label_text.json";
 import kalman from "@fixtures/sections/kalman.json";
 import leadLag from "@fixtures/sections/lead_lag.json";
+import macro from "@fixtures/sections/macro.json";
 import performanceFixture from "@fixtures/sections/performance.json";
 import residual from "@fixtures/sections/residual_alpha.json";
 import shrunk from "@fixtures/sections/shrunk.json";
@@ -27,6 +28,7 @@ export const SECTION_FIELDS = [
   "kalman_betas",
   "tail_risk",
   "alpha_strip",
+  "macro",
 ] as const;
 export type SectionField = (typeof SECTION_FIELDS)[number];
 
@@ -40,6 +42,7 @@ const PAYLOADS: Record<SectionField, unknown> = {
   kalman_betas: kalman,
   tail_risk: tailRisk,
   alpha_strip: alphaStrip,
+  macro,
 };
 
 /** The monthly (60 months) tail risk section, for a report with a monthly subject. */

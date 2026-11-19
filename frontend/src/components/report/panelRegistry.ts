@@ -25,6 +25,7 @@ import { AlphaStripPanel } from "./sections/AlphaStripPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
 import { LazyKalmanPanel, LazyRegressionDetail, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
+import { MacroPanel } from "./sections/MacroPanel";
 import { PerformancePanel } from "./sections/PerformancePanel";
 import { ResidualAlphaPanel } from "./sections/ResidualAlphaPanel";
 import { TailRiskPanel } from "./sections/TailRiskPanel";
@@ -57,6 +58,7 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "exposures", position: 500, Component: ExposuresPanel },
   { name: "alpha_strip", position: 502, Component: AlphaStripPanel },
   { name: "world_beta", position: 505, Component: WorldBetaPanel },
+  { name: "macro", position: 508, Component: MacroPanel },
   { name: "returns", position: 600, Component: ReturnPanel },
   { name: "risk", position: 700, Component: RiskPanel },
   { name: "rolling", position: 710, Component: RollingPanel },
