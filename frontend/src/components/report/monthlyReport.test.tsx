@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { monthlyReport } from "../../test/fixture";
+import { summaryOf } from "./DataNotes";
 import { RegressionDetail } from "./RegressionDetail";
 import { ReportView } from "./ReportView";
 import { PerformanceBody } from "./sections/PerformanceBody";
@@ -30,6 +31,26 @@ describe("ReportView on an uploaded monthly record", () => {
     expect(container.querySelector("#risk")?.textContent).toContain("month-to-month");
   });
 
+  it("annualises the return sources with 12, not 252", () => {
+    const { container } = view();
+    const how = container.querySelector("#returns details.how")?.textContent ?? "";
+    expect(how).toContain("times 12.");
+    expect(how).not.toContain("252");
+    expect(container.querySelector("#returns")?.textContent).not.toMatch(/\bdaily\b|trading day/);
+  });
+
+  it("words the factor-lag data note in months", () => {
+    const lag = { code: "factor_data_lag", message: "raw" };
+    expect(summaryOf([lag], true)).toBe(
+      "The factor data stops before the latest returns, so the newest months are charted but not analysed.",
+    );
+    expect(summaryOf([lag])).toContain("newest days");
+    const r = structuredClone(monthlyReport);
+    r.warnings = [{ code: "factor_data_lag", message: "raw" }];
+    const { container } = render(<ReportView report={r} downloadHref={null} win={null} onWinChange={vi.fn()} />);
+    expect(container.querySelector(".notes-line")?.textContent).toContain("newest months");
+  });
+
   it("names the record and has no download link", () => {
     const { container } = view();
     expect(container.querySelector("h1")?.textContent).toContain("Example Fund");
@@ -49,5 +70,7 @@ describe("the lazy panels of a monthly record, rendered directly", () => {
     const { container } = render(<RegressionDetail report={monthlyReport} />);
     expect(container.querySelector("table")).not.toBeNull();
     expect(container.textContent).not.toContain("5-day estimate");
+    expect(container.textContent).toContain("No clear month-to-month pattern.");
+    expect(container.textContent).not.toMatch(/\bday\b|\bdaily\b|day-to-day/);
   });
 });

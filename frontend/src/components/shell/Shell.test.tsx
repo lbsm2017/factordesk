@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { cloneReport, mockReport } from "../../test/fixture";
+import { cloneReport, mockReport, monthlyReport } from "../../test/fixture";
 import { ReportView } from "../report/ReportView";
-import { auditBadge, NAV_ITEMS, sectionHasData } from "./SectionNav";
+import { auditBadge, NAV_ITEMS, navLabel, sectionHasData } from "./SectionNav";
 import { Shell } from "./Shell";
 
 function page(report = mockReport) {
@@ -74,6 +74,20 @@ describe("SectionNav", () => {
     const nav = await screen.findByRole("navigation", { name: "Sections" });
     const labels = Array.from(nav.querySelectorAll(".nav-label")).map((n) => n.textContent ?? "");
     expect(labels.join("|")).not.toMatch(/Lead-lag|Fragility/);
+  });
+
+  it("names the price item Growth of 100 for a report with a subject", async () => {
+    const price = NAV_ITEMS.find((i) => i.id === "price");
+    if (price === undefined) throw new Error("no price item");
+    expect(navLabel(price, mockReport)).toBe("Price");
+    expect(navLabel(price, undefined)).toBe("Price");
+    expect(navLabel(price, monthlyReport)).toBe("Growth of 100");
+    page(monthlyReport);
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    const labels = Array.from(nav.querySelectorAll(".nav-label")).map((n) => n.textContent ?? "");
+    expect(labels).toContain("Growth of 100");
+    expect(labels).not.toContain("Price");
+    expect(document.querySelector("#price h2")?.textContent).toBe("Growth of 100");
   });
 
   it("names a label and an icon for every item, and a target id once only", () => {

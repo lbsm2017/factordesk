@@ -43,13 +43,19 @@ export function plainName(name: string): string {
   return PLAIN[name] ?? name;
 }
 
-export function warningText(warning: ReportWarning): string {
-  return WARN_PLAIN[warning.code] ?? warning.message;
+/** Summaries reworded for a monthly report (an uploaded record counts months, not days). */
+export const WARN_PLAIN_MONTHLY: Record<string, string> = {
+  factor_data_lag:
+    "The factor data stops before the latest returns, so the newest months are charted but not analysed.",
+};
+
+export function warningText(warning: ReportWarning, monthly = false): string {
+  return (monthly ? WARN_PLAIN_MONTHLY[warning.code] : undefined) ?? WARN_PLAIN[warning.code] ?? warning.message;
 }
 
 /** Summary of up to the first two warnings, joined by a space. */
 export function warningSummary(warnings: readonly ReportWarning[]): string {
-  return warnings.slice(0, 2).map(warningText).join(" ");
+  return warnings.slice(0, 2).map((w) => warningText(w)).join(" ");
 }
 
 /** The reading line of the exposures panel (H.2). */
