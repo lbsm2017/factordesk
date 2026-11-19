@@ -106,6 +106,7 @@ from factordesk.section_hooks import fragility as fragility_hook
 from factordesk.section_hooks import kalman as kalman_hook
 from factordesk.section_hooks import lead_lag as lead_lag_hook
 from factordesk.section_hooks import load_section_inputs
+from factordesk.section_hooks import performance as performance_hook
 from factordesk.section_hooks import residual_alpha as residual_alpha_hook
 from factordesk.section_hooks import shrunk as shrunk_hook
 from factordesk.section_hooks.context import CoreSections, SectionContext, SectionInputs
@@ -852,12 +853,14 @@ def assemble_report(
         make_sample_info=lambda window: _sample_info(sample, vintage, window),
     )
     # Optional sections (schema v3 contract SC3.2), in panel order. Each hook sees only the core.
+    performance = performance_hook.build_performance(ctx)
     lead_lag = lead_lag_hook.build_lead_lag(ctx)
     shrunk_betas = shrunk_hook.build_shrunk_betas(ctx)
     fragility = fragility_hook.build_fragility(ctx)
     residual = residual_alpha_hook.build_residual_analysis(ctx)
     kalman_betas = kalman_hook.build_kalman_betas(ctx)
     present: dict[str, object | None] = {
+        "performance": performance,
         "lead_lag": lead_lag,
         "shrunk_betas": shrunk_betas,
         "fragility": fragility,
@@ -880,6 +883,7 @@ def assemble_report(
         warnings=_warnings(sample, reg, audit, days_behind, gate),
         notes=[NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS, NOTE_SURVIVORSHIP],
         label_text=report_label_text(present),
+        performance=performance,
         lead_lag=lead_lag,
         shrunk_betas=shrunk_betas,
         fragility=fragility,

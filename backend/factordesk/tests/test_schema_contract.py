@@ -38,8 +38,16 @@ MOCK = FIXTURES / "mock_report.json"
 MOCK_V3 = FIXTURES / "mock_report_v3.json"
 NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
 
-SECTION_FIELDS = ("lead_lag", "shrunk_betas", "fragility", "residual", "kalman_betas")
-"""The five optional fields, in panel order (contract SC2, SC4)."""
+SECTION_FIELDS = (
+    "performance",
+    "lead_lag",
+    "shrunk_betas",
+    "fragility",
+    "residual",
+    "kalman_betas",
+)
+"""The six optional fields, in panel order (contract SC2, SC4; performance is the sixth, see
+docs/validation/performance-contract-note-2026-11-18.md)."""
 
 
 def _optional_parts(annotation: Any) -> tuple[Any, ...]:
@@ -51,7 +59,7 @@ def _optional_parts(annotation: Any) -> tuple[Any, ...]:
 
 
 # ----------------------------------------------------------------------------- fields and specs
-def test_sections_are_the_five_optional_fields() -> None:
+def test_sections_are_the_six_optional_fields() -> None:
     assert tuple(spec.report_field for spec in SECTIONS) == SECTION_FIELDS
     for spec in SECTIONS:
         info = FactorReport.model_fields[spec.report_field]
@@ -227,7 +235,7 @@ def _assemble(**kwargs: Any) -> FactorReport:
     )
 
 
-BUILT_SECTIONS: tuple[str, ...] = ("residual", "kalman_betas")
+BUILT_SECTIONS: tuple[str, ...] = ("performance", "residual", "kalman_betas")
 """Fields whose feature is built: the offline pipeline fills them. Each feature branch adds its
 field.
 

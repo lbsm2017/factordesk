@@ -8,5 +8,6 @@ feature fills its panel in.
 from factordesk.report.panels import fragility as fragility
 from factordesk.report.panels import kalman as kalman
 from factordesk.report.panels import lead_lag as lead_lag
+from factordesk.report.panels import performance as performance
 from factordesk.report.panels import residual_alpha as residual_alpha
 from factordesk.report.panels import shrunk as shrunk

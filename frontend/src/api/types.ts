@@ -31,6 +31,7 @@ export type AuditFinding = Schemas["AuditFinding"];
 export type SampleInfo = Schemas["SampleInfo"];
 
 /** Optional sections of the schema v3 contract (docs/specs/schema-v3-contract.md); null when not computed. */
+export type PerformanceSection = Schemas["PerformanceSection"];
 export type LeadLagSection = Schemas["LeadLagSection"];
 export type ShrunkBetas = Schemas["ShrunkBetas"];
 export type FragilitySection = Schemas["FragilitySection"];

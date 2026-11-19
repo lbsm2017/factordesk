@@ -1206,6 +1206,97 @@
         "title": "DiagnosticTest",
         "description": "One residual diagnostic (M3.5). Informational: never drives tags or alerts."
       },
+      "DrawdownEpisodeInfo": {
+        "properties": {
+          "depth": {
+            "type": "number",
+            "title": "Depth",
+            "description": "Trough value / peak value - 1; negative."
+          },
+          "peak_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Peak Date"
+          },
+          "trough_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Trough Date"
+          },
+          "recovery_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Date",
+            "description": "First date after the trough where the path regains the peak; None when it has not."
+          },
+          "days_peak_to_trough": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Days Peak To Trough",
+            "description": "Trading days from peak to trough."
+          },
+          "days_trough_to_recovery": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Trough To Recovery",
+            "description": "Trading days from trough to recovery; None when not recovered."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "depth",
+          "peak_date",
+          "trough_date",
+          "recovery_date",
+          "days_peak_to_trough",
+          "days_trough_to_recovery"
+        ],
+        "title": "DrawdownEpisodeInfo",
+        "description": "One fall of the compounded return path from a running peak, and its recovery."
+      },
+      "DrawdownSeries": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates",
+            "description": "The path origin (the price date before the first analysed return), then each analysed date."
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "Value / running peak - 1 on each date, rounded to 4 decimals; 0.0 at a new high, never positive. Same length as dates."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dates",
+          "values"
+        ],
+        "title": "DrawdownSeries",
+        "description": "The fall from the running peak on every day of the compounded return path, for a chart."
+      },
       "ExcludedRow": {
         "properties": {
           "date": {
@@ -1392,6 +1483,17 @@
             "title": "Label Text",
             "description": "Footnote texts by label key."
           },
+          "performance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerformanceSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historical return, volatility, Sharpe ratio and maximum drawdown."
+          },
           "lead_lag": {
             "anyOf": [
               {
@@ -1471,6 +1573,7 @@
           "warnings",
           "notes",
           "label_text",
+          "performance",
           "lead_lag",
           "shrunk_betas",
           "fragility",
@@ -2430,6 +2533,357 @@
         ],
         "title": "NonOverlappingAlpha",
         "description": "Family FR1 (R5.2): disjoint 252-row windows tiled from the end of S."
+      },
+      "PerformanceDrawdown": {
+        "properties": {
+          "max_drawdown": {
+            "type": "number",
+            "maximum": 0.0,
+            "minimum": -1.0,
+            "title": "Max Drawdown",
+            "description": "Deepest fall from a running peak; 0 when the path never fell."
+          },
+          "peak_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Date",
+            "description": "None when there was no drawdown."
+          },
+          "trough_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trough Date"
+          },
+          "recovery_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Date",
+            "description": "None when not recovered or no drawdown."
+          },
+          "days_peak_to_trough": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Peak To Trough"
+          },
+          "days_trough_to_recovery": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Trough To Recovery"
+          },
+          "episodes": {
+            "items": {
+              "$ref": "#/components/schemas/DrawdownEpisodeInfo"
+            },
+            "type": "array",
+            "title": "Episodes",
+            "description": "Up to five distinct, non-overlapping episodes, deepest first; the first equals the maximum drawdown. Empty when there was no drawdown."
+          },
+          "series": {
+            "$ref": "#/components/schemas/DrawdownSeries",
+            "description": "Daily drawdown over the analysed window."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "max_drawdown",
+          "peak_date",
+          "trough_date",
+          "recovery_date",
+          "days_peak_to_trough",
+          "days_trough_to_recovery",
+          "episodes",
+          "series"
+        ],
+        "title": "PerformanceDrawdown",
+        "description": "Maximum drawdown and the deepest episodes."
+      },
+      "PerformancePeriods": {
+        "properties": {
+          "n_days": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Days",
+            "description": "Daily observations of the analysed sample."
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start",
+            "description": "First analysed date."
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End",
+            "description": "Last analysed date."
+          },
+          "years": {
+            "type": "number",
+            "title": "Years",
+            "description": "n_days / 252."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "n_days",
+          "start",
+          "end",
+          "years"
+        ],
+        "title": "PerformancePeriods",
+        "description": "The analysed span."
+      },
+      "PerformanceReturns": {
+        "properties": {
+          "cagr": {
+            "type": "number",
+            "title": "Cagr",
+            "description": "Compound annual growth rate: prod(1 + r)^(252 / n) - 1."
+          },
+          "cumulative_return": {
+            "type": "number",
+            "title": "Cumulative Return",
+            "description": "prod(1 + r) - 1 over the window."
+          },
+          "mean_return_annual": {
+            "type": "number",
+            "title": "Mean Return Annual",
+            "description": "Arithmetic mean of daily returns times 252; ignores compounding."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "cagr",
+          "cumulative_return",
+          "mean_return_annual"
+        ],
+        "title": "PerformanceReturns",
+        "description": "Growth of the stock over the window (simple daily total returns, M1.3)."
+      },
+      "PerformanceSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "periods": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerformancePeriods"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerformanceReturns"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "volatility_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Annual",
+            "description": "sqrt(252) x sample sd (ddof 1) of daily simple returns."
+          },
+          "sharpe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerformanceSharpe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "drawdown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerformanceDrawdown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "periods",
+          "returns",
+          "volatility_annual",
+          "sharpe",
+          "drawdown"
+        ],
+        "title": "PerformanceSection",
+        "description": "Historical return, volatility, Sharpe ratio and maximum drawdown of the analysed stock.\n\nDescriptive and in-sample: it says what happened over the window, not what will happen.\nStatuses: ``ok``; ``insufficient_data`` (fewer than 60 daily observations); ``failed``."
+      },
+      "PerformanceSharpe": {
+        "properties": {
+          "ratio_annual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio Annual",
+            "description": "sqrt(252) x mean(excess) / sd(excess), ddof 1; None when the excess returns do not vary (the ratio is not defined)."
+          },
+          "ratio_daily": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio Daily",
+            "description": "mean(excess) / sd(excess); None as above."
+          },
+          "mean_excess_annual": {
+            "type": "number",
+            "title": "Mean Excess Annual",
+            "description": "252 x mean of daily excess returns."
+          },
+          "sharpe_se_iid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Se Iid",
+            "description": "Approximate standard error of the annual ratio, sqrt(252) x sqrt((1 + SR_daily^2 / 2) / n) (Lo 2002). Assumes independent, identically distributed returns."
+          },
+          "ci95_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci95 Low",
+            "description": "ratio_annual - 1.96 x sharpe_se_iid."
+          },
+          "ci95_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci95 High",
+            "description": "ratio_annual + 1.96 x sharpe_se_iid."
+          },
+          "ci_includes_zero": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Includes Zero",
+            "description": "True when the 95% interval contains 0; None when the ratio is not defined."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ratio_annual",
+          "ratio_daily",
+          "mean_excess_annual",
+          "sharpe_se_iid",
+          "ci95_low",
+          "ci95_high",
+          "ci_includes_zero"
+        ],
+        "title": "PerformanceSharpe",
+        "description": "Sharpe ratio of the daily excess returns (stock return minus the factor file's RF)."
       },
       "PowerStatement": {
         "properties": {

@@ -28,6 +28,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Return and risk attribution](decision-return-and-risk-attribution.md) [Decided]: pieces that add up exactly to the total and to 100%.
 - [SPY timing noise and the quality gate](decision-spy-timing-noise-and-the-quality-gate.md) [Decided-pending-implementation]: why SPY's R-squared was 0.967 and the pre-set gate that flags it.
 - [Residual alpha analysis](decision-residual-alpha-analysis.md) [Built and validated on 2026-11-18]: an in-sample and a point-in-time line, with the owner's four choices.
+- [Historical performance block](decision-performance-metrics.md) [Built, not yet validated]: the stock's own yearly growth, volatility, Sharpe ratio and worst fall over the analysed window, next to the factor numbers.
 - [Cointegration design](decision-cointegration-design.md) [Decided-pending-implementation]: an exploratory long-run link test that must hold on unseen data.
 - [Drift alerts and regime betas](decision-drift-alerts-and-regime-betas.md) [Decided-pending-implementation]: alerts when two of three conditions agree, and betas by market regime.
 - [Shrunk betas](decision-shrunk-betas.md) [Decided-pending-implementation]: a second beta pulled toward a typical stock by how noisy it is, plus power statements; the ordinary betas stay primary.

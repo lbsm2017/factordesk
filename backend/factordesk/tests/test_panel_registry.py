@@ -21,6 +21,7 @@ ORDER = [
     ("equation", 200),
     ("kpis", 300),
     ("price", 400),
+    ("performance", 450),
     ("exposures", 500),
     ("lead_lag", 510),
     ("shrunk", 520),
@@ -37,6 +38,7 @@ ORDER = [
 """Static panel order of contract SC4 (the React page adds ``notice`` at 150)."""
 
 SECTION_PANELS = {
+    "performance": ("performance", "price"),
     "lead_lag": ("lead-lag", "exposures"),
     "shrunk_betas": ("shrunk", "lead-lag"),
     "fragility": ("fragility", "shrunk"),
