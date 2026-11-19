@@ -45,6 +45,12 @@ JSON otherwise (not ``null``), so ticker reports are byte-identical to the ones 
 A report without it is a daily ticker report annualised with 252. It is additive and does not bump
 the version (contract SC5): no field is removed, renamed or retyped, nothing becomes required, and
 no field changes meaning for a reader that knows the block.
+
+The optional ``model`` field (E1) is ``"ff6"`` for a report on FF5 plus momentum and ``None`` (left
+out of the JSON) for FF5, so FF5 reports are byte-identical to the ones written before it. The
+optional section ``alpha_strip`` (alpha under CAPM, FF3, FF5 and FF6 on the same rows;
+``report/sections/alpha_strip.py``) is also left out of the JSON when ``None``.
+Both are additive and do not bump the version (contract SC5).
 """
 
 from __future__ import annotations
@@ -72,6 +78,7 @@ from factordesk.report.base import Severity as Severity
 from factordesk.report.base import StatisticModel as StatisticModel
 from factordesk.report.base import Status as Status
 from factordesk.report.base import Tag as Tag
+from factordesk.report.sections.alpha_strip import ALPHA_STRIP_SECTION, AlphaStrip
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
@@ -80,6 +87,9 @@ from factordesk.report.sections.residual_alpha import RESIDUAL_ALPHA_SECTION, Re
 from factordesk.report.sections.shrunk import SHRUNK_SECTION, ShrunkBetas
 from factordesk.report.sections.tail_risk import TAIL_RISK_SECTION, TailRiskSection
 from factordesk.report.sections.world_beta import WORLD_BETA_SECTION, WorldBetaSection
+
+FactorModel = Literal["ff5", "ff6"]
+"""Factor model of a report: FF5, or FF6 = FF5 + momentum (Mom)."""
 
 SCHEMA_VERSION = "4"
 """Version written by this code (the schema v3 contract; contract SC5). Additive optional fields
@@ -100,6 +110,7 @@ SECTIONS: tuple[SectionSpec, ...] = (
     RESIDUAL_ALPHA_SECTION,
     KALMAN_SECTION,
     TAIL_RISK_SECTION,
+    ALPHA_STRIP_SECTION,
 )
 """The optional sections of the schema v3 contract, in panel order (contract SC3.1, SC4)."""
 
@@ -222,11 +233,14 @@ class FactorStat(FrozenModel):
     z: float | None = Field(
         description=(
             "HAC test statistic: a z-statistic (normal reference) for daily subjects, a "
-            "t-statistic (Student-t, n - 6 degrees of freedom) for monthly subjects."
+            "t-statistic (Student-t, n - k degrees of freedom, k = factors + 1) for monthly "
+            "subjects."
         )
     )
     p: float | None = Field(description="Two-sided p-value, unadjusted.")
-    p_adj_bh: float | None = Field(description="Benjamini-Hochberg adjusted p (family of 5).")
+    p_adj_bh: float | None = Field(
+        description="Benjamini-Hochberg adjusted p (family: the model's betas)."
+    )
     ci_low: float | None = Field(description="Lower bound of the unadjusted 95% HAC interval.")
     ci_high: float | None = Field(description="Upper bound of the unadjusted 95% HAC interval.")
     tag: Tag | None = Field(description="'reliable' when BH rejects at q = 0.05, else 'noise'.")
@@ -484,11 +498,16 @@ class PriceSeries(FrozenModel):
         return self
 
 
+_OMITTED_WHEN_DEFAULT: tuple[str, ...] = ("subject", "model", "alpha_strip")
+"""Fields left out of the JSON when ``None``, so never required."""
+
+
 def _subject_not_required(schema: JsonDict) -> None:
-    """The ``subject`` block is left out of the JSON when ``None``, so it is never required."""
+    """``subject``, ``model`` and ``alpha_strip`` are left out of the JSON when ``None``, so they
+    are never required."""
     required = schema.get("required")
     if isinstance(required, list):
-        schema["required"] = [name for name in required if name != "subject"]
+        schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
 
 
 class FactorReport(FrozenModel):
@@ -503,6 +522,12 @@ class FactorReport(FrozenModel):
         exclude_if=lambda value: value is None,
         description="What the report is about when it is not a daily ticker; absent (not null) "
         "for a ticker report, which is daily and annualised with 252.",
+    )
+    model: Literal["ff6"] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Factor model of the regression when it is not FF5: ff6 = FF5 + momentum "
+        "(Mom). Absent (not null) for an FF5 report.",
     )
     generated_at: datetime = Field(description="Timezone-aware UTC timestamp.")
     data: DataInfo
@@ -557,6 +582,12 @@ class FactorReport(FrozenModel):
         description="Value at risk and expected shortfall (CVaR) by three methods, with bootstrap "
         "bands, at the series' own frequency (spec section E7).",
     )
+    alpha_strip: AlphaStrip | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Alpha under CAPM, FF3, FF5 and FF6 on the same rows, not ranked; absent "
+        "(not null) when not computed.",
+    )
 
     @field_validator("schema_version")
     @classmethod
@@ -576,6 +607,8 @@ class FactorReport(FrozenModel):
             present = [s.report_field for s in SECTIONS if getattr(self, s.report_field)]
             if self.subject is not None:
                 present.append("subject")
+            if self.model is not None:
+                present.append("model")
             if present:
                 raise ValueError(f"a version 3 report cannot hold {', '.join(present)}")
         return self

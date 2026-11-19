@@ -47,10 +47,13 @@ SECTION_FIELDS = (
     "residual",
     "kalman_betas",
     "tail_risk",
+    "alpha_strip",
 )
-"""The eight optional fields, in panel order (contract SC2, SC4; performance and world beta are
+"""The nine optional fields, in field order (contract SC2, SC4; performance and world beta are
 additions to the five of the contract, see docs/validation/performance-contract-note-2026-11-18.md
-and docs/validation/world-beta-contract-note-2026-11-18.md)."""
+and docs/validation/world-beta-contract-note-2026-11-18.md; the alpha strip is E1's)."""
+OMITTED_WHEN_NONE = ("alpha_strip",)
+"""Optional fields left out of the JSON (not written as null) when not computed."""
 
 
 def _optional_parts(annotation: Any) -> tuple[Any, ...]:
@@ -126,7 +129,10 @@ def test_mock_fixture_is_version_4_with_null_sections() -> None:
         assert getattr(rep, name) is None
     payload = json.loads(MOCK.read_text(encoding="utf-8"))
     for name in SECTION_FIELDS:
-        assert name in payload and payload[name] is None
+        if name in OMITTED_WHEN_NONE:
+            assert name not in payload
+        else:
+            assert name in payload and payload[name] is None
 
 
 def test_mock_fixture_round_trips(tmp_path: Path) -> None:

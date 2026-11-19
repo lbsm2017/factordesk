@@ -23,6 +23,7 @@ ORDER = [
     ("price", 400),
     ("performance", 450),
     ("exposures", 500),
+    ("alpha_strip", 502),
     ("world_beta", 505),
     ("lead_lag", 510),
     ("shrunk", 520),
@@ -43,13 +44,15 @@ SECTION_PANELS = {
     "lead_lag": ("lead-lag", "world-beta"),
     "shrunk_betas": ("shrunk", "lead-lag"),
     "fragility": ("fragility", "shrunk"),
-    "world_beta": ("world-beta", "exposures"),
+    "world_beta": ("world-beta", "alpha-strip"),
+    "alpha_strip": ("alpha-strip", "exposures"),
     "residual": ("residual", "risk"),
     "kalman_betas": ("kalman", "rolling"),
 }
 """Element id of each optional section's panel, and the panel it follows.
 
-The world beta panel (505) follows the exposures (500); lead-lag (510) follows it."""
+The alpha strip (502) follows the exposures (500), the world beta panel (505) follows it and
+lead-lag (510) follows the world beta."""
 
 
 def _panel_ids(page: str) -> list[str]:

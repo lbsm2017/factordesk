@@ -9,11 +9,14 @@ monthly data and never needs a frequency check of its own.
 Declarations:
 
 * performance: every subject, every frequency, every model.
+* alpha strip: every subject, every frequency, every model (it needs the momentum factor in the
+  sample and leaves its field ``None`` without it).
 * world beta: daily only (ACWI and IEUR prices are daily), every model.
 * tail risk (VaR and CVaR): every subject, every frequency, every model.
 * lead-lag, shrunk betas, fragility, residual alpha analysis, Kalman betas: daily and FF5 only.
   Their methods are built on trading-day windows (252-row windows, 5-day blocks, a lag of one
-  trading day, an FF5 prior) and are not defined for monthly data or another model yet.
+  trading day, an FF5 prior) and on the five factors, and are not defined for monthly data or
+  another model yet. Under FF6 they are hidden; the FF5 report is unchanged.
 
 The hooks are looked up by module attribute at call time, so a test may replace one.
 """
@@ -25,6 +28,7 @@ from dataclasses import dataclass
 
 from factordesk.analytics.sample import Frequency
 from factordesk.analytics.subject import FREQUENCIES, SUBJECT_KINDS, SubjectKind
+from factordesk.section_hooks import alpha_strip as alpha_strip_hook
 from factordesk.section_hooks import fragility as fragility_hook
 from factordesk.section_hooks import kalman as kalman_hook
 from factordesk.section_hooks import lead_lag as lead_lag_hook
@@ -109,6 +113,13 @@ HOOKS: tuple[HookSpec, ...] = (
     HookSpec(
         "tail_risk",
         lambda ctx: tail_risk_hook.build_tail_risk(ctx),
+        ALL_SOURCES,
+        ALL_FREQUENCIES,
+        ALL_MODELS,
+    ),
+    HookSpec(
+        "alpha_strip",
+        lambda ctx: alpha_strip_hook.build_alpha_strip(ctx),
         ALL_SOURCES,
         ALL_FREQUENCIES,
         ALL_MODELS,

@@ -11,8 +11,11 @@ ranks them or marks a "best" one: a higher R² does not make a model more correc
 depends on the model (E9a).
 
 The fit is ``regression.ols_hac``, the same estimator as the full-sample regression, so the FF5
-row equals ``run_regression`` on the same rows. HAC t-statistics are asymptotic (normal
-reference); for 36 to 60 monthly rows they are approximate (research A3).
+row equals ``run_regression`` on the same rows. HAC t-statistics use the normal reference for
+daily data; with ``small_sample`` (monthly subjects, as in ``run_regression``) the covariance of
+each model is scaled by ``n / (n - k)`` and the p-value uses Student-t with ``n - k`` degrees of
+freedom, ``k`` the parameters of that model. They remain approximate for 36 to 60 monthly rows
+(research A3).
 
 Pure: no I/O, no clock, no randomness. Inputs are not mutated.
 """
@@ -54,13 +57,16 @@ class ModelAlpha:
     alpha_t: float
     """HAC t-statistic of the intercept (``alpha / se``; scale-free, so not annualised)."""
     alpha_p: float
-    """Two-sided p-value of ``alpha_t`` against the normal distribution."""
+    """Two-sided p-value of ``alpha_t``: normal reference, or Student-t with ``t_df`` degrees of
+    freedom when the comparison used the small-sample variant."""
     alpha_tag: Tag
     """``"reliable"`` when ``alpha_p < 0.05`` (the single-test rule of M3.2)."""
     rsquared: float
     rsquared_adj: float
     nobs: int
     """Rows of the fit; the same for every model of one comparison."""
+    t_df: int | None = None
+    """Student-t degrees of freedom (``nobs - k``) of the small-sample variant; None: normal."""
 
 
 @dataclass(frozen=True)
@@ -106,6 +112,7 @@ def compare_models(
     periods: int | None = None,
     *,
     models: Sequence[str] = MODEL_ORDER,
+    small_sample: bool = False,
 ) -> ModelComparison:
     """Alpha, its HAC t-statistic, R² and adjusted R² of each model on the same rows.
 
@@ -113,7 +120,8 @@ def compare_models(
     frame (``data.french.load_ff6``), else ``ValueError``. ``periods`` defaults to the sample's
     own (252 daily, 12 monthly) and any other value raises (``regression.resolve_periods``).
     Raises ``DegenerateInputError`` when a model's design is singular, and ``ValueError`` when
-    there are no more common rows than the largest model has parameters.
+    there are no more common rows than the largest model has parameters. ``small_sample``
+    (monthly subjects) selects the corrected covariance and Student-t inference of ``ols_hac``.
     """
     periods = resolve_periods(sample, periods)
     names = _check_models(models)
@@ -133,7 +141,13 @@ def compare_models(
     for m in names:
         codes = model_codes(m)
         cols = [union.index(c) for c in codes]
-        fit = ols_hac(y, f_all[common][:, cols], lags=lags, names=[DISPLAY_NAMES[c] for c in codes])
+        fit = ols_hac(
+            y,
+            f_all[common][:, cols],
+            lags=lags,
+            names=[DISPLAY_NAMES[c] for c in codes],
+            small_sample=small_sample,
+        )
         a = float(fit.params[0])
         rows.append(
             ModelAlpha(
@@ -149,6 +163,7 @@ def compare_models(
                 rsquared=fit.rsquared,
                 rsquared_adj=fit.rsquared_adj,
                 nobs=fit.nobs,
+                t_df=fit.t_df,
             )
         )
     index = pd.DatetimeIndex(sample.xret.index)
