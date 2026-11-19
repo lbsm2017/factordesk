@@ -142,7 +142,8 @@ def _add_portfolio_report(app: FastAPI) -> None:
                     f"No prices were returned for {UNKNOWN_TICKER}.",
                     "Check the ticker symbol.",
                 )
-        report = await get_report_service(request).report("SYN", None, None, None, body.get("model", "ff6"))
+        service = get_report_service(request)
+        report = await service.report("SYN", None, None, None, body.get("model", "ff6"))
         return report.model_copy(update={"ticker": tree.get("name", "Portfolio")})
 
     app.add_api_route("/api/report/portfolio", portfolio_report, methods=["POST"])
