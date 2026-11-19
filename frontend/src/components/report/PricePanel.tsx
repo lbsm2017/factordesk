@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChartTokens } from "../charts/chartTokens";
 import { useEChart } from "../charts/useEChart";
+import { isSubjectReport } from "../../report/subject";
 import { priceOutcome } from "../../text/outcome";
 import { Panel } from "./Panel";
 import { priceModel, priceOption, visibleLabels } from "./priceModel";
@@ -9,6 +10,7 @@ import type { ReportPanelProps } from "./types";
 import "./PricePanel.css";
 
 const QUESTION = "How has the price moved over the window? Shaded days are not in the analysis.";
+const RECORD_QUESTION = "How has the record grown over the window? Shaded months are not in the analysis.";
 
 interface DataZoomState {
   startValue?: unknown;
@@ -89,6 +91,7 @@ export function PricePanel({ report }: ReportPanelProps) {
   }
 
   const full = fullFor === model;
+  const record = isSubjectReport(report);
   const toggle = model.canShowFull ? (
     <button type="button" className="zoom-toggle" onClick={() => setFullFor(full ? null : model)}>
       {full ? "Show analysed range" : "Show full history"}
@@ -98,11 +101,15 @@ export function PricePanel({ report }: ReportPanelProps) {
   return (
     <Panel
       id="price"
-      title="Price"
-      question={QUESTION}
+      title={record ? "Growth of 100" : "Price"}
+      question={record ? RECORD_QUESTION : QUESTION}
       outcome={priceOutcome(report)}
       legend={toggle}
-      footnote={`Adjusted close from ${report.data.price_source}, for context only; no statistic uses the price line.`}
+      footnote={
+        record
+          ? "Built from the uploaded monthly returns, for context only; no statistic uses this line."
+          : `Adjusted close from ${report.data.price_source}, for context only; no statistic uses the price line.`
+      }
     >
       <div className="price-wrap">
         <PriceChart model={model} full={full} />
@@ -111,7 +118,7 @@ export function PricePanel({ report }: ReportPanelProps) {
           <thead className="vh">
             <tr>
               <th scope="col">Point</th>
-              <th scope="col">Adjusted close</th>
+              <th scope="col">{record ? "Level" : "Adjusted close"}</th>
             </tr>
           </thead>
           <tbody>

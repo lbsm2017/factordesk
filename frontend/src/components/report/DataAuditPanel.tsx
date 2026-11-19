@@ -1,5 +1,6 @@
-import type { AuditFinding, DataInfo } from "../../api/types";
+import type { AuditFinding, FactorReport } from "../../api/types";
 import { count, dateLong, pct } from "../../format";
+import { isSubjectReport, observations, periodWord } from "../../report/subject";
 import { dataOutcome } from "../../text/outcome";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
@@ -48,10 +49,6 @@ function datesText(dates: readonly string[]): string {
   return ` (${shown}${more > 0 ? ` and ${more} more` : ""})`;
 }
 
-function plural(n: number, one: string, many: string): string {
-  return `${count(n)} ${n === 1 ? one : many}`;
-}
-
 /** "2026-11-01T00:00:00Z" as "1 Nov 2026, 00:00 UTC" (the API sends UTC). */
 function downloadedText(iso: string | null): string {
   if (!iso) return "Injected, not downloaded";
@@ -59,27 +56,28 @@ function downloadedText(iso: string | null): string {
   return m ? `${dateLong(m[1] as string)}, ${m[2]} UTC` : iso;
 }
 
-function coverage(d: DataInfo): [string, string][] {
+function coverage(report: FactorReport): [string, string][] {
+  const d = report.data;
   const reasons = Object.entries(d.excluded_by_reason)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([k, v]) => `${v} ${EXCLUSION_TEXT[k] ?? k}`)
     .join(", ");
   const unc = d.uncovered;
   const after = unc.n
-    ? `${count(unc.n)} price days (raw return ${unc.compounded_return === null ? "n/a" : pct(unc.compounded_return)}, not analysed)`
+    ? `${count(unc.n)} ${periodWord(report)} (raw return ${unc.compounded_return === null ? "n/a" : pct(unc.compounded_return)}, not analysed)`
     : "none";
   return [
     ["Requested", `${dateLong(d.requested_start)} to ${dateLong(d.requested_end)}`],
     [
       "Analysed",
-      `${dateLong(d.actual_start)} to ${dateLong(d.actual_end)}, ${plural(d.n_obs, "trading day", "trading days")}`,
+      `${dateLong(d.actual_start)} to ${dateLong(d.actual_end)}, ${observations(report, d.n_obs)}`,
     ],
     ["Excluded inside the range", `${count(d.n_excluded)}${reasons ? ` (${reasons})` : ""}`],
     ["After factor data", after],
-    ["Before factor data", `${count(d.dropped_price_dates_before_factors)} price days`],
+    ["Before factor data", `${count(d.dropped_price_dates_before_factors)} ${periodWord(report)}`],
     ["Factor data ends", `${dateLong(d.factors_last_date)}, ${count(d.factors_days_behind)} days before the report`],
     ["Factor file downloaded", downloadedText(d.factors_downloaded_at)],
-    ["Prices", d.price_source],
+    [isSubjectReport(report) ? "Returns" : "Prices", d.price_source],
     // Plain text on purpose: the report never links out.
     ["Factors", d.factors_source_url],
   ];
@@ -104,7 +102,7 @@ export function DataAuditPanel({ report }: ReportPanelProps) {
         <div>
           <h3>Coverage</h3>
           <dl className="facts">
-            {coverage(d).map(([term, value]) => (
+            {coverage(report).map(([term, value]) => (
               <div key={term}>
                 <dt>{term}</dt>
                 <dd>{value}</dd>
@@ -128,7 +126,7 @@ export function DataAuditPanel({ report }: ReportPanelProps) {
               ))
             ) : (
               <li className="sev-none">
-                <span className="msg">No findings. Prices passed every check.</span>
+                <span className="msg">{`No findings. ${isSubjectReport(report) ? "The returns" : "Prices"} passed every check.`}</span>
               </li>
             )}
           </ul>

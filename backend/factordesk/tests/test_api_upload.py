@@ -286,3 +286,10 @@ def test_upload_leaves_the_data_folder_and_the_report_caches_untouched(
     assert cache_state(world) == before_caches
     assert world.provider.threads == []  # no price lookup either
     assert NOW  # the clock is fixed, so nothing here depends on the day
+
+
+def test_the_committed_monthly_report_fixture_matches_the_schema() -> None:
+    path = Path(__file__).parent / "fixtures" / "monthly_report.json"
+    report = FactorReport.model_validate_json(path.read_text(encoding="utf-8"))
+    assert report.subject is not None and report.subject.frequency == "monthly"
+    assert report.subject.gross_net == "net"

@@ -53,7 +53,7 @@ export function warningSummary(warnings: readonly ReportWarning[]): string {
 }
 
 /** The reading line of the exposures panel (H.2). */
-export function exposureReading(factors: readonly FactorStat[]): string {
+export function exposureReading(factors: readonly FactorStat[], subject = "the stock"): string {
   const parts: string[] = [];
   const quiet: string[] = [];
   for (const f of factors) {
@@ -74,7 +74,7 @@ export function exposureReading(factors: readonly FactorStat[]): string {
   let s = "";
   if (parts.length) {
     const body = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
-    s = `Over this window the stock ${body}.`;
+    s = `Over this window ${subject} ${body}.`;
   }
   if (quiet.length) {
     const q = quiet.length > 1 ? `${quiet.slice(0, -1).join(", ")} or ${quiet[quiet.length - 1]}` : quiet[0];

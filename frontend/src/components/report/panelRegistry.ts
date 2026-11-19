@@ -31,8 +31,8 @@ import { WorldBetaPanel } from "./sections/WorldBetaPanel";
 /** What `ReportView` hands to every panel; each panel reads the props it needs. */
 export interface PanelHostProps {
   report: FactorReport;
-  /** `/api/report/{t}/html?{same range}`, for the Download link in the header. */
-  downloadHref: string;
+  /** `/api/report/{t}/html?{same range}`, for the Download link in the header; null for an uploaded record. */
+  downloadHref: string | null;
   /** Rolling window shown (the URL's `win`, or the report's primary window). */
   win: RollingWindowDays;
   onWinChange: (win: RollingWindowDays) => void;
