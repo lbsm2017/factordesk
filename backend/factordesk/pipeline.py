@@ -843,7 +843,9 @@ def _warnings(
                 ),
             )
         )
-    if days_behind > STALE_AFTER_DAYS:
+    # A monthly record says so only when months are cut off; daily reports keep their rule.
+    cut_off = sample.uncovered.n > 0 or sample.frequency == "daily"
+    if days_behind > STALE_AFTER_DAYS and cut_off:
         out.append(
             ReportWarning(
                 code="factor_data_lag",
