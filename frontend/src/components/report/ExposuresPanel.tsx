@@ -16,18 +16,30 @@ import "./signColor.css";
 const QUESTION = "What is this stock exposed to, and how sure are we?";
 const DEFAULT_DESC = "Descriptive, in-sample, not predictive.";
 
+/** Sign colour on a beta (owner, 2026-11-19): green above zero, red below; not-significant betas stay grey. */
+function betaSignClass(beta: number | null, faded: boolean | undefined): string {
+  if (beta === null || faded || beta === 0) return "";
+  return beta > 0 ? " num-pos" : " num-neg";
+}
+
 function Legend({ window, hasAverages }: { window: number; hasAverages: boolean }) {
   return (
     <ul className="legend" aria-label="Legend">
       <li>
         <svg className="sw" aria-hidden="true">
-          <rect className="ink" width="14" height="10" rx="2" />
+          <rect className="pos bar-pos" width="14" height="10" rx="2" />
         </svg>
-        Beta
+        Positive beta
       </li>
       <li>
         <svg className="sw" aria-hidden="true">
-          <rect className="ink faded" width="14" height="10" rx="2" />
+          <rect className="neg bar-neg" width="14" height="10" rx="2" />
+        </svg>
+        Negative beta
+      </li>
+      <li>
+        <svg className="sw" aria-hidden="true">
+          <rect className="neg bar-neg faded" width="14" height="10" rx="2" />
         </svg>
         Faded: not significant
       </li>
@@ -94,14 +106,14 @@ function ExposureTable({ model, stats }: { model: ExposureModel; stats: boolean 
                 hi={domain.hi}
                 ticks={domain.ticks}
                 value={r.beta}
-                fill="neutral"
+                fill="sign"
                 faded={r.faded}
                 ci={r.ci}
                 marker={r.beta === null ? null : r.average}
                 title={r.title}
               />
             </td>
-            <td role="cell" className="num strong">
+            <td role="cell" className={`num strong${betaSignClass(r.beta, r.faded)}`}>
               {r.betaText}
             </td>
             {stats ? (

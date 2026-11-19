@@ -51,6 +51,11 @@ All decisions below were given by the owner on 2026-11-18, after testing the das
 - **Dashboard first, static report later.** The offline HTML report keeps its revision 2 look,
   apart from the company name line and the two new panels. Its port is roadmap epic 18.
 - **Stack unchanged.** Plain CSS tokens, no Tailwind or shadcn/ui, no new runtime dependency.
+- **Factor exposure colours (2026-11-19, later the same day).** On approving prototype v4a the owner
+  asked for betas in neutral ink. After testing the dashboard on localhost the owner asked for green
+  and red in the Factor exposures chart: bars above zero are green, below zero red, not-significant
+  bars faded in the same hue, and beta values coloured only when significant. This supersedes
+  "betas neutral" for that panel only; shrunk betas and the Summary table keep neutral ink.
 
 ## Why
 
