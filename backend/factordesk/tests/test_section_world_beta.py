@@ -39,7 +39,7 @@ from factordesk.section_hooks.world_beta import UNAVAILABLE_REASON, load_world_b
 from factordesk.tests.fixtures.dgp import StaticProvider, default_rf, dgp_a, price_history, rng_for
 from factordesk.tests.fixtures.sections import report_with_section
 from factordesk.tests.test_api_report import make_world, serve
-from factordesk.tests.test_world_beta import BENCH_BETA, Case, make_case
+from factordesk.tests.test_world_beta import BENCH_BETA, Case, make_case, overlap_of
 
 NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
 MOCK = Path(__file__).parent / "fixtures" / "mock_report.json"
@@ -156,8 +156,69 @@ def test_twb27_audit_errors_in_acwi_fail_the_section() -> None:
     frame.iloc[600, frame.columns.get_loc("adj_close")] = -5.0  # type: ignore[call-overload]
     s = section_for(dataclasses.replace(case, bench=dataclasses.replace(case.bench, frame=frame)))
     assert s.status == "failed"
-    assert s.reason is not None and "price audit found errors" in s.reason
+    assert s.reason is not None and "price history has errors" in s.reason
+    assert "left out until the history is corrected" in s.reason
     assert s.world is None
+
+
+def _longer_bench(seed: int, first_stock_row: int) -> Case:
+    """The stock starts at row ``first_stock_row`` of ACWI's history: older ACWI rows are outside
+    the overlap. The stock's first return is on ACWI row ``first_stock_row + 1``, so that return
+    rests on ACWI rows ``first_stock_row`` and later."""
+    case = make_case(seed)
+    stock = dataclasses.replace(case.stock, frame=case.stock.frame.iloc[first_stock_row:])
+    return dataclasses.replace(case, stock=stock)
+
+
+def _with_bad_bench_price(case: Case, row: int) -> Case:
+    """A recorded dividend the adjusted close does not carry: an audit error dated at ``row``
+    (``distribution_mismatch``) that leaves every return finite, so no day is dropped by it."""
+    frame = case.bench.frame.copy()
+    close = float(frame.iloc[row, frame.columns.get_loc("close")])  # type: ignore[call-overload]
+    # 4 basis points of the price: above the per-event tolerance, below the calendar-year one.
+    frame.iloc[row, frame.columns.get_loc("dividends")] = 4e-4 * close  # type: ignore[call-overload]
+    return dataclasses.replace(case, bench=dataclasses.replace(case.bench, frame=frame))
+
+
+def test_twb27b_audit_errors_before_the_overlap_become_a_note_not_a_failure() -> None:
+    case = _with_bad_bench_price(_longer_bench(7270, 600), 300)  # years before the stock starts
+    s = section_for(case)
+    assert s.status == "ok" and s.world is not None
+    outside = [w for w in s.audit_warnings if "outside the days used" in w]
+    assert len(outside) == 1 and "do not affect this beta" in outside[0]
+
+
+def test_twb27c_the_row_before_the_first_overlap_return_is_inside_the_window() -> None:
+    base = _longer_bench(7271, 600)
+    _, overlap = overlap_of(base)
+    first_row = int(pd.DatetimeIndex(base.bench.frame.index).get_loc(overlap.dates[0]))  # type: ignore[arg-type]
+    # The first return of the overlap rests on the ACWI price one row before its date.
+    on_the_edge = section_for(_with_bad_bench_price(base, first_row - 1))
+    assert on_the_edge.status == "failed"
+    assert on_the_edge.reason is not None and "price history has errors" in on_the_edge.reason
+    just_outside = section_for(_with_bad_bench_price(base, first_row - 2))
+    assert just_outside.status == "ok"  # no return of the overlap uses that price
+    assert any("outside the days used" in w for w in just_outside.audit_warnings)
+
+
+def test_twb27d_audit_errors_after_the_overlap_become_a_note_too() -> None:
+    case = make_case(7272)
+    short = dataclasses.replace(case.stock, frame=case.stock.frame.iloc[:-30])
+    case = _with_bad_bench_price(dataclasses.replace(case, stock=short), len(case.bench.frame) - 5)
+    s = section_for(case)
+    assert s.status == "ok"
+    assert any("outside the days used" in w for w in s.audit_warnings)
+
+
+def test_twb27e_an_audit_error_inside_the_overlap_fails_with_its_own_step_in_the_panel() -> None:
+    case = _with_bad_bench_price(make_case(7273), 700)
+    report = report_for(case, WorldBenchmarkInput(history=case.bench))
+    assert report.world_beta is not None and report.world_beta.status == "failed"
+    html = render_world_beta_panel(report)
+    assert html is not None
+    assert "price history has errors" in html
+    assert "Run the report again later" not in html  # trying again cannot correct the history
+    assert "The rest of the report is not affected." in html
 
 
 def test_twb28_acwi_audit_warnings_are_carried() -> None:

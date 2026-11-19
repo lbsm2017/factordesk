@@ -25,11 +25,12 @@ from factordesk.analytics.world_beta import (
     BENCHMARK_TICKER,
     MIN_OVERLAP,
     BetaEstimate,
+    Overlap,
     align_overlap,
     compare_betas,
     single_factor_beta,
 )
-from factordesk.data.audit import audit_prices
+from factordesk.data.audit import AuditFinding, audit_prices
 from factordesk.data.prices import (
     IncrementalPriceProvider,
     PriceDataError,
@@ -149,17 +150,33 @@ def build_world_beta(ctx: SectionContext) -> WorldBetaSection | None:
         audit = audit_prices(history.frame, duplicate_dates=history.duplicate_dates)
         warnings = [f.message for f in audit.findings if f.severity == "warn"]
         errors = [f for f in audit.findings if f.severity == "error"]
-        if errors:
-            codes = ", ".join(sorted({f.code for f in errors}))
-            return section(
-                "failed",
-                f"The {BENCHMARK_TICKER} price audit found errors ({codes}), so its returns "
-                "cannot be trusted and the world beta is not computed.",
-                warnings=warnings,
-            )
         overlap = align_overlap(ctx.sample, pd.DatetimeIndex(ctx.history.frame.index), history)
         start = overlap.dates[0] if overlap.n else None
         end = overlap.dates[-1] if overlap.n else None
+        used = _days_used(pd.DatetimeIndex(history.frame.index), overlap)
+        inside = [e for e in errors if _touches(e, used)]
+        if inside:
+            codes = ", ".join(sorted({e.code for e in inside}))
+            return section(
+                "failed",
+                f"The {BENCHMARK_TICKER} price history has errors on days this section uses "
+                f"({codes}), so its returns cannot be trusted and the world beta is not "
+                "computed. The section is left out until the history is corrected.",
+                warnings=warnings,
+            )
+        outside = [e for e in errors if e not in inside]
+        if outside and used is not None:
+            codes = ", ".join(sorted({e.code for e in outside}))
+            warnings.append(
+                f"The {BENCHMARK_TICKER} price audit found errors ({codes}) on dates outside the "
+                f"days used here ({used[0]} to {used[1]}), so they do not affect this beta."
+            )
+        elif outside:
+            codes = ", ".join(sorted({e.code for e in outside}))
+            warnings.append(
+                f"The {BENCHMARK_TICKER} price audit found errors ({codes}); no day is common "
+                "to the analysis sample and the fund, so none of them affects a beta."
+            )
         if overlap.n < MIN_OVERLAP:
             return section(
                 "insufficient_data",
@@ -191,6 +208,34 @@ def build_world_beta(ctx: SectionContext) -> WorldBetaSection | None:
     except Exception as exc:  # any other error: the section says so, the report still builds
         logger.warning("world beta failed", exc_info=True)
         return section("failed", f"The world beta could not be computed ({exc}).")
+
+
+def _days_used(bench_index: pd.DatetimeIndex, overlap: Overlap) -> tuple[date, date] | None:
+    """First and last ACWI price date the overlap's returns rest on, or ``None`` if no day.
+
+    The first return of the overlap needs the ACWI price of the row before its date.
+    """
+    if not overlap.n:
+        return None
+    first = int(bench_index.get_indexer(pd.DatetimeIndex([overlap.dates[0]]))[0])
+    start = bench_index[max(first - 1, 0)]
+    return start.date(), overlap.dates[-1].date()
+
+
+def _touches(finding: AuditFinding, used: tuple[date, date] | None) -> bool:
+    """True when an audit error can change a return used by the beta.
+
+    An error with no date cannot be placed, so it counts. A calendar-year drift is stamped on the
+    last row of its year and spoils that whole year.
+    """
+    if not finding.dates:
+        return True
+    if used is None:
+        return False
+    first, last = used
+    if finding.code == "calendar_year_drift":
+        return any(first.year <= d.year <= last.year for d in finding.dates)
+    return any(first <= d <= last for d in finding.dates)
 
 
 def _unique(history: PriceHistory) -> PriceHistory:

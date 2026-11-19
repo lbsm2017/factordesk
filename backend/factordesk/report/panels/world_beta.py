@@ -30,6 +30,7 @@ TITLE = "World beta (quick estimate)"
 QUESTION = "How much does this stock move with the world market, next to the US market?"
 NEXT_STEP_SHORT = "Choose a longer date range and run the report again."
 NEXT_STEP_FAILED = "Run the report again later; the rest of the report is not affected."
+NEXT_STEP_UNFIXABLE = "The rest of the report is not affected."
 DEFAULT_DESC = "Descriptive, in-sample, not predictive."
 ROW_WORLD = "Against the world (ACWI)"
 ROW_US = "Against the US market, same days"
@@ -115,7 +116,12 @@ def render_world_beta_panel(report: FactorReport) -> str | None:
         return None
     head = panel_head(PANEL_ID, TITLE, QUESTION)
     if s.status != "ok" or s.world is None or s.us_market is None:
-        step = NEXT_STEP_SHORT if s.status == "insufficient_data" else NEXT_STEP_FAILED
+        if s.status == "insufficient_data":
+            step = NEXT_STEP_SHORT
+        elif s.acwi_first_date is None:  # the fund's prices were not fetched: trying again can help
+            step = NEXT_STEP_FAILED
+        else:  # the prices came but cannot be used; running the report again changes nothing
+            step = NEXT_STEP_UNFIXABLE
         body = empty_state(s.reason or "", step)
         return panel_section(PANEL_ID, head, body + _foot(report, s, None))
     body = (
