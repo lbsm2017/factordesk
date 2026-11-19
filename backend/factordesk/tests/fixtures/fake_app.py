@@ -22,11 +22,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from factordesk.api import routes_upload
 from factordesk.api.deps import AppDeps
+from factordesk.api.errors import ApiException
 from factordesk.api.main import create_app
+from factordesk.api.service import get_report_service
 from factordesk.data import factors as factors_module
 from factordesk.data.factors import FactorStatus
 from factordesk.data.prices import PriceDataError, PriceHistory
@@ -104,7 +106,46 @@ def create() -> FastAPI:
         static_dir=FRONTEND_DIST,
         load_ff6=lambda at: daily_ff6,
     )
-    return create_app(deps)
+    app = create_app(deps)
+    _add_portfolio_report(app)
+    return app
+
+
+def _add_portfolio_report(app: FastAPI) -> None:
+    """A stand-in for ``POST /api/report/portfolio`` when the application has no such route yet.
+
+    It checks the tree the way the composer's e2e test needs (at least one weighted holding, and the
+    one ticker the fake provider refuses is refused as an unknown ticker), then answers with the
+    report of the synthetic history under the portfolio's name.
+    """
+    if any(getattr(route, "path", "") == "/api/report/portfolio" for route in app.routes):
+        return
+
+    async def portfolio_report(request: Request) -> object:
+        body = await request.json()
+        tree = body.get("tree", {})
+        leaves = [
+            leaf
+            for asset_class in tree.get("root", {}).get("children", [])
+            for sub in asset_class.get("children", [])
+            for leaf in sub.get("children", [])
+        ]
+        weighted = [leaf for leaf in leaves if leaf.get("weight", 0) > 0]
+        if not weighted:
+            raise ApiException(
+                "bad_request", "The portfolio has no weight.", "Give a holding a weight above 0%."
+            )
+        for leaf in weighted:
+            if leaf.get("ticker") == UNKNOWN_TICKER:
+                raise ApiException(
+                    "unknown_ticker",
+                    f"No prices were returned for {UNKNOWN_TICKER}.",
+                    "Check the ticker symbol.",
+                )
+        report = await get_report_service(request).report("SYN", None, None, None, body.get("model", "ff6"))
+        return report.model_copy(update={"ticker": tree.get("name", "Portfolio")})
+
+    app.add_api_route("/api/report/portfolio", portfolio_report, methods=["POST"])
 
 
 def _with_mom(frame: pd.DataFrame, sd: float) -> pd.DataFrame:
