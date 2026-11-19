@@ -60,6 +60,24 @@ describe("Header", () => {
     expect(container.querySelector(".listing")?.textContent).toBe("Listed on NYSE Arca, priced in US dollars");
   });
 
+  it("links the warning count to the data notes, singular for one, nothing for none", () => {
+    const r = cloneReport();
+    r.warnings = [{ code: "short_history", message: "short" }];
+    r.quality_gate.fired = false;
+    const { container, rerender } = render(<Header report={r} downloadHref={HREF} />);
+    const link = screen.getByRole("link", { name: "1 warning" });
+    expect(link.getAttribute("href")).toBe("#notice");
+    r.warnings = [
+      { code: "short_history", message: "short" },
+      { code: "stale_factors", message: "stale" },
+    ];
+    rerender(<Header report={{ ...r }} downloadHref={HREF} />);
+    expect(screen.getByRole("link", { name: "2 warnings" }).getAttribute("href")).toBe("#notice");
+    r.warnings = [];
+    rerender(<Header report={{ ...r }} downloadHref={HREF} />);
+    expect(container.querySelector(".warn-link")).toBeNull();
+  });
+
   it("leaves out the parts Yahoo did not give", () => {
     expect(listingLine({ exchange: "NasdaqGS" })).toBe("Listed on NasdaqGS");
     expect(listingLine({ currency: "EUR" })).toBe("Priced in EUR");

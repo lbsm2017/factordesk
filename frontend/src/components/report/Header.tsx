@@ -1,6 +1,6 @@
 import { count, dateLong } from "../../format";
 import { Icon } from "../shell/icons";
-import { plural } from "./leadHelpers";
+import { noticeItems, plural } from "./leadHelpers";
 import type { ReportPanelProps } from "./types";
 import "./lead.css";
 
@@ -50,6 +50,7 @@ export function Header({ report, downloadHref }: HeaderProps) {
   const name = security.name?.trim() || null;
   const badge = security.quote_type ? (TYPE_BADGE[security.quote_type.toUpperCase()] ?? null) : null;
   const listing = listingLine(security);
+  const warnings = noticeItems(report).length;
   return (
     <header className="masthead" id="header">
       <div className="page-head">
@@ -75,6 +76,11 @@ export function Header({ report, downloadHref }: HeaderProps) {
           </a>
         </div>
         {listing ? <p className="listing">{listing}</p> : null}
+        {warnings > 0 ? (
+          <p className="warn-link">
+            <a href="#notice">{plural(warnings, "warning", "warnings")}</a>
+          </p>
+        ) : null}
       </div>
       <dl className="abar" aria-label="Analysis settings">
         <div>
