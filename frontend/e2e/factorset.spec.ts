@@ -25,26 +25,31 @@ async function europeBackend(page: Page): Promise<string[]> {
   await page.route(/\/api\/report\/SYN\/ranges/, async (route) => {
     const url = route.request().url();
     if (new URL(url).searchParams.get("factor_set") === "europe") asked.push(url);
-    await route.continue({ url: plain(url) });
+    await route.continue({ url: plain(url) }).catch(() => undefined);
   });
   await page.route(/\/api\/report\/SYN\?/, async (route) => {
     const url = route.request().url();
     const params = new URL(url).searchParams;
-    const response = await route.fetch({ url: plain(url) });
-    const body = (await response.json()) as Record<string, unknown>;
-    if (params.get("factor_set") === "europe") {
-      asked.push(url);
-      body["factor_set"] = "europe";
+    try {
+      const response = await route.fetch({ url: plain(url) });
+      const body = (await response.json()) as Record<string, unknown>;
+      if (params.get("factor_set") === "europe") {
+        asked.push(url);
+        body["factor_set"] = "europe";
+      }
+      if (params.get("ccy") === "EUR") {
+        body["currency"] = {
+          reference: "EUR",
+          fx_source: "Exchange rates: European Central Bank, euro foreign exchange reference rates.",
+          rate_source: "Euro short-term rate and EONIA: European Central Bank, ECB Data Portal.",
+          notes: ["Cash earns the euro overnight rate, not the US rate."],
+        };
+      }
+      await route.fulfill({ status: response.status(), headers: response.headers(), json: body });
+    } catch {
+      // The page gave up on this request (a switch or a new page load aborts the one in flight):
+      // its response is disposed and there is nobody left to answer.
     }
-    if (params.get("ccy") === "EUR") {
-      body["currency"] = {
-        reference: "EUR",
-        fx_source: "Exchange rates: European Central Bank, euro foreign exchange reference rates.",
-        rate_source: "Euro short-term rate and EONIA: European Central Bank, ECB Data Portal.",
-        notes: ["Cash earns the euro overnight rate, not the US rate."],
-      };
-    }
-    await route.fulfill({ response, json: body });
   });
   return asked;
 }
