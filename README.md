@@ -2,7 +2,7 @@
 
 **See what drives a stock's returns, in plain language, with the statistics one click away.**
 
-[![ci](https://github.com/lbsm2017/factordesk/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/lbsm2017/factordesk/actions/workflows/ci.yml)
+[![ci](https://github.com/lbsm2017/factordesk/actions/workflows/ci.yml/badge.svg?branch=prod)](https://github.com/lbsm2017/factordesk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)
 
