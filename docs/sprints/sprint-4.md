@@ -1,7 +1,7 @@
 # Sprint 4: European investor complete, and a better "Factor it" experience
 
-Dates: to be set by the owner (one day, after the `v0.4.0` release)
-Status: draft for the owner's review (2026-11-20).
+Dates: started 2026-11-20, right after approval
+Status: approved by the owner on 2026-11-20 ("excellent, proceed"). Running.
 Previous: [Sprint 3](sprint-3.md). Release target: `v0.5.0`.
 
 ## Context
@@ -61,6 +61,26 @@ On 2026-11-20 the owner chose the goal "European investor complete" for Sprint 4
 5. S4-6.
 
 S4-1, the Europe factors (S4-2 to S4-4) and Factor it (S4-5) are never cut.
+
+### Execution order (RICE and MoSCoW, 2026-11-20)
+
+The owner asked for easy wins first, no interruptions, and attention to dependencies. RICE = reach × impact × confidence ÷ effort (points). Reach is 0.5 to 3, impact is 0.5 to 3, and confidence is a percentage.
+
+| Item | MoSCoW | R | I | C | E | RICE | Wave |
+|---|---|---|---|---|---|---|---|
+| S4-1 Ranges honour the currency | Must | 3 | 1 | 100% | 1 | 3.0 | 1 (easy win) |
+| S4-4 Factor set UI | Must | 2 | 2 | 90% | 2 | 1.8 | 2 (needs S4-3) |
+| S4-8 Validation on real data | Should | 2 | 2 | 90% | 2 | 1.8 | 2 (needs S4-3) |
+| S4-7 Dollar term: lag or lead | Should | 1 | 1 | 80% | 1 | 0.8 | 1 (easy win) |
+| S4-5 Factor it experience | Must | 3 | 2 | 70% | 6 | 0.7 | 1 backend and mockups, 2 frontend |
+| S4-2 + S4-3 Europe factors | Must | 2 | 3 | 80% | 7 | 0.69 | 1 (long pole, starts first) |
+| S4-11 TTF data check | Could | 1 | 1 | 50% | 1 | 0.5 | 1 (easy win) |
+| S4-6 "What EUR changes" panel | Should | 1 | 1 | 90% | 2 | 0.45 | 2 |
+| S4-12 Dark theme | Could | 2 | 1 | 70% | 4 | 0.35 | 3 (after the Factor it UI, same CSS) |
+| S4-13 Hygiene | Could | 1 | 0.5 | 100% | 2 | 0.25 | 1 (small, and it must land before the Factor it UI touches the same files) |
+| S4-10 CHF cash on SARON | Could | 0.5 | 1 | 80% | 2 | 0.2 | 3 |
+
+The checkpoint is run without stopping: the coordinator approves the S4-0 mockups against the design direction, and the owner sees them at the demo, as in Sprint 3.
 
 ### Design decisions to approve with this plan
 
