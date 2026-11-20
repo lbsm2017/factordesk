@@ -343,7 +343,8 @@ class ReportService:
             frame = await self._model_frame(loaded, now, model, ctx, factor_set)
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs, ctx, factor_set)
-            inputs = await self._with_reference(inputs, ctx, loaded, now, model, factor_set)
+            inputs = await self._with_reference(inputs, ctx, loaded, now, model)
+            inputs = await self._with_us_factors(inputs, ctx, loaded, now, model, factor_set)
             inputs = await self._with_macro(inputs, ctx)
             inputs = await self._with_energy(inputs, ctx)
 
@@ -436,7 +437,8 @@ class ReportService:
             )
             frame = await self._model_frame(loaded, now, model, ctx, factor_set)
             inputs = await self._with_world_benchmark(None, ctx, factor_set)
-            inputs = await self._with_reference(inputs, ctx, loaded, now, model, factor_set)
+            inputs = await self._with_reference(inputs, ctx, loaded, now, model)
+            inputs = await self._with_us_factors(inputs, ctx, loaded, now, model, factor_set)
             inputs = await self._with_macro(inputs, ctx)
             inputs = await self._with_energy(inputs, ctx)
 
@@ -607,7 +609,7 @@ class ReportService:
         loader = self.deps.load_europe_ff6
         if loader is None:
             raise ApiException(
-                "bad_request",
+                "network",
                 "The Europe factor set is not available on this server.",
                 "Use the US factor set.",
             )
@@ -729,7 +731,6 @@ class ReportService:
         loaded: LoadedFactors,
         now: datetime,
         model: FactorModel,
-        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> SectionInputs | None:
         """``inputs`` plus what the macro and energy sections need in the EUR view: the USD/EUR
         return on the subject's calendar and the US dollar risk-free rate. The USD view is
@@ -740,9 +741,34 @@ class ReportService:
 
         from factordesk.section_hooks.context import ReferenceInput, SectionInputs
 
-        usd = await self._usd_model_frame(loaded, now, model, factor_set)
+        usd = await self._usd_model_frame(loaded, now, model)  # always the US dollar rate
         reference = ReferenceInput(lambda dates: ctx.returns("USD", dates), usd["RF"])
         return dataclasses.replace(inputs or SectionInputs(), reference=reference)
+
+    async def _with_us_factors(
+        self,
+        inputs: SectionInputs | None,
+        ctx: CurrencyContext,
+        loaded: LoadedFactors,
+        now: datetime,
+        model: FactorModel,
+        factor_set: FactorSet,
+    ) -> SectionInputs | None:
+        """``inputs`` plus the US frame, when the factor set is not the US one.
+
+        The macro, energy and world beta sections keep their US inputs: they run on a second
+        analysis sample built on the frame the US set would give for this request (converted to
+        the reference currency exactly as the US report converts it). The US set is returned as
+        it is."""
+        if factor_set == "us":
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import SectionInputs, UsFactorsInput
+
+        frame = await self._model_frame(loaded, now, model, ctx, "us")
+        us = UsFactorsInput(frame, loaded.vintage.downloaded_at)
+        return dataclasses.replace(inputs or SectionInputs(), us_factors=us)
 
     async def _with_macro(
         self, inputs: SectionInputs | None, ctx: CurrencyContext

@@ -63,6 +63,10 @@ SLOW_SECTION_SECONDS = 1.0
 
 Hook = Callable[[SectionContext], object | None]
 
+US_FACTOR_FIELDS: frozenset[str] = frozenset({"world_beta", "macro", "energy"})
+"""Sections that keep their US inputs whatever the report's factor set: they read the context
+on the US sample (``SectionContext.us_context``) when there is one."""
+
 
 @dataclass(frozen=True)
 class HookSpec:
@@ -195,7 +199,13 @@ def run_hooks(ctx: SectionContext, hooks: tuple[HookSpec, ...] = HOOKS) -> dict[
             out[spec.field] = None
             continue
         began = time.perf_counter()
-        out[spec.field] = spec.build(ctx)
+        base = ctx
+        if spec.field in US_FACTOR_FIELDS:
+            if ctx.us_unavailable:
+                out[spec.field] = None
+                continue
+            base = ctx.us_context or ctx
+        out[spec.field] = spec.build(base)
         took = time.perf_counter() - began
         if took > SLOW_SECTION_SECONDS:
             slow.append((spec.field, took))

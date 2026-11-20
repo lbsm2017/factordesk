@@ -193,3 +193,19 @@ def test_join_momentum_defaults_to_the_us_set() -> None:
     assert join_momentum(ff5, mom).attrs["factor_set"] == "us"
     with pytest.raises(ValueError, match="factor set"):
         join_momentum(ff5, mom, "asia")  # type: ignore[arg-type]
+
+
+def test_a_missing_value_sentinel_becomes_nan() -> None:
+    row = next(ln for ln in EUROPE5_MONTHLY_2020.splitlines() if ln.startswith("202003"))
+    cells = [c.strip() for c in row.split(",")]
+    text = EUROPE5_MONTHLY_2020.replace(row, ",".join([cells[0], "-99.99", *cells[2:]]))
+    frame = _parse(text, "europe5_monthly")
+    march = frame.loc[pd.Timestamp("2020-03-31")].to_numpy(dtype=np.float64)
+    assert np.isnan(march[0]) and np.isfinite(march[1:]).all()
+    assert int(frame.isna().sum().sum()) == 1
+    first = next(ln for ln in EUROPE_MOM_DAILY_APR_2020.splitlines() if ln.startswith("20200401"))
+    daily = _parse(
+        EUROPE_MOM_DAILY_APR_2020.replace(first, "20200401    ,-99.99"), "europe_mom_daily"
+    )
+    mom = daily["Mom"].to_numpy(dtype=np.float64)
+    assert np.isnan(mom[0]) and np.isfinite(mom[1:]).all() and len(mom) == 21
