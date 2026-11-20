@@ -154,6 +154,8 @@ def test_eur_ticker_report_runs_and_carries_the_currency_block(tmp_path: Any) ->
     assert eur["currency"]["fx_source"] and eur["currency"]["rate_source"]
     assert any("macro" in n.lower() for n in eur["currency"]["notes"])
     assert "macro" not in eur
+    assert any("energy" in n.lower() for n in eur["currency"]["notes"])
+    assert "energy" not in eur
     assert eur["regression"] != usd["regression"]
     # The price chart is in euros: USD price times the euro price of a dollar.
     first = pd.Timestamp(eur["price_series"]["dates"][0])
@@ -344,3 +346,33 @@ def test_upload_converts_the_record_to_the_reference_currency(
     assert mixed.status_code == 200, mixed.text
     assert mixed.json()["regression"] != eur.json()["regression"]
     assert json.loads(eur.text)["subject"]["currency"] == "EUR"
+
+
+def test_eur_portfolio_has_holdings_that_match_performance_and_tail_horizons(
+    world: World, client: ApiClient
+) -> None:
+    with_sources(world, FAKE)
+    body = eur_tree([holding(0, "AAA", 0.5), holding(1, "BBB", 0.2)], "fi_na_gov")
+    # 20% USD cash instrument, 10% unallocated (held as euro cash).
+    cash = {"id": "c0", "kind": "cash", "ticker": None, "label": "USD cash", "weight": 0.2}
+    body["root"]["children"][0]["children"].append(
+        {
+            "id": "sc",
+            "kind": "group",
+            "label": "USD Cash",
+            "library_id": "cash_usd",
+            "children": [cash],
+        }
+    )
+    response = post_tree(client, body)
+    assert response.status_code == 200, response.text
+    report = response.json()
+    holdings = report["holdings"]
+    assert holdings["status"] == "ok"
+    performance = report["performance"]["returns"]["cumulative_return"]
+    assert holdings["total_return"] == pytest.approx(performance, abs=1e-9)
+    cash_rows = {r["id"]: r["label"] for r in holdings["rows"] if r["kind"] == "cash"}
+    assert cash_rows["cash"] == "EUR cash" and cash_rows["usd_cash"].startswith("USD cash")
+    if report["tail_risk"]["by_horizon"] is not None:
+        assert report["tail_risk"]["status"] == "ok"
+    assert report["portfolio_backtest"]["unallocated_weight"] == pytest.approx(0.1)

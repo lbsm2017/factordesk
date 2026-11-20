@@ -11,6 +11,7 @@ export type TickerSuggestion = Schemas["TickerSuggestion"];
 export type TickerSuggestions = Schemas["TickerSuggestions"];
 export type AssetClassLibrary = Schemas["AssetClassLibrary"];
 export type LibraryLine = Schemas["LibraryLine"];
+export type CurrencyInfo = Schemas["CurrencyInfo"];
 export type RangeOption = Schemas["RangeOption"];
 export type RangeOptions = Schemas["RangeOptions"];
 export type RangePreset = RangeOption["preset"];

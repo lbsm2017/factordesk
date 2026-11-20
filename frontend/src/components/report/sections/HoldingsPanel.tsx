@@ -138,6 +138,13 @@ function TreeRow({ line, open, onToggle, color, noRisk }: TreeRowProps) {
   );
 }
 
+/** What a cash row holds: in the euro view the unallocated weight is euro cash and USD cash is apart. */
+function cashNote(row: HoldingRow): string {
+  if (row.id === "usd_cash") return "USD cash instruments, converted to euros";
+  if (row.label === "EUR cash") return "Any unallocated weight, held as euro cash";
+  return "USD cash instruments and any unallocated weight";
+}
+
 function PlainRow({ row, noRisk }: { row: HoldingRow; noRisk: boolean }) {
   const cash = row.kind === "cash";
   const color = assetClassColor("Cash");
@@ -152,7 +159,7 @@ function PlainRow({ row, noRisk }: { row: HoldingRow; noRisk: boolean }) {
         <div className="txt">
           <span className="nm">{row.label}</span>
           <span className="sb">
-            {cash ? "USD cash instruments and any unallocated weight" : "Trading cost of the rebalances"}
+            {cash ? cashNote(row) : "Trading cost of the rebalances"}
           </span>
         </div>
       </div>

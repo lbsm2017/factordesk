@@ -35,7 +35,7 @@ export function BacktestCard({ section, currency = "USD" }: { section: Portfolio
   ];
   // Rows that would only say "None" are left out.
   if (section.unallocated_weight > 0) {
-    rows.push(["Unallocated", `${pct(section.unallocated_weight)} held as ${currency} cash`]);
+    rows.push(["Unallocated", `${pct(section.unallocated_weight)} held as ${section.unallocated_currency ?? currency} cash`]);
   }
   if (section.n_dates_dropped > 0) {
     rows.push(["Skipped days", `${count(section.n_dates_dropped)} trading days without a full set of prices`]);

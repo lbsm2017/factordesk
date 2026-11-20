@@ -65,7 +65,7 @@ def build_holdings(ctx: SectionContext) -> HoldingsSection | None:
     # portfolio only (the backtest has one cash leaf).
     paths: dict[str, GroupPath] = {n.id: n.path for n in nodes if n.kind == "holding"}
     paths[CASH_ID] = ()
-    usd_cash = USD_CASH_LEAF in bt.target_weights.index  # the EUR view holds USD cash apart
+    usd_cash = USD_CASH_LEAF in bt.target_weights  # the EUR view holds USD cash apart
     if usd_cash:
         paths[USD_CASH_LEAF] = ()
     eur_cash = info.unallocated_currency == "EUR"
