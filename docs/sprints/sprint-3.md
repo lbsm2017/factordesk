@@ -1,7 +1,7 @@
 # Sprint 3: USD/EUR reference currency, energy factors, carry-over
 
-Dates: 2026-11-21 (one day)
-Status: approved by the owner on 2026-11-20. Scope is frozen. New requests go to the next backlog.
+Dates: planned 2026-11-21; run on the night of 2026-11-20 to 05:00 on 2026-11-21 at the owner's request
+Status: closed. Release `v0.4.0` (pending the owner's merge of the release PR). Approved by the owner on 2026-11-20.
 Previous: [Sprint 2](sprint-2.md). Backlog: [Sprint 2 backlog](sprint-2-backlog.md). Method notes: [reference currency](../research/reference-currency-and-benchmarks.md).
 Release target: `v0.4.0`.
 ## Context
@@ -51,7 +51,7 @@ Sprint 2 shipped v0.3.0: the portfolio composer and the macro section. The owner
 | Pri | Item | Pts | Model | Depends on |
 |---|---|---|---|---|
 | P0 | **S3-0 Checkpoint pack.** <br>• A currency formula sheet.<br>• A hedge table per library line.<br>• Mockups of the USD/EUR switch, the holdings table and the compact tail panel.<br>**The owner approves all of this before any build.** | 2 | coordinator + Sonnet | — |
-| P0 | **S3-1 Rates and FX data.**<br>• EUR/USD from FRED `DEXUSEU` (from 1999), using the existing `data/fred.py`.<br>• The EUR overnight rate: €STR from the ECB Data Portal, with EONIA before Oct 2019.<br>• A compounded EUR cash index.<br>• Daily cache and a source credit. If a source is down, the report shows a notice and does not wait or fail. | 3 | Sonnet; Opus review | — |
+| P0 | **S3-1 Rates and FX data.**<br>• EUR/USD from FRED `DEXUSEU` (from 1999), using the existing `data/fred.py`. *(Superseded on 2026-11-20 by the owner: ECB euro reference rates first, FRED H.10 as fallback, for 10 currencies.)*<br>• The EUR overnight rate: €STR from the ECB Data Portal, with EONIA before Oct 2019.<br>• A compounded EUR cash index.<br>• Daily cache and a source credit. If a source is down, the report shows a notice and does not wait or fail. | 3 | Sonnet; Opus review | — |
 | P0 | **S3-2 Currency engine.**<br>• `fx_convert`.<br>• A synthetic hedge: `R_local + (r_ref − r_local)·days/360`, using the previous day's rates.<br>• When the reference currency is USD, the engine changes nothing. | 3 | Sonnet; Opus review | S3-1 |
 | P0 | **S3-3 Factors in EUR.**<br>• Market: `(1+Mkt_usd)(1+f) − 1 − RF_eur`.<br>• Long-short factors: `(r_L − r_S)(1+f)`.<br>• RF becomes the EUR rate.<br>• This covers CAPM, FF3, FF5 and FF6, daily and monthly. | 2 | Sonnet; Opus review | S3-2 |
 | P0 | **S3-4 Subjects in EUR.**<br>• Tickers: USD-listed and EUR-listed tickers (Yahoo currency EUR) are accepted in both views. Other currencies are still refused.<br>• Portfolios: each sleeve is converted. Cash lines use the EUR rate. USD bond lines are hedged as the S3-0 table says.<br>• Uploads: the user declares the record's currency (USD or EUR) and it is converted.<br>• Cache keys include the currency. | 4 | Sonnet; Opus review | S3-2 |
@@ -91,7 +91,7 @@ The currency core (S3-1 to S3-5) is never cut.
 1. **The USD view is unchanged.**
    - The golden ticker test stays the same.
    - The `reference_currency` field appears only when the currency is not USD, so the schema stays "4".
-2. **FX source.** FRED `DEXUSEU` (noon New York rate). It reuses the FRED client. Missing days carry the previous rate forward. The EUR view starts in 1999-01.
+2. **FX source.** FRED `DEXUSEU` (noon New York rate). It reuses the FRED client. Missing days carry the previous rate forward. The EUR view starts in 1999-01. *(Superseded on 2026-11-20: ECB euro reference rates first, FRED H.10 as fallback; a fixing carries at most 7 days.)*
 3. **EUR rate.** €STR from Oct 2019. Before that, EONIA as it was published: the real overnight rate of the time, with no adjustment. Accrual uses ACT/360.
 4. **Hedging in the EUR view.**
    - Bond lines with only USD underlying (US Treasuries, US investment grade, US high yield, TIPS, EMB) are hedged to EUR.
@@ -172,3 +172,74 @@ Each lane works in a manual worktree, `../factordesk-wt/<lane>`, and merges dire
   - The Balanced SAA holdings table: group totals tie out.
 - The owner gets the screenshots before the release PR.
 
+## What shipped
+
+| Item | What |
+|---|---|
+| S3-0 Checkpoint pack | Mockups of the currency switch, holdings table and compact tail panel ([docs/design/sprint-3](../design/sprint-3/)). The coordinator approved them and the hedge table, because the owner asked the sprint to run without waiting. |
+| S3-1 Rates and FX | ECB euro reference rates for 10 currencies from 1999, with FRED H.10 as fallback. The EUR overnight rate is €STR from October 2019 and EONIA before that, with a compounded ACT/360 cash index. An outage is remembered for the whole host for the day, and a fixing carries at most 7 days. |
+| S3-2 to S3-4 Currency engine | Every subject (ticker, upload, portfolio) can be shown in EUR. Each asset is converted daily before weighting. USD-only bond lines are hedged as R − RF + c_eur on the local return, the EUR cash line earns the euro rate, and unallocated weight is held as EUR cash. Factors are converted to EUR. Listings in the major currencies are accepted, with GBp divided by 100. The price audit runs on the prices as listed. The USD view is byte-identical. |
+| S3-5 Currency UI | USD / EUR switch (URL `ccy=EUR` and remembered), a "Figures in EUR" pill, currency codes on key figures, hedge badges in the composer, the record currency on uploads, and source credits. |
+| S3-6 and S3-8 Energy & carbon | A spike ([note](../research/energy-factor-spike.md)), then a new section with market + Brent + Henry Hub, and a carbon model (KRBN, from Aug 2020, 2-year minimum). It shows VIF, a gas robustness fit without the 5 largest gas moves, and soft fail. The macro correlation is computed once. |
+| S3-7 Tail-risk fixes | Cornish-Fisher CVaR is n/a when its VaR is n/a. A "far from historical" flag scales with volatility. "Based on N" counts the analysed sample. |
+| S3-9 Macro and energy in EUR | Traded legs are converted. The dollar leg is the USD/EUR return. Oil and gas stay as USD log changes. |
+| S3-10 Holdings table | Target, end, return contribution and risk share, rolled up through the tree on exactly the analysed days. It is a plain accessible table. |
+| S3-11 Portfolio CSV | Export and import with a lossless round trip, line-numbered errors, and no silent overwrite. |
+| S3-12 Tail risk v2 | Compact layout and a daily / monthly / quarterly switch on whole calendar periods, with no square-root-of-time scaling. |
+| S3-13 Hygiene | A bundle budget enforced in CI (503 kB of a 540 kB budget). Upload messages capped and line-numbered, and a missing file returns 400. A notice when the FF5 and Mom stamps differ. The lean floor in the verdict. |
+| Owner request | The Backtest card drops "Ends when", and rows that would say only "None". |
+
+## Owner decisions during the sprint (2026-11-20)
+
+- The reference currency became the headline instead of portfolio depth. The carbon proxy is KRBN. TTF gas comes later.
+- Portfolio performance is in the chosen currency, with each asset converted daily at its own rate, for all major listing currencies.
+- FX comes from the ECB first.
+- The sprint runs in auto mode to 05:00. The coordinator approves the checkpoint.
+- The Backtest card filler rows were removed.
+
+## Validation (real data, 2026-11-20)
+
+All 7 checks pass ([note](../research/sprint-3-validation.md), [script](../../scripts/validate_sprint3.py)):
+
+- SPY in EUR against SXR8.DE: quarterly correlation 0.990 and a return gap of +0.30%/yr. Monthly is 0.972, because of close-time differences.
+- Hedged IEF in EUR tracks IEF + (c_eur − RF) to 0 bp. EUR cash in 2023 is 3.28%.
+- XLE's oil sensitivity is +0.21 (t 5.7). XLU shows no gas or carbon sensitivity at daily frequency.
+- Balanced SAA holdings tie out in USD and EUR.
+- The SPY USD regression is identical to v0.3.0.
+- Tail risk computes on every horizon.
+
+Localhost demo screenshots were reviewed. The demo found a false price-audit error in the EUR view, garbled credits, small-beta axes and repeated tickers. All of them were fixed before release.
+
+## Retro
+
+**Went well**
+
+- Seven independent Opus reviews caught real defects before merge:
+  - a stale cache gave silent 0% FX returns;
+  - the "far from historical" flag misfired on low-volatility subjects;
+  - the holdings window counted excluded days;
+  - the treegrid had no keyboard model;
+  - the hedge was applied to returns already converted to EUR.
+- Real-data validation confirmed the hedge bug independently and measured the fix.
+- The mockup-first checkpoint again gave builds that matched the design.
+
+**Problems and fixes**
+
+| Problem | Fix |
+|---|---|
+| Five lanes running full suites overloaded the PC (runs of 10–40 min) | Lanes run targeted tests plus the style and token tests (`src/test`). The full suites run in CI after merge. |
+| Each push to dev cancelled the running CI, so no run completed for a while | Batch merges near the end, and confirm one green run before the release. |
+| CI caught a format slip and a 13 px font that targeted tests missed | Briefs include `ruff format --check backend` and `vitest run src/test`. |
+| A known review nit (audit on converted prices) turned out to be a release blocker on real data | Run the real-data demo before deciding to defer a review finding. |
+| Agents linked worktrees to the main checkout's packages | Remove links before deleting a worktree. Briefs ask for `npm ci` and `uv sync` in the worktree. |
+
+**Backlog from this sprint**
+
+- The ranges endpoint ignores `ccy`.
+- The dollar-lag term in EUR (owner question: a lead term?).
+- CHF cash on SARON.
+- TTF gas.
+- The Europe factor set.
+- Dark theme (no dark styles exist yet).
+- The "What EUR changes" side panel from the mockup.
+- Settings module, per-holding CVaR, factor families and FF6 for the FF5-only sections, carried from the plan.
