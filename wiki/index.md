@@ -1,6 +1,6 @@
 # factordesk wiki
 
-Last updated 2026-11-18. This is the project's knowledge base. Its main purpose is to record each decision in plain English: what we decided, why, how it works, and what we gave up. Pages date their claims, and facts that depend on `docs/` link to the source document instead of copying it.
+Last updated 2026-11-20. This is the project's knowledge base. Its main purpose is to record each decision in plain English: what we decided, why, how it works, and what we gave up. Pages date their claims, and facts that depend on `docs/` link to the source document instead of copying it.
 
 ## Start here
 
@@ -20,6 +20,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) [Decided-pending-implementation]: a few tickers at a time, spaced requests, slow retries and a stop switch, because Yahoo publishes no rate limit.
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md) [Proposed]: regional factor files, US dollar conversion and an optional currency regressor.
 - [USD or EUR reference currency](decision-reference-currency.md) [Decided-pending-implementation]: every report in USD or EUR; each asset converted daily at ECB rates; USD-only bond lines hedged in the euro view (2026-11-20).
+- [A Europe factor set next to the US one](decision-europe-factor-set.md) [Decided; built on branches, not on dev as of 2026-11-20]: Ken French Developed Europe factors chosen by the user, default US; macro, energy and world beta keep the US factors; validation on real data (2026-11-20).
 
 ### Statistics
 
@@ -42,6 +43,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Report density, width cap and range controls](decision-report-density-and-range-controls.md) [Decided-pending-implementation]: a narrow, less dense report; range and ticker pickers belong to the dashboard.
 - [Dashboard server and interface](decision-dashboard-server-and-interface.md) [Decided-pending-implementation]: FastAPI server plus one scrolling React page with ticker search and range chips; plain CSS tokens; static report stays as export.
 - [Dashboard v2: outcome first with a sidebar](decision-dashboard-v2.md) [Decided-pending-implementation]: navy sidebar with controls and section links, a plain verdict sentence instead of the formula, a Show statistics switch, company name, performance and a quick world beta (specified 2026-11-18, not built).
+- [Factor it shows real progress](decision-factor-it-progress.md) [Decided; built on branches, not on dev as of 2026-11-20]: real progress steps over server-sent events, a placeholder page that matches the report, and a failed re-run that keeps the old report under a banner.
 
 ### Engineering and process
 
