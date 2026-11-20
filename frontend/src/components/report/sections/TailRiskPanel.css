@@ -1,14 +1,53 @@
-/* Tail risk panel: a plain table in the style of the drawdown table; tokens only. */
-.tr-wrap { overflow-x: auto; overflow-y: hidden; }
-.tr-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.tr-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-3) 6px 0; border-bottom: 1px solid var(--border); }
-.tr-table tbody th { font-size: var(--fs-2); font-weight: 560; color: var(--ink); padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: top; }
-.tr-table td { padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
-.tr-value { display: block; font-weight: 600; }
-.tr-note { display: block; font-size: var(--fs-1); color: var(--ink-2); }
-.tr-flag { display: block; font-size: var(--fs-1); color: var(--caution); }
-.tr-na { display: block; font-weight: 600; color: var(--ink-2); }
+/* Tail risk panel: one line per method and level, the band as a whisker and the estimate as a dot.
+   Layout of the approved mockup (docs/design/sprint-3/3-tail-risk-panel.html); tokens only. */
+#tail-risk .panel-head > .pm { margin-left: 0; }
+#tail-risk .panel-head > .seg { margin-left: auto; }
+
+.tr-group { margin-top: var(--s-5); }
+.tr-group:first-child { margin-top: var(--s-4); }
+.tr-lines .tr-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s-3); padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
+.tr-lines .tr-head h3 { margin: 0; font-size: var(--fs-sub); }
+.tr-what { color: var(--ink-2); font-size: var(--fs-cap); }
+.tr-scale { margin-left: auto; color: var(--ink-2); font-size: var(--fs-cap); }
+.tr-line { padding: 10px 0 11px; border-bottom: 1px solid var(--grid); }
+.tr-main { display: grid; grid-template-columns: 148px 72px minmax(0, 1fr) 132px; column-gap: var(--s-4); align-items: center; min-height: 32px; font-variant-numeric: tabular-nums; }
+.tr-badge { display: inline-flex; align-items: center; justify-self: start; height: 26px; padding: 0 10px; border: 1px solid var(--control-line); border-radius: var(--r-control); background: var(--surface); font-size: var(--fs-cap); font-weight: 600; color: var(--ink); white-space: nowrap; }
+.tr-v { font-size: var(--fs-sub); font-weight: 600; text-align: right; }
+.tr-v.na { color: var(--ink-2); }
+.tr-r { font-size: var(--fs-cap); color: var(--ink-2); text-align: right; white-space: nowrap; }
+.tr-note { margin: 4px 0 0 calc(148px + var(--s-4)); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: var(--fs-cap); color: var(--ink-2); }
+.tr-flag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--r-control); background: var(--caution-50); color: var(--caution); font-size: var(--fs-cap); font-weight: 600; }
+.tr-flag .icon { width: 14px; height: 14px; }
+.tr-why { max-width: 70ch; }
+.tr-gap { margin-top: var(--s-4); color: var(--ink-2); max-width: 70ch; }
+
+/* whisker: the estimate is the dot, the 90% bootstrap band is the bar with end caps */
+.tr-wh { position: relative; height: 24px; }
+.tr-wh::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 1px; background: var(--grid); }
+.tr-band { position: absolute; top: 11px; height: 2px; background: var(--ink); border-radius: var(--r-mark); }
+.tr-band::before, .tr-band::after { content: ""; position: absolute; top: -5px; width: 2px; height: 12px; background: var(--ink); border-radius: var(--r-mark); }
+.tr-band::before { left: 0; }
+.tr-band::after { right: 0; }
+.tr-dot { position: absolute; top: 6px; width: 12px; height: 12px; margin-left: -6px; border-radius: var(--r-round); background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); }
+.tr-wh.ind .tr-dot { background: var(--surface); border: 2px solid var(--caution); box-shadow: none; }
+.tr-wh.na::before { background: none; border-top: 1px dashed var(--control-line); height: 0; }
+
+.tr-legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); margin-top: var(--s-4); font-size: var(--fs-cap); color: var(--ink-2); }
+.tr-legend li { display: inline-flex; align-items: center; gap: 8px; }
+.tr-lg-dot { width: 12px; height: 12px; border-radius: var(--r-round); background: var(--accent); }
+.tr-lg-dot.ind { background: var(--surface); border: 2px solid var(--caution); }
+.tr-lg-band { position: relative; width: 28px; height: 2px; background: var(--ink); }
+.tr-lg-band::before, .tr-lg-band::after { content: ""; position: absolute; top: -5px; width: 2px; height: 12px; background: var(--ink); }
+.tr-lg-band::before { left: 0; }
+.tr-lg-band::after { right: 0; }
 
 @media screen and (max-width: 719px) {
-  .tr-table td, .tr-table tbody th { padding-right: var(--s-2); }
+  .tr-main { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "badge val" "wh wh" "rng rng"; row-gap: 6px; }
+  .tr-main .tr-badge { grid-area: badge; }
+  .tr-main .tr-v { grid-area: val; }
+  .tr-main .tr-wh { grid-area: wh; }
+  .tr-main .tr-r { grid-area: rng; text-align: left; }
+  .tr-note { margin-left: 0; }
+  .tr-scale { margin-left: 0; flex-basis: 100%; }
+  #tail-risk .panel-head > .seg { margin-left: 0; flex-basis: 100%; }
 }
