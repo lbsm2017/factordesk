@@ -178,7 +178,7 @@ Use only `docs/specs/shrunk-betas.md`, `docs/methodology.md` (M0.5 HAC, M2 align
 
 ### 7.1 Inputs and where they are cached
 
-All in this worktree, `C:\Users\loren\Research\factordesk-wt\feat-shrunk-betas\data\` (gitignored, never committed). Read the parquet files directly with pandas; do not call the factordesk loaders.
+All in the worktree's `data/` folder (gitignored, never committed). Read the parquet files directly with pandas; do not call the factordesk loaders.
 
 | File | Content | SHA-256 of the parquet file |
 | --- | --- | --- |

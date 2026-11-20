@@ -5,9 +5,16 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 ## Open questions
 
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
-- The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 - Should the euro view's dollar term use a lead? A lead is a negative shift that the no look-ahead rule forbids; options are keep the rule, allow a labelled lead, or use a fixing nearer the US close. Owner decision pending (2026-11-20, [spike](../docs/research/dollar-lag-lead-spike.md)).
 - Does the owner accept the re-run error banner that keeps the old report on screen? The coordinator accepted it on 2026-11-20 and flagged it for the demo; it reverses the earlier rule ([Factor it progress](decision-factor-it-progress.md)).
+
+## 2026-11-20 (Going public)
+
+- New page [Making the repository public](decision-going-public.md): the name and secrets scan over the whole history, the data terms of FRED, the ECB and the SNB, and the publish checklist.
+- New page [A noncommercial licence, with commercial use by consent](decision-noncommercial-license.md): the licence changes from MIT to the factordesk Noncommercial License 1.0; who uses it free, who must ask, how the text was made and what it costs.
+- [Open source under the MIT license](decision-open-source-mit-license.md) is marked superseded, with a dated update: dependency licence audit, `THIRD_PARTY_NOTICES.md`, the named creator.
+- Index: the Europe factor set and Factor it progress are now on dev (v0.5.0).
+- Open question closed: the README was rewritten for v0.5.0, with the not-affiliated note.
 
 ## 2026-11-20 (Sprint 4 wiki, S4-9)
 

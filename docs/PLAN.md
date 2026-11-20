@@ -2,7 +2,7 @@
 
 ## Context
 
-Greenfield project in `c:\Users\loren\Research\factors` (empty, not a git repo). The goal is a terminal-style dashboard, "factordesk", where you type a ticker and press **Factor it**. It downloads daily prices (yfinance) and the public Fama-French 5-factor daily data (Ken French Data Library), regresses the stock on the factors, and shows:
+Greenfield project in an empty folder (not yet a git repo). The goal is a terminal-style dashboard, "factordesk", where you type a ticker and press **Factor it**. It downloads daily prices (yfinance) and the public Fama-French 5-factor daily data (Ken French Data Library), regresses the stock on the factors, and shows:
 
 1. Daily price line chart with shaded regions where each factor was dominant.
 2. EDA panels: average beta, positive/negative betas, contribution to return, contribution to risk, cointegrations.
@@ -11,7 +11,7 @@ A second button downloads or refreshes the factor data, and it also runs automat
 
 **Environment findings.**
 - Node 26 and npm are installed.
-- **Python is not installed.** Only the Windows Store stub exists. `uv` (`C:\Users\loren\.local\bin\uv.exe`) and `winget` are present, so `uv` can provision Python 3.12 without admin rights.
+- **Python is not installed.** Only the Windows Store stub exists. `uv` (in the user's `.local\bin` folder) and `winget` are present, so `uv` can provision Python 3.12 without admin rights.
 - Python is required: statsmodels gives HAC regression, Engle-Granger and Johansen tests.
 
 **Decisions made (your answers + defaults):**
