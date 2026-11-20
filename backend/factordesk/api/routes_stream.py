@@ -26,9 +26,10 @@ from fastapi.responses import StreamingResponse
 from factordesk import progress
 from factordesk.api.errors import ApiException, check_ticker, to_api_exception
 from factordesk.api.portfolio_models import PortfolioTree
-from factordesk.api.routes_report import Ccy, End, Model, Preset, Service, Start
+from factordesk.api.routes_report import Ccy, End, Factors, Model, Preset, Service, Start
 from factordesk.api.routes_upload import _too_large  # pyright: ignore[reportPrivateUsage]
 from factordesk.api.runtime import get_runtime
+from factordesk.data.french import FactorSet
 from factordesk.data.upload import MAX_UPLOAD_BYTES
 from factordesk.report.schema import (
     ApiErrorEvent,
@@ -144,12 +145,15 @@ async def stream_report(
     end: End = None,
     model: Model = "ff5",
     ccy: Ccy = "USD",
+    factor_set: Factors = "us",
 ) -> EventStreamResponse:
     """Progress and result of ``GET /api/report/{ticker}``, as server-sent events."""
     plan = progress.plan_of(fx=ccy == "EUR")
 
     async def run() -> FactorReport:
-        return await service.report(check_ticker(ticker), preset, start, end, model, ccy)
+        return await service.report(
+            check_ticker(ticker), preset, start, end, model, ccy, factor_set
+        )
 
     return _stream(_events(plan, run, ticker.upper()))
 
@@ -163,7 +167,9 @@ async def stream_portfolio_report(
     end: End = None,
     model: Model = "ff6",
 ) -> EventStreamResponse:
-    """Progress and result of ``POST /api/report/portfolio``, as server-sent events."""
+    """Progress and result of ``POST /api/report/portfolio``, as server-sent events.
+
+    The factor set is the tree's ``factor_set`` field, as for the plain endpoint."""
     plan = progress.plan_of(fx=tree.reference_currency == "EUR")
 
     async def run() -> FactorReport:
@@ -189,6 +195,10 @@ async def stream_upload_report(
     ccy: Annotated[
         ReferenceCurrency, Form(description="Reference currency of the report: USD or EUR.")
     ] = "USD",
+    factor_set: Annotated[
+        FactorSet,
+        Form(description="Regional Fama-French factor set: us (default) or europe."),
+    ] = "us",
 ) -> EventStreamResponse:
     """Progress and result of ``POST /api/report/upload``, as server-sent events.
 
@@ -206,7 +216,15 @@ async def stream_upload_report(
 
     async def run() -> FactorReport:
         return await runtime.run(
-            build_upload_report, raw, name, gross_net, runtime, model, record_currency, ccy
+            build_upload_report,
+            raw,
+            name,
+            gross_net,
+            runtime,
+            model,
+            record_currency,
+            ccy,
+            factor_set,
         )
 
     return _stream(_events(plan, run))
