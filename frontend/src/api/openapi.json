@@ -751,7 +751,7 @@
     "/api/report/{ticker}/ranges": {
       "get": {
         "summary": "Get Ranges",
-        "description": "Availability of every range preset for this ticker, with the reason when one is short.\n\nThe presets follow the dates of the chosen factor set (the Europe files start in 1990).",
+        "description": "Availability of every range preset for this ticker, with the reason when one is short.\n\n``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices\nleaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).\nThe presets follow the dates of the chosen factor set (the Europe files start in 1990).",
         "operationId": "get_ranges_api_report__ticker__ranges_get",
         "parameters": [
           {
@@ -762,6 +762,22 @@
               "type": "string",
               "title": "Ticker"
             }
+          },
+          {
+            "name": "ccy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "USD",
+                "EUR"
+              ],
+              "type": "string",
+              "description": "Reference currency of every figure: USD (default) or EUR.",
+              "default": "USD",
+              "title": "Ccy"
+            },
+            "description": "Reference currency of every figure: USD (default) or EUR."
           },
           {
             "name": "factor_set",
@@ -2177,7 +2193,10 @@
         "properties": {
           "reference": {
             "type": "string",
-            "const": "EUR",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
             "title": "Reference",
             "description": "Currency of every figure in the report."
           },
@@ -2203,7 +2222,7 @@
               }
             ],
             "title": "Rate Source",
-            "description": "Source credit of the euro cash rate (overnight rate); None when not used."
+            "description": "Source credit of the overnight rates used (euro cash rate, SARON); None when not used."
           },
           "notes": {
             "items": {
@@ -2223,7 +2242,7 @@
           "notes"
         ],
         "title": "CurrencyInfo",
-        "description": "The reference currency of a report that is not in US dollars (written only for those)."
+        "description": "The reference currency, its exchange-rate and rate sources, and notices. Written for a\nreport that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON."
       },
       "DataInfo": {
         "properties": {
@@ -3146,7 +3165,7 @@
                 "type": "null"
               }
             ],
-            "description": "Reference currency of the report when it is not US dollars; absent (not null) for a USD report."
+            "description": "Reference currency of the report when it is not US dollars, or a USD portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report."
           },
           "generated_at": {
             "type": "string",
