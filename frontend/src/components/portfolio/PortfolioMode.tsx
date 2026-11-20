@@ -16,6 +16,8 @@ import { remainder, totalWeight } from "../../portfolio/tree";
 import type { PortfolioTree } from "../../portfolio/tree";
 import { usePortfolioStore } from "../../portfolio/usePortfolioStore";
 import type { Currency } from "../../state/currency";
+import { useFactorSetNote } from "../../state/factorSetNote";
+import type { FactorSet } from "../../state/factorSet";
 import { runAnnouncement, useClearFinishedRun, useReveal, useRunVisible } from "../../state/runUi";
 import type { UrlState } from "../../state/url";
 import { StatsSwitch } from "../controls/StatsSwitch";
@@ -38,6 +40,9 @@ export interface PortfolioModeProps {
   /** The effective reference currency (URL, stored choice or USD) and its setter. */
   currency: Currency;
   onCurrency: (currency: Currency) => void;
+  /** The factor set of the page (URL `fs`) and its setter. */
+  factorSet: FactorSet;
+  onFactorSet: (factorSet: FactorSet) => void;
   onCommit: (patch: Partial<UrlState>) => void;
 }
 
@@ -53,7 +58,7 @@ function allocationText(tree: PortfolioTree, currency: Currency): string {
   return rest > 0 ? `${fmt(invested)} + ${fmt(rest)} ${currency} cash` : `${fmt(invested)} allocated`;
 }
 
-export function PortfolioMode({ state, currency, onCurrency, onCommit }: PortfolioModeProps) {
+export function PortfolioMode({ state, currency, onCurrency, factorSet, onFactorSet, onCommit }: PortfolioModeProps) {
   const store = usePortfolioStore();
   const library = useLibrary();
   const run = usePortfolioReport();
@@ -68,6 +73,12 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
   const folded = ran !== null && active !== null && ran.id === active.id;
   const report = folded ? ran.report : undefined;
   const pending = run.isPending;
+  // The polite sentence for a factor set change, said until the first step of the new run speaks.
+  const [setNote, noteSet] = useFactorSetNote(pending);
+  const chooseFactorSet = (next: FactorSet) => {
+    noteSet(next);
+    onFactorSet(next);
+  };
   const rerun = pending && folded;
 
   // The steps of the run, the page that shows them and the reveal of the report that arrives.
@@ -81,6 +92,7 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
     tree,
     model: state.model,
     currency,
+    factorSet,
     range: state.range,
     start: state.start,
     end: state.end,
@@ -98,13 +110,15 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
   // A model or currency change re-runs the report on screen (the result is not cached).
   const lastModel = useRef(state.model);
   const lastCurrency = useRef(currency);
+  const lastSet = useRef(factorSet);
   useEffect(() => {
-    if (lastModel.current === state.model && lastCurrency.current === currency) return;
+    if (lastModel.current === state.model && lastCurrency.current === currency && lastSet.current === factorSet) return;
     lastModel.current = state.model;
     lastCurrency.current = currency;
+    lastSet.current = factorSet;
     if (ran !== null && !run.isPending) execute(ran.id, ran.tree);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.model, currency]);
+  }, [state.model, currency, factorSet]);
 
   // Focus follows the view: the summary after a run, the heading after Edit.
   const wasFolded = useRef(false);
@@ -136,9 +150,19 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
   const error = run.isError && !folded ? toApiError(run.error) : null;
   const rerunError = run.isError && folded ? toApiError(run.error) : null;
 
+  const stepSentence = runAnnouncement(pending, progress, run.data !== undefined ? run.data.ticker : null);
+  const announcement = stepSentence === "" && pending ? setNote : stepSentence;
+
   const sidebar = (
     <>
-      <ModeSwitch mode={state.mode} onSelect={(mode) => onCommit({ mode })} currency={currency} onCurrency={onCurrency} />
+      <ModeSwitch
+        mode={state.mode}
+        onSelect={(mode) => onCommit({ mode })}
+        currency={currency}
+        onCurrency={onCurrency}
+        factorSet={factorSet}
+        onFactorSet={chooseFactorSet}
+      />
       <PortfolioSidebar
         store={sidebarStore}
         ready={library.isSuccess}
@@ -287,8 +311,8 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
 
   return (
     <>
-      <Shell sidebar={sidebar} report={report} ticker={active?.tree.name ?? null} currency={currency}>
-        <RunAnnouncer text={runAnnouncement(pending, progress, run.data !== undefined ? run.data.ticker : null)} />
+      <Shell sidebar={sidebar} report={report} ticker={active?.tree.name ?? null} currency={currency} factorSet={factorSet}>
+        <RunAnnouncer text={announcement} />
         {main}
       </Shell>
       <UndoToast deleted={store.state.deleted} onUndo={store.undo} onDismiss={store.dismissUndo} />

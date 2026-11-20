@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { flushSync } from "react-dom";
 import type { FactorReport } from "../../api/types";
 import type { Currency } from "../../state/currency";
+import type { FactorSet } from "../../state/factorSet";
 import "../../styles/shell.css";
 import { Icon, Mark } from "./icons";
 import { Sidebar } from "./Sidebar";
@@ -16,6 +17,8 @@ export interface ShellProps {
   ticker?: string | null;
   /** The reference currency; a small chip in the phone top bar shows it without opening the drawer. */
   currency?: Currency;
+  /** The factor set; a second chip appears in the phone top bar for the Europe set only. */
+  factorSet?: FactorSet;
   /** The page's `<main>`; every report panel is a direct child of it. */
   children: ReactNode;
 }
@@ -29,7 +32,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
  * the sidebar is a drawer opened from the top bar: focus moves into it and is kept there, Escape
  * or the close button closes it, and focus returns to the menu button.
  */
-export function Shell({ sidebar, report, ticker = null, currency, children }: ShellProps) {
+export function Shell({ sidebar, report, ticker = null, currency, factorSet, children }: ShellProps) {
   const [open, setOpen] = useState(false);
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
   const aside = useRef<HTMLElement>(null);
@@ -104,10 +107,11 @@ export function Shell({ sidebar, report, ticker = null, currency, children }: Sh
           <Mark />
           <span translate="no">factordesk</span>
         </span>
-        {ticker || currency ? (
+        {ticker || currency || factorSet === "europe" ? (
           <p className="where" translate="no">
             {ticker}
             {currency ? <span className={currency === "EUR" ? "ccy-chip eur" : "ccy-chip"}>{currency}</span> : null}
+            {factorSet === "europe" ? <span className="set-chip">Europe</span> : null}
           </p>
         ) : null}
       </header>

@@ -232,7 +232,8 @@ export function SummaryPanel({ report }: ReportPanelProps) {
       label: r.label.replace("five-factor", `${countWord(k)}-factor`),
     }));
   const currency = currencyOf(report);
-  const notes = currency?.reference === "EUR" ? (currency.notes ?? []).filter((n) => n.trim() !== "") : [];
+  const currencyNotes = currency?.reference === "EUR" ? (currency.notes ?? []).filter((n) => n.trim() !== "") : [];
+  const europe = report.factor_set === "europe";
   const { actual_start: start, actual_end: end } = report.data;
   const period = start && end ? `${dateLong(start)} to ${dateLong(end)}. ` : "";
   const reasons = [...(perf.reason ? [perf.reason] : []), ...model.reasons];
@@ -253,14 +254,24 @@ export function SummaryPanel({ report }: ReportPanelProps) {
         {v.hedge ? <span className="hedge"> {v.hedge}</span> : null}
       </p>
       <DataNotes report={report} />
-      {notes.length > 0 ? (
+      {currencyNotes.length > 0 ? (
         <ul className="cur-notes" aria-label="Currency notes">
-          {notes.map((n) => (
+          {currencyNotes.map((n) => (
             <li key={n}>
               <Icon name="info" />
               <span>{n}</span>
             </li>
           ))}
+        </ul>
+      ) : null}
+      {europe ? (
+        <ul className="cur-notes" aria-label="Factor set note">
+          <li>
+            <Icon name="info" />
+            <span>
+              Factors are the Fama-French <b>Developed Europe</b> set: five factors plus momentum, from 1990.
+            </span>
+          </li>
         </ul>
       ) : null}
       <div className="sum-tables">
