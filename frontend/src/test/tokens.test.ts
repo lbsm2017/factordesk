@@ -125,10 +125,10 @@ describe("design tokens (prototype v4a)", () => {
     expect(contrast(resolved[fg] as string, resolved[bg] as string)).toBeGreaterThanOrEqual(3);
   });
 
-  it("is light only: no dark set, no theme attribute, no OS colour-scheme query", () => {
-    expect(css).not.toMatch(/prefers-color-scheme/);
-    expect(css).not.toMatch(/data-theme/);
-    expect(css).toMatch(/color-scheme:\s*light/);
+  it("is light as the base, with a dark set under data-theme and under the system setting", () => {
+    expect(ruleBody(css, ":root {")).toMatch(/color-scheme:\s*light/);
+    expect(css).toMatch(/prefers-color-scheme: dark/);
+    expect(css).toMatch(/data-theme="dark"/);
   });
 
   it("keeps every type size at 14 px or more", () => {
