@@ -75,6 +75,10 @@
   --ac-comm: #A8780A;
   --ac-cash: #6B7A99;
   --ac-other: #7A5C4B;
+  /* tail risk method identity, in the tail risk panel only: Historical and Forecast. Neither is the
+     sign pair or the factor set; both bars are also named in the legend and the tooltip. */
+  --m-hist: #2B54B8;
+  --m-fc: #C27A00;
   /* names kept from rev 2 so the panel stylesheets read the new values */
   --border: var(--line);
   --focus: var(--accent);
@@ -183,6 +187,9 @@
     --ac-comm: #D6A33C;
     --ac-cash: #909DBA;
     --ac-other: #B38F7B;
+    /* tail risk method identity */
+    --m-hist: #6F9BF5;
+    --m-fc: #F2A93B;
   }
 }
 
@@ -247,6 +254,9 @@
     --ac-comm: #D6A33C;
     --ac-cash: #909DBA;
     --ac-other: #B38F7B;
+    /* tail risk method identity */
+    --m-hist: #6F9BF5;
+    --m-fc: #F2A93B;
   }
 }
 

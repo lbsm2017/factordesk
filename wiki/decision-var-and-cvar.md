@@ -39,6 +39,7 @@ Every report shows how much could be lost on a bad day or month, using three met
 
 - 2026-11-20: the tail sample became exactly the analysed sample (the same rows as every other section), so multi-day gap returns and other rows the analysis excluded are no longer in it.
 - 2026-11-20: tail risk now has three horizons: daily, monthly and quarterly. A monthly or quarterly figure uses non-overlapping returns compounded over complete calendar months or quarters of the same days, never a square-root-of-time scaling. Uploaded monthly records get monthly and quarterly only. The same minimum-tail rule applies, so quarterly 99% is often n/a. The panel shows one line per method and level, with the band as a whisker and a Daily | Monthly | Quarterly switch.
+- 2026-11-20: the panel became one compact grouped chart on a single shared scale: a VaR group and a CVaR group, one row per level (95% first), each with two thin bars, Historical and Forecast. Forecast is the Cornish-Fisher figure, or the Gaussian figure with a small Gaussian tag where Cornish-Fisher is n/a. The 90% band is a soft overlay on the bar end, the value is printed at the bar end, and an n/a figure is a short muted marker with its reason in a tooltip. Gaussian stays in "How this is computed" and in the table that screen readers get. Colour in this panel marks the two bars only, never the sign.
 
 ## What would change our mind
 
