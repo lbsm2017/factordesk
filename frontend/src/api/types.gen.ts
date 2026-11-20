@@ -161,6 +161,8 @@ export interface paths {
         /**
          * Get Ranges
          * @description Availability of every range preset for this ticker, with the reason when one is short.
+         *
+         *     The presets follow the dates of the chosen factor set (the Europe files start in 1990).
          */
         get: operations["get_ranges_api_report__ticker__ranges_get"];
         put?: never;
@@ -185,6 +187,8 @@ export interface paths {
          *     ``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro
          *     rate, factors converted. The report then carries a ``currency`` block. 503 when the
          *     exchange rates or the euro rate cannot be reached (the USD view does not need them).
+         *     ``factor_set=europe`` uses the Developed Europe factors in place of the US ones; the report
+         *     then carries a ``factor_set`` field.
          */
         get: operations["get_report_api_report__ticker__get"];
         put?: never;
@@ -578,6 +582,13 @@ export interface components {
              * @enum {string}
              */
             ccy: "USD" | "EUR";
+            /**
+             * Factor Set
+             * @description Regional Fama-French factor set: us (default) or europe.
+             * @default us
+             * @enum {string}
+             */
+            factor_set: "us" | "europe";
         };
         /**
          * CorrPair
@@ -1086,6 +1097,11 @@ export interface components {
              * @description Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report.
              */
             model?: "ff6" | null;
+            /**
+             * Factor Set
+             * @description Regional factor set of the regression when it is not the US one: europe = the Ken French Developed Europe factors (in US dollars). Absent (not null) for a report on the US factors.
+             */
+            factor_set?: "europe" | null;
             /** @description Reference currency of the report when it is not US dollars; absent (not null) for a USD report. */
             currency?: components["schemas"]["CurrencyInfo"] | null;
             /**
@@ -2241,6 +2257,13 @@ export interface components {
              * @enum {string}
              */
             reference_currency: "USD" | "EUR";
+            /**
+             * Factor Set
+             * @description Regional Fama-French factor set of the report: us (default) or europe (Developed Europe, in US dollars); left out of the JSON when us.
+             * @default us
+             * @enum {string}
+             */
+            factor_set: "us" | "europe";
             root: components["schemas"]["RootGroup"];
         };
         /**
@@ -4276,7 +4299,10 @@ export interface operations {
     };
     get_ranges_api_report__ticker__ranges_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
+                factor_set?: "us" | "europe";
+            };
             header?: never;
             path: {
                 ticker: string;
@@ -4363,6 +4389,8 @@ export interface operations {
                 model?: "ff5" | "ff6";
                 /** @description Reference currency of every figure: USD (default) or EUR. */
                 ccy?: "USD" | "EUR";
+                /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
+                factor_set?: "us" | "europe";
             };
             header?: never;
             path: {
@@ -4448,6 +4476,8 @@ export interface operations {
                 end?: string | null;
                 /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
                 model?: "ff5" | "ff6";
+                /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
+                factor_set?: "us" | "europe";
             };
             header?: never;
             path: {

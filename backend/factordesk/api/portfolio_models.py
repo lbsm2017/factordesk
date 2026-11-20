@@ -29,6 +29,7 @@ from typing import Annotated, Final, Literal
 from pydantic import Field, model_validator
 
 from factordesk.analytics.backtest import WEIGHT_TOLERANCE
+from factordesk.data.french import FactorSet
 from factordesk.report.base import FrozenModel
 from factordesk.report.schema import ReferenceCurrency
 
@@ -103,6 +104,12 @@ class PortfolioTree(FrozenModel):
         exclude_if=lambda value: value == "USD",
         description="Currency of the backtest and of every figure of the report; left out of the "
         "JSON when USD.",
+    )
+    factor_set: FactorSet = Field(
+        default="us",
+        exclude_if=lambda value: value == "us",
+        description="Regional Fama-French factor set of the report: us (default) or europe "
+        "(Developed Europe, in US dollars); left out of the JSON when us.",
     )
     root: RootGroup
 

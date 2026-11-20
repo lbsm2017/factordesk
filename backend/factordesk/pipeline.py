@@ -73,6 +73,7 @@ from factordesk.analytics.subject import ReturnSubject, subject_from_history
 from factordesk.data import factors as factor_data
 from factordesk.data import french
 from factordesk.data.audit import AuditReport, audit_levels, audit_prices
+from factordesk.data.french import FactorSet
 from factordesk.data.prices import (
     SUPPORTED_CURRENCY,
     PriceHistory,
@@ -142,6 +143,23 @@ NOTE_US_FACTORS = (
     "that Yahoo reports in another currency is refused; when Yahoo reports no currency, the "
     "ticker is analysed without that check."
 )
+NOTE_EUROPE_FACTORS = (
+    "The factors are Developed Europe Fama-French factors from the Ken French data library, "
+    "built in US dollars with the US one-month Treasury bill as the risk-free rate; they start "
+    "in July 1990. A stock that does not trade in Europe mixes factor exposure with currency "
+    "and local-market effects. A ticker that Yahoo reports in another currency is refused; when "
+    "Yahoo reports no currency, the ticker is analysed without that check. The shrunk-betas "
+    "section is left out because its prior comes from US factor portfolios."
+)
+NOTE_EUROPE_FACTORS_SERIES = (
+    "The factors are Developed Europe Fama-French factors from the Ken French data library, "
+    "built in US dollars with the US one-month Treasury bill as the risk-free rate; they start "
+    "in July 1990. The returns are taken to be in the report's currency."
+)
+NOTE_EUROPE_WORLD_BETA = (
+    "The market factor of the world beta section's comparison row is the Europe market factor "
+    "in this report; the row is still labelled US market."
+)
 NOTE_DESC = "Every statistic is descriptive and in-sample, not predictive."
 NOTE_US_FACTORS_SERIES = (
     "The factors are US Fama-French factors in USD, and the returns are taken to be in US "
@@ -167,7 +185,12 @@ FACTOR_SOURCE_URL: dict[str, str] = {
     "daily": factor_data.SOURCE_URL,
     "monthly": french.DATASETS["ff5_monthly"].url,
 }
-"""The French file behind each frequency (the FF5 model)."""
+"""The French file behind each frequency (the FF5 model, US factors)."""
+EUROPE_SOURCE_URL: dict[str, str] = {
+    "daily": french.DATASETS["europe5_daily"].url,
+    "monthly": french.DATASETS["europe5_monthly"].url,
+}
+"""The French file behind each frequency for the Europe factor set."""
 
 _UNIT: dict[str, str] = {"daily": "trading days", "monthly": "months"}
 _SUBJECT_NOUN: dict[str, str] = {
@@ -904,6 +927,7 @@ def assemble_report(
     currency: CurrencyInfo | None = None,
     converted: bool = False,
     audit_history: PriceHistory | None = None,
+    factor_set: FactorSet = french.DEFAULT_FACTOR_SET,
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
@@ -919,7 +943,9 @@ def assemble_report(
     report's ``currency`` block for a reference other than USD. ``audit_history`` is the price
     history the audit reads when ``history`` was converted: the audit checks the prices as the
     exchange lists them, because a conversion breaks the link between ``Close``, ``Adj Close``
-    and each dividend (None: audit ``history``).
+    and each dividend (None: audit ``history``). ``factor_set`` says which regional factor set
+    ``factor_frame`` holds (``"us"``, or ``"europe"``: the report then names it); the frame must
+    already be that set's.
     """
     if not converted:
         check_currency(ticker, security)
@@ -946,6 +972,7 @@ def assemble_report(
         reference_currency=reference_currency,
         currency=currency,
         audit_history=audit_history,
+        factor_set=factor_set,
     )
 
 
@@ -1038,6 +1065,7 @@ def assemble_subject_report(
     reference_currency: str = SUPPORTED_CURRENCY,
     currency: CurrencyInfo | None = None,
     audit_history: PriceHistory | None = None,
+    factor_set: FactorSet = french.DEFAULT_FACTOR_SET,
 ) -> FactorReport:
     """The report of any return subject: the engine behind every mode.
 
@@ -1053,8 +1081,12 @@ def assemble_subject_report(
     other than the reference raises ``UnsupportedCurrencyError``; fewer aligned rows than the
     frequency's floor raise ``InsufficientHistoryError`` (daily 504, monthly 36).
     ``audit_history`` is the unconverted price history of a ticker subject, audited in place of
-    ``subject.history`` (None: audit ``subject.history``).
+    ``subject.history`` (None: audit ``subject.history``). ``factor_set`` names the regional
+    factor set ``factor_frame`` holds, "us" (default) or "europe"; it changes the source link,
+    the notes and the report's ``factor_set`` field (left out for "us"), nothing else: every
+    section reads the frame it is given.
     """
+    french.check_factor_set(factor_set)
     if model not in FACTOR_MODELS:
         raise ValueError(f"unknown factor model {model!r}; use 'ff5' or 'ff6'")
     codes = model_codes(model)
@@ -1120,7 +1152,9 @@ def assemble_subject_report(
         factors_last_date=sample.factor_last_date,
         factors_downloaded_at=factors_downloaded_at,
         factors_days_behind=days_behind,
-        factors_source_url=FACTOR_SOURCE_URL[subject.frequency],
+        factors_source_url=(EUROPE_SOURCE_URL if factor_set == "europe" else FACTOR_SOURCE_URL)[
+            subject.frequency
+        ],
         price_source=price_source,
         dropped_price_dates_after_factors=sample.uncovered.n,
         dropped_price_dates_before_factors=sample.n_before_factors,
@@ -1187,10 +1221,22 @@ def assemble_subject_report(
     # Optional sections (schema v3 contract SC3.2), in panel-call order. Each hook sees only the
     # core; a hook outside its HookSpec (subject kind, frequency, model) leaves its field None.
     present = run_hooks(ctx)
+    europe = factor_set == "europe"
     if subject.kind == "ticker":
-        notes = [NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS, NOTE_SURVIVORSHIP]
+        notes = [
+            NOTE_DESC,
+            NOTE_VINTAGE,
+            NOTE_EUROPE_FACTORS if europe else NOTE_US_FACTORS,
+            NOTE_SURVIVORSHIP,
+        ]
+        if europe and present.get("world_beta") is not None:
+            notes.append(NOTE_EUROPE_WORLD_BETA)
     else:
-        notes = [NOTE_DESC, NOTE_VINTAGE, NOTE_US_FACTORS_SERIES]
+        notes = [
+            NOTE_DESC,
+            NOTE_VINTAGE,
+            NOTE_EUROPE_FACTORS_SERIES if europe else NOTE_US_FACTORS_SERIES,
+        ]
     if not is_daily:
         notes.append(NOTE_MONTHLY_TEMPLATE.format(k=len(codes) + 1))
     if model == "ff6":
@@ -1202,6 +1248,7 @@ def assemble_subject_report(
             "subject": _subject_info(subject),
             "currency": currency,
             "model": "ff6" if model == "ff6" else None,
+            "factor_set": "europe" if europe else None,
             "generated_at": now,
             "data": core.data,
             "regression": core.regression,
