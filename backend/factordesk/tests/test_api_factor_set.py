@@ -226,6 +226,64 @@ def test_eur_with_europe_runs_and_is_cached_apart(
     assert {(k[6], k[7]) for k in keys} == {("europe", "USD"), ("europe", "EUR"), ("us", "EUR")}
 
 
+def _late_rate_sources(first_rate: pd.Timestamp) -> Any:
+    """Fakes whose euro cash rate has no value before ``first_rate``: the factor dates before it
+    are left out of the converted frames, while the prices convert on every date."""
+    from factordesk.data import rates
+    from factordesk.tests.test_currency_view import RATE
+
+    def late_rate() -> rates.RateResult:
+        days = pd.bdate_range(first_rate, "2035-01-01")
+        return rates.RateResult(
+            pd.Series(RATE, index=days, name="eur_rate"), None, rates.ECB_CREDIT
+        )
+
+    return dataclasses.replace(FAKE, eur_rate=late_rate)
+
+
+def _left_out(report: FactorReport) -> list[str]:
+    assert report.currency is not None
+    return [n for n in report.currency.notes if "factor dates" in n]
+
+
+@pytest.mark.parametrize("factor_set", ["us", "europe"])
+def test_eur_gives_no_left_out_notice_when_no_dropped_date_is_in_the_window(
+    eu_world: tuple[World, FakeEurope], client: ApiClient, factor_set: str
+) -> None:
+    world, _ = eu_world
+    with_sources(cast(Any, world), FAKE)  # the rates cover every factor date
+    assert _left_out(_report(client, f"?ccy=EUR&factor_set={factor_set}&range=FULL")) == []
+    # the rates start late, but the requested window starts after them: nothing it uses is cut
+    prices = world.history.frame.index
+    with_sources(cast(Any, world), _late_rate_sources(pd.Timestamp(str(prices[300]))))
+    start = pd.Timestamp(str(prices[600])).date()
+    report = _report(client, f"?ccy=EUR&factor_set={factor_set}&start={start}")
+    assert _left_out(report) == []
+
+
+@pytest.mark.parametrize("factor_set", ["us", "europe"])
+def test_eur_gives_one_left_out_notice_with_the_in_window_count(
+    eu_world: tuple[World, FakeEurope], client: ApiClient, factor_set: str
+) -> None:
+    world, fake = eu_world
+    prices = world.history.frame.index
+    first_rate = pd.Timestamp(str(prices[300]))
+    with_sources(cast(Any, world), _late_rate_sources(first_rate))
+    report = _report(client, f"?ccy=EUR&factor_set={factor_set}&range=FULL")
+    us = with_mom(world.factors.frame, 91)
+    frames = [us] if factor_set == "us" else [fake.frame, us]  # the US frame feeds macro
+    left = pd.DatetimeIndex([]).union(frames[0].index.difference(frames[0].index))
+    for frame in frames:
+        left = left.union(pd.DatetimeIndex(frame.index[1:][frame.index[1:] <= first_rate]))
+    first = pd.Timestamp(str(prices[0]))
+    expected = int(((left >= first) & (left <= pd.Timestamp(str(prices[-1])))).sum())
+    assert expected > 0
+    assert _left_out(report) == [
+        f"{expected} factor dates before the EUR series start or after its last rate were "
+        "left out; nothing was filled."
+    ]
+
+
 # ----------------------------------------------------------------------------- portfolio
 @pytest.fixture
 def pf_world(tmp_path: Path) -> tuple[portfolio_tests.World, FakeEurope]:

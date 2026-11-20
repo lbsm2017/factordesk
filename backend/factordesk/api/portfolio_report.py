@@ -28,7 +28,7 @@ from factordesk.analytics.currency import convert, hedge
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.analytics.subject import LEVEL_BASE, ReturnSubject
 from factordesk.api import ranges
-from factordesk.api.currency_ctx import CurrencyContext
+from factordesk.api.currency_ctx import CurrencyContext, clip_window
 from factordesk.api.errors import ApiException, one_line, to_api_exception
 from factordesk.api.portfolio_models import (
     CHF_CASH_LIBRARY_ID,
@@ -689,7 +689,11 @@ def build_portfolio_report(
             end=last_day,
             section_inputs=section_inputs,
             reference_currency="EUR" if eur else "USD",
-            currency=ctx.info() if ctx is not None and (eur or ctx.chf_noted) else None,
+            currency=(
+                ctx.info(clip_window(first_day, last_day, summary.window_start, summary.window_end))
+                if ctx is not None and (eur or ctx.chf_noted)
+                else None
+            ),
             factor_set=factor_set,
         )
     except InsufficientHistoryError as exc:

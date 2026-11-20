@@ -41,7 +41,7 @@ from fastapi import Request
 from factordesk import progress
 from factordesk.analytics.currency import convert_history, listing_currency
 from factordesk.api import ranges
-from factordesk.api.currency_ctx import CurrencyContext
+from factordesk.api.currency_ctx import CurrencyContext, clip_window
 from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime
 from factordesk.data.factors import FactorError, FactorStatus
@@ -371,7 +371,9 @@ class ReportService:
                     security=security,
                     model=model,
                     reference_currency=ccy,
-                    currency=None if ccy == "USD" else ctx.info(),
+                    currency=None
+                    if ccy == "USD"
+                    else ctx.info(_analysis_window(history, first, last)),
                     audit_history=local,
                     factor_set=factor_set,
                 )
@@ -880,6 +882,16 @@ def _downloaded_at(
 def _day(moment: pd.Timestamp) -> str:
     """``4 Jan 1999``."""
     return f"{moment.day} {moment:%b %Y}"
+
+
+def _analysis_window(
+    history: PriceHistory, first: date | None, last: date | None
+) -> tuple[date, date]:
+    """The days a ticker report can cover: the requested range cut to the price history."""
+    days = history.frame.index
+    return clip_window(
+        first, last, pd.Timestamp(str(days[0])).date(), pd.Timestamp(str(days[-1])).date()
+    )
 
 
 def _note_left_out(
