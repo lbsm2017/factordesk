@@ -183,8 +183,20 @@ The start call answers `cached: true`. The page fetches the report and draws it 
 7. **No elapsed times** on done steps.
 8. **Per-mode placeholder lists** are fixed in the frontend; the backend does not send them.
 
-## What the UI needs from the API (for the S4-5 backend lane)
+## What the UI gets from the API (S4-5 backend contract, fixed 2026-11-20)
 
-- Start call returns a run id and `cached: true` or `false`.
-- Progress updates carry `step` (`prices`, `fx`, `factors`, `models`, `sections`), `status` (`running`, `done`, `failed`) and, on failure, the `message` and `action` texts above.
-- The plain report endpoints stay as they are; the UI falls back to them.
+This replaces the earlier draft of this section (run id, per-step status). The backend lane builds the contract below; the UI derives the step states from it.
+
+- Streaming endpoints, server-sent events read with `fetch` (one parser for all three):
+  `GET /api/report/{ticker}/stream`, `POST /api/report/portfolio/stream`, `POST /api/report/upload/stream`. They take the same parameters as the plain endpoints.
+- `event: step` with data `{"step", "label", "index", "total"}`. When a step arrives, every earlier step is **done** and this one is **running**; later steps are **waiting**.
+- `event: report` with data = the `FactorReport`. All steps are done, and the reveal starts.
+- `event: error` with data = the `ApiError` plus `status`. The running step becomes **failed**, and the later ones become **not run**. The message and the action come from the `ApiError`.
+- A cache hit sends `report` at once, with no steps (frame g).
+- If the stream fails before its first event, the UI falls back to the plain endpoint, with no step list.
+
+## Coordinator decisions (2026-11-20)
+
+Choices 1–8 above are accepted as the build spec. Specifically:
+- Choice 3: the re-run error banner is accepted, because it names the previous ticker. It is flagged to the owner at the demo, since it reverses the old rule.
+- Choice 6: confirmed. Single tickers and uploads are converted unhedged. Only the library bond lines of a portfolio are hedged (Sprint 3 hedge table).
