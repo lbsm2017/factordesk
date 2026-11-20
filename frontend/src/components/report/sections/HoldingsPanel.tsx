@@ -246,7 +246,7 @@ function Loaded({ section }: { section: HoldingsSection }) {
         </div>
       </div>
       <p className="total-note">
-        Total return after cost: <b className={signClass(sums.total_return)}>{`${points(sums.total_return)} pp`}</b> over{" "}
+        Total return after cost: <b className={signClass(sums.total_return)}>{`${points(sums.total_return)}%`}</b> over{" "}
         {dateLong(section.window_start)} to {dateLong(section.window_end)}
       </p>
       {section.risk_share_reason ? <p className="foot-note">{section.risk_share_reason}</p> : null}

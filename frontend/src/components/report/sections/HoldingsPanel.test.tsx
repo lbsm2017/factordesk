@@ -183,7 +183,7 @@ describe("HoldingsPanel", () => {
       risk: share(sum((r) => r.risk_share)),
     });
     expect(screen.getByText(/Total return after cost:/).textContent).toBe(
-      `Total return after cost: ${pp(section.total_return)} pp over ${dateLong(section.window_start)} to ${dateLong(section.window_end)}`,
+      `Total return after cost: ${pp(section.total_return)}% over ${dateLong(section.window_start)} to ${dateLong(section.window_end)}`,
     );
   });
 
