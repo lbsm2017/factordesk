@@ -40,15 +40,26 @@ export function readChartTokens(element: Element = document.documentElement): Ch
   };
 }
 
-/** Tokens at mount, re-read when `prefers-color-scheme` changes. */
+/** Tokens at mount, re-read when the theme choice (`data-theme` on `<html>`) or `prefers-color-scheme` changes. */
 export function useChartTokens(): ChartTokens {
   const [tokens, setTokens] = useState<ChartTokens>(() => readChartTokens());
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia("(prefers-color-scheme: dark)");
-    const update = () => setTokens(readChartTokens());
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
+    // Keep the same object when no value changed, so the charts are not drawn again for nothing.
+    const update = () =>
+      setTokens((current) => {
+        const next = readChartTokens();
+        return JSON.stringify(next) === JSON.stringify(current) ? current : next;
+      });
+    const query = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+    query?.addEventListener("change", update);
+    const observer = typeof MutationObserver === "function" ? new MutationObserver(update) : null;
+    observer?.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    // The choice may have changed between the first render and this effect.
+    update();
+    return () => {
+      query?.removeEventListener("change", update);
+      observer?.disconnect();
+    };
   }, []);
   return tokens;
 }
