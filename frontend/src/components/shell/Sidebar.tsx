@@ -1,7 +1,9 @@
 import type { ReactNode, Ref } from "react";
 import type { FactorReport } from "../../api/types";
 import { Icon, Mark } from "./icons";
+import { useTheme } from "../../state/theme";
 import { SectionNav } from "./SectionNav";
+import { ThemeSwitch } from "./ThemeSwitch";
 
 export interface SidebarProps {
   ref?: Ref<HTMLElement>;
@@ -18,6 +20,7 @@ export interface SidebarProps {
 
 /** The navy sidebar (design J.2): product mark, the controls, then the section navigation. */
 export function Sidebar({ ref, open, root, report, onClose, onNavigate, children }: SidebarProps) {
+  const [theme, setTheme] = useTheme();
   return (
     <aside ref={ref} className="sidebar" id="sidebar" aria-label="Controls and sections">
       <div className="side-scroll">
@@ -35,6 +38,9 @@ export function Sidebar({ ref, open, root, report, onClose, onNavigate, children
         </div>
         {children}
         <SectionNav root={root} report={report} onNavigate={onNavigate} />
+      </div>
+      <div className="side-foot">
+        <ThemeSwitch choice={theme} onSelect={setTheme} />
       </div>
     </aside>
   );
