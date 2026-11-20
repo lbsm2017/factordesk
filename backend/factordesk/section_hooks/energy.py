@@ -269,8 +269,18 @@ def build_energy(ctx: SectionContext) -> EnergySection | None:
     )
     if energy.oil.levels is None or energy.gas.levels is None:
         return block("failed", FRED_UNAVAILABLE, legs)
+    fx = None
+    if reference is not None:
+        try:
+            fx = reference.fx_returns(ctx.subject.calendar)
+        except Exception:  # the exchange rates are down: the section says so
+            logger.warning("energy section: no USD/EUR rate", exc_info=True)
+            return block(
+                "failed",
+                "The energy regression needs the USD/EUR rate and it is unavailable.",
+                legs,
+            )
     try:
-        fx = None if reference is None else reference.fx_returns(ctx.subject.calendar)
         result = run_energy(
             ctx.sample, ctx.subject.calendar, energy.oil.levels, energy.gas.levels, carbon, fx
         )

@@ -62,7 +62,7 @@ ROLES: dict[str, str] = {
     DOLLAR_SERIES: "USD = daily return of the Fed nominal broad dollar index",
 }
 EUR_ROLES: dict[str, str] = {
-    "IEF": "TERM = IEF minus RF, in euros; DEF = LQD minus IEF, in euros",
+    "IEF": "TERM = IEF minus the US dollar cash rate, in euros; DEF = LQD minus IEF, in euros",
     "LQD": "DEF = LQD minus IEF, in euros",
     "DBC": "COMM = DBC in euros minus the euro cash rate",
     "TIP": "INFL = TIP minus IEI, in euros",
@@ -71,7 +71,9 @@ EUR_ROLES: dict[str, str] = {
 EUR_USD_TICKER = "USD/EUR"
 EURO_VIEW_START = date(1999, 1, 4)
 """First ECB reference rate (the EUR view starts in January 1999): the USD/EUR leg's first date."""
-EUR_USD_ROLE = "USD = return of the US dollar measured in euros (ECB reference rate)"
+EUR_USD_ROLE = (
+    "USD = return of the US dollar measured in euros (euro reference rate, see the currency footer)"
+)
 FUNDS_UNAVAILABLE = "The prices of {funds} could not be fetched."
 
 
@@ -251,11 +253,11 @@ def build_macro(ctx: SectionContext) -> MacroSection | None:
         usd_note = None
         try:
             euro = EuroLegs(reference.fx_returns(ctx.subject.calendar), reference.usd_rf)
-        except Exception as exc:  # the exchange rates are down: the section says so
+        except Exception:  # the exchange rates are down: the section says so
             logger.warning("macro section: no USD/EUR rate", exc_info=True)
             return block(
                 "failed",
-                f"The macro regression needs the USD/EUR rate and it is unavailable ({exc}).",
+                "The macro regression needs the USD/EUR rate and it is unavailable.",
                 legs=_legs(levels, None),
                 usd_included=False,
                 usd_note=None,

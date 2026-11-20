@@ -17,7 +17,7 @@ exception and never a wait longer than the 8 s download timeout, twice at most):
 - ``CURRENCIES``: the supported codes. ``FRED_QUOTES``: quote direction of each FRED H.10 series.
 
 Primary source: ECB euro foreign exchange reference rates (``EXR.D.<CCY>.EUR.SP00.A``, units of
-CCY per 1 EUR, fixed about 14:15 CET, daily from 1999-01-04). Fallback: FRED H.10 (noon New York,
+CCY per 1 EUR, fixed about 14:10 CET, daily from 1999-01-04). Fallback: FRED H.10 (noon New York,
 crossed through USD). Both legs of a pair always come from the same source. A cross rate is a
 ratio of two legs, so ``X in R = leg(X) / leg(R)``; the two fixings differ in time of day, so
 daily figures differ slightly between sources.

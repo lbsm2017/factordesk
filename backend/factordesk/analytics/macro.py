@@ -110,7 +110,7 @@ USD_LAG_NOTE = (
 )
 EUR_FACTORS: tuple[MacroFactor, ...] = (
     MacroFactor("mkt_rf", "Mkt-RF", "Market", "French market excess return, in euros"),
-    MacroFactor("term", "TERM", "Rates", "IEF minus RF, in euros"),
+    MacroFactor("term", "TERM", "Rates", "IEF minus the US dollar cash rate, in euros"),
     MacroFactor(
         "def",
         "DEF",
@@ -124,14 +124,15 @@ EUR_FACTORS: tuple[MacroFactor, ...] = (
         "usd",
         "USD",
         "US dollar against the euro",
-        "return of the US dollar measured in euros (ECB reference rate)",
+        "return of the US dollar measured in euros (euro reference rate, see the currency footer)",
         "positive beta: gains when the dollar strengthens against the euro",
     ),
 )
 EUR_BY_CODE: dict[str, MacroFactor] = {f.code: f for f in EUR_FACTORS}
 EUR_USD_LAG_NOTE = (
-    "The euro reference rate is fixed at 14:10 Frankfurt time, before the US close, so a daily "
-    "regression adds the previous day's return and reports the summed beta."
+    "The euro reference rate is fixed before the subject's close, so the previous-day term is "
+    "expected to be near zero. It is kept for consistency with the US-dollar view: read the "
+    "summed beta."
 )
 
 
