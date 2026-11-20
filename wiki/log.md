@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-20 (Energy & carbon section)
+
+- Sprint 3, item S3-8: added the Energy & carbon section. Added [the decision page](energy-and-carbon-factors.md) and a dated update on the [macro decision page](decision-factor-models-and-macro.md). The macro correlation matrix is now computed once.
+
 ## 2026-11-20 (Sprint 2 closed)
 
 - Sprint 2 shipped the portfolio composer: the Asset Class Library, the portfolio backtest API and the macro sensitivities section. Added [docs/sprints/sprint-2.md](../docs/sprints/sprint-2.md), which records what shipped, the owner's decisions, the demo results and the retro.

@@ -94,3 +94,9 @@ Every report can switch between the five-factor and six-factor (with momentum) m
 - **If FRED is unreachable:** the section runs without the dollar and says "dollar index unavailable". An older cached copy is used first, with a note.
 - **Overlap:** VIF and the correlation matrix show how much the factors share. The VIF is computed on the six factors without the lag term. A badge shows when VIF is above 5.
 - **Tags:** reliable or noise by the same Benjamini-Hochberg rule as the headline betas, across the factors of this regression.
+
+## Update, 2026-11-20: oil, gas and carbon get their own section
+
+- **What changed:** an Energy & carbon section now follows the macro section. Its legs are the Brent oil change, the Henry Hub gas change and KRBN (carbon), with the market as a control. Details are on the [energy and carbon page](energy-and-carbon-factors.md).
+- **Why a separate section:** the legs do not belong in the macro regression. Broad commodities (COMM) already sit there, and oil and COMM correlate +0.6 to +0.8, so mixing them would inflate the VIF.
+- **Also fixed:** the macro correlation matrix was computed twice (and a third time for the condition number). It is now computed once. The output is the same.
