@@ -70,6 +70,7 @@ from factordesk.analytics.sample import (
     build_subject_sample,
 )
 from factordesk.analytics.subject import ReturnSubject, subject_from_history
+from factordesk.api import progress
 from factordesk.data import factors as factor_data
 from factordesk.data import french
 from factordesk.data.audit import AuditReport, audit_levels, audit_prices
@@ -1059,6 +1060,7 @@ def assemble_subject_report(
         raise ValueError(f"unknown factor model {model!r}; use 'ff5' or 'ff6'")
     codes = model_codes(model)
     _check_subject_currency(subject, reference_currency)
+    progress.step("models")
     is_daily = subject.frequency == "daily"
     periods = subject.periods
     audit = _subject_audit(subject, audit_history)
@@ -1145,6 +1147,7 @@ def assemble_subject_report(
             for f in audit.findings
         ],
     )
+    progress.step("sections")
     core = CoreSections(
         data=data,
         regression=_regression_section(reg, info, gate is not None and gate.fired),

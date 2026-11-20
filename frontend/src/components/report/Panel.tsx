@@ -15,6 +15,11 @@ const PAIR_CLASS: Readonly<Record<string, string>> = {
 /** Risk sources and World beta grow number columns with statistics on; they then take the full row, and the partner of each (Return sources, Alpha across models) with them. */
 const WIDE_WITH_STATS = new Set(["returns", "risk", "world-beta"]);
 
+/** The pair class of a panel id (`s-7`, `s-5`, `s-6`), or undefined when it takes a full row. The placeholders use it too, so they pair as the real panels do. */
+export function pairClass(id: string, stats: boolean): string | undefined {
+  return stats && WIDE_WITH_STATS.has(id) ? undefined : PAIR_CLASS[id];
+}
+
 export interface PanelProps {
   /** Element id, also the link target (for example "price", "exposures"). */
   id: string;
@@ -45,7 +50,7 @@ export interface PanelProps {
  */
 export function Panel({ id, title, question, outcome, aside, legend, reading, footnote, how, empty, children }: PanelProps) {
   const stats = useShowStats();
-  const pair = stats && WIDE_WITH_STATS.has(id) ? undefined : PAIR_CLASS[id];
+  const pair = pairClass(id, stats);
   const headingId = `${id}-title`;
   return (
     <section className={pair ? `panel ${pair}` : "panel"} id={id} aria-labelledby={headingId}>

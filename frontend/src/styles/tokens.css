@@ -108,6 +108,9 @@
   --label-w: 176px;
   --num-w: 92px;
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 150ms;
+  --dur: 200ms;
+  --stagger: 60ms;
 }
 
 @media (max-width: 899px) {

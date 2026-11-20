@@ -35,7 +35,7 @@ import pandas as pd
 from fastapi import Request
 
 from factordesk.analytics.currency import convert_history, listing_currency
-from factordesk.api import ranges
+from factordesk.api import progress, ranges
 from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime
@@ -300,11 +300,16 @@ class ReportService:
         ranges.check_request(preset, start, end)
         now = self._now()
         loaded = await self._factors()
+        cold = (ticker, now.date()) not in self.prices
+        if cold:  # a warm run may still end in a cache hit, which reports no steps
+            progress.step("prices")
         security = await self._security(ticker, now.date())
         listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
         ctx = CurrencyContext(ccy, self.deps.currency)
         local = history  # the audit reads the prices as the exchange lists them
+        if cold and ccy == "EUR":
+            progress.step("fx")
         history = await self.runtime.run(self._to_reference, ticker, history, listing, scale, ctx)
         cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
         first, last = ranges.resolve(preset, start, end, cov)
@@ -318,6 +323,7 @@ class ReportService:
             )
 
         async def make() -> FactorReport:
+            progress.step("factors")
             frame = await self._model_frame(loaded, now, model, ctx)
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs, ctx)
@@ -399,6 +405,7 @@ class ReportService:
             logger.info("Portfolio report cache hit")
 
         async def make() -> FactorReport:
+            progress.step("prices")
             ctx = CurrencyContext(ccy, self.deps.currency)
             listings: dict[str, tuple[str, float]] = {}
             for ticker in tickers:  # refuses a currency that cannot be converted
@@ -407,6 +414,9 @@ class ReportService:
             histories = await self.runtime.run(
                 pr.fetch_histories, self.deps.price_provider, tickers
             )
+            if ccy == "EUR":
+                progress.step("fx")
+            progress.step("factors")
             frame = await self._model_frame(loaded, now, model, ctx)
             inputs = await self._with_world_benchmark(None, ctx)
             inputs = await self._with_reference(inputs, ctx, loaded, now, model)

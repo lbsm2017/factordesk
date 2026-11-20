@@ -22,6 +22,8 @@ export interface ControlsStripProps {
   report: FactorReport | undefined;
   /** A request is running (the strip stays usable). */
   busy: boolean;
+  /** Fill of the busy button's line, 0 to 1. */
+  progress?: number;
   /** A factor refresh is running. */
   refreshing: boolean;
   /** Result of the last factor refresh, announced politely. */
@@ -55,6 +57,7 @@ export function ControlsStrip({
   factorStatus,
   report,
   busy,
+  progress = 0,
   refreshing,
   refreshMessage,
   onQueryChange,
@@ -76,6 +79,8 @@ export function ControlsStrip({
           suggestions={suggestions}
           error={tickerError}
           focusOnMount={state.ticker === null}
+          busy={busy}
+          progress={progress}
           onQueryChange={(query) => {
             setTickerError(null);
             onQueryChange(query);
@@ -124,9 +129,6 @@ export function ControlsStrip({
       <div className="side-group">
         <FactorDataLine status={factorStatus} refreshing={refreshing} message={refreshMessage} onRefresh={onRefreshFactors} />
       </div>
-      <span className="vh" role="status">
-        {busy ? "Loading the report." : ""}
-      </span>
     </section>
   );
 }

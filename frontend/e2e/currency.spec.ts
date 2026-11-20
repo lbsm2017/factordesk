@@ -12,6 +12,10 @@ const FIRST_REPORT_MS = 120_000;
  */
 async function euroBackend(page: Page): Promise<string[]> {
   const asked: string[] = [];
+  // No progress stream here: the page falls back to the plain endpoint, which is answered below.
+  await page.route(/\/api\/report\/SYN\/stream\?/, (route) =>
+    route.fulfill({ status: 404, json: { code: "not_found", message: "Not found.", action: "Check the address." } }),
+  );
   await page.route(/\/api\/report\/SYN\?/, async (route) => {
     const url = route.request().url();
     const euro = new URL(url).searchParams.get("ccy") === "EUR";
