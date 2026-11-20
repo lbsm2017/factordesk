@@ -105,13 +105,25 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
     setRan(null);
   };
 
+  const importTree = (tree: PortfolioTree) => {
+    store.create(tree);
+    run.reset();
+    setRan(null);
+  };
+
   const sidebarStore = { ...store, select };
   const error = run.isError && !folded ? toApiError(run.error) : null;
 
   const sidebar = (
     <>
       <ModeSwitch mode={state.mode} onSelect={(mode) => onCommit({ mode })} currency={currency} onCurrency={onCurrency} />
-      <PortfolioSidebar store={sidebarStore} ready={library.isSuccess} onCreate={create} />
+      <PortfolioSidebar
+        store={sidebarStore}
+        ready={library.isSuccess}
+        onCreate={create}
+        library={libraryLines}
+        onImport={importTree}
+      />
       <StatsSwitch />
     </>
   );

@@ -77,6 +77,12 @@ const PATHS = {
       <path d="M3.5 15.5v1h13v-1" />
     </>
   ),
+  upload: (
+    <>
+      <path d="M10 13V3M6 6.5l4-4 4 4" />
+      <path d="M3.5 15.5v1h13v-1" />
+    </>
+  ),
   refresh: (
     <>
       <path d="M16 9.5A6.5 6.5 0 1 1 13.6 4.5" />

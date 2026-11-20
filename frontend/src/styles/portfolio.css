@@ -310,6 +310,10 @@
 .pf-rename .btn { flex: none; padding: 0 12px; }
 .btn-quiet { background: none !important; color: var(--rail-text) !important; border-color: var(--rail-track) !important; }
 .pf-hint { padding: 0 8px; }
+.pf-import-errors { margin: 8px 8px 0; padding: 8px 10px; border-radius: var(--r-control); background: var(--rail-hover); color: var(--rail-text); font-size: var(--fs-small, 13px); }
+.pf-import-errors p { margin: 0 0 4px; padding: 0; }
+.pf-import-errors ul { margin: 0 0 4px; padding-left: 18px; }
+.pf-import-errors li { overflow-wrap: anywhere; }
 
 /* undo toast: fixed at the bottom of the screen */
 .toast {
