@@ -2,6 +2,8 @@ cff-version: 1.2.0
 message: "If you use factordesk in your work, please cite it as below. The methods it implements are cited in docs/references.md."
 type: software
 title: factordesk
+version: "1.0.0"
+date-released: "2026-11-21"
 abstract: "Fama-French factor analysis of a ticker, an uploaded track record or a portfolio, on your own machine. Fits excess returns on the Ken French factors (US or Developed Europe) with Newey-West standard errors and reports betas, alpha, rolling exposures, risk and return attribution, tail risk and residual diagnostics, in USD or EUR."
 authors:
   - family-names: "Bassetti"

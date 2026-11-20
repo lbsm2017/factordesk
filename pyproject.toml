@@ -1,6 +1,6 @@
 [project]
 name = "factordesk"
-version = "0.5.0"
+version = "1.0.0"
 description = "Fama-French factor analysis dashboard for stocks, ETFs, fund track records and portfolios"
 requires-python = ">=3.12"
 license = "LicenseRef-factordesk-Noncommercial-1.0"
