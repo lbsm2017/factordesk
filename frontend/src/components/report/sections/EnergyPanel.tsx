@@ -10,9 +10,6 @@ import "./EnergyPanel.css";
 
 export const TITLE = "Energy & carbon";
 export const QUESTION = "How has the return moved with oil, gas and carbon prices, after the market?";
-/** One line above the tables; the method detail is in "How this is computed". */
-export const INTRO =
-  "Each number describes how the return moved together with that price, not what comes next.";
 /** Two-sided 95% normal quantile, for the line beta ± 1.96 · SE. */
 const Z95 = 1.96;
 /** A variance inflation factor above this gets the caution style (the bar of the main regression). */
@@ -65,10 +62,6 @@ function tickText(t: number, ticks: readonly number[]): string {
 /** A sensitivity with at least two significant digits and at least three decimals: "0.0021", "0.412". */
 function betaText(x: number): string {
   return signed(x, valueDigits(x, 3));
-}
-
-function wordFor(s: EnergySection): string {
-  return s.frequency === "monthly" ? "months" : "days";
 }
 
 function textOf(label: string, row: { beta: number; se: number }): string {
@@ -191,7 +184,7 @@ export function legsOf(s: EnergySection): Leg[] {
   });
   const legs = (s.long_model?.rows ?? []).filter((r) => r.code !== "mkt_rf").map((r) => leg(r, null));
   const co2 = s.carbon_model?.rows.find((r) => r.code === "co2");
-  if (s.carbon_model && co2) legs.push(leg(co2, s.carbon_model.label ?? co2.note));
+  if (s.carbon_model && co2) legs.push(leg(co2, `since ${dateShort(s.carbon_model.start)}`));
   return legs;
 }
 
@@ -203,14 +196,6 @@ function domainOfLegs(legs: readonly Leg[]): NiceDomain {
     if (w) values.push(w.low, w.high);
   }
   return niceDomain(Math.min(...values), Math.max(...values), 3);
-}
-
-/** "Natural gas and carbon credits (KRBN): no link strong enough to rely on." Null when every leg is reliable. */
-export function weakLine(legs: readonly Pick<Leg, "code" | "tag">[]): string | null {
-  const names = legs.filter((l) => l.tag !== "reliable").map((l) => NOUNS[l.code] ?? l.code);
-  if (names.length === 0) return null;
-  const list = names.length === 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-  return `${list.charAt(0).toUpperCase()}${list.slice(1)}: no link strong enough to rely on, after the market.`;
 }
 
 function Line({ leg, domain }: { leg: Leg; domain: NiceDomain }) {
@@ -235,15 +220,7 @@ function Legs({ s, subject, rows }: { s: EnergySection; subject: string; rows: s
   const legs = legsOf(s);
   const domain = domainOfLegs(legs);
   const says = legs.filter((l) => l.tag === "reliable").map((l) => sentence(l, subject)).filter((x): x is string => x !== null);
-  const gas = s.long_model?.gas_robust;
-  const gasLeg = legs.find((l) => l.code === "gas");
-  if (gas && gasLeg?.tag === "reliable") {
-    says.push(`Without the ${gas.n_excluded} largest gas ${wordFor(s)}, the same rise in gas goes with a ${pct(moveFor("gas", gas.beta), 1)} move.`);
-  }
-  const weak = weakLine(legs);
-  if (weak) says.push(weak);
   const crowded = legs.filter(overlaps);
-  const limited = s.long_model?.window_limited_by;
   return (
     <div className="en-model">
       <div className="en-wrap">
@@ -288,20 +265,17 @@ function Legs({ s, subject, rows }: { s: EnergySection; subject: string; rows: s
           </tfoot>
         </table>
       </div>
-      <ul className="en-says">
-        {says.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
+      {says.length > 0 ? (
+        <ul className="en-says">
+          {says.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
       {crowded.length > 0 ? (
         <p className="en-limit en-overlap">
           {crowded.map((l) => l.label).join(" and ")} overlap{crowded.length === 1 ? "s" : ""} with the other prices
           (variance inflation factor above {VIF_WARN}), so the sensitivity is imprecise.
-        </p>
-      ) : null}
-      {limited && s.long_model ? (
-        <p className="en-limit">
-          The window starts when {limited} begins ({dateLong(s.long_model.start)}).
         </p>
       ) : null}
     </div>
@@ -312,9 +286,10 @@ function Legs({ s, subject, rows }: { s: EnergySection; subject: string; rows: s
  * Panel of the `energy` section (S3-8): how the return moved with oil, gas and carbon prices after
  * the market. One table with one row per price: oil and gas from the long model, carbon from the
  * short carbon model. Each row has the sensitivity, a dot and an approximate 95% range on one scale,
- * and the t-statistic. Plain-words sentences for the reliable legs and one line for the weak ones.
- * The market rows, the VIFs and the gas fit without the largest moves are in "How this is computed";
- * an overlap above the VIF bar gets a caution line. Registered in `panelRegistry.ts` at position 509,
+ * and the t-statistic, and a plain-words sentence for each reliable leg. Nothing else is shown
+ * unless it needs attention (an overlap above the VIF bar, an old FRED copy, a hidden carbon row).
+ * The market rows, the VIFs, the gas caveat and the gas fit without the largest moves are in "How
+ * this is computed". Registered in `panelRegistry.ts` at position 509,
  * right after Macro sensitivities. Renders nothing when the section is absent; a section that could
  * not be computed shows its reason (for example FRED being down) and nothing else.
  */
@@ -344,8 +319,6 @@ export function EnergyPanel({ report }: ReportPanelProps) {
       title={TITLE}
       question={QUESTION}
       aside={`${dateShort(start)} to ${dateShort(end)}`}
-      reading={INTRO}
-      footnote={s.gas_note}
       how={how(s, rows)}
     >
       <Legs s={s} subject={subject} rows={rows} />

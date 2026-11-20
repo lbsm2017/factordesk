@@ -5,7 +5,7 @@ import { signed } from "../../../format";
 import { tickLabel, valueDigits } from "../exposureModel";
 import { cloneReport } from "../../../test/fixture";
 import { withSection } from "../../../test/sectionFixtures";
-import { EnergyPanel, INTRO, legsOf, moveFor, overlaps, RISE, sentence, VIF_WARN, weakLine, whisker } from "./EnergyPanel";
+import { EnergyPanel, legsOf, moveFor, overlaps, RISE, sentence, VIF_WARN, whisker } from "./EnergyPanel";
 
 type Section = NonNullable<FactorReport["energy"]>;
 
@@ -37,7 +37,8 @@ describe("EnergyPanel", () => {
     expect(labels).toEqual(["Oil", "Natural gas", "Carbon"]);
     expect(container.textContent).not.toContain("controlled for");
     expect(container.querySelector("tbody")?.textContent).not.toContain("largest");
-    expect(container.querySelector(".reading")?.textContent).toBe(INTRO);
+    expect(container.querySelector(".reading")).toBeNull();
+    expect(container.querySelector(".foot > p")).toBeNull();
   });
 
   it("takes oil and gas from the long model and carbon from the carbon model", () => {
@@ -49,11 +50,9 @@ describe("EnergyPanel", () => {
     expect(legs[2]?.beta).toBe(s.carbon_model?.rows.find((x) => x.code === "co2")?.beta);
   });
 
-  it("labels only the carbon row as a short sample, mainly EU carbon", () => {
+  it("gives only the carbon row a note: the start of its shorter window", () => {
     const { container } = render(<EnergyPanel report={report()} />);
-    expect(container.querySelector('tr[data-leg="co2"] .en-note')?.textContent).toMatch(
-      /^short sample, since [A-Z][a-z]{2} \d{4}, mainly EU carbon$/,
-    );
+    expect(container.querySelector('tr[data-leg="co2"] .en-note')?.textContent).toMatch(/^since [A-Z][a-z]{2} \d{4}$/);
     expect(container.querySelectorAll("tbody .en-note")).toHaveLength(1);
   });
 
@@ -67,40 +66,14 @@ describe("EnergyPanel", () => {
     expect(how).toContain("Market");
   });
 
-  it("keeps the gas caveat once, as the footnote", () => {
-    const r = report();
-    const { container } = render(<EnergyPanel report={r} />);
-    expect(container.querySelector('tr[data-leg="gas"] .en-note')).toBeNull();
-    expect(container.querySelector(".foot > p")?.textContent).toBe(section(r).gas_note);
-    expect(section(r).gas_note).toContain("descriptive");
-  });
-
-  it("writes a sentence for each reliable price and one line for the weak ones", () => {
+  it("writes a sentence for each reliable price and nothing for the weak ones", () => {
     const r = report((s) => {
       for (const m of [s.long_model, s.carbon_model]) for (const row of m?.rows ?? []) row.tag = row.code === "oil" ? "reliable" : "noise";
     });
     const lines = says(render(<EnergyPanel report={r} />).container);
-    expect(lines).toHaveLength(2);
+    expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/^A 10% rise in oil went with a [+−]?[0-9.]+% move in .+, after the market\.$/);
-    expect(lines[1]).toBe("Natural gas and carbon credits (KRBN): no link strong enough to rely on, after the market.");
     expect(lines.join(" ")).not.toMatch(/beta|ln\(|±|\bSE\b/);
-  });
-
-  it("checks a reliable gas link without the largest moves, counted in months for a monthly section", () => {
-    const r = report((s) => {
-      s.frequency = "monthly";
-      for (const row of s.long_model?.rows ?? []) row.tag = "reliable";
-    });
-    const lines = says(render(<EnergyPanel report={r} />).container);
-    expect(lines.some((l) => l.startsWith("Without the 5 largest gas months, the same rise in gas goes with a"))).toBe(true);
-  });
-
-  it("says nothing about the largest gas moves when the gas link is weak", () => {
-    const r = report((s) => {
-      for (const row of s.long_model?.rows ?? []) if (row.code === "gas") row.tag = "noise";
-    });
-    const lines = says(render(<EnergyPanel report={r} />).container);
-    expect(lines.join(" ")).not.toContain("largest gas");
   });
 
   it("writes the sentence of the owner's example: a 10% rise in oil and the move in the subject", () => {
@@ -112,8 +85,6 @@ describe("EnergyPanel", () => {
       "A 10% rise in oil went with a +1.9% move in SPY, after the market.",
     );
     expect(sentence({ code: "mkt_rf", beta: 1, tag: "reliable" }, "SPY")).toBeNull();
-    expect(weakLine([{ code: "oil", tag: "reliable" }])).toBeNull();
-    expect(weakLine([{ code: "gas", tag: "noise" }])).toBe("Natural gas: no link strong enough to rely on, after the market.");
   });
 
   it("uses no formula on screen and calls the numbers sensitivities", () => {
@@ -156,15 +127,16 @@ describe("EnergyPanel", () => {
     expect(container.querySelector(".en-overlap")?.textContent).toMatch(/^Oil overlaps with the other prices/);
   });
 
-  it("names the series that limits the window", () => {
+  it("keeps the series that limits the window and the gas caveat in the fold", () => {
     const r = report((s) => {
       if (s.long_model) s.long_model.window_limited_by = "DHHNGSP";
       if (s.carbon_model) s.carbon_model.window_limited_by = "KRBN";
     });
     const { container } = render(<EnergyPanel report={r} />);
-    expect(container.querySelector(".en-limit")?.textContent).toContain("DHHNGSP");
     const how = container.querySelector("details.how")?.textContent ?? "";
+    expect(how).toContain("the window starts when DHHNGSP begins");
     expect(how).toContain("the window starts when KRBN begins");
+    expect(how).toContain(section(r).gas_note);
   });
 
   it("shows the note when an older cached copy of Brent or Henry Hub was used", () => {
