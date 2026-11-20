@@ -7,9 +7,11 @@ body of the finished stream.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import socket
 import threading
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -17,7 +19,9 @@ import httpx
 import pandas as pd
 import pytest
 
-from factordesk.api import progress, routes_stream, routes_upload
+from factordesk import progress
+from factordesk.api import routes_stream, routes_upload
+from factordesk.api import service as service_module
 from factordesk.data.prices import PriceDataError
 from factordesk.report.schema import ApiErrorEvent, FactorReport, ProgressStep
 from factordesk.tests import test_api_portfolio as portfolio_tests
@@ -50,8 +54,12 @@ def events_of(response: httpx.Response) -> list[tuple[str, Any]]:
     """The ``(event name, data)`` pairs of a finished stream; comment lines are skipped."""
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/event-stream")
+    return parse_events(response.text)
+
+
+def parse_events(text: str) -> list[tuple[str, Any]]:
     out: list[tuple[str, Any]] = []
-    for block in response.text.split("\n\n"):
+    for block in text.split("\n\n"):
         lines = [line for line in block.split("\n") if line and not line.startswith(":")]
         if not lines:
             continue
@@ -339,3 +347,134 @@ def test_a_bad_upload_sends_an_error_and_a_missing_file_is_the_plain_error(
     assert bad[-1][1]["code"] == "invalid_upload" and bad[-1][1]["status"] == 422
     assert missing.status_code == 400 and missing.json()["code"] == "bad_request"
     assert big.status_code == 413
+
+
+# --------------------------------------------------------------------------- robustness
+
+
+async def collect(events: AsyncIterator[str]) -> list[tuple[str, Any]]:
+    return parse_events("".join([chunk async for chunk in events]))
+
+
+def test_the_stream_headers_stop_caching_and_proxy_buffering(tmp_path: Path) -> None:
+    w = report_tests.make_world(tmp_path)
+    with report_tests.serve(w.app) as c:
+        response = cast(Any, c).get("/api/report/SYN/stream")
+    assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["x-accel-buffering"] == "no"
+
+
+def test_an_unexpected_error_is_an_internal_event_with_a_fixed_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_args: object, **_kw: object) -> FactorReport:
+        raise RuntimeError("secret detail")
+
+    monkeypatch.setattr(service_module, "assemble_report", broken)
+    w = report_tests.make_world(tmp_path)
+    with report_tests.serve(w.app) as c:
+        response = cast(Any, c).get("/api/report/SYN/stream")
+    events = events_of(response)
+    assert names(events)[-1] == "error" and "report" not in names(events)
+    error = ApiErrorEvent.model_validate(events[-1][1])
+    assert error.code == "internal" and error.status == 500
+    assert error.message == routes_stream.INTERNAL_MESSAGE
+    assert "secret detail" not in response.text
+
+
+def test_two_streams_at_once_do_not_cross_their_events(tmp_path: Path) -> None:
+    w = report_tests.make_world(tmp_path)
+    with_sources(cast(Any, w), FAKE)
+
+    async def go() -> tuple[list[tuple[str, Any]], list[tuple[str, Any]]]:
+        async def usd() -> FactorReport:
+            return await w.service.report("SYN", ccy="USD")
+
+        async def eur() -> FactorReport:
+            return await w.service.report("SYN", ccy="EUR")
+
+        return await asyncio.gather(
+            collect(routes_stream._events(progress.plan_of(), usd, "SYN")),  # pyright: ignore[reportPrivateUsage]
+            collect(routes_stream._events(progress.plan_of(fx=True), eur, "SYN")),  # pyright: ignore[reportPrivateUsage]
+        )
+
+    usd_events, eur_events = asyncio.run(go())
+    assert step_ids(usd_events) == USD_STEPS and names(usd_events)[-1] == "report"
+    assert step_ids(eur_events) == EUR_STEPS and names(eur_events)[-1] == "report"
+    assert {d["total"] for n, d in usd_events if n == "step"} == {4}
+    assert {d["total"] for n, d in eur_events if n == "step"} == {5}
+
+
+def test_a_client_that_leaves_cancels_its_stream_but_the_cache_is_still_filled(
+    tmp_path: Path,
+) -> None:
+    w = report_tests.make_world(tmp_path)
+    inside, gate = threading.Event(), threading.Event()
+
+    def slow_inputs(_now: object) -> None:
+        inside.set()
+        assert gate.wait(timeout=20)
+
+    object.__setattr__(w.service.deps, "load_section_inputs", slow_inputs)
+    seen: dict[str, asyncio.Task[Any]] = {}
+
+    async def go() -> None:
+        async def run() -> FactorReport:
+            task = asyncio.current_task()
+            assert task is not None
+            seen["work"] = task
+            return await w.service.report("SYN")
+
+        events = routes_stream._events(progress.plan_of(), run, "SYN")  # pyright: ignore[reportPrivateUsage]
+        await anext(events)
+        while not inside.is_set():
+            await asyncio.sleep(0.01)
+        await events.aclose()  # what the server does when the client disconnects
+        await asyncio.sleep(0.05)
+        assert seen["work"].cancelled()
+        assert len(w.service.reports) == 0
+        gate.set()
+        for _ in range(500):
+            if len(w.service.reports) == 1:
+                return
+            await asyncio.sleep(0.02)
+
+    try:
+        asyncio.run(go())
+    finally:
+        gate.set()
+    assert len(w.service.reports) == 1
+
+
+def test_a_slow_factor_load_shows_the_factor_step_before_it_ends(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(service_module, "SLOW_FACTORS_SECONDS", 0.05)
+    w = report_tests.make_world(tmp_path)
+    inside, gate = threading.Event(), threading.Event()
+    real_load = w.factors.load
+
+    def slow_load(refresh: bool, now: Any) -> pd.DataFrame:
+        inside.set()
+        assert gate.wait(timeout=20)
+        return real_load(refresh, now)
+
+    object.__setattr__(w.service.deps, "load_factors", slow_load)
+
+    async def go() -> tuple[list[str], list[tuple[str, Any]]]:
+        async def run() -> FactorReport:
+            return await w.service.report("SYN")
+
+        events = routes_stream._events(progress.plan_of(), run, "SYN")  # pyright: ignore[reportPrivateUsage]
+        early = [await anext(events), await anext(events)]
+        assert inside.is_set() and not gate.is_set()  # the load is still running
+        gate.set()
+        rest = [chunk async for chunk in events]
+        return early, parse_events("".join(early + rest))
+
+    try:
+        early, events = asyncio.run(go())
+    finally:
+        gate.set()
+    assert [parse_events(chunk)[0][1]["step"] for chunk in early] == ["prices", "factors"]
+    check_steps(events, USD_STEPS)

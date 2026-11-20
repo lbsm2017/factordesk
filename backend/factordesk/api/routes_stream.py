@@ -3,7 +3,7 @@
 Each ``.../stream`` endpoint takes the same input as its plain endpoint and answers with
 server-sent events (``text/event-stream``):
 
-- ``event: step``: a ``ProgressStep``, sent when the run reaches a step (``api.progress``);
+- ``event: step``: a ``ProgressStep``, sent when the run reaches a step (``factordesk.progress``);
 - ``event: report``: the ``FactorReport``, exactly the body of the plain endpoint;
 - ``event: error``: an ``ApiErrorEvent``, the plain endpoint's ``ApiError`` plus its HTTP status.
 
@@ -17,18 +17,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from factordesk.api import progress
-from factordesk.api.errors import check_ticker, to_api_exception
+from factordesk import progress
+from factordesk.api.errors import ApiException, check_ticker, to_api_exception
 from factordesk.api.portfolio_models import PortfolioTree
-from factordesk.api.routes_report import Ccy, End, Model, Preset, Service, Start
+from factordesk.api.routes_report import Ccy, End, Factors, Model, Preset, Service, Start
 from factordesk.api.routes_upload import _too_large  # pyright: ignore[reportPrivateUsage]
 from factordesk.api.runtime import get_runtime
+from factordesk.data.french import FactorSet
 from factordesk.data.upload import MAX_UPLOAD_BYTES
 from factordesk.report.schema import (
     ApiErrorEvent,
@@ -43,6 +44,9 @@ logger = logging.getLogger(__name__)
 
 KEEP_ALIVE_SECONDS = 15.0
 """Silence after which a comment line is sent, so a proxy does not close the stream."""
+
+INTERNAL_MESSAGE = "The report could not be computed."
+INTERNAL_ACTION = "Try again. If it happens again, report it with this page's address."
 
 router = APIRouter(prefix="/api/report")
 
@@ -71,8 +75,9 @@ def _event(name: str, data: str) -> str:
 
 def _error_event(exc: BaseException, ticker: str | None) -> str:
     error = to_api_exception(exc, ticker)
-    if error.code == "internal":
+    if error.code == "internal":  # the text of an unexpected error is logged, never sent
         logger.error("Unhandled %s in a report stream", type(exc).__name__, exc_info=exc)
+        error = ApiException("internal", INTERNAL_MESSAGE, INTERNAL_ACTION)
     else:
         logger.info("%s in a report stream: %s", error.code, error.message)
     body = ApiErrorEvent(
@@ -83,7 +88,7 @@ def _error_event(exc: BaseException, ticker: str | None) -> str:
 
 async def _events(
     plan: list[ProgressStepId], run: _Run, ticker: str | None = None
-) -> AsyncIterator[str]:
+) -> AsyncGenerator[str]:
     """Run ``run`` and yield its events. The reporter lives in the run's own task, so the tasks
     and worker threads the run starts report to this stream and to no other."""
     loop = asyncio.get_running_loop()
@@ -96,8 +101,13 @@ async def _events(
         with progress.reporting(progress.StepReporter(plan, emit)):
             return await run()
 
+    def finished(done: asyncio.Task[FactorReport]) -> None:
+        if not done.cancelled():
+            done.exception()  # mark a failure as seen, even when the client has left
+        queue.put_nowait(None)
+
     task = asyncio.ensure_future(work())
-    task.add_done_callback(lambda _: queue.put_nowait(None))
+    task.add_done_callback(finished)
     try:
         while True:
             try:
@@ -135,12 +145,15 @@ async def stream_report(
     end: End = None,
     model: Model = "ff5",
     ccy: Ccy = "USD",
+    factor_set: Factors = "us",
 ) -> EventStreamResponse:
     """Progress and result of ``GET /api/report/{ticker}``, as server-sent events."""
     plan = progress.plan_of(fx=ccy == "EUR")
 
     async def run() -> FactorReport:
-        return await service.report(check_ticker(ticker), preset, start, end, model, ccy)
+        return await service.report(
+            check_ticker(ticker), preset, start, end, model, ccy, factor_set
+        )
 
     return _stream(_events(plan, run, ticker.upper()))
 
@@ -154,7 +167,9 @@ async def stream_portfolio_report(
     end: End = None,
     model: Model = "ff6",
 ) -> EventStreamResponse:
-    """Progress and result of ``POST /api/report/portfolio``, as server-sent events."""
+    """Progress and result of ``POST /api/report/portfolio``, as server-sent events.
+
+    The factor set is the tree's ``factor_set`` field, as for the plain endpoint."""
     plan = progress.plan_of(fx=tree.reference_currency == "EUR")
 
     async def run() -> FactorReport:
@@ -180,6 +195,10 @@ async def stream_upload_report(
     ccy: Annotated[
         ReferenceCurrency, Form(description="Reference currency of the report: USD or EUR.")
     ] = "USD",
+    factor_set: Annotated[
+        FactorSet,
+        Form(description="Regional Fama-French factor set: us (default) or europe."),
+    ] = "us",
 ) -> EventStreamResponse:
     """Progress and result of ``POST /api/report/upload``, as server-sent events.
 
@@ -197,7 +216,15 @@ async def stream_upload_report(
 
     async def run() -> FactorReport:
         return await runtime.run(
-            build_upload_report, raw, name, gross_net, runtime, model, record_currency, ccy
+            build_upload_report,
+            raw,
+            name,
+            gross_net,
+            runtime,
+            model,
+            record_currency,
+            ccy,
+            factor_set,
         )
 
     return _stream(_events(plan, run))

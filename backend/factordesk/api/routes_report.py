@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse
 
 from factordesk.api.errors import check_ticker
 from factordesk.api.service import ReportService, get_report_service
+from factordesk.data.french import FactorSet
 from factordesk.report.schema import (
     ApiError,
     FactorModel,
@@ -55,12 +56,26 @@ Ccy = Annotated[
     ReferenceCurrency,
     Query(description="Reference currency of every figure: USD (default) or EUR."),
 ]
+Factors = Annotated[
+    FactorSet,
+    Query(
+        description="Regional Fama-French factor set: us (default) or europe (Developed Europe, "
+        "published in US dollars)."
+    ),
+]
 
 
 @router.get("/{ticker}/ranges", responses=_ERRORS)
-async def get_ranges(ticker: str, service: Service) -> RangeOptions:
-    """Availability of every range preset for this ticker, with the reason when one is short."""
-    return await service.range_options(check_ticker(ticker))
+async def get_ranges(
+    ticker: str, service: Service, ccy: Ccy = "USD", factor_set: Factors = "us"
+) -> RangeOptions:
+    """Availability of every range preset for this ticker, with the reason when one is short.
+
+    ``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices
+    leaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).
+    The presets follow the dates of the chosen factor set (the Europe files start in 1990).
+    """
+    return await service.range_options(check_ticker(ticker), ccy, factor_set)
 
 
 @router.get("/{ticker}", responses=_ERRORS)
@@ -72,14 +87,17 @@ async def get_report(
     end: End = None,
     model: Model = "ff5",
     ccy: Ccy = "USD",
+    factor_set: Factors = "us",
 ) -> FactorReport:
     """The factor report for a range preset or custom dates (neither: Full history).
 
     ``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro
     rate, factors converted. The report then carries a ``currency`` block. 503 when the
     exchange rates or the euro rate cannot be reached (the USD view does not need them).
+    ``factor_set=europe`` uses the Developed Europe factors in place of the US ones; the report
+    then carries a ``factor_set`` field.
     """
-    return await service.report(check_ticker(ticker), preset, start, end, model, ccy)
+    return await service.report(check_ticker(ticker), preset, start, end, model, ccy, factor_set)
 
 
 @router.get(
@@ -94,10 +112,11 @@ async def get_report_html(
     start: Start = None,
     end: End = None,
     model: Model = "ff5",
+    factor_set: Factors = "us",
 ) -> HTMLResponse:
     """The offline HTML report for the same ticker and range, as a file download."""
     symbol = check_ticker(ticker)
-    page = await service.report_html(symbol, preset, start, end, model)
+    page = await service.report_html(symbol, preset, start, end, model, factor_set)
     return HTMLResponse(
         content=page,
         headers={"Content-Disposition": f'attachment; filename="{symbol}_report.html"'},

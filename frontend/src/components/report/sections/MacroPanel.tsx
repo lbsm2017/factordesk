@@ -151,8 +151,9 @@ function Row({ row, domain }: { row: MacroRow; domain: NiceDomain }) {
   return (
     <tr>
       <th scope="row" title={title}>
-        <span className="mc-label">{row.label}</span>
-        {row.note ? <span className="mc-note">{row.note}</span> : null}
+        <span className={row.note ? "mc-label has-tip" : "mc-label"}>{row.label}</span>
+        {/* The note shows on mouse-over (title); screen readers still read it. */}
+        {row.note ? <span className="vh mc-note">{`, ${row.note}`}</span> : null}
       </th>
       <td className="num">{finite(row.beta) ? betaText(row.beta) : "n/a"}</td>
       <td className="mc-plot">

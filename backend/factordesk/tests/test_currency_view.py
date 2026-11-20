@@ -176,6 +176,49 @@ def test_report_cache_key_differs_by_currency(tmp_path: Any) -> None:
     assert {k[:-1] for k in keys[:1]} == {k[:-1] for k in keys[1:]}
 
 
+def late_fx_sources(skip: int) -> CurrencySources:
+    """Fakes whose exchange rates start ``skip`` days after the first price."""
+
+    def late(loader: Any) -> Any:
+        def run(ccy: str, ref: str, dates: pd.DatetimeIndex) -> FxResult:
+            result = loader(ccy, ref, dates)
+            assert result.series is not None
+            return FxResult(result.series.iloc[skip:], None, SOURCE_ECB)
+
+        return run
+
+    return CurrencySources(late(fake_prices), late(fake_returns), fake_rate)
+
+
+def test_ranges_honour_the_currency_when_the_rates_start_later(tmp_path: Any) -> None:
+    w = ticker_world(tmp_path)
+    skip = 400
+    with_sources(cast(Any, w), late_fx_sources(skip))
+    with report_tests.serve(w.app) as c:
+        usd = c.get("/api/report/SYN/ranges")
+        default = c.get("/api/report/SYN/ranges?ccy=USD")
+        eur = c.get("/api/report/SYN/ranges?ccy=EUR")
+        report = c.get("/api/report/SYN?range=FULL&ccy=EUR")
+    assert usd.status_code == 200 and eur.status_code == 200, eur.text
+    assert usd.text == default.text
+    u, e = usd.json(), eur.json()
+    assert e["first_return_date"] > u["first_return_date"]
+    full = {o["preset"]: o for o in e["options"]}["FULL"]
+    usd_full = {o["preset"]: o for o in u["options"]}["FULL"]
+    assert full["n_obs"] < usd_full["n_obs"]
+    assert full["n_obs"] == report.json()["data"]["n_obs"]
+    keys = w.service.ranges.keys()
+    assert {k[-1] for k in keys} == {"USD", "EUR"} and len(keys) == 2
+
+
+def test_eur_ranges_fail_soft_with_a_503(tmp_path: Any) -> None:
+    w = ticker_world(tmp_path)
+    with_sources(cast(Any, w), dataclasses.replace(FAKE, fx_returns=down_returns))
+    with report_tests.serve(w.app) as c:
+        assert c.get("/api/report/SYN/ranges").status_code == 200
+        assert c.get("/api/report/SYN/ranges?ccy=EUR").status_code == 503
+
+
 def test_eur_view_fails_soft_with_a_503_and_the_usd_view_does_not_care(tmp_path: Any) -> None:
     w = ticker_world(tmp_path)
     with_sources(cast(Any, w), dataclasses.replace(FAKE, fx_prices=down_returns))

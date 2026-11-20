@@ -36,11 +36,15 @@ describe("MacroPanel", () => {
     for (const tr of rows) expect(within(tr).getAllByRole("cell")).toHaveLength(4);
   });
 
-  it("labels DEF as not duration-matched and INFL as a breakeven proxy, in the rows", () => {
+  it("keeps the row notes out of sight: on mouse-over and for screen readers only", () => {
     const { container } = render(<MacroPanel report={report()} />);
-    const notes = Array.from(container.querySelectorAll("tbody .mc-note")).map((n) => n.textContent);
-    expect(notes).toContain("credit minus rates, not duration-matched");
-    expect(notes).toContain("breakeven proxy");
+    const notes = Array.from(container.querySelectorAll("tbody .mc-note"));
+    expect(notes.map((n) => n.textContent)).toContain(", credit minus rates, not duration-matched");
+    expect(notes.map((n) => n.textContent)).toContain(", breakeven proxy");
+    for (const n of notes) expect(n.classList.contains("vh")).toBe(true);
+    const titles = Array.from(container.querySelectorAll("tbody th")).map((th) => th.getAttribute("title") ?? "");
+    expect(titles.some((x) => x.endsWith("; credit minus rates, not duration-matched"))).toBe(true);
+    expect(titles.some((x) => x.endsWith("; breakeven proxy"))).toBe(true);
   });
 
   it("draws one dot per row and a zero line on one shared scale, and names each row for screen readers", () => {
@@ -51,7 +55,7 @@ describe("MacroPanel", () => {
       expect(tr.querySelectorAll("circle.mc-dot")).toHaveLength(1);
       expect(tr.querySelectorAll("line.zero")).toHaveLength(1);
       expect(tr.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
-      expect(tr.querySelector(".vh")?.textContent).toMatch(/: beta [+−]?[0-9.]+, approximate 95% range/);
+      expect(tr.querySelector(".mc-plot .vh")?.textContent).toMatch(/: beta [+−]?[0-9.]+, approximate 95% range/);
     }
     const gridX = (tr: Element) => Array.from(tr.querySelectorAll("line.grid, line.zero")).map((l) => l.getAttribute("x1"));
     expect(gridX(rows[0] as Element)).toEqual(gridX(rows[5] as Element));
