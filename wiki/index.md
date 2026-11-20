@@ -1,6 +1,6 @@
 # factordesk wiki
 
-Last updated 2026-11-20. This is the project's knowledge base. Its main purpose is to record each decision in plain English: what we decided, why, how it works, and what we gave up. Pages date their claims, and facts that depend on `docs/` link to the source document instead of copying it.
+Last updated 2026-11-21. This is the project's knowledge base. Its main purpose is to record each decision in plain English: what we decided, why, how it works, and what we gave up. Pages date their claims, and facts that depend on `docs/` link to the source document instead of copying it.
 
 ## Start here
 

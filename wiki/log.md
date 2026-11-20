@@ -8,6 +8,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - Should the euro view's dollar term use a lead? A lead is a negative shift that the no look-ahead rule forbids; options are keep the rule, allow a labelled lead, or use a fixing nearer the US close. Owner decision pending (2026-11-20, [spike](../docs/research/dollar-lag-lead-spike.md)).
 - Does the owner accept the re-run error banner that keeps the old report on screen? The coordinator accepted it on 2026-11-20 and flagged it for the demo; it reverses the earlier rule ([Factor it progress](decision-factor-it-progress.md)).
 
+## 2026-11-21 (Version 1.0.0)
+
+- [Making the repository public](decision-going-public.md): version 1.0.0 is the first public release; versions 0.1.0 to 0.5.0 were private.
+
 ## 2026-11-20 (Going public)
 
 - New page [Making the repository public](decision-going-public.md): the name and secrets scan over the whole history, the data terms of FRED, the ECB and the SNB, and the publish checklist.

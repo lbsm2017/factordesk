@@ -10,7 +10,7 @@
   <a href="LICENSE"><img alt="License: free for noncommercial use" src="https://img.shields.io/badge/license-free%20for%20noncommercial%20use-orange.svg"></a>
   <img alt="Python 3.12 or newer" src="https://img.shields.io/badge/python-3.12%2B-blue.svg">
   <img alt="Runs on Windows, macOS and Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg">
-  <img alt="Version 0.5.0" src="https://img.shields.io/badge/version-0.5.0-blue.svg">
+  <img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue.svg">
   <a href="#contributing"><img alt="Pull requests welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
 </p>
 
@@ -799,7 +799,7 @@ without a source are listed in
 
 ## Status and roadmap
 
-As of 2026-11-20, version 0.5.0:
+As of 2026-11-21, version 1.0.0, the first public release:
 
 | Built and independently validated | Specified, not built |
 | --- | --- |
