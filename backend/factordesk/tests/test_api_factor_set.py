@@ -480,3 +480,16 @@ def test_monthly_macro_and_energy_do_not_depend_on_the_factor_set(
     for section in ("macro", "energy"):
         assert us[section] is not None and us[section]["status"] == "ok", section
         assert eu[section] == us[section], (section, ccy)
+
+
+# ----------------------------------------------------------------------------- streams
+def test_the_streams_take_the_factor_set(
+    eu_world: tuple[World, FakeEurope], client: ApiClient
+) -> None:
+    from factordesk.tests.test_api_stream import events_of
+
+    plain = client.get("/api/report/SPY?factor_set=europe").json()
+    streamed = events_of(client.get("/api/report/SPY/stream?factor_set=europe"))
+    assert streamed[-1][0] == "report"
+    assert streamed[-1][1]["factor_set"] == "europe"
+    assert streamed[-1][1] == plain

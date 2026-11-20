@@ -809,6 +809,26 @@ class ApiError(FrozenModel):
     action: str
 
 
+ProgressStepId = Literal["prices", "fx", "factors", "models", "sections"]
+"""The steps of a report run, in order (``fx`` only for a EUR run)."""
+
+
+class ProgressStep(FrozenModel):
+    """Data of an ``event: step`` of a ``.../stream`` endpoint: a step the run has reached."""
+
+    step: ProgressStepId
+    label: str
+    index: int = Field(ge=1, description="Position of the step in this run, from 1.")
+    total: int = Field(ge=1, description="Number of steps in this run.")
+
+
+class ApiErrorEvent(ApiError):
+    """Data of an ``event: error`` of a ``.../stream`` endpoint: the ``ApiError`` plus the HTTP
+    status the plain endpoint would answer."""
+
+    status: int
+
+
 STATISTIC_MODELS: tuple[type[StatisticModel], ...] = (
     Regression,
     RollingWindow,
