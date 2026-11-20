@@ -31,6 +31,7 @@ from factordesk.api import ranges
 from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import ApiException, one_line, to_api_exception
 from factordesk.api.portfolio_models import (
+    CHF_CASH_LIBRARY_ID,
     EUR_CASH_LIBRARY_ID,
     PortfolioTree,
     load_library,
@@ -176,14 +177,22 @@ def eur_cash_keys(plan: PortfolioPlan, ccy: str) -> set[str]:
     return {r.key for r in plan.holdings if r.key and r.library_id == EUR_CASH_LIBRARY_ID}
 
 
+def chf_cash_keys(plan: PortfolioPlan) -> set[str]:
+    """Leaves of the CHF Cash line: they earn SARON when the rate is available (any view)."""
+    return {r.key for r in plan.holdings if r.key and r.library_id == CHF_CASH_LIBRARY_ID}
+
+
 def usd_cash_weight(plan: PortfolioPlan) -> float:
     """Total target weight of the USD cash instruments."""
     return sum(r.weight for r in plan.rows if r.key is None)
 
 
-def tickers_for(plan: PortfolioPlan, ccy: str) -> tuple[str, ...]:
-    """The tickers to fetch: ``plan.tickers`` less those only the euro cash index replaces."""
+def tickers_for(plan: PortfolioPlan, ccy: str, saron: bool = False) -> tuple[str, ...]:
+    """The tickers to fetch: ``plan.tickers`` less those only the euro cash index replaces, and
+    (``saron``: ``CurrencyContext.chf_ready`` answered True) those only SARON cash replaces."""
     skip = eur_cash_keys(plan, ccy)
+    if saron:
+        skip = skip | chf_cash_keys(plan)
     out: list[str] = []
     for row in plan.holdings:
         if row.key not in skip and row.ticker is not None and row.ticker not in out:
@@ -322,15 +331,18 @@ def _common_returns(
     """
     ccy = "USD" if ctx is None else ctx.ref
     cash_keys = eur_cash_keys(plan, ccy)
+    chf_keys: set[str] = chf_cash_keys(plan)
+    if not (ctx is not None and chf_keys and ctx.chf_ready()):
+        chf_keys = set[str]()
     prices: dict[str, pd.Series] = {}
     for row in plan.holdings:
         assert row.key is not None and row.ticker is not None
-        if row.key not in cash_keys:
+        if row.key not in cash_keys and row.key not in chf_keys:
             prices[row.key] = _adjusted_close(histories[row.ticker])
     if not prices:
         raise _invalid(
             "The portfolio holds no instrument with prices.",
-            "Add an instrument other than euro cash: cash alone is not a backtest.",
+            "Add an instrument other than euro or Swiss franc cash: cash alone is not a backtest.",
         )
     labels = _labels(plan, ccy)
     common: pd.DatetimeIndex | None = None
@@ -350,6 +362,12 @@ def _common_returns(
         {key: series.loc[common].pct_change().iloc[1:] for key, series in prices.items()}
     )
     frame.index = pd.DatetimeIndex(frame.index, name="date")
+    if ctx is not None and chf_keys:
+        # SARON cash in francs, converted at the franc's own rate: a currency position, unhedged
+        chf = convert(ctx.chf_cash(common), ctx.returns("CHF", common))
+        for chf_key in chf_keys:
+            frame[chf_key] = chf
+        frame = frame[[row.key for row in plan.holdings if row.key in frame.columns]]
     first = {k: s.index[0] for k, s in prices.items()}
     last = {k: s.index[-1] for k, s in prices.items()}
     rf_leaf = _compounded_rf(rf, common)
@@ -663,7 +681,7 @@ def build_portfolio_report(
             end=last_day,
             section_inputs=section_inputs,
             reference_currency="EUR" if eur else "USD",
-            currency=ctx.info() if ctx is not None and eur else None,
+            currency=ctx.info() if ctx is not None and (eur or ctx.chf_noted) else None,
         )
     except InsufficientHistoryError as exc:
         raise to_api_exception(exc, subject.label) from exc

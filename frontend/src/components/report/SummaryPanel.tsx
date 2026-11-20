@@ -232,7 +232,7 @@ export function SummaryPanel({ report }: ReportPanelProps) {
       label: r.label.replace("five-factor", `${countWord(k)}-factor`),
     }));
   const currency = currencyOf(report);
-  const notes = currency?.reference === "EUR" ? (currency.notes ?? []).filter((n) => n.trim() !== "") : [];
+  const notes = (report.currency?.notes ?? []).filter((n) => n.trim() !== "");
   const { actual_start: start, actual_end: end } = report.data;
   const period = start && end ? `${dateLong(start)} to ${dateLong(end)}. ` : "";
   const reasons = [...(perf.reason ? [perf.reason] : []), ...model.reasons];

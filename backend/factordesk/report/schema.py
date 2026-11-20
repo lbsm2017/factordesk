@@ -540,14 +540,16 @@ ReferenceCurrency = Literal["USD", "EUR"]
 
 
 class CurrencyInfo(FrozenModel):
-    """The reference currency of a report that is not in US dollars (written only for those)."""
+    """The reference currency, its exchange-rate and rate sources, and notices. Written for a
+    report that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON."""
 
-    reference: Literal["EUR"] = Field(description="Currency of every figure in the report.")
+    reference: ReferenceCurrency = Field(description="Currency of every figure in the report.")
     fx_source: str | None = Field(
         description="Source credit of the exchange rates used; None when none were needed."
     )
     rate_source: str | None = Field(
-        description="Source credit of the euro cash rate (overnight rate); None when not used."
+        description="Source credit of the overnight rates used (euro cash rate, SARON); None when "
+        "not used."
     )
     notes: list[str] = Field(
         description="Plain-words notices: dates dropped for lack of an exchange rate, sections "
@@ -577,8 +579,8 @@ class FactorReport(FrozenModel):
     currency: CurrencyInfo | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
-        description="Reference currency of the report when it is not US dollars; absent (not "
-        "null) for a USD report.",
+        description="Reference currency of the report when it is not US dollars, or a USD "
+        "portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report.",
     )
     generated_at: datetime = Field(description="Timezone-aware UTC timestamp.")
     data: DataInfo
