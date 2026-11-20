@@ -102,9 +102,7 @@ def test_present_sections_draw_their_frame_in_place() -> None:
         "holdings",
         "macro",
         "energy",
-    } == set(
-        SECTION_FILES
-    )
+    } == set(SECTION_FILES)
     report = load_report(MOCK)
     for field in SECTION_PANELS:
         report = report_with_section(report, field)
