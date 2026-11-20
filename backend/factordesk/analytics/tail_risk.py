@@ -5,13 +5,16 @@ research notes ``docs/research/next-stage-research.md`` section D.
 
 Conventions
 -----------
-* Input is a series of **simple** returns at its own frequency (1 day or 1 month). Results stay
-  at that frequency: there is no square-root-of-time scaling.
+* Input is a series of **simple** returns at one horizon (1 day, 1 month or 1 quarter). Results
+  stay at that horizon: there is no square-root-of-time scaling. A coarser horizon is built from
+  the finer returns by compounding whole calendar months or quarters, never overlapping, never
+  partial (:func:`complete_period_returns`).
 * A loss is ``L = -r``. VaR and CVaR are reported as **positive fractions of value** when the
   tail is a loss (a negative figure means even the tail is a gain).
 * ``level`` is the confidence level (0.99); ``p = 1 - level`` is the tail probability and
   ``z_p = Phi^-1(p)`` is negative.
-* Levels: 99% VaR and 97.5% CVaR for every series; monthly series also get 95% VaR and 95% CVaR.
+* Levels: 99% VaR and 97.5% CVaR for every series; monthly and quarterly series also get 95% VaR
+  and 95% CVaR.
 
 Methods
 -------
@@ -19,7 +22,8 @@ Methods
   the sorted returns. This is the inverse of the empirical CDF, ``inf{x : F_n(x) >= p}``
   (Hyndman-Fan type 1); no interpolation. CVaR is the mean loss of the observations at or beyond
   VaR (``r <= r_(k)``, ties included). When the expected tail count ``n p`` is below
-  :func:`min_expected_tail` (3, or 2 for the monthly 95% row) the figure is n/a.
+  :func:`min_expected_tail` (3, or 2 for the 95% row of a monthly or quarterly series) the figure
+  is n/a.
 * **Gaussian.** ``VaR = -(mu + z_p sigma)`` and ``CVaR = -mu + sigma phi(z_p) / p``, with the
   sample mean and the sample standard deviation (``ddof = 1``).
 * **Cornish-Fisher (modified).** Zangari (1996) / Favre & Galeano (2002):
@@ -72,12 +76,12 @@ Methods
 Uncertainty
 -----------
 Each figure gets a 90% percentile bootstrap band, from 1,000 resamples by default and a fixed
-seed. Monthly series use the iid bootstrap. Daily series use the stationary bootstrap of
-Politis & Romano (1994, *JASA* 89) with circular wrapping. Its mean block length is chosen by
-the automatic rule of Politis & White (2004, *Econometric Reviews* 23) with the correction of
-Patton, Politis & White (2009), applied to the absolute demeaned returns, because volatility
-clustering, not return autocorrelation, is the dependence that moves tail measures. The length
-is floored at 1 and capped at ``min(3 sqrt(n), n / 3)``.
+seed. Monthly and quarterly series use the iid bootstrap. Daily series use the stationary
+bootstrap of Politis & Romano (1994, *JASA* 89) with circular wrapping. Its mean block length is
+chosen by the automatic rule of Politis & White (2004, *Econometric Reviews* 23) with the
+correction of Patton, Politis & White (2009), applied to the absolute demeaned returns, because
+volatility clustering, not return autocorrelation, is the dependence that moves tail measures.
+The length is floored at 1 and capped at ``min(3 sqrt(n), n / 3)``.
 
 For Cornish-Fisher, resamples that fail the local guard are dropped from the band and
 ``Band.resamples`` says how many were used. If fewer than :data:`MIN_CF_VALID_SHARE` (80%) of
@@ -128,7 +132,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.special import ndtr  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
 
 FloatArray = NDArray[np.float64]
-Frequency = Literal["daily", "monthly"]
+Frequency = Literal["daily", "monthly", "quarterly"]
 Method = Literal["historical", "gaussian", "cornish_fisher"]
 Measure = Literal["var", "cvar"]
 BandQuality = Literal["validated", "approximate"]
@@ -137,13 +141,18 @@ METHODS: tuple[Method, ...] = ("historical", "gaussian", "cornish_fisher")
 LEVELS: dict[Frequency, tuple[tuple[Measure, float], ...]] = {
     "daily": (("var", 0.99), ("cvar", 0.975)),
     "monthly": (("var", 0.99), ("cvar", 0.975), ("var", 0.95), ("cvar", 0.95)),
+    "quarterly": (("var", 0.99), ("cvar", 0.975), ("var", 0.95), ("cvar", 0.95)),
 }
 """The (measure, confidence level) pairs reported for each frequency."""
 
 MIN_EXPECTED_TAIL = 3.0
 """A historical figure needs at least this many expected tail observations ``n (1 - level)``."""
 MIN_EXPECTED_TAIL_MONTHLY_95 = 2.0
-"""Exception for the monthly 95% row, so that 40 months (2 expected tail months) show it."""
+"""Exception for the 95% row of a monthly or quarterly series, so that 40 periods (2 expected tail
+periods) show it."""
+EDGE_TOLERANCE_DAYS = 4
+"""A period at the end of the data counts as covered when the last observation is within this many
+calendar days of the period end (a weekend plus a holiday). See :func:`complete_period_returns`."""
 CF_Z_LOW = -4.0
 """Lower end of the interval on which the Cornish-Fisher map must be increasing."""
 CF_INVALID = "outside the valid range of the expansion (Maillard 2012)"
@@ -238,7 +247,7 @@ def tail_probability(level: float) -> float:
 
 def min_expected_tail(frequency: Frequency, level: float) -> float:
     """Minimum expected tail observations for a historical figure at ``level``."""
-    if frequency == "monthly" and math.isclose(level, 0.95):
+    if frequency != "daily" and math.isclose(level, 0.95):
         return MIN_EXPECTED_TAIL_MONTHLY_95
     return MIN_EXPECTED_TAIL
 
@@ -324,6 +333,97 @@ def modified_tail_mean(g: ArrayLike, p: float, skew: ArrayLike, exkurt: ArrayLik
         + s**2 / 72.0 * (j[7] - 15.0 * j[5] + 45.0 * j[3] - 15.0 * j[1])
     )
     return np.asarray(total / p, dtype=np.float64)
+
+
+# ----------------------------------------------------------------------------- horizons
+DateArray = NDArray[np.datetime64]
+
+
+@dataclass(frozen=True)
+class PeriodReturns:
+    """Compounded returns of complete calendar periods: labels (``2020-03``, ``2020Q1``) and
+    returns, in date order."""
+
+    labels: tuple[str, ...]
+    returns: FloatArray
+
+
+def _period_keys(dates: DateArray, period: Literal["monthly", "quarterly"]) -> NDArray[np.int64]:
+    """Months (or quarters) since January 1970 of each date."""
+    months = dates.astype("datetime64[D]").astype("datetime64[M]").astype(np.int64)
+    return months if period == "monthly" else months // 3
+
+
+def _period_label(key: int, period: Literal["monthly", "quarterly"]) -> str:
+    if period == "monthly":
+        return str(np.datetime64(key, "M"))
+    year, quarter = divmod(key, 4)
+    return f"{1970 + year}Q{quarter + 1}"
+
+
+def _period_bounds(
+    key: int, period: Literal["monthly", "quarterly"]
+) -> tuple[np.datetime64, np.datetime64]:
+    """First and last calendar day of a period."""
+    width = 1 if period == "monthly" else 3
+    start = np.datetime64(key * width, "M").astype("datetime64[D]")
+    end = np.datetime64((key + 1) * width, "M").astype("datetime64[D]") - np.timedelta64(1, "D")
+    return start, end
+
+
+def complete_period_returns(
+    dates: DateArray,
+    returns: FloatArray,
+    reference: DateArray,
+    period: Literal["monthly", "quarterly"],
+    source: Literal["daily", "monthly"],
+) -> PeriodReturns:
+    """Non-overlapping returns of whole calendar months or quarters, compounded from finer returns.
+
+    ``dates`` and ``returns`` are the simple returns of the analysed sample (finite values).
+    ``reference`` holds every return date of the subject, inside the sample or not; it says which
+    rows the analysis left out and whether the subject's data continue beyond the sample. Each
+    result is ``prod(1 + r) - 1`` over one period. A period is complete only when:
+
+    * every return date of the subject inside the period is in the sample (no excluded or missing
+      day); a monthly source needs all 3 months of a quarter in the sample;
+    * for a daily source, the data cover both ends of the period: at the start the subject has an
+      earlier return date (the first return of a history needs the day before, which is not in
+      the period), at the end the subject has a later return date or the last observation is
+      within :data:`EDGE_TOLERANCE_DAYS` of the period end.
+
+    Nothing is scaled; an incomplete period at either end is left out, never extrapolated.
+    """
+    d = dates.astype("datetime64[D]")
+    ref = reference.astype("datetime64[D]")
+    if d.size == 0:
+        return PeriodReturns((), np.zeros(0, dtype=np.float64))
+    order = np.argsort(d, kind="stable")
+    d = d[order]
+    r = np.asarray(returns, dtype=np.float64)[order]
+    keys = _period_keys(d, period)
+    ref_keys = _period_keys(ref, period)
+    ref_in_sample = np.isin(ref, d)
+    first_ref, last_ref = ref.min(), ref.max()
+    labels: list[str] = []
+    values: list[float] = []
+    for key in np.unique(keys):
+        in_period = keys == key
+        n_sample = int(in_period.sum())
+        ref_here = ref_keys == key
+        if not (n_sample == int(ref_here.sum()) == int((ref_here & ref_in_sample).sum())):
+            continue
+        if source == "monthly":
+            if n_sample != (3 if period == "quarterly" else 1):
+                continue
+        else:
+            start, end = _period_bounds(int(key), period)
+            limit = end - np.timedelta64(EDGE_TOLERANCE_DAYS, "D")
+            if not (first_ref < start and (last_ref > end or d[in_period].max() >= limit)):
+                continue
+        labels.append(_period_label(int(key), period))
+        values.append(float(np.expm1(np.log1p(r[in_period]).sum())))
+    return PeriodReturns(tuple(labels), np.asarray(values, dtype=np.float64))
 
 
 # ----------------------------------------------------------------------------- per-sample core
@@ -547,7 +647,7 @@ def tail_risk(
     values, returns at or below -100%, or a constant series.
     """
     if frequency not in LEVELS:
-        raise ValueError(f"frequency must be 'daily' or 'monthly', got {frequency!r}")
+        raise ValueError(f"frequency must be 'daily', 'monthly' or 'quarterly', got {frequency!r}")
     x = np.array(returns, dtype=np.float64).ravel()
     n = x.size
     if n < MIN_OBS:

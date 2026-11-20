@@ -3631,6 +3631,36 @@ export interface components {
             expected_tail_obs: number;
         };
         /**
+         * TailHorizon
+         * @description The tail risk figures of one horizon (one day, one month or one quarter).
+         *
+         *     Statuses: ``ok``; ``insufficient_data`` (fewer than 12 complete periods); ``failed`` (the
+         *     periodic returns have no usable tail statistic). A horizon that is not ok holds no part.
+         */
+        TailHorizon: {
+            /**
+             * Horizon
+             * @enum {string}
+             */
+            horizon: "daily" | "monthly" | "quarterly";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "failed";
+            /**
+             * Reason
+             * @description Why the horizon has no figures; None when ok.
+             */
+            reason: string | null;
+            series: components["schemas"]["TailSeriesStats"] | null;
+            /**
+             * Figures
+             * @description Same order as TailRiskSection.figures; the 95% rows exist for monthly and quarterly horizons only.
+             */
+            figures: components["schemas"]["TailFigureInfo"][] | null;
+        };
+        /**
          * TailRiskSection
          * @description VaR and CVaR by three methods, with bootstrap bands.
          *
@@ -3660,6 +3690,11 @@ export interface components {
              * @description Every figure: levels in the order VaR 99%, CVaR 97.5%, then (monthly only) VaR 95% and CVaR 95%; within a level historical, Gaussian, Cornish-Fisher.
              */
             figures: components["schemas"]["TailFigureInfo"][] | null;
+            /**
+             * By Horizon
+             * @description The figures of every horizon the series supports, in the order daily, monthly, quarterly (daily only for a daily series). The horizon that equals `frequency` repeats the top-level figures exactly. Absent (not null) for a section that is not ok, or in reports made before this field existed.
+             */
+            by_horizon?: components["schemas"]["TailHorizon"][] | null;
         };
         /**
          * TailSeriesStats
@@ -3668,7 +3703,7 @@ export interface components {
         TailSeriesStats: {
             /**
              * N Obs
-             * @description Returns used (days or months).
+             * @description Returns used (days, months or quarters).
              */
             n_obs: number;
             /**
@@ -3693,7 +3728,7 @@ export interface components {
             excess_kurtosis: number;
             /**
              * Bootstrap
-             * @description iid for monthly series; stationary block bootstrap for daily series.
+             * @description iid for monthly and quarterly series; stationary block bootstrap for daily series.
              * @enum {string}
              */
             bootstrap: "iid" | "stationary";

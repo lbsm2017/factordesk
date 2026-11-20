@@ -5,8 +5,12 @@ Definitions and conventions: ``analytics/tail_risk.py`` and the spec section "E7
 ``FactorReport.tail_risk`` field (``None`` when the feature did not run). It is additive and does
 not change the schema version (contract SC5).
 
-The figures are at the series' own frequency: one day for a daily series, one month for a monthly
-one, with no scaling to another horizon. A loss is a positive fraction of value (0.02 is a 2%
+The top-level figures are at the series' own frequency: one day for a daily series, one month for
+a monthly one, with no scaling to another horizon. ``by_horizon`` (optional) adds the same
+figures for each horizon the series supports: daily, monthly and quarterly for a daily series,
+monthly and quarterly for a monthly one. A coarser horizon is built from the finer returns by
+compounding complete calendar months or quarters that do not overlap; nothing is scaled with the
+square root of time. A loss is a positive fraction of value (0.02 is a 2%
 loss); a negative figure means even the tail was a gain. A figure that is not available has
 ``value = None`` and says why in ``reason``. Bands are percentile bootstrap bands with the level
 in ``series.band_level``.
@@ -80,13 +84,14 @@ class TailFigureInfo(FrozenModel):
 class TailSeriesStats(FrozenModel):
     """The series behind the figures and the bootstrap settings."""
 
-    n_obs: int = Field(ge=1, description="Returns used (days or months).")
+    n_obs: int = Field(ge=1, description="Returns used (days, months or quarters).")
     mean: float = Field(description="Sample mean of the periodic simple returns.")
     std: float = Field(description="Sample standard deviation (ddof 1) of the returns.")
     skewness: float = Field(description="Moment estimator of skewness.")
     excess_kurtosis: float = Field(description="Moment estimator of excess kurtosis.")
     bootstrap: Literal["iid", "stationary"] = Field(
-        description="iid for monthly series; stationary block bootstrap for daily series."
+        description="iid for monthly and quarterly series; stationary block bootstrap for daily "
+        "series."
     )
     mean_block_length: float | None = Field(
         description="Mean block length of the stationary bootstrap; None for the iid bootstrap."
@@ -94,6 +99,38 @@ class TailSeriesStats(FrozenModel):
     n_resamples: int = Field(ge=1, description="Bootstrap resamples drawn.")
     band_level: float = Field(description="Coverage of the bands (0.9 is a 90% band).")
     seed: int = Field(description="Random seed of the bootstrap.")
+
+
+TailHorizonName = Literal["daily", "monthly", "quarterly"]
+
+
+class TailHorizon(FrozenModel):
+    """The tail risk figures of one horizon (one day, one month or one quarter).
+
+    Statuses: ``ok``; ``insufficient_data`` (fewer than 12 complete periods); ``failed`` (the
+    periodic returns have no usable tail statistic). A horizon that is not ok holds no part.
+    """
+
+    horizon: TailHorizonName
+    status: Literal["ok", "insufficient_data", "failed"]
+    reason: str | None = Field(description="Why the horizon has no figures; None when ok.")
+    series: TailSeriesStats | None
+    figures: list[TailFigureInfo] | None = Field(
+        description="Same order as TailRiskSection.figures; the 95% rows exist for monthly and "
+        "quarterly horizons only."
+    )
+
+    @model_validator(mode="after")
+    def _parts_present_exactly_when_ok(self) -> TailHorizon:
+        """An ``ok`` horizon holds every part and no reason; any other holds a reason only."""
+        parts = (self.series, self.figures)
+        if (self.status == "ok") != all(part is not None for part in parts):
+            raise ValueError("every part is present exactly when status is 'ok'")
+        if self.status == "ok" and self.reason is not None:
+            raise ValueError("reason must be None when status is 'ok'")
+        if self.status != "ok" and (self.reason is None or any(p is not None for p in parts)):
+            raise ValueError("a horizon that is not ok holds a reason and no part")
+        return self
 
 
 class TailRiskSection(SectionModel):
@@ -110,6 +147,14 @@ class TailRiskSection(SectionModel):
     figures: list[TailFigureInfo] | None = Field(
         description="Every figure: levels in the order VaR 99%, CVaR 97.5%, then (monthly only) "
         "VaR 95% and CVaR 95%; within a level historical, Gaussian, Cornish-Fisher."
+    )
+    by_horizon: list[TailHorizon] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="The figures of every horizon the series supports, in the order daily, "
+        "monthly, quarterly (daily only for a daily series). The horizon that equals `frequency` "
+        "repeats the top-level figures exactly. Absent (not null) for a section that is not ok, or "
+        "in reports made before this field existed.",
     )
 
     @model_validator(mode="after")

@@ -8853,6 +8853,76 @@
         "title": "TailFigureInfo",
         "description": "One VaR or CVaR figure: one method, one measure, one confidence level."
       },
+      "TailHorizon": {
+        "properties": {
+          "horizon": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly",
+              "quarterly"
+            ],
+            "title": "Horizon"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the horizon has no figures; None when ok."
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TailSeriesStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "figures": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TailFigureInfo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figures",
+            "description": "Same order as TailRiskSection.figures; the 95% rows exist for monthly and quarterly horizons only."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "horizon",
+          "status",
+          "reason",
+          "series",
+          "figures"
+        ],
+        "title": "TailHorizon",
+        "description": "The tail risk figures of one horizon (one day, one month or one quarter).\n\nStatuses: ``ok``; ``insufficient_data`` (fewer than 12 complete periods); ``failed`` (the\nperiodic returns have no usable tail statistic). A horizon that is not ok holds no part."
+      },
       "TailRiskSection": {
         "properties": {
           "status": {
@@ -8920,6 +8990,21 @@
             ],
             "title": "Figures",
             "description": "Every figure: levels in the order VaR 99%, CVaR 97.5%, then (monthly only) VaR 95% and CVaR 95%; within a level historical, Gaussian, Cornish-Fisher."
+          },
+          "by_horizon": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TailHorizon"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By Horizon",
+            "description": "The figures of every horizon the series supports, in the order daily, monthly, quarterly (daily only for a daily series). The horizon that equals `frequency` repeats the top-level figures exactly. Absent (not null) for a section that is not ok, or in reports made before this field existed."
           }
         },
         "additionalProperties": false,
@@ -8941,7 +9026,7 @@
             "type": "integer",
             "minimum": 1.0,
             "title": "N Obs",
-            "description": "Returns used (days or months)."
+            "description": "Returns used (days, months or quarters)."
           },
           "mean": {
             "type": "number",
@@ -8970,7 +9055,7 @@
               "stationary"
             ],
             "title": "Bootstrap",
-            "description": "iid for monthly series; stationary block bootstrap for daily series."
+            "description": "iid for monthly and quarterly series; stationary block bootstrap for daily series."
           },
           "mean_block_length": {
             "anyOf": [
