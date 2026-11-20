@@ -21,12 +21,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from factordesk.analytics.currency import EuroLegs
 from factordesk.analytics.macro import (
-    BY_CODE,
+    EUR_USD_LAG_NOTE,
     LEG_TICKERS,
     USD_LAG_NOTE,
     MacroFit,
     TooFewRowsError,
+    factors_of,
     run_macro,
 )
 from factordesk.analytics.sample import DegenerateInputError
@@ -34,6 +36,7 @@ from factordesk.data.fred import DOLLAR_SERIES, FredError, load_fred_series
 from factordesk.data.prices import PriceProvider, collapse_duplicate_dates
 from factordesk.report.base import SampleInfo, Status
 from factordesk.report.sections.macro import (
+    EUR_MODEL_NOTE,
     MODEL_NOTE,
     USD_UNAVAILABLE,
     MacroLeg,
@@ -58,6 +61,17 @@ ROLES: dict[str, str] = {
     "IEI": "INFL = TIP minus IEI",
     DOLLAR_SERIES: "USD = daily return of the Fed nominal broad dollar index",
 }
+EUR_ROLES: dict[str, str] = {
+    "IEF": "TERM = IEF minus RF, in euros; DEF = LQD minus IEF, in euros",
+    "LQD": "DEF = LQD minus IEF, in euros",
+    "DBC": "COMM = DBC in euros minus the euro cash rate",
+    "TIP": "INFL = TIP minus IEI, in euros",
+    "IEI": "INFL = TIP minus IEI, in euros",
+}
+EUR_USD_TICKER = "USD/EUR"
+EURO_VIEW_START = date(1999, 1, 4)
+"""First ECB reference rate (the EUR view starts in January 1999): the USD/EUR leg's first date."""
+EUR_USD_ROLE = "USD = return of the US dollar measured in euros (ECB reference rate)"
 FUNDS_UNAVAILABLE = "The prices of {funds} could not be fetched."
 
 
@@ -106,16 +120,21 @@ def _levels(bench: WorldBenchmarkInput) -> pd.Series | None:
     return frame["adj_close"].astype("float64")
 
 
-def _legs(funds: dict[str, pd.Series | None], dollar: pd.Series | None) -> list[MacroLeg]:
+def _legs(
+    funds: dict[str, pd.Series | None], dollar: pd.Series | None, euro: EuroLegs | None = None
+) -> list[MacroLeg]:
+    roles = ROLES if euro is None else EUR_ROLES
     out = [
         MacroLeg(
             ticker=t,
-            role=ROLES[t],
+            role=roles[t],
             first_date=None if (lv := funds.get(t)) is None else _first_date(lv),
         )
         for t in LEG_TICKERS
     ]
-    if dollar is not None:
+    if euro is not None:
+        out.append(MacroLeg(ticker=EUR_USD_TICKER, role=EUR_USD_ROLE, first_date=EURO_VIEW_START))
+    elif dollar is not None:
         out.append(
             MacroLeg(
                 ticker=DOLLAR_SERIES, role=ROLES[DOLLAR_SERIES], first_date=_first_date(dollar)
@@ -124,10 +143,11 @@ def _legs(funds: dict[str, pd.Series | None], dollar: pd.Series | None) -> list[
     return out
 
 
-def _rows(fit: MacroFit) -> list[MacroRow]:
+def _rows(fit: MacroFit, euro: bool = False) -> list[MacroRow]:
     out: list[MacroRow] = []
+    by_code = factors_of(euro)
     for r in fit.rows:
-        f = BY_CODE[r.code]
+        f = by_code[r.code]
         out.append(
             MacroRow.model_validate(
                 {
@@ -172,6 +192,8 @@ def build_macro(ctx: SectionContext) -> MacroSection | None:
     macro = ctx.inputs.macro
     if macro is None:
         return None
+    reference = ctx.inputs.reference
+    eur = reference is not None
     frequency = ctx.subject.frequency
     base = ctx.sample_info(None)
 
@@ -194,7 +216,7 @@ def build_macro(ctx: SectionContext) -> MacroSection | None:
                 "status": status,
                 "reason": reason,
                 "sample": _info(base, n, start, end),
-                "model_note": MODEL_NOTE,
+                "model_note": EUR_MODEL_NOTE if eur else MODEL_NOTE,
                 "n_obs": n,
                 "n_sample": ctx.sample.n if n_sample is None else n_sample,
                 "frequency": frequency,
@@ -204,7 +226,7 @@ def build_macro(ctx: SectionContext) -> MacroSection | None:
                 else ("normal" if fit.t_df is None else "student_t"),
                 "r2": None if fit is None else fit.r2,
                 "adj_r2": None if fit is None else fit.adj_r2,
-                "rows": [] if fit is None else _rows(fit),
+                "rows": [] if fit is None else _rows(fit, eur),
                 "correlation_codes": [] if fit is None else list(fit.codes),
                 "correlation": []
                 if fit is None
@@ -215,32 +237,49 @@ def build_macro(ctx: SectionContext) -> MacroSection | None:
                 "usd_note": usd_note,
                 "usd_lag_note": None
                 if fit is None or frequency != "daily" or "usd" not in fit.codes
-                else USD_LAG_NOTE,
+                else (EUR_USD_LAG_NOTE if eur else USD_LAG_NOTE),
             }
         )
 
     levels = {t: _levels(macro.funds[t]) if t in macro.funds else None for t in LEG_TICKERS}
-    dollar = macro.dollar.levels
-    legs = _legs(levels, dollar)
-    usd_note = USD_UNAVAILABLE if dollar is None else macro.dollar.note
+    euro: EuroLegs | None = None
+    if reference is None:
+        dollar = macro.dollar.levels
+        usd_note = USD_UNAVAILABLE if dollar is None else macro.dollar.note
+    else:  # EUR view: the dollar leg is the USD/EUR return, not the Fed index
+        dollar = None
+        usd_note = None
+        try:
+            euro = EuroLegs(reference.fx_returns(ctx.subject.calendar), reference.usd_rf)
+        except Exception as exc:  # the exchange rates are down: the section says so
+            logger.warning("macro section: no USD/EUR rate", exc_info=True)
+            return block(
+                "failed",
+                f"The macro regression needs the USD/EUR rate and it is unavailable ({exc}).",
+                legs=_legs(levels, None),
+                usd_included=False,
+                usd_note=None,
+            )
+    legs = _legs(levels, dollar, euro)
+    usd_on = euro is not None or dollar is not None
     missing = [t for t in LEG_TICKERS if levels[t] is None]
     if missing:
         return block(
             "failed",
             FUNDS_UNAVAILABLE.format(funds=", ".join(missing)),
             legs=legs,
-            usd_included=dollar is not None,
+            usd_included=usd_on,
             usd_note=usd_note,
         )
     present = {t: lv for t, lv in levels.items() if lv is not None}
     try:
-        design, fit = run_macro(ctx.sample, ctx.subject.calendar, present, dollar)
+        design, fit = run_macro(ctx.sample, ctx.subject.calendar, present, dollar, euro)
     except TooFewRowsError as exc:
         return block(
             "insufficient_data",
             f"The macro regression needs more data: {exc}.",
             legs=legs,
-            usd_included=dollar is not None,
+            usd_included=usd_on,
             usd_note=usd_note,
         )
     except DegenerateInputError as exc:
@@ -248,7 +287,7 @@ def build_macro(ctx: SectionContext) -> MacroSection | None:
             "failed",
             f"The macro regression could not be computed: {exc.reason.rstrip('.')}.",
             legs=legs,
-            usd_included=dollar is not None,
+            usd_included=usd_on,
             usd_note=usd_note,
         )
     except Exception as exc:  # any other error: the section says so, the report still builds
@@ -257,14 +296,14 @@ def build_macro(ctx: SectionContext) -> MacroSection | None:
             "failed",
             f"The macro regression could not be computed ({exc}).",
             legs=legs,
-            usd_included=dollar is not None,
+            usd_included=usd_on,
             usd_note=usd_note,
         )
     return block(
         "ok",
         None,
         legs=legs,
-        usd_included=dollar is not None,
+        usd_included=usd_on,
         usd_note=usd_note,
         n=fit.nobs,
         n_sample=design.n_sample,

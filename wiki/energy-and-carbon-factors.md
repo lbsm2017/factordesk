@@ -66,3 +66,11 @@ Every report gets an Energy & carbon section that shows how the return moved wit
 - Analytics: `backend/factordesk/analytics/energy.py`. Section model: `backend/factordesk/report/sections/energy.py`. Hook and loader: `backend/factordesk/section_hooks/energy.py`.
 - Panel: `frontend/src/components/report/sections/EnergyPanel.tsx`, after Macro sensitivities.
 - Related: [factor models and macro](decision-factor-models-and-macro.md), [Sprint 3 plan](../docs/sprints/sprint-3.md).
+
+## In the euro view (2026-11-20)
+
+- The Energy & carbon section runs in the EUR view.
+- Brent and Henry Hub are shock series. Their log changes stay in US dollars.
+- The carbon leg becomes `(1 + KRBN)(1 + f) − 1 − c`, where `f` is the return of the US dollar in euros and `c` the euro cash return. The market leg is already in euros.
+- The panel says "in euros" where it names the currency, and names the oil and gas legs as US dollars.
+- Details: [reference currency](decision-reference-currency.md).

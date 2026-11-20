@@ -109,7 +109,7 @@ function how(s: MacroSection, rows: string): string {
     windowText(s),
     `Funds start: ${legsText(s)}.`,
     s.usd_note ? `Dollar: ${s.usd_note}.` : "",
-    `${count(s.n_sample - s.n_obs)} of ${count(s.n_sample)} rows of the analysis sample are left out because a fund or the dollar index has no value there.`,
+    `${count(s.n_sample - s.n_obs)} of ${count(s.n_sample)} rows of the analysis sample are left out because a fund or ${s.legs.some((l) => l.ticker === "USD/EUR") ? "the exchange rate" : "the dollar index"} has no value there.`,
   ];
   return parts.filter((p) => p !== "").join(" ");
 }

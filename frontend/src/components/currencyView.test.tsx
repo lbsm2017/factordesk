@@ -143,14 +143,9 @@ describe("BacktestCard subtitle", () => {
 });
 
 describe("hidden panels", () => {
-  it("leaves Macro out of the euro view until its legs are converted", () => {
-    expect(hiddenPanels(eurReport()).has("macro")).toBe(true);
-    expect(hiddenPanels(mockReport).has("macro")).toBe(false);
-  });
-
-  it("leaves the energy panel out of the euro view, whether or not its key is registered yet", () => {
-    expect(hiddenPanels(eurReport()).has("energy")).toBe(true);
-    expect(hiddenPanels(mockReport).has("energy")).toBe(false);
+  it("keeps Macro and Energy in the euro view: their legs are converted", () => {
+    expect(hiddenPanels(eurReport()).has("macro")).toBe(false);
+    expect(hiddenPanels(eurReport()).has("energy")).toBe(false);
   });
 
   it("follows the response, not the page: no currency block means USD labels", () => {

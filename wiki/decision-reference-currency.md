@@ -31,6 +31,10 @@ Notation:
 | Market factor | `(1 + MktRF + RF)(1 + f) − 1 − c_eur` |
 | Long-short factors (SMB, HML, RMW, CMA, Mom) | `X · (1 + f)` |
 | Risk-free rate | `c_eur` |
+| Macro and energy legs: spreads (TERM, DEF, INFL) | USD spread `X · (1 + f)` |
+| Macro and energy legs: COMM, carbon (KRBN) | `(1 + R)(1 + f) − 1 − c_eur` |
+| Macro dollar leg | `f` (the dollar measured in euros) instead of the Fed broad dollar index |
+| Brent and Henry Hub changes | Not converted: log changes stay in US dollars |
 
 The euro view starts in January 1999. Days without an ECB rate (euro-area bank holidays) carry the previous rate forward.
 

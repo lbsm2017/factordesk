@@ -206,7 +206,7 @@ def _build_upload_report(
     ccy: ReferenceCurrency,
 ) -> tuple[FactorReport, int]:
     from factordesk.pipeline import assemble_subject_report
-    from factordesk.section_hooks.context import SectionInputs
+    from factordesk.section_hooks.context import ReferenceInput, SectionInputs
 
     label = clean_name(name)
     try:
@@ -233,19 +233,20 @@ def _build_upload_report(
     frame = monthly_frame(model, runtime, now)
     load_macro = runtime.deps.load_macro
     load_energy = runtime.deps.load_energy
+    reference = None
     if ccy == "EUR":
+        usd_rf = frame["RF"]  # the dollar risk-free rate, before the frame is converted
         frame = ctx.factors(frame)
-        ctx.note("The macro and energy sections are not available in EUR yet.")
-        inputs = None
-    else:
-        inputs = (
-            None
-            if load_macro is None and load_energy is None
-            else SectionInputs(
-                macro=None if load_macro is None else load_macro(),
-                energy=None if load_energy is None else load_energy(),
-            )
+        reference = ReferenceInput(lambda dates: ctx.returns("USD", dates), usd_rf)
+    inputs = (
+        None
+        if load_macro is None and load_energy is None
+        else SectionInputs(
+            macro=None if load_macro is None else load_macro(),
+            energy=None if load_energy is None else load_energy(),
+            reference=reference,
         )
+    )
     try:
         report = assemble_subject_report(
             subject,

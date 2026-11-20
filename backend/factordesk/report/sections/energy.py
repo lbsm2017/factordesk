@@ -38,6 +38,12 @@ MODEL_NOTE = (
     "co-movement in this window, not a forecast."
 )
 """Fixed note under the section."""
+EUR_MODEL_NOTE = (
+    "Separate regression, not the headline model, in euros. Sensitivities are raw and describe "
+    "co-movement in this window, not a forecast. Oil and gas price changes stay in US dollars; "
+    "the market and carbon legs are in euros."
+)
+"""Fixed note under the section in the EUR view."""
 
 
 def carbon_label(start: date) -> str:

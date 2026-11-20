@@ -32,6 +32,11 @@ Timing is the macro rule: a daily leg return counts only when the leg's previous
 subject's previous date; a missing price is never filled (a missing FRED day removes that day and
 the next). A monthly regression compounds each leg to the month-end first.
 
+EUR view (``fx``, the return of the US dollar in euros over each interval of the calendar). The
+market and the sample's ``rf`` are already in euros. CO2 becomes ``(1 + KRBN)(1 + f) - 1 - c`` with
+``c`` the euro cash return. Brent and Henry Hub are shock series and stay log changes in US
+dollars.
+
 Pure: no I/O, no clock. Inputs are not mutated.
 """
 
@@ -44,6 +49,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from factordesk.analytics.currency import excess_in_reference
 from factordesk.analytics.macro import TooFewRowsError, leg_returns
 from factordesk.analytics.regression import (
     Z_975,
@@ -97,6 +103,26 @@ FACTORS: tuple[EnergyFactor, ...] = (
     ),
 )
 BY_CODE: dict[str, EnergyFactor] = {f.code: f for f in FACTORS}
+EUR_FACTORS: tuple[EnergyFactor, ...] = (
+    EnergyFactor("mkt_rf", "Mkt-RF", "Market", "French market excess return, in euros"),
+    FACTORS[1],
+    FACTORS[2],
+    EnergyFactor(
+        "co2",
+        "CO2",
+        "Carbon",
+        "KRBN total return in euros minus the euro cash rate",
+        "mainly EU carbon",
+    ),
+)
+EUR_BY_CODE: dict[str, EnergyFactor] = {f.code: f for f in EUR_FACTORS}
+
+
+def factors_of(euro: bool) -> dict[str, EnergyFactor]:
+    """The factor descriptions of the USD view or of the EUR view (wording only)."""
+    return EUR_BY_CODE if euro else BY_CODE
+
+
 LONG_CODES: tuple[str, ...] = ("mkt_rf", "oil", "gas")
 CARBON_CODES: tuple[str, ...] = ("mkt_rf", "oil", "gas", "co2")
 CARBON_TICKER = "KRBN"
@@ -131,11 +157,13 @@ def build_columns(
     oil_levels: pd.Series,
     gas_levels: pd.Series,
     carbon_levels: pd.Series | None,
+    fx: pd.Series | None = None,
 ) -> EnergyColumns:
     """The four legs on the sample's rows (``calendar`` is the subject's calendar, origin first).
 
     Oil and gas are log returns of the spot prices; CO2 is the simple KRBN return minus RF, NaN
-    everywhere without KRBN prices. A non-positive price is a missing price.
+    everywhere without KRBN prices. A non-positive price is a missing price. With ``fx`` (the EUR
+    view) CO2 is ``(1 + KRBN)(1 + f) - 1 - rf``, ``rf`` being the euro cash return.
     """
     freq = sample.frequency
     rows = pd.DatetimeIndex(sample.xret.index)
@@ -143,9 +171,12 @@ def build_columns(
     if carbon_levels is None:
         co2 = np.full(len(rows), np.nan, dtype=np.float64)
     else:
-        co2 = (
-            leg_returns(carbon_levels, calendar, freq).reindex(rows).to_numpy(dtype=np.float64) - rf
-        )
+        krbn = leg_returns(carbon_levels, calendar, freq).reindex(rows).to_numpy(dtype=np.float64)
+        if fx is None:
+            co2 = krbn - rf
+        else:
+            f = fx.reindex(rows).to_numpy(dtype=np.float64)
+            co2 = np.asarray(excess_in_reference(krbn, f, rf), dtype=np.float64)
     return EnergyColumns(
         dates=rows,
         y=sample.xret.to_numpy(dtype=np.float64),
@@ -328,15 +359,16 @@ def run_energy(
     oil_levels: pd.Series,
     gas_levels: pd.Series,
     carbon_levels: pd.Series | None,
+    fx: pd.Series | None = None,
 ) -> EnergyResult:
-    """Build the legs and fit both models.
+    """Build the legs and fit both models (``fx``: the EUR view, see ``build_columns``).
 
     Raises ``TooFewRowsError`` when the long model has fewer than ``MIN_ROWS`` rows and
     ``DegenerateInputError`` when its design is singular. The carbon model never raises: with
     fewer than ``MIN_CARBON_ROWS`` rows, without KRBN prices or with a singular design it is left
     out and ``carbon_note`` says why.
     """
-    cols = build_columns(sample, calendar, oil_levels, gas_levels, carbon_levels)
+    cols = build_columns(sample, calendar, oil_levels, gas_levels, carbon_levels, fx)
     long_design = design_of(cols, LONG_CODES)
     floor = MIN_ROWS[cols.frequency]
     if long_design.n < floor:

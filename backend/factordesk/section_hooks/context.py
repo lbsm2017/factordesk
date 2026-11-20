@@ -170,6 +170,19 @@ class EnergyInput:
 
 
 @dataclass(frozen=True)
+class ReferenceInput:
+    """What the macro and energy sections need in the EUR view.
+
+    ``fx_returns(calendar)`` is the return of one US dollar in euros over each interval of the
+    subject's calendar (origin first), indexed by ``calendar[1:]``. ``usd_rf`` is the French
+    (US dollar) risk-free return on the factor frame's dates; the euro frame's ``RF`` is euro cash.
+    """
+
+    fx_returns: Callable[[pd.DatetimeIndex], pd.Series]
+    usd_rf: pd.Series
+
+
+@dataclass(frozen=True)
 class SectionInputs:
     """Data a section needs that ``assemble_report`` does not already have.
 
@@ -193,6 +206,8 @@ class SectionInputs:
     energy: EnergyInput | None = None
     """Brent, Henry Hub and KRBN of the energy section; ``None``: not fetched, the section does
     not run. Owned by the energy feature."""
+    reference: ReferenceInput | None = None
+    """The EUR view of the macro and energy sections; ``None``: the US-dollar view."""
 
 
 @dataclass(frozen=True)

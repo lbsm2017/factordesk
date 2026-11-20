@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from factordesk.analytics.currency import hedge
+from factordesk.analytics.currency import EuroLegs, convert_factors, hedge
 from factordesk.api import portfolio_report as pr
 from factordesk.api.currency_ctx import CurrencyContext, CurrencySources
 from factordesk.api.portfolio_models import PortfolioTree, load_library
@@ -152,10 +152,6 @@ def test_eur_ticker_report_runs_and_carries_the_currency_block(tmp_path: Any) ->
     eur = eur_response.json()
     assert eur["currency"]["reference"] == "EUR"
     assert eur["currency"]["fx_source"] and eur["currency"]["rate_source"]
-    assert any("macro" in n.lower() for n in eur["currency"]["notes"])
-    assert "macro" not in eur
-    assert any("energy" in n.lower() for n in eur["currency"]["notes"])
-    assert "energy" not in eur
     assert eur["regression"] != usd["regression"]
     # The price chart is in euros: USD price times the euro price of a dollar.
     first = pd.Timestamp(eur["price_series"]["dates"][0])
@@ -240,7 +236,6 @@ def test_eur_portfolio_holds_the_unallocated_weight_as_euro_cash(
     assert body["currency"]["reference"] == "EUR"
     assert body["portfolio_backtest"]["unallocated_weight"] == pytest.approx(0.4)
     assert body["portfolio_backtest"]["unallocated_currency"] == "EUR"
-    assert "macro" not in body
 
 
 def test_eur_portfolio_hedges_flagged_lines_and_says_so(world: World, client: ApiClient) -> None:
@@ -418,3 +413,205 @@ def test_api_hedged_leaf_is_the_local_return_minus_rf_plus_euro_cash(
     assert (
         "US risk-free rate (factor file)" in response.json()["portfolio_backtest"]["end_limited_by"]
     )
+
+
+# ----------------------------------------------------------- macro and energy in the EUR view
+def _fx_f(calendar: pd.DatetimeIndex) -> pd.Series:
+    """A made-up return of the dollar in euros over each interval of ``calendar``."""
+    values = 0.002 * np.sin(np.arange(1, len(calendar)) / 7.0)
+    return pd.Series(values, index=calendar[1:], name="fx")
+
+
+def _eur_frame(factors: pd.DataFrame, calendar: pd.DatetimeIndex, cash: float) -> pd.DataFrame:
+    c = pd.Series(cash, index=calendar[1:])
+    return convert_factors(factors, _fx_f(calendar), c)
+
+
+def test_eur_macro_legs_are_the_usd_legs_converted_with_the_dollar_return() -> None:
+    from factordesk.analytics.macro import build_design
+    from factordesk.analytics.sample import build_sample
+    from factordesk.tests.test_macro import levels_of, make_macro_case
+
+    case = make_macro_case(9101, n=800)
+    calendar = pd.DatetimeIndex(case.stock.frame.index)
+    f = _fx_f(calendar)
+    c = 0.0001
+    frame = _eur_frame(case.factors, calendar, c)
+    sample = build_sample(case.stock, frame)
+    legs = EuroLegs(f, case.factors["RF"])
+    design = build_design(sample, calendar, levels_of(case), None, legs)
+    usd = build_design(
+        build_sample(case.stock, case.factors), calendar, levels_of(case), case.dollar
+    )
+    term, dspread, comm, infl, _ = case.z.T
+    skip = 800 - design.n  # the first day has no lagged dollar return
+    assert skip == 1
+    fx = f.to_numpy()[skip:]
+    cols = dict(zip(design.codes, design.x.T, strict=True))
+    usd_cols = dict(zip(usd.codes, usd.x.T, strict=True))
+    # a spread leg is the USD spread times (1 + f); TERM uses the dollar risk-free rate
+    for code in ("term", "def", "infl"):
+        np.testing.assert_allclose(cols[code], usd_cols[code] * (1.0 + fx), atol=1e-12)
+    np.testing.assert_allclose(cols["term"], term[skip:] * (1.0 + fx), atol=1e-12)
+    np.testing.assert_allclose(cols["def"], dspread[skip:] * (1.0 + fx), atol=1e-12)
+    np.testing.assert_allclose(cols["infl"], infl[skip:] * (1.0 + fx), atol=1e-12)
+    # COMM is DBC converted, minus the euro cash return c (not the dollar rate)
+    dbc = case.rf[skip:] + comm[skip:]
+    np.testing.assert_allclose(cols["comm"], (1.0 + dbc) * (1.0 + fx) - 1.0 - c, atol=1e-12)
+    # the dollar leg is f itself, with the previous day's f as the lag term
+    np.testing.assert_allclose(cols["usd"], fx, atol=1e-15)
+    assert design.usd_lag is not None
+    np.testing.assert_allclose(design.usd_lag, f.to_numpy()[skip - 1 : -1], atol=1e-15)
+    # the market leg is the euro market factor of the frame
+    np.testing.assert_allclose(cols["mkt_rf"], frame["Mkt-RF"].to_numpy()[skip:], atol=1e-15)
+
+
+def test_eur_macro_ignores_the_fed_dollar_index() -> None:
+    from factordesk.analytics.macro import run_macro
+    from factordesk.analytics.sample import build_sample
+    from factordesk.tests.test_macro import levels_of, make_macro_case
+
+    case = make_macro_case(9102, n=600)
+    calendar = pd.DatetimeIndex(case.stock.frame.index)
+    sample = build_sample(case.stock, _eur_frame(case.factors, calendar, 0.0001))
+    legs = EuroLegs(_fx_f(calendar), case.factors["RF"])
+    _, with_index = run_macro(sample, calendar, levels_of(case), case.dollar, legs)
+    _, without = run_macro(sample, calendar, levels_of(case), None, legs)
+    assert [r.beta for r in with_index.rows] == [r.beta for r in without.rows]
+    assert [r.code for r in without.rows][-1] == "usd"
+    usd = without.rows[-1]
+    assert usd.beta_same_day is not None and usd.beta_lag is not None
+
+
+def test_eur_energy_carbon_leg_uses_the_euro_cash_return_and_shocks_stay_in_dollars() -> None:
+    from factordesk.analytics.energy import build_columns
+    from factordesk.analytics.sample import build_sample
+    from factordesk.tests.test_energy import make_energy_case
+
+    case = make_energy_case(9103, n=700)
+    calendar = pd.DatetimeIndex(case.stock.frame.index)
+    f = _fx_f(calendar)
+    c = 0.0001
+    sample = build_sample(case.stock, _eur_frame(case.factors, calendar, c))
+    krbn = case.krbn.frame["adj_close"]
+    usd_cols = build_columns(
+        build_sample(case.stock, case.factors), calendar, case.oil_levels, case.gas_levels, krbn
+    )
+    eur_cols = build_columns(sample, calendar, case.oil_levels, case.gas_levels, krbn, f)
+    fx = f.to_numpy()
+    krbn_ret = case.rf + case.co2  # KRBN's simple return, as the case builds it
+    np.testing.assert_allclose(eur_cols.co2, (1.0 + krbn_ret) * (1.0 + fx) - 1.0 - c, atol=1e-12)
+    # Brent and Henry Hub are not converted
+    np.testing.assert_array_equal(eur_cols.oil, usd_cols.oil)
+    np.testing.assert_array_equal(eur_cols.gas, usd_cols.gas)
+
+
+def _usd_loaders(dates: pd.DatetimeIndex) -> tuple[Any, Any]:
+    from factordesk.section_hooks.context import (
+        DollarInput,
+        EnergyInput,
+        MacroInput,
+        SeriesInput,
+        WorldBenchmarkInput,
+    )
+    from factordesk.tests.fixtures.dgp import price_history
+
+    rng = np.random.default_rng(9104)
+    n = len(dates)
+
+    def fund(ticker: str, drift: float) -> WorldBenchmarkInput:
+        return WorldBenchmarkInput(
+            history=price_history(rng.normal(drift, 0.003, size=n), dates, ticker=ticker)
+        )
+
+    def levels(start: float, sd: float) -> pd.Series:
+        index = pd.DatetimeIndex([pd.Timestamp("2009-12-31"), *dates], name="date")
+        values = start * np.exp(np.concatenate([[0.0], np.cumsum(rng.normal(0.0, sd, size=n))]))
+        return pd.Series(values, index=index)
+
+    macro = MacroInput(
+        funds={t: fund(t, 0.0002) for t in ("IEF", "LQD", "DBC", "TIP", "IEI")},
+        dollar=DollarInput(levels=levels(100.0, 0.002)),
+    )
+    energy = EnergyInput(
+        oil=SeriesInput(levels=levels(60.0, 0.015)),
+        gas=SeriesInput(levels=levels(3.0, 0.02)),
+        carbon=fund("KRBN", 0.0003),
+    )
+    return (lambda: macro), (lambda: energy)
+
+
+def test_eur_ticker_report_has_macro_and_energy_and_the_usd_view_keeps_its_wording(
+    tmp_path: Any,
+) -> None:
+    w = ticker_world(tmp_path)
+    with_sources(cast(Any, w), FAKE)
+    macro, energy = _usd_loaders(pd.DatetimeIndex(w.history.frame.index[1:]))
+    deps = cast(Any, w).service.deps
+    object.__setattr__(deps, "load_macro", macro)
+    object.__setattr__(deps, "load_energy", energy)
+    with report_tests.serve(w.app) as c:
+        usd = c.get("/api/report/SYN").json()
+        eur_response = c.get("/api/report/SYN?ccy=EUR")
+    assert eur_response.status_code == 200, eur_response.text
+    eur = eur_response.json()
+    assert eur["macro"]["status"] == "ok" and eur["energy"]["status"] == "ok"
+    assert eur["energy"]["carbon_model"] is not None
+    notes = " ".join(eur["currency"]["notes"]).lower()
+    assert "macro" not in notes and "energy" not in notes
+    # the dollar leg is the dollar against the euro, in the EUR view only
+    assert [r["label"] for r in eur["macro"]["rows"]][-1] == "US dollar against the euro"
+    assert [r["label"] for r in usd["macro"]["rows"]][-1] == "US dollar"
+    assert "in euros" in eur["macro"]["model_note"]
+    assert "in euros" not in usd["macro"]["model_note"]
+    assert eur["macro"]["usd_included"] and eur["macro"]["usd_lag_note"]
+    assert eur["macro"]["rows"][-1]["beta_lag"] is not None
+    assert any(leg["ticker"] == "USD/EUR" for leg in eur["macro"]["legs"])
+    assert "in euros" in eur["energy"]["model_note"]
+    assert eur["macro"]["rows"] != usd["macro"]["rows"]
+    # oil and gas stay US-dollar log changes
+    oil_leg = next(leg for leg in eur["energy"]["legs"] if leg["code"] == "oil")
+    assert "US dollars" in oil_leg["role"]
+
+
+def test_eur_monthly_subject_has_macro_with_the_dollar_leg_and_no_lag_term() -> None:
+    from factordesk.analytics.macro import LEG_TICKERS
+    from factordesk.analytics.subject import subject_from_monthly_returns
+    from factordesk.pipeline import assemble_subject_report
+    from factordesk.section_hooks.context import (
+        DollarInput,
+        MacroInput,
+        ReferenceInput,
+        SectionInputs,
+        WorldBenchmarkInput,
+    )
+    from factordesk.tests.test_macro import NOW, _history  # pyright: ignore[reportPrivateUsage]
+    from factordesk.tests.test_subject import monthly_case
+
+    returns, factors, _ = monthly_case(120, 33, start="2005-01-31")
+    month_ends = pd.DatetimeIndex(returns.index)
+    calendar = pd.DatetimeIndex([month_ends[0] - pd.offsets.MonthEnd(1), *month_ends])
+    days = pd.bdate_range("2004-12-01", month_ends[-1])
+    rng = np.random.default_rng(34)
+
+    def walk(sd: float) -> pd.Series:
+        steps = rng.normal(0.0002, sd, len(days) - 1)
+        return pd.Series(100.0 * np.concatenate([[1.0], np.cumprod(1.0 + steps)]), index=days)
+
+    funds = {t: WorldBenchmarkInput(history=_history(t, walk(0.003))) for t in LEG_TICKERS}
+    macro = MacroInput(funds=funds, dollar=DollarInput(levels=walk(0.002)))
+    usd_rf = factors["RF"]
+    frame = convert_factors(factors, _fx_f(calendar), pd.Series(0.0001, index=month_ends))
+    inputs = SectionInputs(
+        macro=macro,
+        reference=ReferenceInput(lambda dates: _fx_f(dates), usd_rf),
+    )
+    subject = subject_from_monthly_returns(returns, label="Fund")
+    report = assemble_subject_report(
+        subject, frame, now=NOW, factors_downloaded_at=None, section_inputs=inputs
+    )
+    section = report.macro
+    assert section is not None and section.status == "ok" and section.frequency == "monthly"
+    assert section.rows[-1].label == "US dollar against the euro"
+    assert section.usd_lag_note is None and section.rows[-1].beta_lag is None
+    assert "in euros" in section.model_note

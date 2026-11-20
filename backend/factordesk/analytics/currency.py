@@ -16,6 +16,10 @@
   price times the exchange-rate price of its date, so its total returns are ``convert`` of the
   local ones). Dates without an exchange rate before the first or after the last one are cut;
   those inside keep their row with NaN prices (so the sample excludes them). All are counted.
+- ``EuroLegs`` and the three leg helpers: the EUR view of the macro and energy sections. A traded
+  spread of two USD returns is ``X (1 + f)`` (``spread_in_reference``); a traded return above
+  cash is ``(1 + R)(1 + f) - 1 - c`` (``excess_in_reference``); the dollar leg is ``f`` itself.
+  Shock series (Brent, Henry Hub) are not converted.
 - ``listing_currency(ticker, security)``: the ISO code of a listing and the price scale (GBp and
   GBX are pence: 0.01 pounds); anything outside ``fx.CURRENCIES`` is refused.
 
@@ -27,6 +31,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -88,6 +93,32 @@ def convert_series(
         return Converted(out)
     notice = f"{n} dates had no {from_ccy}/{to_ccy} exchange rate and are left out."
     return Converted(out, n, notice)
+
+
+@dataclass(frozen=True)
+class EuroLegs:
+    """What the macro and energy sections need to run in the reference currency (EUR).
+
+    ``fx`` is the return of one US dollar in euros over each interval of the subject's calendar,
+    indexed by ``calendar[1:]``. ``usd_rf`` is the French (US dollar) risk-free return on the
+    factor frame's dates: the euro frame's ``RF`` is the euro cash return, so the dollar one is
+    kept here for the USD spreads (``IEF - RF``). The sample's own ``rf`` is the euro cash return.
+    """
+
+    fx: pd.Series
+    usd_rf: pd.Series
+
+
+def spread_in_reference(spread: pd.Series | np.ndarray, fx: pd.Series | np.ndarray) -> Any:
+    """A spread of two USD returns in euros: ``X (1 + f)``."""
+    return spread * (1.0 + fx)
+
+
+def excess_in_reference(
+    returns: pd.Series | np.ndarray, fx: pd.Series | np.ndarray, cash: pd.Series | np.ndarray
+) -> Any:
+    """A USD return above euro cash: ``(1 + R)(1 + f) - 1 - c``."""
+    return (1.0 + returns) * (1.0 + fx) - 1.0 - cash
 
 
 MARKET = "Mkt-RF"

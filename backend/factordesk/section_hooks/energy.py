@@ -24,10 +24,10 @@ from pathlib import Path
 import pandas as pd
 
 from factordesk.analytics.energy import (
-    BY_CODE,
     CARBON_TICKER,
     EnergyFit,
     EnergyResult,
+    factors_of,
     run_energy,
 )
 from factordesk.analytics.macro import TooFewRowsError
@@ -36,6 +36,7 @@ from factordesk.data.fred import BRENT_SERIES, HENRY_HUB_SERIES, FredError, load
 from factordesk.data.prices import PriceProvider, collapse_duplicate_dates
 from factordesk.report.base import SampleInfo, Status
 from factordesk.report.sections.energy import (
+    EUR_MODEL_NOTE,
     FRED_UNAVAILABLE,
     GAS_NOTE_DAILY,
     GAS_NOTE_MONTHLY,
@@ -61,6 +62,11 @@ ROLES: dict[str, str] = {
     BRENT_SERIES: "OIL = log change of the Brent spot price",
     HENRY_HUB_SERIES: "GAS = log change of the Henry Hub spot price",
     CARBON_TICKER: "CO2 = KRBN total return minus RF",
+}
+EUR_ROLES: dict[str, str] = {
+    BRENT_SERIES: "OIL = log change of the Brent spot price, in US dollars",
+    HENRY_HUB_SERIES: "GAS = log change of the Henry Hub spot price, in US dollars",
+    CARBON_TICKER: "CO2 = KRBN total return in euros minus the euro cash rate",
 }
 LEG_CODES: dict[str, str] = {BRENT_SERIES: "oil", HENRY_HUB_SERIES: "gas", CARBON_TICKER: "co2"}
 TITLES: dict[str, str] = {
@@ -119,12 +125,13 @@ def _carbon_levels(bench: WorldBenchmarkInput) -> pd.Series | None:
     return frame["adj_close"].astype("float64")
 
 
-def _legs(levels: dict[str, pd.Series | None]) -> list[EnergyLeg]:
+def _legs(levels: dict[str, pd.Series | None], euro: bool = False) -> list[EnergyLeg]:
+    roles = EUR_ROLES if euro else ROLES
     return [
         EnergyLeg(
             ticker=ticker,
             code=LEG_CODES[ticker],  # pyright: ignore[reportArgumentType]
-            role=ROLES[ticker],
+            role=roles[ticker],
             first_date=None if (lv := levels.get(ticker)) is None else _first_date(lv),
         )
         for ticker in (BRENT_SERIES, HENRY_HUB_SERIES, CARBON_TICKER)
@@ -145,15 +152,18 @@ def _limiting_leg(
     return latest.ticker
 
 
-def _model(key: str, fit: EnergyFit, legs: list[EnergyLeg], subject_start: date) -> EnergyModel:
+def _model(
+    key: str, fit: EnergyFit, legs: list[EnergyLeg], subject_start: date, euro: bool = False
+) -> EnergyModel:
+    by_code = factors_of(euro)
     rows = [
         EnergyRow.model_validate(
             {
                 "code": r.code,
-                "name": BY_CODE[r.code].name,
-                "label": BY_CODE[r.code].label,
-                "definition": BY_CODE[r.code].definition,
-                "note": BY_CODE[r.code].note,
+                "name": by_code[r.code].name,
+                "label": by_code[r.code].label,
+                "definition": by_code[r.code].definition,
+                "note": by_code[r.code].note,
                 "beta": r.beta,
                 "se": r.se,
                 "t": r.t,
@@ -199,6 +209,8 @@ def build_energy(ctx: SectionContext) -> EnergySection | None:
     energy = ctx.inputs.energy
     if energy is None:
         return None
+    reference = ctx.inputs.reference
+    eur = reference is not None
     frequency = ctx.subject.frequency
     base = ctx.sample_info(None)
 
@@ -215,11 +227,13 @@ def build_energy(ctx: SectionContext) -> EnergySection | None:
             for name, s in (("Brent", energy.oil), ("Henry Hub", energy.gas))
             if s.note
         ]
-        long_model = None if result is None else _model("long", result.long, legs, ctx.sample.start)
+        long_model = (
+            None if result is None else _model("long", result.long, legs, ctx.sample.start, eur)
+        )
         carbon_model = (
             None
             if result is None or result.carbon is None
-            else _model("carbon", result.carbon, legs, ctx.sample.start)
+            else _model("carbon", result.carbon, legs, ctx.sample.start, eur)
         )
         fit = None if result is None else result.long
         return EnergySection.model_validate(
@@ -232,7 +246,7 @@ def build_energy(ctx: SectionContext) -> EnergySection | None:
                     None if fit is None else fit.start,
                     None if fit is None else fit.end,
                 ),
-                "model_note": MODEL_NOTE,
+                "model_note": EUR_MODEL_NOTE if eur else MODEL_NOTE,
                 "gas_note": GAS_NOTE_DAILY if frequency == "daily" else GAS_NOTE_MONTHLY,
                 "frequency": frequency,
                 "n_sample": ctx.sample.n if result is None else result.n_sample,
@@ -250,13 +264,15 @@ def build_energy(ctx: SectionContext) -> EnergySection | None:
             BRENT_SERIES: energy.oil.levels,
             HENRY_HUB_SERIES: energy.gas.levels,
             CARBON_TICKER: carbon,
-        }
+        },
+        eur,
     )
     if energy.oil.levels is None or energy.gas.levels is None:
         return block("failed", FRED_UNAVAILABLE, legs)
     try:
+        fx = None if reference is None else reference.fx_returns(ctx.subject.calendar)
         result = run_energy(
-            ctx.sample, ctx.subject.calendar, energy.oil.levels, energy.gas.levels, carbon
+            ctx.sample, ctx.subject.calendar, energy.oil.levels, energy.gas.levels, carbon, fx
         )
     except TooFewRowsError as exc:
         return block("insufficient_data", f"The energy regression needs more data: {exc}.", legs)

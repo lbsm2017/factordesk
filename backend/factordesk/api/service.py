@@ -318,6 +318,7 @@ class ReportService:
             frame = await self._model_frame(loaded, now, model, ctx)
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs, ctx)
+            inputs = await self._with_reference(inputs, ctx, loaded, now, model)
             inputs = await self._with_macro(inputs, ctx)
             inputs = await self._with_energy(inputs, ctx)
 
@@ -404,6 +405,7 @@ class ReportService:
             )
             frame = await self._model_frame(loaded, now, model, ctx)
             inputs = await self._with_world_benchmark(None, ctx)
+            inputs = await self._with_reference(inputs, ctx, loaded, now, model)
             inputs = await self._with_macro(inputs, ctx)
             inputs = await self._with_energy(inputs, ctx)
 
@@ -640,15 +642,33 @@ class ReportService:
             ctx.note(f"{ticker}: {dropped} dates had no exchange rate and are left out.")
         return converted
 
+    async def _with_reference(
+        self,
+        inputs: SectionInputs | None,
+        ctx: CurrencyContext,
+        loaded: LoadedFactors,
+        now: datetime,
+        model: FactorModel,
+    ) -> SectionInputs | None:
+        """``inputs`` plus what the macro and energy sections need in the EUR view: the USD/EUR
+        return on the subject's calendar and the US dollar risk-free rate. The USD view is
+        returned as it is."""
+        if ctx.ref == "USD" or (self.deps.load_macro is None and self.deps.load_energy is None):
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import ReferenceInput, SectionInputs
+
+        usd = await self._usd_model_frame(loaded, now, model)
+        reference = ReferenceInput(lambda dates: ctx.returns("USD", dates), usd["RF"])
+        return dataclasses.replace(inputs or SectionInputs(), reference=reference)
+
     async def _with_macro(
         self, inputs: SectionInputs | None, ctx: CurrencyContext
     ) -> SectionInputs | None:
-        """``inputs`` plus the macro section's funds and dollar index (None: not wired). Left
-        out in the EUR view."""
+        """``inputs`` plus the macro section's funds and dollar index (None: not wired). In the
+        EUR view the section converts its legs (``_with_reference``)."""
         loader = self.deps.load_macro
-        if ctx.ref != "USD":
-            ctx.note("The macro section is not available in EUR yet.")
-            return inputs
         if loader is None:
             return inputs
         import dataclasses
@@ -661,12 +681,9 @@ class ReportService:
     async def _with_energy(
         self, inputs: SectionInputs | None, ctx: CurrencyContext
     ) -> SectionInputs | None:
-        """``inputs`` plus the energy section's oil, gas and KRBN data (None: not wired). Left
-        out in the EUR view."""
+        """``inputs`` plus the energy section's oil, gas and KRBN data (None: not wired). In the
+        EUR view the section converts its legs (``_with_reference``)."""
         loader = self.deps.load_energy
-        if ctx.ref != "USD":
-            ctx.note("The energy section is not available in EUR yet.")
-            return inputs
         if loader is None:
             return inputs
         import dataclasses
