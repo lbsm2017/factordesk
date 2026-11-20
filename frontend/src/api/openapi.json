@@ -156,6 +156,350 @@
         }
       }
     },
+    "/api/report/{ticker}/stream": {
+      "get": {
+        "summary": "Stream Report",
+        "description": "Progress and result of ``GET /api/report/{ticker}``, as server-sent events.",
+        "operationId": "stream_report_api_report__ticker__stream_get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "3Y",
+                    "5Y",
+                    "10Y",
+                    "FULL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Range preset; not together with start or end.",
+              "title": "Range"
+            },
+            "description": "Range preset; not together with start or end."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First requested date, YYYY-MM-DD.",
+              "title": "Start"
+            },
+            "description": "First requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last requested date, YYYY-MM-DD.",
+              "title": "End"
+            },
+            "description": "Last requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ff5",
+                "ff6"
+              ],
+              "type": "string",
+              "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
+              "default": "ff5",
+              "title": "Model"
+            },
+            "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum)."
+          },
+          {
+            "name": "ccy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "USD",
+                "EUR"
+              ],
+              "type": "string",
+              "description": "Reference currency of every figure: USD (default) or EUR.",
+              "default": "USD",
+              "title": "Ccy"
+            },
+            "description": "Reference currency of every figure: USD (default) or EUR."
+          },
+          {
+            "name": "factor_set",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "us",
+                "europe"
+              ],
+              "type": "string",
+              "description": "Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars).",
+              "default": "us",
+              "title": "Factor Set"
+            },
+            "description": "Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A stream of server-sent events. `step` (data: ProgressStep) for each step reached, then one `report` (data: FactorReport, as the plain endpoint) or one `error` (data: ApiErrorEvent). A cached report sends `report` alone.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProgressStep"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FactorReport"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ApiErrorEvent"
+                    }
+                  ],
+                  "title": "Response 200 Stream Report Api Report  Ticker  Stream Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report/portfolio/stream": {
+      "post": {
+        "summary": "Stream Portfolio Report",
+        "description": "Progress and result of ``POST /api/report/portfolio``, as server-sent events.\n\nThe factor set is the tree's ``factor_set`` field, as for the plain endpoint.",
+        "operationId": "stream_portfolio_report_api_report_portfolio_stream_post",
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "3Y",
+                    "5Y",
+                    "10Y",
+                    "FULL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Range preset; not together with start or end.",
+              "title": "Range"
+            },
+            "description": "Range preset; not together with start or end."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First requested date, YYYY-MM-DD.",
+              "title": "Start"
+            },
+            "description": "First requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last requested date, YYYY-MM-DD.",
+              "title": "End"
+            },
+            "description": "Last requested date, YYYY-MM-DD."
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ff5",
+                "ff6"
+              ],
+              "type": "string",
+              "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
+              "default": "ff6",
+              "title": "Model"
+            },
+            "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioTree"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A stream of server-sent events. `step` (data: ProgressStep) for each step reached, then one `report` (data: FactorReport, as the plain endpoint) or one `error` (data: ApiErrorEvent). A cached report sends `report` alone.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProgressStep"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FactorReport"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ApiErrorEvent"
+                    }
+                  ],
+                  "title": "Response 200 Stream Portfolio Report Api Report Portfolio Stream Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report/upload/stream": {
+      "post": {
+        "summary": "Stream Upload Report",
+        "description": "Progress and result of ``POST /api/report/upload``, as server-sent events.\n\nAn upload has no price download, so its steps start at the factor data; ``fx`` is a step\nwhen the record or the report is in euros.",
+        "operationId": "stream_upload_report_api_report_upload_stream_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_stream_upload_report_api_report_upload_stream_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A stream of server-sent events. `step` (data: ProgressStep) for each step reached, then one `report` (data: FactorReport, as the plain endpoint) or one `error` (data: ApiErrorEvent). A cached report sends `report` alone.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProgressStep"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FactorReport"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ApiErrorEvent"
+                    }
+                  ],
+                  "type": "string",
+                  "title": "Response 200 Stream Upload Report Api Report Upload Stream Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/report/upload": {
       "post": {
         "summary": "Upload Report",
@@ -407,7 +751,7 @@
     "/api/report/{ticker}/ranges": {
       "get": {
         "summary": "Get Ranges",
-        "description": "Availability of every range preset for this ticker, with the reason when one is short.\n\nThe presets follow the dates of the chosen factor set (the Europe files start in 1990).",
+        "description": "Availability of every range preset for this ticker, with the reason when one is short.\n\n``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices\nleaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).\nThe presets follow the dates of the chosen factor set (the Europe files start in 1990).",
         "operationId": "get_ranges_api_report__ticker__ranges_get",
         "parameters": [
           {
@@ -418,6 +762,22 @@
               "type": "string",
               "title": "Ticker"
             }
+          },
+          {
+            "name": "ccy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "USD",
+                "EUR"
+              ],
+              "type": "string",
+              "description": "Reference currency of every figure: USD (default) or EUR.",
+              "default": "USD",
+              "title": "Ccy"
+            },
+            "description": "Reference currency of every figure: USD (default) or EUR."
           },
           {
             "name": "factor_set",
@@ -1230,6 +1590,53 @@
         "title": "ApiError",
         "description": "Every error body: ``message`` says what went wrong, ``action`` what to do."
       },
+      "ApiErrorEvent": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_ticker",
+              "unknown_ticker",
+              "bad_range",
+              "insufficient_history",
+              "degenerate_input",
+              "unsupported_currency",
+              "factor_data_invalid",
+              "network",
+              "upstream_refused",
+              "not_found",
+              "internal",
+              "bad_request",
+              "invalid_upload",
+              "upload_too_large",
+              "invalid_portfolio"
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "action",
+          "status"
+        ],
+        "title": "ApiErrorEvent",
+        "description": "Data of an ``event: error`` of a ``.../stream`` endpoint: the ``ApiError`` plus the HTTP\nstatus the plain endpoint would answer."
+      },
       "AssetClassGroup": {
         "properties": {
           "id": {
@@ -1599,6 +2006,85 @@
         "title": "BetaFit",
         "description": "One single-factor regression of the stock's excess return, with Newey-West inference."
       },
+      "Body_stream_upload_report_api_report_upload_stream_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "CSV with a date and a return column."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name of the record."
+          },
+          "gross_net": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Net",
+            "description": "gross or net of fees; empty when unknown."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "ff5",
+              "ff6"
+            ],
+            "title": "Model",
+            "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
+            "default": "ff5"
+          },
+          "record_currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Record Currency",
+            "description": "Currency of the record itself: USD (default) or EUR.",
+            "default": "USD"
+          },
+          "ccy": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Ccy",
+            "description": "Reference currency of the report: USD or EUR.",
+            "default": "USD"
+          },
+          "factor_set": {
+            "type": "string",
+            "enum": [
+              "us",
+              "europe"
+            ],
+            "title": "Factor Set",
+            "description": "Regional Fama-French factor set: us (default) or europe.",
+            "default": "us"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_stream_upload_report_api_report_upload_stream_post"
+      },
       "Body_upload_report_api_report_upload_post": {
         "properties": {
           "file": {
@@ -1707,7 +2193,10 @@
         "properties": {
           "reference": {
             "type": "string",
-            "const": "EUR",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
             "title": "Reference",
             "description": "Currency of every figure in the report."
           },
@@ -1733,7 +2222,7 @@
               }
             ],
             "title": "Rate Source",
-            "description": "Source credit of the euro cash rate (overnight rate); None when not used."
+            "description": "Source credit of the overnight rates used (euro cash rate, SARON); None when not used."
           },
           "notes": {
             "items": {
@@ -1753,7 +2242,7 @@
           "notes"
         ],
         "title": "CurrencyInfo",
-        "description": "The reference currency of a report that is not in US dollars (written only for those)."
+        "description": "The reference currency, its exchange-rate and rate sources, and notices. Written for a\nreport that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON."
       },
       "DataInfo": {
         "properties": {
@@ -2676,7 +3165,7 @@
                 "type": "null"
               }
             ],
-            "description": "Reference currency of the report when it is not US dollars; absent (not null) for a USD report."
+            "description": "Reference currency of the report when it is not US dollars, or a USD portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report."
           },
           "generated_at": {
             "type": "string",
@@ -5349,6 +5838,47 @@
         ],
         "title": "PriceSeries",
         "description": "Adjusted close for charting only (never used for regression here)."
+      },
+      "ProgressStep": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "enum": [
+              "prices",
+              "fx",
+              "factors",
+              "models",
+              "sections"
+            ],
+            "title": "Step"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Index",
+            "description": "Position of the step in this run, from 1."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Total",
+            "description": "Number of steps in this run."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step",
+          "label",
+          "index",
+          "total"
+        ],
+        "title": "ProgressStep",
+        "description": "Data of an ``event: step`` of a ``.../stream`` endpoint: a step the run has reached."
       },
       "ProxyBeta": {
         "properties": {

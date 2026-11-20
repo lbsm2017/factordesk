@@ -56,10 +56,6 @@ export const mockTickers: TickerSuggestion[] = [
 export const requests: string[] = [];
 
 let status = mockStatus;
-/** Replace what `GET /api/factors/status` returns, and what a refresh returns next. */
-export function setStatus(next: FactorDataStatus): void {
-  status = next;
-}
 let refreshed: FactorDataStatus | null = null;
 export function setRefreshResult(next: FactorDataStatus | null): void {
   refreshed = next;

@@ -541,14 +541,16 @@ ReferenceCurrency = Literal["USD", "EUR"]
 
 
 class CurrencyInfo(FrozenModel):
-    """The reference currency of a report that is not in US dollars (written only for those)."""
+    """The reference currency, its exchange-rate and rate sources, and notices. Written for a
+    report that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON."""
 
-    reference: Literal["EUR"] = Field(description="Currency of every figure in the report.")
+    reference: ReferenceCurrency = Field(description="Currency of every figure in the report.")
     fx_source: str | None = Field(
         description="Source credit of the exchange rates used; None when none were needed."
     )
     rate_source: str | None = Field(
-        description="Source credit of the euro cash rate (overnight rate); None when not used."
+        description="Source credit of the overnight rates used (euro cash rate, SARON); None when "
+        "not used."
     )
     notes: list[str] = Field(
         description="Plain-words notices: dates dropped for lack of an exchange rate, sections "
@@ -585,8 +587,8 @@ class FactorReport(FrozenModel):
     currency: CurrencyInfo | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
-        description="Reference currency of the report when it is not US dollars; absent (not "
-        "null) for a USD report.",
+        description="Reference currency of the report when it is not US dollars, or a USD "
+        "portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report.",
     )
     generated_at: datetime = Field(description="Timezone-aware UTC timestamp.")
     data: DataInfo
@@ -807,6 +809,26 @@ class ApiError(FrozenModel):
     code: ErrorCode
     message: str
     action: str
+
+
+ProgressStepId = Literal["prices", "fx", "factors", "models", "sections"]
+"""The steps of a report run, in order (``fx`` only for a EUR run)."""
+
+
+class ProgressStep(FrozenModel):
+    """Data of an ``event: step`` of a ``.../stream`` endpoint: a step the run has reached."""
+
+    step: ProgressStepId
+    label: str
+    index: int = Field(ge=1, description="Position of the step in this run, from 1.")
+    total: int = Field(ge=1, description="Number of steps in this run.")
+
+
+class ApiErrorEvent(ApiError):
+    """Data of an ``event: error`` of a ``.../stream`` endpoint: the ``ApiError`` plus the HTTP
+    status the plain endpoint would answer."""
+
+    status: int
 
 
 STATISTIC_MODELS: tuple[type[StatisticModel], ...] = (

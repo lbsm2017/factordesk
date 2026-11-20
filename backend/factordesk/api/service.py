@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, cast
 import pandas as pd
 from fastapi import Request
 
+from factordesk import progress
 from factordesk.analytics.currency import convert_history, listing_currency
 from factordesk.api import ranges
 from factordesk.api.currency_ctx import CurrencyContext
@@ -105,6 +106,9 @@ def assemble_report(
         factor_set=factor_set,
     )
 
+
+SLOW_FACTORS_SECONDS = 0.25
+"""A factor load that takes longer than this (a download) is shown as the factor step."""
 
 PRICE_CACHE_SIZE = 16
 """Price histories kept in memory (DB3 layer 2)."""
@@ -199,7 +203,7 @@ class LoadedFactors:
 
 type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
-type RangesKey = tuple[str, Vintage, date, FactorSet]
+type RangesKey = tuple[str, Vintage, date, FactorSet, ReferenceCurrency]
 type ReportKey = tuple[
     str, date | None, date | None, Vintage, date, FactorModel, FactorSet, ReferenceCurrency
 ]
@@ -320,13 +324,18 @@ class ReportService:
     ) -> FactorReport:
         ranges.check_request(preset, start, end)
         now = self._now()
-        loaded = await self._factors()
+        loaded = await self._factors_shown()
+        cold = (ticker, now.date()) not in self.prices
+        if cold:  # a warm run may still end in a cache hit, which reports no steps
+            progress.step("prices")
         base = await self._set_frame(loaded, now, factor_set)
         security = await self._security(ticker, now.date())
         listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
         ctx = CurrencyContext(ccy, self.deps.currency)
         local = history  # the audit reads the prices as the exchange lists them
+        if cold and ccy == "EUR":
+            progress.step("fx")
         history = await self.runtime.run(self._to_reference, ticker, history, listing, scale, ctx)
         cov = await self.runtime.run(ranges.coverage, history, base)
         first, last = ranges.resolve(preset, start, end, cov)
@@ -340,6 +349,7 @@ class ReportService:
             )
 
         async def make() -> FactorReport:
+            progress.step("factors")
             frame = await self._model_frame(loaded, now, model, ctx, factor_set)
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs, ctx, factor_set)
@@ -401,7 +411,6 @@ class ReportService:
         plan = pr.plan_of(tree)
         ccy = tree.reference_currency
         factor_set = tree.factor_set
-        tickers = pr.tickers_for(plan, ccy)
         logger.info(
             "Portfolio report start: %d instruments, model %s, %s, factors %s, range %s",
             len(plan.rows),
@@ -411,7 +420,7 @@ class ReportService:
             _range_text(preset, start, end),
         )
         now = self._now()
-        loaded = await self._factors()
+        loaded = await self._factors_shown()
         key: PortfolioKey = (
             plan.digest,
             model,
@@ -427,7 +436,11 @@ class ReportService:
             logger.info("Portfolio report cache hit")
 
         async def make() -> FactorReport:
+            progress.step("prices")
             ctx = CurrencyContext(ccy, self.deps.currency)
+            # FXF, the proxy of the CHF Cash line, is fetched only when SARON is not used
+            saron = bool(pr.chf_cash_keys(plan)) and await self.runtime.run(ctx.chf_ready)
+            tickers = pr.tickers_for(plan, ccy, saron)
             listings: dict[str, tuple[str, float]] = {}
             for ticker in tickers:  # refuses a currency that cannot be converted
                 security = await self._security(ticker, now.date())
@@ -435,6 +448,9 @@ class ReportService:
             histories = await self.runtime.run(
                 pr.fetch_histories, self.deps.price_provider, tickers
             )
+            if ccy == "EUR":
+                progress.step("fx")
+            progress.step("factors")
             frame = await self._model_frame(loaded, now, model, ctx, factor_set)
             inputs = await self._with_world_benchmark(None, ctx, factor_set)
             inputs = await self._with_reference(inputs, ctx, loaded, now, model)
@@ -475,19 +491,34 @@ class ReportService:
             raise
 
     async def range_options(
-        self, ticker: str, factor_set: FactorSet = DEFAULT_FACTOR_SET
+        self,
+        ticker: str,
+        ccy: ReferenceCurrency = "USD",
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> RangeOptions:
-        """Availability of every preset for an already validated ticker, on the dates of the
-        factor set."""
+        """Availability of every preset for an already validated ticker, in ``ccy``, on the
+        dates of the factor set.
+
+        The EUR view counts the rows the EUR report would use: prices and factors are converted
+        first, so a rate series that starts after the prices shortens the history here too.
+        """
         now = self._now()
         loaded = await self._factors()
         base = await self._set_frame(loaded, now, factor_set)
-        await self._security(ticker, now.date())
+        security = await self._security(ticker, now.date())
+        listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
-        key: RangesKey = (ticker, loaded.vintage, now.date(), factor_set)
+        key: RangesKey = (ticker, loaded.vintage, now.date(), factor_set, ccy)
 
         async def make() -> RangeOptions:
-            return await self.runtime.run(ranges.range_options, ticker, history, base)
+            ctx = CurrencyContext(ccy, self.deps.currency)
+
+            def build() -> RangeOptions:
+                converted = self._to_reference(ticker, history, listing, scale, ctx)
+                frame = base if ccy == "USD" else ctx.factors(base)
+                return ranges.range_options(ticker, converted, frame)
+
+            return await self.runtime.run(build)
 
         return await self.ranges.get(key, make)
 
@@ -511,6 +542,18 @@ class ReportService:
         if now.utcoffset() is None:
             raise ValueError("the injected clock must return a timezone-aware time")
         return now.astimezone(UTC)
+
+    async def _factors_shown(self) -> LoadedFactors:
+        """``_factors()``; when it is slow, a progress stream shows the factor step meanwhile.
+
+        A fast load shows nothing, so a cached report still sends no step.
+        """
+        task = asyncio.ensure_future(self._factors())
+        task.add_done_callback(_retrieve)
+        done, _ = await asyncio.wait({task}, timeout=SLOW_FACTORS_SECONDS)
+        if not done:
+            progress.step("factors")
+        return await task
 
     async def _factors(self) -> LoadedFactors:
         loaded = await self.factors.get("factors", self._load_factors)
