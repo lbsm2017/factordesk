@@ -6,6 +6,10 @@ type Schemas = components["schemas"];
 export type FactorReport = Schemas["FactorReport"];
 export type ApiError = Schemas["ApiError"];
 export type ErrorCode = ApiError["code"];
+/** The server-sent events of the three `.../stream` report endpoints (generated from the backend schema). */
+export type ProgressStep = Schemas["ProgressStep"];
+export type ProgressStepId = ProgressStep["step"];
+export type ApiErrorEvent = Schemas["ApiErrorEvent"];
 export type FactorDataStatus = Schemas["FactorDataStatus"];
 export type TickerSuggestion = Schemas["TickerSuggestion"];
 export type TickerSuggestions = Schemas["TickerSuggestions"];

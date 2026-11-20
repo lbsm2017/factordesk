@@ -7,11 +7,12 @@ import type { Currency } from "../state/currency";
 import { DEFAULT_MODEL, DEFAULT_RANGE, isSuggestQuery } from "../state/url";
 import type { FactorModel, UrlState } from "../state/url";
 import { ApiRequestError, apiRequest, NETWORK_ERROR } from "./client";
+import { PORTFOLIO_RUN, recordFallback, recordStep, reportRunKey, startRun, UPLOAD_RUN } from "./runProgress";
+import { streamReport } from "./stream";
 import type {
   ApiError,
   AssetClassLibrary,
   FactorDataStatus,
-  FactorReport,
   RangeOptions,
   TickerSuggestions,
 } from "./types";
@@ -106,15 +107,32 @@ export function useRanges(ticker: string | null, ccy: Currency = DEFAULT_CURRENC
   });
 }
 
+/** The query key of a report: ticker, range, model and currency. */
+export function reportQueryKey(state: UrlState, ccy: Currency = state.ccy ?? DEFAULT_CURRENCY): readonly unknown[] {
+  return ["report", state.ticker, reportRangeKey(state), state.model ?? DEFAULT_MODEL, ccy];
+}
+
+/** The key under which the steps of a report run are kept (see `useRunProgress`). */
+export function reportProgressKey(state: UrlState, ccy: Currency = state.ccy ?? DEFAULT_CURRENCY): string {
+  return reportRunKey(reportQueryKey(state, ccy));
+}
+
 export function useReport(state: UrlState, ccy: Currency = state.ccy ?? DEFAULT_CURRENCY) {
   const { ticker } = state;
+  const queryKey = reportQueryKey(state, ccy);
+  const runKey = reportRunKey(queryKey);
   return useQuery({
-    queryKey: ["report", ticker, reportRangeKey(state), state.model ?? DEFAULT_MODEL, ccy],
-    queryFn: ({ signal }) =>
-      apiRequest<FactorReport>(`/api/report/${encodeURIComponent(ticker ?? "")}`, {
-        signal,
-        query: reportParams(state, ccy),
-      }),
+    queryKey,
+    queryFn: ({ signal }) => {
+      startRun(runKey);
+      const path = `/api/report/${encodeURIComponent(ticker ?? "")}`;
+      return streamReport(
+        `${path}/stream`,
+        path,
+        { signal, query: reportParams(state, ccy) },
+        { signal, onStep: (step) => recordStep(runKey, step), onFallback: () => recordFallback(runKey) },
+);
+    },
     enabled: ticker !== null,
     staleTime: Infinity,
     placeholderData: keepPreviousData,
@@ -194,8 +212,15 @@ export function uploadBody({ file, name, grossNet, model, recordCurrency, ccy }:
 /** Runs a monthly track record through the API. The result is held by the hook only: never cached, never stored. */
 export function useUploadReport() {
   return useMutation({
-    mutationFn: (input: UploadInput) =>
-      apiRequest<FactorReport>("/api/report/upload", { method: "POST", body: uploadBody(input) }),
+    mutationFn: (input: UploadInput) => {
+      startRun(UPLOAD_RUN);
+      return streamReport(
+        "/api/report/upload/stream",
+        "/api/report/upload",
+        { method: "POST", body: uploadBody(input) },
+        { onStep: (step) => recordStep(UPLOAD_RUN, step), onFallback: () => recordFallback(UPLOAD_RUN) },
+);
+    },
     retry: false,
   });
 }
@@ -238,12 +263,15 @@ export function portfolioBody({ tree, currency }: PortfolioRunInput): PortfolioT
 /** Runs a portfolio through the API. Like the upload, the result is held by the hook only and never cached. */
 export function usePortfolioReport() {
   return useMutation({
-    mutationFn: (input: PortfolioRunInput) =>
-      apiRequest<FactorReport>("/api/report/portfolio", {
-        method: "POST",
-        query: portfolioQuery(input),
-        json: portfolioBody(input),
-      }),
+    mutationFn: (input: PortfolioRunInput) => {
+      startRun(PORTFOLIO_RUN);
+      return streamReport(
+        "/api/report/portfolio/stream",
+        "/api/report/portfolio",
+        { method: "POST", query: portfolioQuery(input), json: portfolioBody(input) },
+        { onStep: (step) => recordStep(PORTFOLIO_RUN, step), onFallback: () => recordFallback(PORTFOLIO_RUN) },
+);
+    },
     retry: false,
   });
 }

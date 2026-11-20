@@ -1,7 +1,7 @@
 # Decision: a nightly run of the slow and live tests
 
 Date: 2026-11-18
-Status: Decided-pending-implementation
+Status: Superseded on 2026-11-20 (see the update at the end)
 
 ## In one sentence
 
@@ -29,3 +29,13 @@ The workflow uses the free minutes included in the GitHub plan (unlimited on sta
 ## What we have not verified
 
 As of commit `047baac` (the base of this branch), the workflow has not run on GitHub. It must be merged, then started once with the manual trigger, before we rely on it. See [the CI section of the dashboard document](../docs/dashboard.md#ci).
+
+## Update 2026-11-20: nightly removed, GitHub tests pull requests only
+
+On 2026-11-20 the owner decided that GitHub runs tests for pull requests only, with no nightly run. This followed a day when GitHub Actions refused to start jobs because of a billing block, and every run showed as failed. In the branch `fix/ci-pr-only`:
+
+- `.github/workflows/nightly.yml` is deleted;
+- `.github/workflows/ci.yml` runs on pull requests to `dev` and `prod` only, with no push trigger;
+- the CI badge is removed from the README, because pull-request-only runs cannot show the state of `prod`.
+
+The slow and live tests now run by hand before each release: `uv run pytest -m slow` and `uv run pytest -m live`. The claims above about the 03:17 UTC schedule are superseded.

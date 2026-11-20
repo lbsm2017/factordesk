@@ -50,8 +50,9 @@ On 2026-11-20 the owner chose the goal "European investor complete" for Sprint 4
 | P2 | **S4-11 TTF gas: data check only.** Find a free daily source. Build it only if one exists. | 1 | Sonnet | — |
 | P2 | **S4-12 Dark theme.** Colour tokens for dark mode, plus a switch. | 4 | Sonnet | S4-5 |
 | P2 | **S4-13 Hygiene.**<br>• Remove the dead code.<br>• Dependabot for CI.<br>• Remove the old worktrees.<br>• The energy sentence for very small sensitivities. | 2 | Haiku/Sonnet | — |
+| P1 | **S4-14 Tail risk panel, compact** (added by the owner on 2026-11-20).<br>• Two groups, VaR and CVaR, with one row per level (VaR 95% and 99%; CVaR 95% and 97.5%).<br>• Two coloured bars per row on one shared scale: Historical, and Forecast. Forecast is the Cornish-Fisher estimate, or the Gaussian one when Cornish-Fisher is not available; a tag says which.<br>• One legend and one axis. The 90% band is an overlay on each bar.<br>• Gaussian and all three methods stay in "How this is computed".<br>• About half the height of the panel before. | 3 | Sonnet | S4-12 |
 
-**Planned capacity:** 36 pts. **Sprint load:** 24 pts committed (67%), plus 9 pts stretch.
+**Planned capacity:** 36 pts. **Sprint load:** 24 pts committed (67%), plus 9 pts stretch. On 2026-11-20 the owner added S4-14 (3 pts), so the committed load is 27 pts (75%).
 
 **Cut order:**
 1. S4-13.
@@ -79,6 +80,7 @@ The owner asked for easy wins first, no interruptions, and attention to dependen
 | S4-12 Dark theme | Could | 2 | 1 | 70% | 4 | 0.35 | 3 (after the Factor it UI, same CSS) |
 | S4-13 Hygiene | Could | 1 | 0.5 | 100% | 2 | 0.25 | 1 (small, and it must land before the Factor it UI touches the same files) |
 | S4-10 CHF cash on SARON | Could | 0.5 | 1 | 80% | 2 | 0.2 | 3 |
+| S4-14 Tail risk panel, compact (owner, added 2026-11-20) | Should | 2 | 2 | 90% | 3 | 1.2 | 3 (after the dark theme) |
 
 The checkpoint is run without stopping: the coordinator approves the S4-0 mockups against the design direction, and the owner sees them at the demo, as in Sprint 3.
 

@@ -3,8 +3,11 @@
  * them (dashboard spec DB6, prototype v4a). The "Show statistics" switch lives in `StatsProvider`.
  */
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { barFraction, expectedPlan, runView, UPLOAD_RUN, useRunProgress } from "./api/runProgress";
 import {
   downloadHref,
+  reportProgressKey,
   toApiError,
   useFactorStatus,
   useRanges,
@@ -22,12 +25,16 @@ import { Landing, TrackLanding } from "./components/controls/ReportStates";
 import { TrackRecordInput } from "./components/controls/TrackRecordInput";
 import { PortfolioMode } from "./components/portfolio/PortfolioMode";
 import { ErrorFrame } from "./components/report/ErrorFrame";
-import { LoadingFrame } from "./components/report/LoadingFrame";
+import { PlaceholderPage } from "./components/report/PlaceholderPage";
+import { RerunBanner } from "./components/report/RerunBanner";
+import { RerunBar } from "./components/report/RerunBar";
+import { RunAnnouncer } from "./components/report/RunAnnouncer";
 import { ReportView } from "./components/report/ReportView";
 import { Shell } from "./components/shell/Shell";
 import { useCurrency } from "./state/currency";
 import { addRecent, useRecent } from "./state/recent";
 import type { RollingWindowDays } from "./state/url";
+import { runAnnouncement, useClearFinishedRun, useKept, useReveal, useRunVisible } from "./state/runUi";
 import { StatsProvider } from "./state/stats";
 import { useUrlState } from "./state/useUrlState";
 import "./styles/controls.css";
@@ -52,11 +59,17 @@ function DemoPage() {
 
 const TRACK_TITLE = "Track record";
 
+/** Moves focus to the ticker field (the "Change ticker" button of the error page). */
+function focusTicker(): void {
+  document.getElementById("ticker-input")?.focus();
+}
+
 function Dashboard() {
   const [state, commit] = useUrlState();
   const [currency, setCurrency] = useCurrency(state.ccy, commit);
   const [query, setQuery] = useState("");
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<number | null>(null);
   const recent = useRecent();
   const factors = useFactorStatus();
   const suggestions = useTickerSuggestions(query);
@@ -69,15 +82,28 @@ function Dashboard() {
   const refresh = useRefreshFactors(setRefreshMessage);
   const upload = useUploadReport();
 
-  // A stale report is never shown under an error, and never on the landing page.
-  const shown = track
-    ? upload.isSuccess
-      ? upload.data
-      : undefined
-    : state.ticker === null || report.isError
-      ? undefined
-      : report.data;
-  const busy = !track && state.ticker !== null && report.isFetching && shown !== undefined;
+  // What is on screen: the new report, or the previous one while the next request runs or fails.
+  const tickerFresh = state.ticker === null ? undefined : report.data;
+  const keptTicker = useKept(tickerFresh);
+  const keptTrack = useKept(upload.data);
+  const fresh = track ? upload.data : tickerFresh;
+  const pending = track ? upload.isPending : report.isFetching;
+  const error = track ? (upload.isError ? toApiError(upload.error) : null) : report.isError ? toApiError(report.error) : null;
+  const kept = track ? keptTrack : keptTicker;
+  const shown = fresh ?? (pending || error !== null ? kept : undefined);
+  const rerun = pending && shown !== undefined;
+  const title = track ? upload.variables?.name.trim() || TRACK_TITLE : (state.ticker ?? "");
+
+  // The steps of the run: the expected list gives the names of the steps that have not started.
+  const uploadEuro = upload.variables?.recordCurrency === "EUR" || currency === "EUR";
+  const plan = expectedPlan({ prices: !track, fx: track ? uploadEuro : currency === "EUR" });
+  const runKey = track ? UPLOAD_RUN : reportProgressKey(tickerState, currency);
+  const progress = useRunProgress(runKey);
+  const view = runView(progress, plan);
+  const visible = useRunVisible(pending, progress);
+  const reveal = useReveal(fresh, pending, visible);
+  const readyFor = fresh !== undefined && !pending ? fresh.ticker : null;
+  useClearFinishedRun(runKey, readyFor !== null && error === null);
 
   // A model or currency change re-runs the record on screen (the upload result is not cached).
   const lastModel = useRef(state.model);
@@ -98,6 +124,59 @@ function Dashboard() {
 
   if (portfolio) return <PortfolioMode state={state} currency={currency} onCurrency={setCurrency} onCommit={commit} />;
 
+  const retry = () => {
+    if (track) {
+      if (upload.variables !== undefined) upload.mutate(upload.variables);
+    } else {
+      void report.refetch();
+    }
+  };
+  const errorStamp = track ? upload.submittedAt : report.errorUpdatedAt;
+  const running = rerun && visible;
+
+  let main: ReactNode;
+  if (!track && state.ticker === null) {
+    main = <Landing recent={recent} onPick={(ticker) => commit({ ticker })} />;
+  } else if (error !== null && shown === undefined) {
+    main = (
+      <ErrorFrame
+        ticker={title}
+        error={error}
+        progress={progress}
+        plan={plan}
+        onRetry={retry}
+        {...(track ? {} : { onChange: focusTicker })}
+      />
+    );
+  } else if (shown === undefined) {
+    main =
+      pending && visible ? (
+        <PlaceholderPage mode={track ? "track" : "ticker"} title={title} view={view} />
+      ) : track && !pending ? (
+        <TrackLanding />
+      ) : (
+        <main className="report-region" aria-busy={pending} data-testid="loading-frame" />
+      );
+  } else {
+    main = (
+      <>
+        {running ? <RerunBar title={title} view={view} /> : null}
+        {error !== null && dismissed !== errorStamp ? (
+          <RerunBanner error={error} previous={shown.ticker} onRetry={retry} onDismiss={() => setDismissed(errorStamp)} />
+        ) : null}
+        <ReportView
+          report={shown}
+          downloadHref={track || error !== null ? null : downloadHref(state, currency)}
+          win={state.win}
+          onWinChange={(win) => commit({ win })}
+          busy={rerun}
+          dim={running}
+          reveal={reveal}
+        />
+      </>
+    );
+  }
+
   return (
     <Shell
       report={shown}
@@ -108,7 +187,11 @@ function Dashboard() {
           <ModeSwitch mode={state.mode} onSelect={(mode) => commit({ mode })} currency={currency} onCurrency={setCurrency} />
           {track ? (
             <>
-              <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate({ ...input, model: state.model, ccy: currency })} />
+              <TrackRecordInput
+                busy={pending}
+                progress={barFraction(view)}
+                onRun={(input) => upload.mutate({ ...input, model: state.model, ccy: currency })}
+              />
               {shown !== undefined ? (
                 <div className="side-group">
                   <AnalysedRange report={shown} label="Analysed period" />
@@ -123,7 +206,8 @@ function Dashboard() {
               ranges={state.ticker === null ? undefined : ranges.data}
               factorStatus={factors.data}
               report={shown}
-              busy={busy}
+              busy={pending}
+              progress={barFraction(view)}
               refreshing={refresh.isPending}
               refreshMessage={refreshMessage}
               onQueryChange={setQuery}
@@ -138,31 +222,8 @@ function Dashboard() {
         </>
       }
     >
-      {track ? (
-        upload.isPending ? (
-          <LoadingFrame ticker={upload.variables?.name.trim() || TRACK_TITLE} />
-        ) : upload.isError ? (
-          <ErrorFrame ticker={upload.variables?.name.trim() || TRACK_TITLE} error={toApiError(upload.error)} />
-        ) : shown === undefined ? (
-          <TrackLanding />
-        ) : (
-          <ReportView report={shown} downloadHref={null} win={state.win} onWinChange={(win) => commit({ win })} />
-        )
-      ) : state.ticker === null ? (
-        <Landing recent={recent} onPick={(ticker) => commit({ ticker })} />
-      ) : report.isError ? (
-        <ErrorFrame ticker={state.ticker} error={toApiError(report.error)} />
-      ) : shown === undefined ? (
-        <LoadingFrame ticker={state.ticker} />
-      ) : (
-        <ReportView
-          report={shown}
-          downloadHref={downloadHref(state, currency)}
-          win={state.win}
-          onWinChange={(win) => commit({ win })}
-          busy={busy}
-        />
-      )}
+      <RunAnnouncer text={runAnnouncement(pending, progress, readyFor)} />
+      {main}
     </Shell>
   );
 }
