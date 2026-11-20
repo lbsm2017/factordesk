@@ -227,6 +227,8 @@ export interface paths {
          * Get Ranges
          * @description Availability of every range preset for this ticker, with the reason when one is short.
          *
+         *     ``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices
+         *     leaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).
          *     The presets follow the dates of the chosen factor set (the Europe files start in 1990).
          */
         get: operations["get_ranges_api_report__ticker__ranges_get"];
@@ -733,15 +735,16 @@ export interface components {
         };
         /**
          * CurrencyInfo
-         * @description The reference currency of a report that is not in US dollars (written only for those).
+         * @description The reference currency, its exchange-rate and rate sources, and notices. Written for a
+         *     report that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON.
          */
         CurrencyInfo: {
             /**
              * Reference
              * @description Currency of every figure in the report.
-             * @constant
+             * @enum {string}
              */
-            reference: "EUR";
+            reference: "USD" | "EUR";
             /**
              * Fx Source
              * @description Source credit of the exchange rates used; None when none were needed.
@@ -749,7 +752,7 @@ export interface components {
             fx_source: string | null;
             /**
              * Rate Source
-             * @description Source credit of the euro cash rate (overnight rate); None when not used.
+             * @description Source credit of the overnight rates used (euro cash rate, SARON); None when not used.
              */
             rate_source: string | null;
             /**
@@ -1231,7 +1234,7 @@ export interface components {
              * @description Regional factor set of the regression when it is not the US one: europe = the Ken French Developed Europe factors (in US dollars). Absent (not null) for a report on the US factors.
              */
             factor_set?: "europe" | null;
-            /** @description Reference currency of the report when it is not US dollars; absent (not null) for a USD report. */
+            /** @description Reference currency of the report when it is not US dollars, or a USD portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report. */
             currency?: components["schemas"]["CurrencyInfo"] | null;
             /**
              * Generated At
@@ -4571,6 +4574,8 @@ export interface operations {
     get_ranges_api_report__ticker__ranges_get: {
         parameters: {
             query?: {
+                /** @description Reference currency of every figure: USD (default) or EUR. */
+                ccy?: "USD" | "EUR";
                 /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
                 factor_set?: "us" | "europe";
             };

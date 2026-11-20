@@ -66,11 +66,16 @@ Factors = Annotated[
 
 
 @router.get("/{ticker}/ranges", responses=_ERRORS)
-async def get_ranges(ticker: str, service: Service, factor_set: Factors = "us") -> RangeOptions:
+async def get_ranges(
+    ticker: str, service: Service, ccy: Ccy = "USD", factor_set: Factors = "us"
+) -> RangeOptions:
     """Availability of every range preset for this ticker, with the reason when one is short.
 
-    The presets follow the dates of the chosen factor set (the Europe files start in 1990)."""
-    return await service.range_options(check_ticker(ticker), factor_set)
+    ``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices
+    leaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).
+    The presets follow the dates of the chosen factor set (the Europe files start in 1990).
+    """
+    return await service.range_options(check_ticker(ticker), ccy, factor_set)
 
 
 @router.get("/{ticker}", responses=_ERRORS)

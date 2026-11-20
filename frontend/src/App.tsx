@@ -80,7 +80,7 @@ function Dashboard() {
   const track = state.mode === "track";
   const portfolio = state.mode === "portfolio";
   const tickerState = track || portfolio ? { ...state, ticker: null } : state;
-  const ranges = useRanges(tickerState.ticker, factorSet);
+  const ranges = useRanges(tickerState.ticker, currency, factorSet);
   const report = useReport(tickerState, currency);
   const refresh = useRefreshFactors(setRefreshMessage);
   const upload = useUploadReport();

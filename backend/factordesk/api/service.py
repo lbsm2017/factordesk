@@ -203,7 +203,7 @@ class LoadedFactors:
 
 type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
-type RangesKey = tuple[str, Vintage, date, FactorSet]
+type RangesKey = tuple[str, Vintage, date, FactorSet, ReferenceCurrency]
 type ReportKey = tuple[
     str, date | None, date | None, Vintage, date, FactorModel, FactorSet, ReferenceCurrency
 ]
@@ -411,7 +411,6 @@ class ReportService:
         plan = pr.plan_of(tree)
         ccy = tree.reference_currency
         factor_set = tree.factor_set
-        tickers = pr.tickers_for(plan, ccy)
         logger.info(
             "Portfolio report start: %d instruments, model %s, %s, factors %s, range %s",
             len(plan.rows),
@@ -439,6 +438,9 @@ class ReportService:
         async def make() -> FactorReport:
             progress.step("prices")
             ctx = CurrencyContext(ccy, self.deps.currency)
+            # FXF, the proxy of the CHF Cash line, is fetched only when SARON is not used
+            saron = bool(pr.chf_cash_keys(plan)) and await self.runtime.run(ctx.chf_ready)
+            tickers = pr.tickers_for(plan, ccy, saron)
             listings: dict[str, tuple[str, float]] = {}
             for ticker in tickers:  # refuses a currency that cannot be converted
                 security = await self._security(ticker, now.date())
@@ -489,19 +491,34 @@ class ReportService:
             raise
 
     async def range_options(
-        self, ticker: str, factor_set: FactorSet = DEFAULT_FACTOR_SET
+        self,
+        ticker: str,
+        ccy: ReferenceCurrency = "USD",
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> RangeOptions:
-        """Availability of every preset for an already validated ticker, on the dates of the
-        factor set."""
+        """Availability of every preset for an already validated ticker, in ``ccy``, on the
+        dates of the factor set.
+
+        The EUR view counts the rows the EUR report would use: prices and factors are converted
+        first, so a rate series that starts after the prices shortens the history here too.
+        """
         now = self._now()
         loaded = await self._factors()
         base = await self._set_frame(loaded, now, factor_set)
-        await self._security(ticker, now.date())
+        security = await self._security(ticker, now.date())
+        listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
-        key: RangesKey = (ticker, loaded.vintage, now.date(), factor_set)
+        key: RangesKey = (ticker, loaded.vintage, now.date(), factor_set, ccy)
 
         async def make() -> RangeOptions:
-            return await self.runtime.run(ranges.range_options, ticker, history, base)
+            ctx = CurrencyContext(ccy, self.deps.currency)
+
+            def build() -> RangeOptions:
+                converted = self._to_reference(ticker, history, listing, scale, ctx)
+                frame = base if ccy == "USD" else ctx.factors(base)
+                return ranges.range_options(ticker, converted, frame)
+
+            return await self.runtime.run(build)
 
         return await self.ranges.get(key, make)
 

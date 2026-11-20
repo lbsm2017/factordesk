@@ -96,13 +96,14 @@ export function useTickerSuggestions(text: string) {
   });
 }
 
-export function useRanges(ticker: string | null, factorSet: FactorSet = DEFAULT_FACTOR_SET) {
+/** The range presets of a ticker, counted in the reference currency and the factor set of the page. */
+export function useRanges(ticker: string | null, ccy: Currency = DEFAULT_CURRENCY, factorSet: FactorSet = DEFAULT_FACTOR_SET) {
   return useQuery({
-    queryKey: ["ranges", ticker, factorSet],
+    queryKey: ["ranges", ticker, ccy, factorSet],
     queryFn: ({ signal }) =>
       apiRequest<RangeOptions>(`/api/report/${encodeURIComponent(ticker ?? "")}/ranges`, {
         signal,
-        query: factorSetParam(factorSet),
+        query: { ...ccyParam(ccy), ...factorSetParam(factorSet) },
       }),
     enabled: ticker !== null,
     staleTime: 5 * 60_000,
