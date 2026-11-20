@@ -50,7 +50,9 @@ const NOUNS: Readonly<Record<string, string>> = {
 export function sentence(row: Pick<EnergyRow, "code" | "beta" | "tag">, subject: string): string | null {
   const noun = NOUNS[row.code];
   if (noun === undefined) return null;
-  const move = pct(moveFor(row.code, row.beta), 1);
+  const change = moveFor(row.code, row.beta);
+  // Below 0.05% in absolute value, one decimal would read "0.0%", so show two decimals.
+  const move = pct(change, Math.abs(change) < 0.0005 ? 2 : 1);
   const base = `A ${pct(RISE, 0, false)} rise in ${noun} went with a ${move} move in ${subject}, after the market`;
   return row.tag === "reliable" ? `${base}.` : `${base}. The link is too weak to rely on.`;
 }
