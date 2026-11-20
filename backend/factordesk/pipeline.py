@@ -1182,6 +1182,7 @@ def assemble_subject_report(
         notes.append(NOTE_MONTHLY_TEMPLATE.format(k=len(codes) + 1))
     if model == "ff6":
         notes.append(NOTE_FF6)
+    notes.extend(french.stamp_notices(factor_frame.attrs))
     return FactorReport.model_validate(
         {
             "ticker": subject.label,

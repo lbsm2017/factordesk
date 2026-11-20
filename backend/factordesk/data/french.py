@@ -561,6 +561,7 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
         "mom": dict(mom.attrs),
         "first_date": pd.Timestamp(ff5_index[0]).date().isoformat(),
         "last_date": pd.Timestamp(ff5_last).date().isoformat(),
+        "mom_last_date": pd.Timestamp(mom_last).date().isoformat(),
         "ff6_first_date": first.date().isoformat() if overlap else None,
         "ff6_last_date": last.date().isoformat() if overlap else None,
         "ends_with": ends_with,
@@ -568,6 +569,34 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
         "mom_rows_without_ff5": mom_only,
     }
     return out
+
+
+def stamp_notices(attrs: Mapping[Any, Any]) -> list[str]:
+    """Report notes for a joined FF6 frame whose two files do not carry the same stamp.
+
+    ``attrs`` is ``join_momentum``'s ``attrs``. A note is returned when the five-factor and
+    momentum files end on different dates, and another when both name a CRSP vintage and the two
+    differ. Nothing is returned for a frame that is not a joined one, or when the stamps agree.
+    """
+    ff5 = cast("Mapping[str, Any] | None", attrs.get("ff5"))
+    mom = cast("Mapping[str, Any] | None", attrs.get("mom"))
+    if not isinstance(ff5, Mapping) or not isinstance(mom, Mapping):
+        return []
+    notices: list[str] = []
+    ff5_last, mom_last = attrs.get("last_date"), attrs.get("mom_last_date")
+    if ff5_last and mom_last and ff5_last != mom_last:
+        notices.append(
+            f"The five-factor file ends on {ff5_last} and the momentum file on {mom_last}. "
+            f"Momentum results use the dates both files cover, up to {min(ff5_last, mom_last)}."
+        )
+    ff5_stamp, mom_stamp = ff5.get("crsp_stamp"), mom.get("crsp_stamp")
+    if ff5_stamp and mom_stamp and ff5_stamp != mom_stamp:
+        notices.append(
+            f"The five-factor file is from the {ff5_stamp} CRSP release and the momentum file "
+            f"from {mom_stamp}. The two files were not published together, so recent values may "
+            "differ from what the library shows today."
+        )
+    return notices
 
 
 def _ff5_daily_vintage(data_dir: Path | None, now: datetime | None) -> dict[str, Any]:

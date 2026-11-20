@@ -122,6 +122,28 @@ def test_ff6_ticker_report_uses_six_factors_and_hides_ff5_only_sections() -> Non
     assert ff6.r2 == pytest.approx(report.regression.r2, rel=1e-10)
 
 
+def test_report_notes_carry_the_french_stamp_notice() -> None:
+    returns, factors, _ = monthly_case(72, 11)
+    subject = subject_from_monthly_returns(returns, label="Example Fund")
+    frame = with_mom(factors, 78, sd=0.03)
+    frame.attrs = {
+        "ff5": {"crsp_stamp": "202609"},
+        "mom": {"crsp_stamp": "202608"},
+        "last_date": "2026-09-30",
+        "mom_last_date": "2026-08-31",
+    }
+    report = assemble_subject_report(
+        subject,
+        frame,
+        "ff5",
+        now=NOW,
+        factors_downloaded_at=None,  # pyright: ignore[reportArgumentType]
+    )
+    assert any("2026-08-31" in note for note in report.notes)
+    assert any("202608" in note for note in report.notes)
+    assert not any("CRSP release" in note for note in monthly_report().notes)
+
+
 def test_ff6_differs_from_ff5_only_where_the_model_enters() -> None:
     ff5, ff6 = ticker_report("ff5"), ticker_report("ff6")
     assert ff5.data == ff6.data
