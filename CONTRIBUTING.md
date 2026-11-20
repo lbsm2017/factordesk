@@ -118,5 +118,20 @@ the terms allow.
 
 ## License
 
-By contributing you agree that your contribution is released under the project's
-[MIT License](LICENSE).
+factordesk is under the [factordesk Noncommercial License 1.0](LICENSE): free for personal and
+other noncommercial use, with commercial use only by written consent of the licensor, Lorenzo
+Bassetti. He also grants commercial licences. For that to work, he must be able to license every
+part of the code, including yours.
+
+By opening a pull request you agree that:
+
+1. Your contribution is released to everyone under the project's [license](LICENSE).
+2. You grant Lorenzo Bassetti a perpetual, worldwide, non-exclusive, royalty-free, irrevocable
+   licence to use, change, distribute and sublicense your contribution under any terms, including
+   commercial licences.
+3. You keep the copyright in your contribution.
+4. The contribution is your own work, or you have the right to submit it (for example, your
+   employer allows it), and it contains no code under terms that conflict with the above.
+
+The pull request template has a box to tick for this. If you cannot agree, open an issue and
+describe the change instead.

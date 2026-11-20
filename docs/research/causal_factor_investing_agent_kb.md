@@ -7,7 +7,8 @@
 | Source | Marcos M. López de Prado (2023), *Causal Factor Investing: Can Factor Investing Become Scientific?* Cambridge Elements in Quantitative Finance (series editor R. Rebonato). DOI 10.1017/9781009397315. 92 pages, 8 sections plus appendix. |
 | Author of this summary | Written by the factordesk project owner (2026). It is an original summary and study guide of the book, not the book itself. The text is paraphrased and reorganised, and extended with outside literature and original tested code. Short quotations are marked with quotation marks. |
 | Attribution | Based on López de Prado, M. M. (2023), *Causal Factor Investing: Can Factor Investing Become Scientific?*, Cambridge University Press, DOI 10.1017/9781009397315. The book is published open access under CC BY-NC 4.0. All ideas marked `[B §x]` belong to the book's author. Read the original for authoritative statements. |
-| Licence of this file | Released with the factordesk repository under the MIT licence, apart from the attributed ideas and short quotations, which remain the book author's. |
+| Licence of this file | Released with the factordesk repository under its noncommercial licence (`LICENSE`), which is in line with the book's CC BY-NC 4.0 terms. The attributed ideas and short quotations remain the book author's. |
+| Role in factordesk | The book is cited as a source for scientific rigour, out of intellectual honesty and courtesy to its author. None of factordesk's algorithms are taken from it; it informs how results are worded and qualified. |
 | Intended reader | A coding or research assistant, or an analyst, who must review, design or critique factor and systematic-investment research, and write Python that respects the book's methodology. |
 | Reading order | Part 1 and Part 2 are mandatory (about 150 lines). Parts 3 to 5 are the scientific and mathematical depth. Part 6 is the critical assessment. Parts 7 and 8 are operational. Part 9 is code. Part 10 is references. |
 

@@ -35,11 +35,13 @@ unverified, 4 are resolved with a source, 2 are partly resolved and 5 still have
 
 | Provider | Terms of use | What factordesk uses it for | Status |
 |---|---|---|---|
-| Kenneth R. French Data Library | No terms page found; the page carries the notice "Copyright Eugene F. Fama and Kenneth R. French" ([library page](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html)) | Every factor return and the risk-free rate; downloaded at run time, never stored in the repository | Used |
-| Yahoo Finance, through yfinance 1.8.0 | [Yahoo terms of service](https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html); [yfinance README](https://raw.githubusercontent.com/ranaroussi/yfinance/main/README.md) | Daily prices (`Close`, `Adj Close`, dividends, splits) for the analysed ticker; downloaded at run time, never stored in the repository | Used |
+| Kenneth R. French Data Library | No terms page found; the page carries the notice "Copyright Eugene F. Fama and Kenneth R. French" ([library page](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html)) | Every factor return and the risk-free rate: the US five factors and momentum, the Developed Europe five factors and momentum, and the portfolio files behind the shrunk-beta prior (daily and monthly); downloaded at run time, never stored in the repository | Used |
+| Yahoo Finance, through yfinance 1.8.0 | [Yahoo terms of service](https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html); [yfinance README](https://raw.githubusercontent.com/ranaroussi/yfinance/main/README.md) | Daily prices (`Close`, `Adj Close`, dividends, splits), name, exchange and currency of the analysed ticker; the ACWI and IEUR world-beta ETFs; the macro legs (IEF, LQD, DBC, TIP, IEI), KRBN and FXF; every portfolio proxy; downloaded at run time, never stored in the repository | Used |
+| FRED, Federal Reserve Bank of St. Louis | [Legal notices](https://fred.stlouisfed.org/legal/) | Public CSV (`fredgraph.csv`, not the API) of DTWEXBGS (US dollar, Federal Reserve Board), DCOILBRENTEU and DHHNGSP (Brent and Henry Hub, U.S. Energy Information Administration), the H.10 `DEX*` exchange rates (fallback) and ECBESTRVOLWGTTRMDMNRT (€STR fallback); `backend/factordesk/data/fred.py` | Used |
+| ECB Data Portal | [Reuse of ESCB statistics](https://www.ecb.europa.eu/stats/ecb_statistics/governance_and_quality_framework/html/usage_policy.en.html); [website disclaimer](https://www.ecb.europa.eu/home/disclaimer/html/index.en.html) | Euro reference exchange rates (EXR), €STR and EONIA for the EUR view and EUR cash; `backend/factordesk/data/ecb.py` | Used |
+| Swiss National Bank data portal | [SNB copyright clause](https://www.snb.ch/en/srv/disclaimer_copyright) | SARON for CHF cash (the history cube `zirepo` and the current cube `snbgwdzid`); `backend/factordesk/data/snb.py` | Used |
 | Tiingo | [Terms of use](https://www.tiingo.com/tos/) ("Last Updated Date: November 5th, 2026"); [pricing page](https://www.tiingo.com/about/pricing) | Candidate cross-check source, studied in `data-source-comparison.md` | Not used |
 | Alpaca Markets | [Terms and conditions (PDF)](https://files.alpaca.markets/disclosures/alpaca_terms_and_conditions.pdf); [redistribution note](https://alpaca.markets/support/redistribute-alpaca-api) | Research comparison only (the owner's own key, aggregate statistics only); the planned adapter is not built | Not used in the product |
-| ECB euro reference rates | [ECB page](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) | Proposed currency conversion for European tickers (`methodology-datasets.md`, D9.3); not implemented | Not used |
 | Yahoo help, "What is the adjusted close?" | [SLN28256](https://help.yahoo.com/kb/SLN28256.html) | Yahoo's own definition of `Adj Close` and its split and dividend multipliers; the basis of the adjusted-close audit (`methodology.md` M1.4) | Documentation only |
 | Yahoo help, "Yahoo Finance Market Coverage and Data Delays" | [SLN2310](https://help.yahoo.com/kb/SLN2310.html) | Ticker suffix, exchange and country table behind the region rule (`methodology-datasets.md`, D7) | Documentation only |
 
@@ -71,6 +73,32 @@ project's wider comparison is in [`data-source-comparison.md`](data-source-compa
   missing, bad dividend adjust. Default: False". factordesk calls it with `auto_adjust=False` and
   `repair=False` (`backend/factordesk/data/prices.py`). Documentation:
   <https://ranaroussi.github.io/yfinance/> (HTTP 200).
+
+Added on 2026-11-20 for the sources of Sprints 2 to 4 (pages read on 2026-11-20; some quotations
+are short because the fetch tool shortens long passages):
+
+- FRED legal notices (<https://fred.stlouisfed.org/legal/>): "you are free to use FRED for your own
+  non-commercial, educational, and personal uses", and "please cite the source of the data and note
+  that it was accessed via FRED". Series tagged "Public Domain: Citation Requested" "may be used for
+  internal commercial uses and may be displayed in textbooks, newsletters, or reports to clients".
+  DTWEXBGS, DEXUSEU, DCOILBRENTEU, DHHNGSP and ECBESTRVOLWGTTRMDMNRT all carry the tag "Public
+  Domain: Citation Requested" on their series pages. Every series page also shows the general banner
+  "Data in this graph are copyrighted. Please review the copyright information in the series notes
+  before sharing"; the notes of these series contain no copyright sentence. factordesk reads the
+  public CSV, not the FRED API, so the API's notice requirement does not apply (our reading).
+- ECB, policy on the reuse of ESCB statistics
+  (<https://www.ecb.europa.eu/stats/ecb_statistics/governance_and_quality_framework/html/usage_policy.en.html>):
+  reuse is free of charge, for commercial or non-commercial use, on condition that the source is
+  quoted (for example "Source: ECB statistics") and the statistics are not modified; the right
+  "does not apply to third-party data without a prior permission from the originator". The €STR
+  page says "The ECB does not charge for the €STR or license its use."
+- SNB copyright clause (<https://www.snb.ch/en/srv/disclaimer_copyright>, paraphrased by the fetch
+  tool): SNB information and data may be saved, transmitted or otherwise used for non-commercial
+  purposes; for data from outside sources, users must respect those sources' rights. The SNB rates
+  page (<https://www.snb.ch/en/srv/current_interest_exchange_rates>): "SARON is provided on the SNB
+  website for information purposes only" and "SIX Index Ltd is responsible for licensing SARON."
+  Commercial use of SARON needs a licence from SIX; factordesk's personal-use posture covers its own
+  use (our reading).
 
 ### Source of truth for factor data
 
@@ -716,7 +744,7 @@ Fonts embedded in the report (licence files in `backend/factordesk/report/fonts/
 (SIL Open Font License 1.1; "Copyright 2022 The Instrument Sans Project Authors") and STIX Two Text
 (SIL Open Font License 1.1; "Copyright 2001-2021 The STIX Fonts Project Authors").
 
-factordesk itself is MIT licensed (`LICENSE`).
+factordesk itself is under the factordesk Noncommercial License 1.0 (`LICENSE`): free for noncommercial use, commercial use by written consent. It was MIT until 2026-11-20, before the repository was public.
 
 ## Unverified citations
 

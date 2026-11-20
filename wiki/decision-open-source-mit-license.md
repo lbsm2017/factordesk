@@ -1,7 +1,7 @@
 # Decision: open source under the MIT license
 
 Date: 2026-11-18
-Status: Decided
+Status: Superseded on 2026-11-20 by [A noncommercial licence, with commercial use by consent](decision-noncommercial-license.md). The repository was never public under MIT. The text below is kept as the record of the earlier choice.
 
 ## In one sentence
 
@@ -9,7 +9,7 @@ factordesk is released under the MIT License, a short permissive license that le
 
 ## What we decided
 
-- The code is licensed MIT, with the notice "Copyright (c) 2026 factordesk contributors".
+- The code is licensed MIT, with the notice "Copyright (c) 2026 factordesk contributors". (Changed on 2026-11-20: see the update below.)
 - Contributors agree that their contributions are released under the same license (stated in `CONTRIBUTING.md`).
 - The license covers our code only. The Ken French library and Yahoo Finance data stay under their providers' own terms, and users must follow them.
 
@@ -42,7 +42,17 @@ Corporate contributors arriving, the name becoming commercially important, a con
 - [docs/references.md](../docs/references.md), data terms and credit.
 - MIT text: <https://opensource.org/license/mit>
 
+## Update 2026-11-20: licence check, then a new licence
+
+- **Dependencies audited.** Every runtime dependency is permissive (MIT, BSD, Apache-2.0, ISC, 0BSD). The Python package certifi is MPL-2.0 and is used unchanged, which MPL allows. MPL-2.0 (lightningcss, axe-core) and CC-BY-4.0 (caniuse-lite) appear only in development tools and are not shipped. No copyleft code is in the product.
+- **Third-party notices.** The wheel ships a compiled page that contains ECharts (Apache-2.0), so its NOTICE must travel with it. [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) lists the bundled packages, the OFL fonts and the ECharts notice, and `pyproject.toml` ships it with the licence in the package.
+- **Named creator.** The owner asked to be named as the creator. The copyright line names Lorenzo Bassetti and factordesk contributors, and the same name is in `CITATION.cff`, `pyproject.toml` and the README. This replaces the 2026-11-18 choice of "factordesk contributors" alone.
+- **MIT replaced.** The same day the owner decided that commercial use must need his consent, which MIT does not provide. The licence is now the factordesk Noncommercial License 1.0; see [the new decision](decision-noncommercial-license.md).
+
 ## Related decisions
+
+- [A noncommercial licence, with commercial use by consent](decision-noncommercial-license.md)
+- [Making the repository public](decision-going-public.md)
 
 - [Project name: factordesk](decision-project-name-factordesk.md)
 - [No data and no secrets in the repository](decision-no-data-and-no-secrets-in-the-repo.md)

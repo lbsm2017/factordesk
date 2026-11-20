@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { fileURLToPath } from "node:url";
 
 const FIRST_REPORT_MS = 120_000;
-const SHOTS = "C:/Users/loren/Research/factordesk-wt/fs-shots";
+const SHOTS = process.env["SHOTS_DIR"] ?? fileURLToPath(new URL("../shots/", import.meta.url));
 
 /**
  * The fake backend has no Europe factors and no exchange rates. The Europe and euro views are tested
