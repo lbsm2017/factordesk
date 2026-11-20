@@ -1,35 +1,62 @@
-# factordesk
+<h1 align="center">factordesk</h1>
 
-**See what drives a stock's returns, in plain language, with the statistics one click away.**
+<p align="center">
+  <b>Fama-French factor analysis for stocks, ETFs, fund track records and portfolios.</b><br>
+  See what drives the returns, in plain language, on your own machine.
+</p>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)
+<p align="center">
+  <a href="https://github.com/lbsm2017/factordesk/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/lbsm2017/factordesk?style=flat&logo=github"></a>
+  <a href="LICENSE"><img alt="License: free for noncommercial use" src="https://img.shields.io/badge/license-free%20for%20noncommercial%20use-orange.svg"></a>
+  <img alt="Python 3.12 or newer" src="https://img.shields.io/badge/python-3.12%2B-blue.svg">
+  <img alt="Runs on Windows, macOS and Linux" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg">
+  <img alt="Version 0.5.0" src="https://img.shields.io/badge/version-0.5.0-blue.svg">
+  <a href="#contributing"><img alt="Pull requests welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
+</p>
 
-factordesk runs a Fama-French five-factor analysis of a single stock or ETF on your own machine.
-Type a ticker and press **Factor it**. factordesk downloads the daily prices and the public Ken
-French factor data, regresses the stock's excess returns on the five factors, and shows the result
-as a local dashboard or as a single offline HTML file.
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-you-can-do-with-it">What you can do</a> ·
+  <a href="#a-tour-of-the-dashboard">Screenshots</a> ·
+  <a href="#method">Method</a> ·
+  <a href="#faq">FAQ</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
 
-It answers three questions:
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark-theme.png">
+    <img src="docs/images/dashboard-overview.png" alt="factordesk dashboard: Fama-French factor analysis of the SPY ETF with performance, alpha, beta and R-squared" width="900">
+  </picture>
+</p>
 
-1. **What is this stock exposed to?** Market, size, value, profitability and investment, each with
-   a 95% interval and a clear "significant or not".
-2. **Where did the return and the risk come from?** An exact split of the average return and of the
-   variance into factor parts and a stock-specific part.
-3. **Did it earn anything beyond those exposures, and does that hold up without hindsight?** Alpha,
-   residual return with point-in-time betas, and betas that move over time.
+Type a ticker and press **Factor it**. factordesk downloads the prices and the public Ken French
+factor data, runs the factor regression, and tells you in one sentence what the stock, fund or
+portfolio really is: how much is the market, how much is size, value, profitability, investment
+and momentum, and whether anything is left that looks like alpha.
 
-factordesk describes the past. It does not forecast, rank or recommend anything.
+```bash
+git clone https://github.com/lbsm2017/factordesk.git && cd factordesk
+uv sync
+uv run factordesk report SPY --open     # a full factor report in your browser
+```
 
-![The factordesk dashboard for SPY, full history](docs/images/dashboard-overview.png)
+No account, no API key and no cloud: it runs locally and uses free public data.
+[Full quick start](#quick-start), with the interactive dashboard, is below.
 
-<sub>Screenshots in this README show SPY over its full history (1 Feb 1993 to 30 Sep 2026), taken on
-19 Nov 2026 from a local run. Prices come from Yahoo Finance and are shown for illustration only;
-no price data is stored in this repository.</sub>
+If factordesk is useful to you, please **star the repository**. Stars are how other people find
+it.
+
+<sub>Screenshots in this README show SPY, IEUR and a 60/40 portfolio of ETFs, taken on 20 Nov 2026
+from a local run. Prices come from Yahoo Finance and are shown for illustration only; no price data
+is stored in this repository. Created by <b>Lorenzo Bassetti</b>. Free for personal and other
+noncommercial use; commercial use needs consent (<a href="#can-i-use-it">Can I use it?</a>).</sub>
 
 ## Contents
 
-- [Highlights](#highlights)
+- [Why factordesk](#why-factordesk)
+- [What you can do with it](#what-you-can-do-with-it)
+- [Features](#features)
 - [Quick start](#quick-start)
 - [A tour of the dashboard](#a-tour-of-the-dashboard)
 - [How it works](#how-it-works)
@@ -42,80 +69,199 @@ no price data is stored in this repository.</sub>
 - [Data sources and licences](#data-sources-and-licences)
 - [Limitations](#limitations)
 - [Status and roadmap](#status-and-roadmap)
+- [Contributing](#contributing)
+- [FAQ](#faq)
+- [Can I use it?](#can-i-use-it)
 - [Documentation map](#documentation-map)
 - [Key references](#key-references)
-- [Cite, contribute, licence](#cite-contribute-licence)
+- [Author, citation, licence](#author-citation-licence)
 
-## Highlights
+## Why factordesk
 
-- **Verdict first.** Every page opens with one plain sentence on what the stock does, followed by
-  two short tables (Performance and Factor model) with a one-word reading for each number. Every
-  panel then opens with its own result sentence.
+- **It answers in plain language.** Every page opens with a verdict sentence, and every number
+  carries a one-word reading: clear evidence, could be noise, or probably biased. The regression
+  table is one switch away when you want it.
+- **It is honest about uncertainty.** Robust (Newey-West) standard errors, a correction for testing
+  several factors at once, and checks that use only the data known on each day, so a result that
+  needs hindsight is shown as such.
+- **It runs on your machine.** No account, no API key, no upload to anyone's server. Your portfolio
+  weights and any track record you upload never leave your computer.
+- **It covers more than one stock.** Tickers, uploaded track records and whole portfolios; US
+  dollars or euros; US or Developed Europe factors.
+- **It shows its sources.** Every method is documented with its reference, every data file with its
+  date and origin, and every caveat that applies is printed on the page.
+- **It is tested.** More than 2,800 automated tests, an independent recomputation of the reference
+  report, and a written methodology you can check the code against.
+
+factordesk describes the past. It does not forecast, rank or recommend anything.
+
+## What you can do with it
+
+| You want to | factordesk gives you |
+| --- | --- |
+| **Know what a stock or ETF really is** | Its factor exposures (market beta, size, value, profitability, investment, momentum) with confidence intervals. Is that "quality" ETF more than the market plus a profitability tilt? |
+| **Test a fund manager's alpha** | Upload the monthly track record of a mutual fund or hedge fund and see the alpha under CAPM and the Fama-French three-, five- and six-factor models, side by side. |
+| **X-ray a portfolio or an asset allocation** | Build a 60/40 or a multi-asset portfolio, backtest it with monthly rebalancing, and see which holdings and which factors carry the return and the risk. |
+| **Measure risk** | Volatility, Sharpe ratio, maximum drawdown, value at risk (VaR) and expected shortfall (CVaR), with risk attribution by factor. |
+| **See the macro sensitivities** | Exposure to interest rates, credit, inflation, commodities, the US dollar, oil, natural gas and carbon prices. |
+| **Check whether exposures are stable** | Rolling betas, Kalman-filter betas and betas adjusted for noise, all without look-ahead. |
+| **Work in euros** | A euro view with daily ECB exchange rates, euro cash rates and the Developed Europe factor set. |
+| **Learn or teach factor investing** | A worked example of empirical asset pricing: every statistic is explained, sourced and reproducible. |
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="#factor-exposures"><img src="docs/images/factor-exposures.png" alt="Fama-French factor exposures of SPY: betas to market, size, value, profitability, investment and momentum with 95% confidence intervals"></a><br>
+      <b>Factor exposures.</b> Which factors move it, and which betas are statistically significant.
+    </td>
+    <td width="50%" valign="top">
+      <a href="#return-and-risk-sources"><img src="docs/images/return-risk-sources.png" alt="Return attribution and risk attribution by Fama-French factor, alpha and specific risk"></a><br>
+      <b>Return and risk attribution.</b> Where the return and the variance came from, adding up exactly.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="#portfolio-mode"><img src="docs/images/portfolio-composer.png" alt="Portfolio composer with a 60/40 asset allocation of ETFs, ready for a monthly-rebalanced backtest"></a><br>
+      <b>Portfolio composer and backtest.</b> Asset classes, proxy ETFs, presets and CSV import.
+    </td>
+    <td width="50%" valign="top">
+      <a href="#tail-risk"><img src="docs/images/tail-risk.png" alt="Tail risk panel: historical and forecast value at risk (VaR) and expected shortfall (CVaR) with bootstrap bands"></a><br>
+      <b>Tail risk.</b> VaR and CVaR, historical and forecast, daily to quarterly.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="#exposure-over-time"><img src="docs/images/rolling-betas.png" alt="Rolling factor betas over time with 95% bands"></a><br>
+      <b>Betas over time.</b> Rolling and Kalman-filter betas that use only past data.
+    </td>
+    <td width="50%" valign="top">
+      <a href="#macro-sensitivities-and-energy"><img src="docs/images/macro-energy.png" alt="Macro sensitivities: betas to interest rates, credit, commodities, inflation and the US dollar"></a><br>
+      <b>Macro sensitivities.</b> Rates, credit, inflation, the dollar, oil, gas and carbon.
+    </td>
+  </tr>
+</table>
+
+## Features
+
+- **Verdict first.** Every page opens with one plain sentence on what the stock, record or
+  portfolio does, then two short tables (Performance and Factor model) with a one-word reading for
+  each number. Every panel then opens with its own result sentence.
 - **Statistics on demand.** A **Show statistics** switch reveals t-statistics, p-values and
   intervals. With it off, the page reads like a research note; with it on, like a regression table.
+- **Three modes.** Analyse a **Ticker**, an uploaded **Track record** (monthly CSV) or a
+  **Portfolio** built in the composer.
+- **Portfolio composer.** A tree of asset classes from a 44-line library with a proxy ETF on each
+  line, four presets (Blank, 60/40, Balanced SAA, Growth), CSV import and export, and a backtest
+  with monthly rebalancing and trading costs. The Holdings panel shows each line's return
+  contribution and risk share.
+- **USD or EUR.** Every report can be shown in US dollars or euros. Listings in 11 currencies are
+  converted daily at ECB rates; cash earns the T-bill rate in USD and €STR in EUR; US bond lines are
+  hedged in the euro view.
+- **US or Europe factors.** The US five factors plus momentum, or the Ken French Developed Europe
+  set.
 - **Careful inference.** Newey-West (HAC) standard errors, Benjamini-Hochberg correction across the
-  five betas, and return and risk attribution that adds up exactly to the total.
-- **Historical performance.** Annualised return, volatility, Sharpe ratio with an approximate 95%
-  interval, maximum drawdown with dates, and the five largest falls.
+  betas, and return and risk attribution that adds up exactly to the total.
+- **Alpha across models.** Alpha under CAPM, the three-, five- and six-factor models side by side,
+  so you see how much of it the extra factors explain.
+- **Tail risk.** Value at risk and expected shortfall at 95% and 99%, historical and forecast, with
+  bootstrap bands, at a daily, monthly or quarterly horizon.
+- **Macro, energy and carbon.** Sensitivities to rates, credit, commodities, inflation and the US
+  dollar, and to Brent oil, US natural gas and carbon allowances.
 - **World beta.** A quick single-factor beta against world stocks (ACWI) and Europe (IEUR), each
   compared with the US market beta on the same days.
 - **Betas over time.** Rolling betas (126 or 252 days), Kalman-filter betas that use only past
-  data, and shrunk betas pulled toward a prior.
-- **Beyond the factors.** Residual return with in-sample and point-in-time betas side by side, so a
-  result that only exists with hindsight is easy to spot.
+  data, and betas adjusted for noise.
 - **Audit trail.** A data-and-audit panel lists coverage, excluded days, the factor file's date and
   source, every audit finding and every caveat that applies.
+- **Shows its work.** **Factor it** shows each step as it runs (prices, exchange rates, factors,
+  models, sections), and the page fills in panel by panel.
+- **Light or dark.** A System, Light and Dark theme switch.
 - **Local and private.** The server listens on `127.0.0.1`, has no login and contacts nothing but
-  the public data sources.
+  the public data sources. Uploaded files stay in memory and are never written to disk.
 - **Offline export.** One self-contained HTML report per ticker, from the dashboard or the command
   line.
 
 ## Quick start
 
-You need [uv](https://docs.astral.sh/uv/) and, for the dashboard, Node 26 or newer with npm 12 or
-newer.
+You need [uv](https://docs.astral.sh/uv/), which installs Python for you. The interactive dashboard
+also needs Node 26 or newer with npm 12 or newer, to build the page once.
+
+**1. Get the code**
 
 ```bash
 git clone https://github.com/lbsm2017/factordesk.git
 cd factordesk
-uv sync                                  # install Python and the pinned dependencies
-
-# The dashboard
-npm --prefix frontend ci
-npm --prefix frontend run build
-uv run factordesk serve --open           # then open http://127.0.0.1:8000/?t=SPY
-
-# Or an offline report, no Node needed
-uv run factordesk report SPY --open      # writes SPY_report.html
+uv sync                # Python and every dependency, pinned
 ```
 
-With the [shortcuts](#shortcuts) the same steps are `make setup` and `make serve`, or
-`uv run poe setup` and `uv run poe serve` without make.
+**2. Open the dashboard**
 
-The first run downloads the factor file and the ticker's price history. Both are cached in
-`data/`, so later runs are fast.
+```bash
+uv run poe setup       # once: build the dashboard page
+uv run poe serve       # start it and open http://127.0.0.1:8000
+```
+
+Type a ticker such as `SPY`, `AAPL` or `NESN.SW` and press **Factor it**.
+
+**Or write a one-file report, with no Node needed**
+
+```bash
+uv run factordesk report SPY --open      # writes SPY_report.html and opens it
+```
+
+If you have make, `make setup` and `make serve` do the same; every command is listed under
+[Shortcuts](#shortcuts). The first run downloads the factor files and the ticker's price history.
+Both are cached in `data/`, so later runs are fast. Step-by-step instructions for each system are
+under [Installation](#installation).
 
 ## A tour of the dashboard
 
-The page has a navy sidebar with the controls and a section list, and a content area with one
-panel per question. The URL holds the state, so a link such as
-`http://127.0.0.1:8000/?t=AAPL&range=5Y&stats=1` reopens the same view.
+The page has a sidebar with the controls and a section list, and a content area with one panel per
+question. The URL holds the state, so a link reopens the same view.
 
-### Sidebar and header
+### Sidebar
 
-- **Ticker.** Any Yahoo Finance symbol quoted in US dollars (`AAPL`, `SPY`, `BRK-B`). Tickers you
-  have already analysed are suggested as you type, with their company name.
-- **Date range.** 3Y, 5Y, 10Y or Full history, or your own From and To dates. A preset is disabled
-  when the history is too short, with the reason.
+<img src="docs/images/sidebar-modes.png" alt="The sidebar with the mode, currency, factor set and theme controls" width="280" align="right">
+
+- **Analyse.** Choose **Ticker**, **Track record** or **Portfolio**.
+- **Ticker.** Any Yahoo Finance symbol (`AAPL`, `SPY`, `BRK-B`, `NESN.SW`). Tickers you have
+  already analysed are suggested as you type, with their company name.
+- **Date range.** 3Y, 5Y, 10Y (the default) or Full history, or your own From and To dates. A preset
+  is disabled when the history is too short, with the reason.
+- **Currency.** **USD** or **EUR**. Your last choice is remembered.
+- **Factor set.** **US** or **Europe** (Developed Europe five factors plus momentum). Macro, energy
+  and world beta always use their US inputs.
 - **Factor data.** The date the factor file ends, and **Check for newer factor data**. The Ken
   French library publishes with a lag of a month or more, so the newest prices are charted but not
   analysed; the sidebar says how many days that is.
 - **Show statistics.** Adds t-statistics, p-values and intervals to every panel.
+- **Theme.** System, Light or Dark.
 - **Section list.** Jumps to a panel and highlights the one you are reading.
 
-The header gives the company name, exchange, currency and security type, a link to any warnings,
-the analysis period, the number of trading days, the factor data's end date and the benchmark.
-**Download report** saves the same analysis as an offline HTML file.
+<br clear="right">
+
+The URL parameters are:
+
+| Parameter | Values | Default when missing |
+| --- | --- | --- |
+| `t` | a ticker | none |
+| `m` | `track` or `portfolio` | ticker mode |
+| `range` | `3Y`, `5Y`, `10Y`, `FULL`, or `start` and `end` as `YYYY-MM-DD` | `10Y` |
+| `model` | `ff5` or `ff6` | `ff6` (five factors plus momentum) |
+| `ccy` | `USD` or `EUR` | your last choice, else USD |
+| `fs` | `europe` | the US factors |
+| `stats` | `1` | statistics hidden |
+
+For example, `http://127.0.0.1:8000/?t=AAPL&range=5Y&ccy=EUR&stats=1` opens Apple over five years
+in euros with the statistics shown.
+
+### Header
+
+The header gives the name, exchange, currency and security type, a link to any warnings, the
+analysis period, the number of days, the factor data's end date and the benchmark. Pills show
+**Figures in EUR** and **US factors** or **Europe factors**. **What EUR changes** opens a short
+explanation of how the euro view converts returns, cash and hedged lines. **Download report** saves
+the analysis as an offline HTML file (ticker mode, USD).
 
 ### Summary
 
@@ -138,8 +284,8 @@ returns are green when positive and red when negative.
 
 ![Factor exposures panel](docs/images/factor-exposures.png)
 
-The core of the analysis. Each bar is a full-sample beta: how much the stock's excess return moved
-with one factor, holding the others fixed.
+The core of the analysis. Each bar is a full-sample beta: how much the excess return moved with one
+factor, holding the others fixed.
 
 | Factor | Plain name | A positive beta means | A negative beta means |
 | --- | --- | --- | --- |
@@ -148,6 +294,7 @@ with one factor, holding the others fixed.
 | HML | Value | leans toward value stocks | leans toward growth stocks |
 | RMW | Profitability | leans toward highly profitable firms | leans toward weakly profitable firms |
 | CMA | Investment | leans toward firms that invest conservatively | leans toward firms that invest aggressively |
+| MOM | Momentum (six-factor model only) | leans toward recent winners | leans toward recent losers |
 
 Bars above zero are green and bars below zero red. A faded bar is not significant: its
 Benjamini-Hochberg adjusted p-value is 0.05 or more, so the beta cannot be told apart from zero. The
@@ -156,14 +303,21 @@ on, the table adds the t-statistic and the average rolling beta:
 
 ![Factor exposures with statistics on](docs/images/factor-exposures-statistics.png)
 
+### Alpha across models
+
+![Alpha across models panel](docs/images/alpha-models.png)
+
+Alpha under CAPM, the three-factor, five-factor and six-factor models on the same days. An alpha
+that shrinks as factors are added was a factor exposure, not skill.
+
 ### World beta
 
 ![World beta panel](docs/images/world-beta.png)
 
-A quick single-factor check outside the US factor set: the stock's beta against the iShares MSCI
-ACWI ETF (a stand-in for the MSCI All Country World index) and the iShares Core MSCI Europe ETF
-(IEUR). Each is shown next to a one-factor US market beta on exactly the same days, and the panel
-says whether the two differ. The ETF prices are cached and refreshed each time you load a ticker.
+A quick single-factor check outside the US factor set: the beta against the iShares MSCI ACWI ETF
+(a stand-in for the MSCI All Country World index) and the iShares Core MSCI Europe ETF (IEUR). Each
+is shown next to a one-factor US market beta on exactly the same days, and the panel says whether
+the two differ.
 
 ### Return and risk sources
 
@@ -172,8 +326,35 @@ says whether the two differ. The ETF prices are cached and refreshed each time y
 **Return sources** splits the average annual excess return into the part each factor explains
 (beta times the factor's average return), alpha, and a residual that is zero by construction. The
 rows add up exactly to the total. **Risk sources** splits the variance into factor shares and a
-stock-specific (idiosyncratic) share. Shares add to 100% and can be negative when one factor
-offsets the others.
+specific (idiosyncratic) share. Shares add to 100% and can be negative when one factor offsets the
+others.
+
+### Tail risk
+
+![Tail risk panel](docs/images/tail-risk.png)
+
+Value at risk (VaR) at 95% and 99%, and expected shortfall (CVaR) at 95% and 97.5%. Each figure has
+a **Historical** bar (from the observed returns) and a **Forecast** bar (Cornish-Fisher, which
+allows for skew and fat tails, or Gaussian when Cornish-Fisher does not apply) on one shared scale,
+each with a 90% bootstrap band. Switch the horizon between **Daily**, **Monthly** and
+**Quarterly**. A forecast is flagged as indicative when the Cornish-Fisher curve is not reliable
+or its bootstrap band is wide. **How this is computed** gives
+the details.
+
+### Macro sensitivities and energy
+
+![Macro sensitivities panel](docs/images/macro-energy.png)
+
+**Macro sensitivities** regress the excess return on the market and five macro legs built from
+ETFs and FRED: rates (IEF minus cash), credit (LQD minus IEF), commodities (DBC minus cash),
+inflation (TIP minus IEI) and the US dollar (the Federal Reserve's broad dollar index). Each row
+shows a variance inflation factor (VIF) so you can see when two legs overlap.
+
+![Energy and carbon panel](docs/images/energy-carbon.png)
+
+**Energy & carbon** regresses on the market plus Brent crude and Henry Hub natural gas, and, from
+August 2020, a carbon model with the KRBN carbon allowance ETF (it needs at least two years). The
+gas fit is repeated without its five largest moves so one spike cannot drive the result.
 
 ### Exposure over time
 
@@ -183,10 +364,11 @@ Rolling betas over the previous 126 or 252 trading days, with a pointwise 95% ba
 only past data. The table gives the latest value, the average and the range that holds the middle
 80% of windows, and the result sentence says whether an exposure stayed stable or crossed zero.
 
-### Deeper checks
+### Deeper checks (five-factor model)
 
-These panels sit under **Deeper checks** in the section list, for readers who want to test the
-headline numbers.
+These panels test the headline numbers. They are built on the five-factor model, so they appear
+when the model is FF5 (`model=ff5` in the URL); under the default six-factor model they are left
+out.
 
 **Beyond the factors** (residual alpha) compares the residual return under full-sample betas
 (in-sample) with the residual under trailing 252-day betas known on each day (point-in-time). A
@@ -202,8 +384,9 @@ and shown with its equivalent rolling window.
 
 ![Kalman betas panel](docs/images/kalman-betas.png)
 
-**Shrunk betas** pull each beta toward a prior in proportion to its uncertainty (Vasicek), show how
-far each one moved, and state the smallest effect the data could have detected.
+**Adjusted for noise** (shrunk betas) pulls each beta toward a prior in proportion to its
+uncertainty (Vasicek), shows how far each one moved, and states the smallest effect the data could
+have detected.
 
 ### Data and audit
 
@@ -214,6 +397,61 @@ and source URL, every audit finding (for example the check of distribution adjus
 CRSP convention) and every caveat that applies. Audit findings are reported, never acted on: no
 price is changed or removed. A **Regression detail** panel at the end of the page holds the full
 regression table and the residual diagnostics.
+
+### Track record mode
+
+![The track record upload screen](docs/images/track-record.png)
+
+Drop a CSV file of monthly returns, or choose one. The file has a header row and two columns:
+
+```text
+date,return
+2020-01-31,0.012
+2020-02-29,-0.034
+```
+
+A date is `YYYY-MM-DD` or `YYYY-MM` and is moved to the month end; a return is a decimal (`0.012`
+is 1.2%). Say whether the returns are **Gross**, **Net** or **Not stated**, and whether the record
+is in **USD** or **EUR**. The file can be up to 1 MB, is held in memory only and is never written
+to disk. The report uses monthly factors and has the same panels as a ticker where monthly data
+allows; it has no **Download report** link.
+
+### Portfolio mode
+
+![The portfolio composer with the 60/40 preset](docs/images/portfolio-composer.png)
+
+The composer has an allocation tree on the left and a live check panel on the right.
+
+- **Build.** Start from **Blank**, **60/40**, **Balanced SAA** or **Growth**, or add lines from the
+  library of 44 asset classes. Each line has a proxy ETF; lines without one are greyed ("No proxy
+  yet"). Keep several named portfolios, rename them, delete them, and undo a delete.
+- **Check.** The live panel shows the total, any unallocated weight (it goes to cash in the
+  reference currency), and the trading cost in basis points. **Normalise to 100%** and **Put
+  remainder in USD cash** fix the total in one click.
+- **Share.** **Export CSV** and **Import CSV** round-trip a portfolio exactly; an import error names
+  the line at fault.
+- **Run backtest.** A monthly-rebalanced backtest of up to 50 instruments over the period they all
+  trade, analysed with the six-factor model by default. In the euro view, lines are tagged
+  "hedged to EUR", "not hedged: several currencies" or "USD cash, not hedged".
+
+The portfolio report adds two panels. **Backtest** gives the window, the holdings that limit it,
+the number of rebalances, the cost and the unallocated weight. **Holdings** gives each line's target
+and end weight, return contribution and risk share, rolled up through the tree.
+
+![The Holdings panel of a 60/40 backtest](docs/images/portfolio-holdings.png)
+
+### The euro view and the Europe factors
+
+![SPY in euros against the Developed Europe factors](docs/images/eur-view.png)
+
+With **Currency** on **EUR**, every price is converted to euros at the daily ECB reference rate,
+cash earns €STR (EONIA before October 2019), and US bond lines in a portfolio are hedged to euros.
+With **Factor set** on **Europe**, the regression uses the Ken French Developed Europe factors. The
+two switches are independent.
+
+### Dark theme
+
+![The dashboard in the dark theme](docs/images/dark-theme.png)
 
 ### On a phone
 
@@ -226,12 +464,15 @@ text is smaller than 14 px at any width.
 
 ```mermaid
 flowchart LR
-    T[Ticker and range] --> P[Prices<br/>yfinance, cached]
+    T[Ticker, track record<br/>or portfolio] --> P[Prices<br/>yfinance, cached]
     P --> Q[Audit and<br/>quality gate]
-    F[Ken French<br/>5-factor daily file, cached] --> A
-    Q --> A[Align days,<br/>excess returns]
+    X[Exchange rates and cash<br/>ECB, FRED, SNB] --> C[Convert to<br/>USD or EUR]
+    Q --> C
+    F[Ken French factors<br/>US or Europe, cached] --> A
+    C --> A[Align days,<br/>excess returns]
     A --> R[OLS with<br/>HAC errors]
-    R --> S[Attribution, rolling,<br/>Kalman, shrunk,<br/>residual, performance]
+    R --> S[Attribution, rolling,<br/>Kalman, shrunk, residual,<br/>tail risk, performance]
+    M[Macro and energy<br/>ETFs and FRED] --> S
     E[ACWI and IEUR<br/>prices, cached] --> W[World beta]
     S --> J[Typed report]
     W --> J
@@ -240,14 +481,18 @@ flowchart LR
 ```
 
 1. **Data.** Daily adjusted closes come from Yahoo Finance through yfinance, with one cached
-   metadata read for the company name, exchange and currency. Tickers quoted in another currency are
-   refused with a plain message until regional factors exist. The factor file comes from the
-   Kenneth R. French Data Library and is refreshed automatically once it is more than 40 days old.
+   metadata read for the name, exchange and currency. Listings in USD, EUR, GBP (pence are divided
+   by 100), CHF, JPY, CAD, AUD, HKD, SEK, NOK and DKK are accepted; other currencies are refused
+   with a plain message. Exchange rates and euro cash rates come from the ECB, with FRED as a
+   fallback; Swiss franc cash comes from SARON at the Swiss National Bank. The factor files come
+   from the Kenneth R. French Data Library and are refreshed automatically once they are more than
+   40 days old.
 2. **Audit.** Distributions and splits are checked against the CRSP adjustment convention, extreme
    days are flagged, and a quality gate tests whether the closing prices are synchronous with the
    factor data.
-3. **Analysis.** The stock's excess return is regressed on the five factors over the days where
-   prices and factors overlap; every other section builds on that sample.
+3. **Analysis.** The excess return is regressed on the factors over the days where prices and
+   factors overlap; every other section builds on that sample. Track records and portfolios use
+   monthly data.
 4. **Report.** The result is one typed report (`backend/factordesk/report/schema.py`, schema
    version 4). The dashboard and the offline HTML renderer both read it. Optional sections carry a
    status (ok, insufficient data, not applicable or failed), so one failing section never breaks the
@@ -259,19 +504,21 @@ from the backend's OpenAPI schema, and CI fails if they drift.
 
 ## Method
 
-For each day, the stock's excess return is regressed by ordinary least squares on the five
-Fama-French factors (Mkt-RF, SMB, HML, RMW, CMA)
-([Fama and French 2015](https://doi.org/10.1016/j.jfineco.2014.10.010)).
+The excess return is regressed by ordinary least squares on the Fama-French factors: the five
+factors Mkt-RF, SMB, HML, RMW and CMA
+([Fama and French 2015](https://doi.org/10.1016/j.jfineco.2014.10.010)), plus momentum (MOM) in the
+six-factor model that the dashboard uses by default.
 
 - **Inference.** Newey-West HAC standard errors, so autocorrelation and changing volatility do not
   overstate significance.
-- **Multiple testing.** The five betas are corrected together with Benjamini-Hochberg at 5%.
+- **Multiple testing.** The betas are corrected together with Benjamini-Hochberg at 5%.
   "Significant" always means the adjusted p-value is below 0.05.
 - **Attribution.** Return and risk attribution add up exactly to the totals.
 - **No look-ahead where it matters.** Rolling, Kalman and point-in-time residual results use only
   data available on each day.
 - **Performance.** Annualised from daily data; the Sharpe ratio interval follows Lo (2002) under an
   iid assumption.
+- **Tail risk.** Historical and Cornish-Fisher VaR and CVaR with bootstrap bands.
 - **Quality gate.** Flags closing prices that are not synchronous with the factor data, which
   biases R² down and residual volatility up.
 
@@ -292,8 +539,11 @@ Also in place:
 - an independent recomputation of the SPY report, and mutation testing
   ([docs/validation/](docs/validation));
 - an independent review of every analytics section before merge ([docs/reviews/](docs/reviews));
+- real-data validation of the euro view and the Europe factors
+  ([Sprint 3](docs/research/sprint-3-validation.md), [Sprint 4](docs/research/sprint-4-validation.md));
 - a written [test oracle](docs/test-oracle.md) with tolerances;
-- Monte Carlo tests of the Kalman filter at 200 replications (`uv run pytest -m slow`, run before each release);
+- Monte Carlo tests of the Kalman filter at 200 replications (`uv run pytest -m slow`, run before
+  each release);
 - pinned lockfiles and fixed seeds;
 - a bibliography where every source was checked ([docs/references.md](docs/references.md)).
 
@@ -351,11 +601,12 @@ Linux; `uv run poe` with no task lists them all. If you have make, the same shor
 | `uv run poe stop` | `make stop` | Stop the dashboard on port 8000 (`--port` or `PORT=` for another port) |
 | `uv run poe report SPY` | `make report T=SPY` | Write an offline report and open it |
 | `uv run poe factors` | `make factors` | Show the cached factor file's range and age |
-| `uv run poe refresh-factors` | `make refresh-factors` | Download the latest factor file |
+| `uv run poe refresh-factors` | `make refresh-factors` | Download the latest US factor file and the files behind the shrunk-beta prior |
 | `uv run poe build` | `make build` | Rebuild the page after frontend changes |
 | `uv run poe dev` | `make dev` | API with reload, for frontend work (run `npm --prefix frontend run dev` beside it) |
 | `uv run poe test` | `make test` | Python and frontend unit tests |
 | `uv run poe check` | `make check` | Lint, format and type checks, as CI runs them |
+| `uv run poe e2e` | `make e2e` | Browser tests (Playwright) against a fake backend |
 | `uv run poe ci` | `make ci` | Every CI gate: checks, tests, build, bundle size, browser tests |
 
 `stop` only stops a factordesk server: it first checks that the port answers like factordesk, so it
@@ -377,7 +628,8 @@ uv run factordesk serve --open
 | `--dev` | API only, restarting on code changes; the page comes from the Vite dev server. |
 | `--static DIR` | Serve the built page from another folder. |
 
-The runbook, with the development setup, caching rules and troubleshooting, is
+`serve` warns when the built page is older than its source, so you know to run the build again. The
+runbook, with the development setup, caching rules and troubleshooting, is
 [docs/dashboard.md](docs/dashboard.md).
 
 ### An offline report
@@ -407,20 +659,22 @@ uv run factordesk report AAPL --out reports --json
 uv run factordesk report BRK-B --open
 ```
 
-Tickers use Yahoo Finance symbols, so a class B share is `BRK-B`, not `BRK.B`. A ticker needs about
-two years of daily history that overlaps the factor data. An example report with made-up numbers
-is in [docs/samples/mock_report.html](docs/samples/mock_report.html). The offline report keeps the
+The command-line report covers a ticker quoted in US dollars, with the US five-factor model. The
+euro view, the Europe factors, track records and portfolios are in the dashboard and the API. Tickers
+use Yahoo Finance symbols, so a class B share is `BRK-B`, not `BRK.B`. A ticker needs about two years
+of daily history that overlaps the factor data. An example report with made-up numbers is in
+[docs/samples/mock_report.html](docs/samples/mock_report.html). The offline report keeps the
 earlier report design for now; giving it the dashboard's look is on the roadmap.
 
 ### Factor data
 
 ```bash
-uv run factordesk factors status    # date range, age and source of the cached file
-uv run factordesk factors refresh   # download the latest file now
+uv run factordesk factors status    # date range, age and source of the cached US file
+uv run factordesk factors refresh   # download the latest US file now
 ```
 
-Prices are cached in `data/` for the day. Delete `data/` at any time to start clean; it is rebuilt
-on the next run.
+The Europe and momentum files are downloaded the first time they are needed and cached in `data/`. Prices are cached in `data/` for the day. Delete `data/` at any time to start
+clean; it is rebuilt on the next run.
 
 ### The API
 
@@ -434,10 +688,18 @@ The dashboard talks to a small JSON API on the same port. All routes are under `
 | `GET /api/tickers?q=&limit=` | Tickers already fetched, by prefix, with names. |
 | `GET /api/report/{ticker}/ranges` | Which presets are available, with the reason when one is not. |
 | `GET /api/report/{ticker}?range=` or `?start=&end=` | The full report as JSON. |
-| `GET /api/report/{ticker}/html` | The offline HTML report as a download. |
+| `GET /api/report/{ticker}/stream` | The same report with progress steps, as server-sent events. |
+| `GET /api/report/{ticker}/html` | The offline HTML report as a download (USD). |
+| `POST /api/report/upload` | A track-record report from a CSV file (multipart: `file`, `name`, `gross_net`, `record_currency`). |
+| `POST /api/report/portfolio` | A portfolio backtest and report from a portfolio tree (JSON). |
+| `GET /api/portfolio/library` | The asset-class library with its proxy ETFs. |
 
-The schema is in `frontend/src/api/openapi.json`. An unknown ticker returns 404 with a plain
-message; a ticker quoted in another currency returns 422 `unsupported_currency`.
+The report routes also take `model=ff5|ff6`, `ccy=USD|EUR` and `factor_set=us|europe`. The API
+defaults to `ff5` for tickers and uploads and to `ff6` for portfolios; the dashboard always sends its choice. The
+upload and portfolio routes each have a `/stream` variant with progress steps. The schema is in
+`frontend/src/api/openapi.json`. An unknown ticker returns 404 with a plain message; a ticker
+quoted in an unsupported currency returns 422 `unsupported_currency`; an upload over 1 MB returns
+413.
 
 ### If something goes wrong
 
@@ -447,7 +709,7 @@ exit code tells scripts what kind of problem it was:
 | Exit code | Meaning |
 | --- | --- |
 | 0 | Success |
-| 1 | Data problem: unknown ticker, too little history, or a factor file that failed validation |
+| 1 | Data problem: unknown ticker, too little history, a currency the command line does not support, or a factor file that failed validation |
 | 2 | Wrong command or option (run `uv run factordesk --help`), or `serve` cannot start (page not built, port in use) |
 | 3 | Network problem, or Yahoo Finance refused the request (try again later) |
 | 4 | The output folder cannot be written (or is inside `data/`, which is not allowed) |
@@ -456,15 +718,18 @@ exit code tells scripts what kind of problem it was:
 
 ```text
 backend/factordesk/
-  analytics/    regression, rolling, attribution, Kalman, shrinkage, residual, performance, world beta
-  data/         price and factor downloads, caching, the price audit
-  report/       the typed report schema and the offline HTML renderer
-  api/          FastAPI routes, range presets, error mapping, the static page
-  pipeline.py   from ticker to report
-  cli.py        the factordesk command
-frontend/       React and TypeScript dashboard (Vite)
-docs/           methodology, specs, design, reviews, validation, roadmap
-wiki/           every decision in plain English
+  analytics/      regression, rolling, attribution, Kalman, shrinkage, residual, performance,
+                  world beta, macro, energy, tail risk, currency, backtest, portfolio attribution
+  data/           prices (Yahoo), factors (Ken French), FRED, ECB, SNB, exchange and cash rates,
+                  uploads, the asset-class library, caching, the price audit
+  report/         the typed report schema and the offline HTML renderer
+  section_hooks/  which report sections run for which model and mode
+  api/            FastAPI routes, progress streams, range presets, error mapping, the static page
+  pipeline.py     from ticker to report
+  cli.py          the factordesk command
+frontend/         React and TypeScript dashboard (Vite)
+docs/             methodology, specs, design, reviews, validation, sprints, roadmap
+wiki/             every decision in plain English
 ```
 
 ## Tests and quality checks
@@ -485,7 +750,7 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run lint
 npm --prefix frontend test
 npm --prefix frontend run build
-npm --prefix frontend run size     # bundle budget: 400 kB raw, 125 kB gzip
+npm --prefix frontend run size     # bundle budget: 540 kB raw, 166 kB gzip
 npm --prefix frontend run e2e      # Playwright, against a fake backend
 ```
 
@@ -495,26 +760,35 @@ release: `uv run pytest -m slow` and `uv run pytest -m live`.
 
 ## Data sources and licences
 
-| Source | Used for | Terms |
-| --- | --- | --- |
-| [Kenneth R. French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) | Every factor return and the risk-free rate | The page carries a copyright notice by Eugene F. Fama and Kenneth R. French; no terms page was found on 2026-11-18. We credit them. |
-| Yahoo Finance, through [yfinance](https://ranaroussi.github.io/yfinance/) | Daily prices, dividends and splits of the analysed ticker and of the ACWI and IEUR ETFs; name, exchange and currency | Yahoo's terms forbid commercial use and collecting data by automated means without permission. The yfinance README says the Yahoo Finance API is "intended for personal use only". No source grants research use, and factordesk obtains no permission from Yahoo for you. The project is personal use only. |
+factordesk's **code** is under the [factordesk Noncommercial License](LICENSE). The **data** it
+downloads is not covered by that licence: it stays under each provider's terms, and you are responsible for following them when you run factordesk. No data
+is stored in this repository; everything is downloaded to your own machine at run time.
 
-The wording of both is quoted and dated in [docs/references.md](docs/references.md). Neither
-dataset is committed: `data/` and `.env` are gitignored, and real-data sample reports stay local
-([decision](wiki/decision-no-data-and-no-secrets-in-the-repo.md)). You are responsible for following
-the providers' terms when you run factordesk.
+| Source | Used for | Terms in short |
+| --- | --- | --- |
+| [Kenneth R. French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) | Every factor return and the risk-free rate: US and Developed Europe five factors and momentum, and the portfolio files behind the shrunk-beta prior | The page carries a copyright notice by Eugene F. Fama and Kenneth R. French; no terms page was found on 2026-11-18. Please credit them. |
+| Yahoo Finance, through [yfinance](https://ranaroussi.github.io/yfinance/) | Daily prices, dividends and splits of the analysed ticker, of every portfolio proxy and of the ACWI, IEUR, IEF, LQD, DBC, TIP, IEI, KRBN and FXF ETFs; name, exchange and currency | Yahoo's terms forbid commercial use and collecting data by automated means without permission, and the yfinance README says the API is "intended for personal use only". factordesk obtains no permission from Yahoo for you, so use it for personal research. |
+| [FRED](https://fred.stlouisfed.org/legal/), Federal Reserve Bank of St. Louis | The broad US dollar index, Brent crude and Henry Hub gas (from the U.S. Energy Information Administration), and fallback exchange and €STR rates | The series used are marked "Public Domain: Citation Requested". Free to use; cite the source and that it was accessed via FRED. |
+| [ECB Data Portal](https://www.ecb.europa.eu/stats/ecb_statistics/governance_and_quality_framework/html/usage_policy.en.html) | Euro reference exchange rates, €STR and EONIA | Free to reuse, also commercially, if the source is quoted ("Source: ECB statistics"). |
+| [Swiss National Bank data portal](https://www.snb.ch/en/srv/disclaimer_copyright) | SARON, for Swiss franc cash | Non-commercial use. SARON is licensed by SIX Index Ltd; commercial use needs a SIX licence. |
+
+The wording of each source is quoted and dated in [docs/references.md](docs/references.md)
+([decision](wiki/decision-no-data-and-no-secrets-in-the-repo.md)).
 
 factordesk is not affiliated with, endorsed by or vetted by Yahoo, the yfinance project, iShares,
-MSCI, Dartmouth College, Kenneth R. French or Eugene F. Fama
+MSCI, Dartmouth College, Kenneth R. French, Eugene F. Fama, the Federal Reserve, the U.S. Energy
+Information Administration, the European Central Bank, the Swiss National Bank or SIX
 ([decision](wiki/decision-project-name-factordesk.md)).
 
 ## Limitations
 
 - Results are descriptive and in-sample, not forecasts. Past exposures may not persist.
-- The factor file lags by a month or more, so the newest prices are charted but not analysed.
-- US factors only. Tickers quoted in another currency are refused until regional factors exist.
-- ACWI and IEUR are ETFs standing in for MSCI indices, which have no free daily data.
+- The factor files lag by a month or more, so the newest prices are charted but not analysed.
+- The command-line report covers US-dollar tickers and the US five-factor model only; the offline
+  HTML report is in US dollars only.
+- The Europe factor set covers developed Europe only; other regions are not available yet.
+- ACWI, IEUR and the macro legs are ETFs standing in for indices, which have no free daily data.
+- A portfolio backtest holds at most 50 instruments and starts when the youngest proxy starts.
 - SPY's early Yahoo closes carry timing noise that the quality gate flags but does not remove.
 - Only tickers that exist today can be analysed, so results carry survivorship bias.
 - Not yet verified: screen readers, Firefox and Safari, and printing the dashboard page.
@@ -525,23 +799,151 @@ without a source are listed in
 
 ## Status and roadmap
 
-As of 2026-11-19, on `dev`:
+As of 2026-11-20, version 0.5.0:
 
 | Built and independently validated | Specified, not built |
 | --- | --- |
-| Five-factor regression with HAC errors and BH correction | Fragility score ("this alpha rests on N days") |
-| Return and risk attribution | Lead-lag (Dimson, Scholes-Williams) betas |
-| Rolling betas (126 and 252 days) | European mode with regional factors |
-| Price audit and quality gate | Offline report in the dashboard's design |
-| Residual alpha, in-sample and point-in-time | Peer comparison |
-| Shrunk betas | One-line install from a published release |
-| Kalman-filter betas | |
-| Historical performance and drawdowns | |
-| World beta against ACWI and IEUR | |
-| Company name and currency check | |
-| Dashboard v2 and the offline HTML report | |
+| Five- and six-factor regression with HAC errors and BH correction | Fragility score ("this alpha rests on N days") |
+| Alpha across CAPM, FF3, FF5 and FF6 | Lead-lag (Dimson, Scholes-Williams) betas |
+| Return and risk attribution | European natural gas (TTF) in the energy panel |
+| Rolling, Kalman and shrunk betas | Factor regions beyond the US and developed Europe |
+| Price audit and quality gate | Offline report in the dashboard's design, in EUR |
+| Residual alpha, in-sample and point-in-time | Currency, factor set and model options on the command line |
+| Historical performance, drawdowns and tail risk | Peer comparison |
+| World beta, macro sensitivities, energy and carbon | One-line install from a published release |
+| Track-record upload | |
+| Portfolio composer and backtest | |
+| USD or EUR view, 11 listing currencies | |
+| US or Developed Europe factors | |
+| Dashboard with progress steps and a dark theme | |
 
-Priorities, effort and owner decisions are in [docs/ROADMAP.md](docs/ROADMAP.md).
+What shipped in each sprint is in [docs/sprints/](docs/sprints). Priorities, effort and owner
+decisions are in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Contributing
+
+Contributions are welcome, from a one-line fix to a new factor region. You do not need to be a
+quant: testers, front-end developers, technical writers and people who simply doubt a number are
+all useful here.
+
+**Start in five minutes:**
+
+```bash
+git clone https://github.com/lbsm2017/factordesk.git && cd factordesk
+uv sync                # Python and every dependency, pinned
+uv run poe setup       # build the dashboard page
+uv run poe test        # the fast test suite, offline
+```
+
+Branch from `dev`, make your change, and open a pull request against `dev`.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rules in full.
+
+**Good places to start:**
+
+| If you like | You could |
+| --- | --- |
+| Testing | Try the dashboard in Firefox or Safari, or with a screen reader, and report what breaks. None of these is verified yet. |
+| Statistics | Challenge a number. Pick a ticker, recompute a statistic your own way, and open an issue if it disagrees. Method errors are as valuable as code bugs. |
+| Python | Add currency, factor-set and model options to the command line, which today covers US-dollar tickers only. |
+| Data | Add a Ken French region (Japan, Asia Pacific, North America, Emerging Markets) next to the US and Developed Europe factor sets. |
+| Front end | Bring the offline HTML report up to the dashboard's design, or improve a chart. |
+| Writing | Fix or clarify the docs, the glossary or this README. If something confused you, it will confuse others. |
+
+More ideas are in [Status and roadmap](#status-and-roadmap) and in the issues labelled
+[`good first issue`](https://github.com/lbsm2017/factordesk/labels/good%20first%20issue) and
+[`help wanted`](https://github.com/lbsm2017/factordesk/labels/help%20wanted). Not sure where to
+begin? Open an issue and ask.
+
+Two things to know before you send code. Every new statistic needs a test with a known answer and
+an entry in the methodology, because the project's promise is that its numbers can be checked. And
+contributions are accepted under the [contribution terms](CONTRIBUTING.md#license): your work is
+released under the project licence, and you let the author license it commercially as well.
+
+## FAQ
+
+### What is a Fama-French factor analysis?
+
+It is a regression of an investment's returns on a small set of published "factors": the market,
+company size (SMB), value (HML), profitability (RMW), investment (CMA) and momentum (MOM). The
+result says how much of the return is explained by exposure to each factor (the betas) and how
+much is left over (the alpha). The factors come from the research of Eugene Fama and Kenneth
+French, and the data from the Kenneth R. French Data Library. The [glossary](wiki/glossary.md)
+defines every term in plain English.
+
+### Is factordesk free?
+
+Yes, for personal and other noncommercial use: your own study, research and savings, and use by
+schools, universities and charities. Companies, professional advisers and investment organisations
+need the author's consent first. See [Can I use it?](#can-i-use-it)
+
+### Do I need an account, an API key or a paid data subscription?
+
+No. factordesk uses free public sources: Yahoo Finance for prices (through yfinance), the Kenneth
+R. French Data Library for factors, and FRED, the ECB and the Swiss National Bank for rates and
+macro series. Each source has its own terms of use; see
+[Data sources and licences](#data-sources-and-licences).
+
+### Does it work for European stocks, and in euros?
+
+Yes. Tickers listed in EUR, GBP, CHF, SEK, NOK, DKK and five other currencies are accepted in the
+dashboard, results can be shown in euros, and you can switch from the US factors to the Ken French
+Developed Europe factors.
+
+### Can I analyse a mutual fund, a hedge fund or my own portfolio?
+
+Yes. A fund that has a Yahoo Finance ticker works like a stock. For any other fund or strategy,
+upload its monthly returns as a CSV file in [track record mode](#track-record-mode). For a
+portfolio, build the allocation in [portfolio mode](#portfolio-mode) and run a backtest.
+
+### How is it different from a backtester or a portfolio optimiser?
+
+A backtester asks "what would this strategy have returned?" and an optimiser asks "which weights
+are best?". factordesk asks "what is this thing exposed to, and is its alpha real?". It has a
+simple monthly-rebalanced backtest so a portfolio can be analysed, but it does not search for
+strategies, forecast returns or suggest weights.
+
+### Can I trust the numbers?
+
+Check them. The statistical rules are written down in [docs/methodology.md](docs/methodology.md),
+every method cites its paper, the test suite compares results with known answers, and the
+reference report was recomputed independently ([docs/validation/](docs/validation)). The known
+weak points are listed under [Limitations](#limitations). If you find a number you cannot
+reproduce, please open an issue.
+
+### Is my data private?
+
+Yes. The server listens on your own machine only (`127.0.0.1`). Uploaded track records are kept
+in memory and never written to disk, portfolios are saved in your browser, and the only network
+traffic is the download of public prices, factors and rates.
+
+### Is this investment advice?
+
+No. See [Not financial advice](#not-financial-advice).
+
+## Can I use it?
+
+factordesk is source-available under the
+[factordesk Noncommercial License 1.0](LICENSE). It is not an open-source licence: you may read,
+run, change and share the code for noncommercial purposes, and you need consent for anything
+else.
+
+| You are | Use |
+| --- | --- |
+| A person using it for your own study, research or savings | Free |
+| A student, teacher or researcher at a school, university or public research organisation | Free |
+| A charity or other noncommercial organisation, outside investment management | Free |
+| A company, a professional adviser, or anyone using it for paid work or a product | Ask first |
+| A bank, asset manager, pension fund, sovereign wealth fund, endowment, insurer or central bank, or anyone managing or advising on investments for an organisation | Ask first |
+| A government institution (other than a school, university or public research organisation) | Ask first |
+
+In every case, keep the licence and the copyright notice with any copy you share, and please
+[cite factordesk](#author-citation-licence) if you use it in published work.
+
+**Commercial use.** Write to Lorenzo Bassetti at <lorenzo.bassetti@gmail.com> to ask for consent
+or a commercial licence. A commercial licence covers the code only: the data factordesk downloads
+stays under each provider's terms ([Data sources and licences](#data-sources-and-licences)).
+
+This table is a plain summary. The [LICENSE](LICENSE) file is the text that counts.
 
 ## Documentation map
 
@@ -556,6 +958,8 @@ Priorities, effort and owner decisions are in [docs/ROADMAP.md](docs/ROADMAP.md)
 | [docs/specs/](docs/specs) | Feature specifications, including dashboard v2 and the schema contract |
 | [docs/design/report-design.md](docs/design/report-design.md) | Look, wording and accessibility of the report and the dashboard |
 | [docs/reviews/](docs/reviews) and [docs/validation/](docs/validation) | Independent reviews and validation |
+| [docs/sprints/](docs/sprints) | What each sprint shipped, its decisions and its retro |
+| [docs/research/](docs/research) | Research notes and spikes behind the newer features |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is built, in progress and planned |
 | [docs/references.md](docs/references.md) | Verified bibliography, sources and terms; [BibTeX](docs/references.bib) |
 | [docs/dashboard.md](docs/dashboard.md) | Dashboard runbook |
@@ -569,25 +973,39 @@ and [docs/references.md](docs/references.md).
 
 1. Fama and French (2015), *J. Financial Economics* 116(1), [doi](https://doi.org/10.1016/j.jfineco.2014.10.010): the five-factor model.
 2. Fama and French (1993), *J. Financial Economics* 33(1), [doi](https://doi.org/10.1016/0304-405X(93)90023-5): the three-factor model.
-3. French, [Kenneth R. French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html): factor data.
-4. Newey and West (1987), *Econometrica* 55(3), [doi](https://doi.org/10.2307/1913610): HAC errors.
-5. Benjamini and Hochberg (1995), *J. Royal Statistical Society B* 57(1), [doi](https://doi.org/10.1111/j.2517-6161.1995.tb02031.x): multiple testing.
-6. Kalman (1960), *J. Basic Engineering* 82(1), [doi](https://doi.org/10.1115/1.3662552): Kalman betas.
-7. Vasicek (1973), *J. Finance* 28(5), [doi](https://doi.org/10.2307/2978759): shrunk betas.
-8. Dimson (1979), *J. Financial Economics* 7(2), [doi](https://doi.org/10.1016/0304-405X(79)90013-8): lead-lag betas (specified).
-9. Scholes and Williams (1977), *J. Financial Economics* 5(3), [doi](https://doi.org/10.1016/0304-405X(77)90041-1): lead-lag cross-check (specified).
-10. Engle and Granger (1987), *Econometrica* 55(2), [doi](https://doi.org/10.2307/1913236): cointegration (specified).
+3. Carhart (1997), *J. Finance* 52(1), [doi](https://doi.org/10.1111/j.1540-6261.1997.tb03808.x): momentum as a fourth factor.
+4. French, [Kenneth R. French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html): factor data.
+5. Newey and West (1987), *Econometrica* 55(3), [doi](https://doi.org/10.2307/1913610): HAC errors.
+6. Benjamini and Hochberg (1995), *J. Royal Statistical Society B* 57(1), [doi](https://doi.org/10.1111/j.2517-6161.1995.tb02031.x): multiple testing.
+7. Kalman (1960), *J. Basic Engineering* 82(1), [doi](https://doi.org/10.1115/1.3662552): Kalman betas.
+8. Vasicek (1973), *J. Finance* 28(5), [doi](https://doi.org/10.2307/2978759): shrunk betas.
+9. Dimson (1979), *J. Financial Economics* 7(2), [doi](https://doi.org/10.1016/0304-405X(79)90013-8): lead-lag betas (specified).
+10. Scholes and Williams (1977), *J. Financial Economics* 5(3), [doi](https://doi.org/10.1016/0304-405X(77)90041-1): lead-lag cross-check (specified).
 
-## Cite, contribute, licence
+## Author, citation, licence
 
-[CITATION.cff](CITATION.cff) holds the citation for factordesk itself (GitHub: "Cite this
-repository"); please also credit Eugene F. Fama and Kenneth R. French for the factor data.
-[CONTRIBUTING.md](CONTRIBUTING.md) covers setup, rules and pull requests; [SECURITY.md](SECURITY.md)
-says how to report a vulnerability privately; [LICENSE](LICENSE) is MIT
-([decision](wiki/decision-open-source-mit-license.md)).
+factordesk was created by **Lorenzo Bassetti** ([@lbsm2017](https://github.com/lbsm2017)) and is
+maintained with the factordesk contributors.
+
+- **Licence.** The code is under the [factordesk Noncommercial License 1.0](LICENSE), copyright
+  2026 Lorenzo Bassetti and factordesk contributors: free for noncommercial use, commercial use by
+  written consent ([Can I use it?](#can-i-use-it),
+  [decision](wiki/decision-noncommercial-license.md)). The fonts are under the SIL Open Font
+  License; these and the libraries bundled into the dashboard page are listed in
+  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- **Citation.** [CITATION.cff](CITATION.cff) holds the citation for factordesk itself (GitHub:
+  "Cite this repository"). Please also credit Eugene F. Fama and Kenneth R. French for the factor
+  data.
+- **Sources of method.** The papers behind each method are in [Key references](#key-references).
+  López de Prado (2023), *Causal Factor Investing* ([doi](https://doi.org/10.1017/9781009397315)),
+  is cited as a source for scientific rigour: it shapes how results are worded and qualified, and
+  none of factordesk's algorithms are taken from it.
+- **Contributing.** [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, rules, pull requests and the
+  contribution terms.
+- **Security.** [SECURITY.md](SECURITY.md) says how to report a vulnerability privately.
 
 ## Not financial advice
 
-factordesk is a research and education tool. Its output describes how a stock's past returns
-related to published factors. It is not investment, tax or legal advice, and it is not a
-recommendation to buy or sell anything. Past exposures may not persist.
+factordesk is a research and education tool. Its output describes how past returns related to
+published factors. It is not investment, tax or legal advice, and it is not a recommendation to buy
+or sell anything. Past exposures may not persist.
