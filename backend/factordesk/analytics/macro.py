@@ -311,7 +311,8 @@ def fit_macro(design: MacroDesign) -> MacroFit:
         )
         for i, code in enumerate(design.codes)
     )
-    correlation = np.asarray(np.corrcoef(design.x, rowvar=False), dtype=np.float64)
+    assert cc.correlation is not None  # set by ``collinearity``: the matrix is computed once
+    correlation = cc.correlation
     return MacroFit(
         rows=rows,
         codes=design.codes,

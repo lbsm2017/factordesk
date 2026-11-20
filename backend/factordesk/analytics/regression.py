@@ -331,7 +331,15 @@ def condition_number(factors: FloatArray) -> float:
     """``sqrt(lambda_max / lambda_min)`` of the factor correlation matrix (M3.4); 1 for one."""
     if np.asarray(factors).shape[1] == 1:
         return 1.0
-    eig = np.linalg.eigvalsh(np.corrcoef(np.asarray(factors, dtype=np.float64), rowvar=False))
+    corr: FloatArray = np.asarray(
+        np.corrcoef(np.asarray(factors, dtype=np.float64), rowvar=False), dtype=np.float64
+    )
+    return _condition_of(corr)
+
+
+def _condition_of(corr: FloatArray) -> float:
+    """The condition number of a correlation matrix that is already computed."""
+    eig = np.linalg.eigvalsh(corr)
     return float(math.sqrt(eig[-1] / eig[0]))
 
 
@@ -341,15 +349,19 @@ class Collinearity:
     kappa: float
     high_corr_pairs: tuple[tuple[str, str, float], ...]
     warnings: tuple[str, ...]
+    correlation: FloatArray | None = None
+    """The factor correlation matrix, computed once here (``None`` only for a hand-built value)."""
 
 
 def collinearity(factors: FloatArray, names: Sequence[str]) -> Collinearity:
-    """VIF, condition number, high-correlation pairs and the M3.4 warning sentences."""
+    """VIF, condition number, correlation matrix, high-correlation pairs and the M3.4 warning
+    sentences. The correlation matrix is computed once and shared by the condition number, the
+    pairs and the ``correlation`` field."""
     v = vif(factors)
-    kappa = condition_number(factors)
     corr: FloatArray = np.asarray(
         np.corrcoef(np.asarray(factors, dtype=np.float64), rowvar=False), dtype=np.float64
     )
+    kappa = 1.0 if corr.ndim < 2 else _condition_of(corr)
     pairs = tuple(
         (names[i], names[j], float(corr[i, j]))
         for i in range(len(names))
@@ -380,6 +392,7 @@ def collinearity(factors: FloatArray, names: Sequence[str]) -> Collinearity:
         kappa=kappa,
         high_corr_pairs=pairs,
         warnings=tuple(warnings),
+        correlation=corr,
     )
 
 
