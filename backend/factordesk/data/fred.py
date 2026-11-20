@@ -1,4 +1,5 @@
-"""FRED series download: the Fed nominal broad dollar index for the macro section (E4).
+"""FRED series download: the Fed nominal broad dollar index for the macro section (E4), and the
+Brent and Henry Hub spot prices for the energy section.
 
 The public CSV of one series is ``https://fred.stlouisfed.org/graph/fredgraph.csv?id=<SERIES>``:
 a header line ``observation_date,<SERIES>`` (older files say ``DATE``) and one line per day. FRED
@@ -35,6 +36,10 @@ logger = logging.getLogger(__name__)
 
 DOLLAR_SERIES = "DTWEXBGS"
 """FRED id of the Federal Reserve nominal broad U.S. dollar index."""
+BRENT_SERIES = "DCOILBRENTEU"
+"""FRED id of the Brent crude oil spot price (US dollars a barrel, EIA)."""
+HENRY_HUB_SERIES = "DHHNGSP"
+"""FRED id of the Henry Hub natural gas spot price (US dollars per million BTU, EIA)."""
 FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 TIMEOUT_S = 8.0
 ATTEMPTS = 2

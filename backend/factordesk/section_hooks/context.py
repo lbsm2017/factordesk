@@ -102,6 +102,31 @@ class MacroInput:
 
 
 @dataclass(frozen=True)
+class SeriesInput:
+    """The levels of one FRED series, or why there are none (same shape as ``DollarInput``).
+
+    ``levels`` is ``None`` when the series could not be fetched and no cached copy exists.
+    ``note`` is set when an older cached copy was used.
+    """
+
+    levels: pd.Series | None
+    unavailable_reason: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class EnergyInput:
+    """The data of the energy section: Brent and Henry Hub spot prices and the KRBN history.
+
+    ``carbon`` is the KRBN history (or the reason it is missing), as for the macro funds.
+    """
+
+    oil: SeriesInput
+    gas: SeriesInput
+    carbon: WorldBenchmarkInput
+
+
+@dataclass(frozen=True)
 class SectionInputs:
     """Data a section needs that ``assemble_report`` does not already have.
 
@@ -122,6 +147,9 @@ class SectionInputs:
     macro: MacroInput | None = None
     """Fund prices and the dollar index of the macro section; ``None``: not fetched, the section
     does not run. Owned by the macro feature."""
+    energy: EnergyInput | None = None
+    """Brent, Henry Hub and KRBN of the energy section; ``None``: not fetched, the section does
+    not run. Owned by the energy feature."""
 
 
 @dataclass(frozen=True)

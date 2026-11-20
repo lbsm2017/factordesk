@@ -1,0 +1,208 @@
+{
+  "status": "ok",
+  "reason": null,
+  "sample": {
+    "n": 720,
+    "start": "2010-01-04",
+    "end": "2012-10-05",
+    "requested_start": "2010-01-04",
+    "requested_end": "2012-10-05",
+    "window": null,
+    "n_excluded": 0,
+    "excluded": [],
+    "factor_vintage": {
+      "last_date": "2012-10-05",
+      "downloaded_at": null
+    }
+  },
+  "model_note": "Separate regression, not the headline model. Sensitivities are raw and describe co-movement in this window, not a forecast.",
+  "gas_note": "Daily gas sensitivities are descriptive: gas moves are extremely fat-tailed, so a few days can drive the result.",
+  "frequency": "daily",
+  "n_sample": 720,
+  "long_model": {
+    "key": "long",
+    "title": "Market, oil and gas",
+    "label": null,
+    "n_obs": 720,
+    "start": "2010-01-04",
+    "end": "2012-10-05",
+    "hac_lags": 6,
+    "t_reference": "normal",
+    "r2": 0.8675235812335813,
+    "adj_r2": 0.8669685124398673,
+    "rows": [
+      {
+        "code": "mkt_rf",
+        "name": "Mkt-RF",
+        "label": "Market",
+        "definition": "French market excess return",
+        "note": null,
+        "beta": 0.9214922977393797,
+        "se": 0.014257982384764408,
+        "t": 64.62992258456251,
+        "p": 0.0,
+        "ci_low": 0.893547165773035,
+        "ci_high": 0.9494374297057244,
+        "tag": "reliable",
+        "vif": 1.0014958827302345
+      },
+      {
+        "code": "oil",
+        "name": "OIL",
+        "label": "Oil",
+        "definition": "log change of the Brent spot price (FRED DCOILBRENTEU)",
+        "note": null,
+        "beta": 0.1993661029629243,
+        "se": 0.009016671756007448,
+        "t": 22.11083073198208,
+        "p": 2.4865052127695007e-108,
+        "ci_low": 0.18169375106073019,
+        "ci_high": 0.21703845486511844,
+        "tag": "reliable",
+        "vif": 1.0008594138752007
+      },
+      {
+        "code": "gas",
+        "name": "GAS",
+        "label": "Natural gas",
+        "definition": "log change of the Henry Hub spot price (FRED DHHNGSP)",
+        "note": "very large one-off moves",
+        "beta": 0.017538612011883576,
+        "se": 0.0013829830824739217,
+        "t": 12.681725636520426,
+        "p": 7.466963462931929e-37,
+        "ci_low": 0.014828014979006503,
+        "ci_high": 0.02024920904476065,
+        "tag": "reliable",
+        "vif": 1.0020283253001003
+      }
+    ],
+    "gas_robust": {
+      "beta": 0.023923371954737496,
+      "se": 0.006286549200854696,
+      "t": 3.8054855200186712,
+      "p": 0.00014152629432882994,
+      "n_excluded": 5,
+      "excluded_dates": [
+        "2010-03-15",
+        "2011-07-18",
+        "2012-09-10",
+        "2010-04-07",
+        "2010-08-25"
+      ],
+      "n_obs": 715
+    },
+    "window_limited_by": null
+  },
+  "carbon_model": {
+    "key": "carbon",
+    "title": "Market, oil, gas and carbon",
+    "label": "short sample, since Aug 2020, mainly EU carbon",
+    "n_obs": 520,
+    "start": "2010-10-11",
+    "end": "2012-10-05",
+    "hac_lags": 5,
+    "t_reference": "normal",
+    "r2": 0.9039619602815523,
+    "adj_r2": 0.9032160337594672,
+    "rows": [
+      {
+        "code": "mkt_rf",
+        "name": "Mkt-RF",
+        "label": "Market",
+        "definition": "French market excess return",
+        "note": null,
+        "beta": 0.8838656938071164,
+        "se": 0.014795148581115794,
+        "t": 59.74023775166837,
+        "p": 0.0,
+        "ci_low": 0.8548677354422106,
+        "ci_high": 0.9128636521720223,
+        "tag": "reliable",
+        "vif": 1.0144447251781004
+      },
+      {
+        "code": "oil",
+        "name": "OIL",
+        "label": "Oil",
+        "definition": "log change of the Brent spot price (FRED DCOILBRENTEU)",
+        "note": null,
+        "beta": 0.20315560801779953,
+        "se": 0.009203544212611115,
+        "t": 22.07362765090284,
+        "p": 5.665835387278111e-108,
+        "ci_low": 0.1851169928309597,
+        "ci_high": 0.22119422320463936,
+        "tag": "reliable",
+        "vif": 1.0016881918726794
+      },
+      {
+        "code": "gas",
+        "name": "GAS",
+        "label": "Natural gas",
+        "definition": "log change of the Henry Hub spot price (FRED DHHNGSP)",
+        "note": "very large one-off moves",
+        "beta": 0.02107856040057078,
+        "se": 0.0017409264485846814,
+        "t": 12.107668544933066,
+        "p": 9.618949965732778e-34,
+        "ci_low": 0.017666407261611585,
+        "ci_high": 0.024490713539529977,
+        "tag": "reliable",
+        "vif": 1.0206925183943132
+      },
+      {
+        "code": "co2",
+        "name": "CO2",
+        "label": "Carbon",
+        "definition": "KRBN total return minus RF",
+        "note": "mainly EU carbon",
+        "beta": 0.0991112748987098,
+        "se": 0.006372327379270387,
+        "t": 15.55338716920375,
+        "p": 1.5090903939165576e-54,
+        "ci_low": 0.08662174273764134,
+        "ci_high": 0.11160080705977826,
+        "tag": "reliable",
+        "vif": 1.0349693593235219
+      }
+    ],
+    "gas_robust": {
+      "beta": 0.023925664326117393,
+      "se": 0.0073219807950029745,
+      "t": 3.2676491506841865,
+      "p": 0.001084447087356255,
+      "n_excluded": 5,
+      "excluded_dates": [
+        "2011-07-18",
+        "2012-09-10",
+        "2012-02-03",
+        "2012-09-12",
+        "2011-09-21"
+      ],
+      "n_obs": 515
+    },
+    "window_limited_by": "KRBN"
+  },
+  "carbon_note": null,
+  "legs": [
+    {
+      "ticker": "DCOILBRENTEU",
+      "code": "oil",
+      "role": "OIL = log change of the Brent spot price",
+      "first_date": "2009-12-31"
+    },
+    {
+      "ticker": "DHHNGSP",
+      "code": "gas",
+      "role": "GAS = log change of the Henry Hub spot price",
+      "first_date": "2009-12-31"
+    },
+    {
+      "ticker": "KRBN",
+      "code": "co2",
+      "role": "CO2 = KRBN total return minus RF",
+      "first_date": "2010-10-08"
+    }
+  ]
+}

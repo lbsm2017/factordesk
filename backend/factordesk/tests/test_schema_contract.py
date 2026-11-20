@@ -50,12 +50,13 @@ SECTION_FIELDS = (
     "alpha_strip",
     "portfolio_backtest",
     "macro",
+    "energy",
 )
-"""The eleven optional fields, in field order (contract SC2, SC4; performance and world beta are
+"""The twelve optional fields, in field order (contract SC2, SC4; performance and world beta are
 additions to the five of the contract, see docs/validation/performance-contract-note-2026-11-18.md
 and docs/validation/world-beta-contract-note-2026-11-18.md; the alpha strip is E1's and the macro
 section is E4's)."""
-OMITTED_WHEN_NONE = ("alpha_strip", "portfolio_backtest", "macro")
+OMITTED_WHEN_NONE = ("alpha_strip", "portfolio_backtest", "macro", "energy")
 """Optional fields left out of the JSON (not written as null) when not computed."""
 
 

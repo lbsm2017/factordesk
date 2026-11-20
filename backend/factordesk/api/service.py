@@ -292,6 +292,7 @@ class ReportService:
             inputs = await self._section_inputs(loaded.vintage, now)
             inputs = await self._with_world_benchmark(inputs)
             inputs = await self._with_macro(inputs)
+            inputs = await self._with_energy(inputs)
 
             def build() -> FactorReport:
                 return assemble_report(
@@ -360,6 +361,7 @@ class ReportService:
             frame = await self._model_frame(loaded, now, model)
             inputs = await self._with_world_benchmark(None)
             inputs = await self._with_macro(inputs)
+            inputs = await self._with_energy(inputs)
 
             def build() -> FactorReport:
                 return pr.build_portfolio_report(
@@ -527,6 +529,18 @@ class ReportService:
 
         macro = await self.runtime.run(loader)
         return dataclasses.replace(inputs or SectionInputs(), macro=macro)
+
+    async def _with_energy(self, inputs: SectionInputs | None) -> SectionInputs | None:
+        """``inputs`` plus the energy section's oil, gas and KRBN data (None: not wired)."""
+        loader = self.deps.load_energy
+        if loader is None:
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import SectionInputs
+
+        energy = await self.runtime.run(loader)
+        return dataclasses.replace(inputs or SectionInputs(), energy=energy)
 
     async def _history(self, ticker: str, today: date) -> PriceHistory:
         async def make() -> PriceHistory:

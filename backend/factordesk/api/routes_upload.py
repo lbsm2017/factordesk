@@ -198,7 +198,15 @@ def _build_upload_report(
     now = runtime.deps.now().astimezone(UTC)
     frame = monthly_frame(model, runtime, now)
     load_macro = runtime.deps.load_macro
-    inputs = None if load_macro is None else SectionInputs(macro=load_macro())
+    load_energy = runtime.deps.load_energy
+    inputs = (
+        None
+        if load_macro is None and load_energy is None
+        else SectionInputs(
+            macro=None if load_macro is None else load_macro(),
+            energy=None if load_energy is None else load_energy(),
+        )
+    )
     try:
         report = assemble_subject_report(
             subject,
