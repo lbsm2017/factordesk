@@ -1,3 +1,4 @@
+import { reportCurrency } from "../../api/currency";
 import { dateLong } from "../../format";
 import { isSubjectReport, observations, subjectLine } from "../../report/subject";
 import { Icon } from "../shell/icons";
@@ -52,6 +53,7 @@ export function Header({ report, downloadHref }: HeaderProps) {
   const badge = security.quote_type ? (TYPE_BADGE[security.quote_type.toUpperCase()] ?? null) : null;
   const listing = subjectLine(report) ?? listingLine(security);
   const warnings = noticeItems(report).length;
+  const currency = reportCurrency(report);
   return (
     <header className="masthead" id="header">
       <div className="page-head">
@@ -70,6 +72,7 @@ export function Header({ report, downloadHref }: HeaderProps) {
             {badge}
           </span>
         ) : null}
+        {currency === "EUR" ? <span className="ccy-pill">Figures in EUR</span> : null}
         {downloadHref !== null ? (
           <div className="head-actions">
             <a className="btn-outline" href={downloadHref} download>
@@ -100,6 +103,12 @@ export function Header({ report, downloadHref }: HeaderProps) {
           <dt>Factor data</dt>
           <dd title={`${plural(d.factors_days_behind, "day", "days")} old`}>To {dateLong(d.factors_last_date)}</dd>
         </div>
+        {currency === "EUR" ? (
+          <div>
+            <dt>Currency</dt>
+            <dd>EUR</dd>
+          </div>
+        ) : null}
         {isSubjectReport(report) ? null : (
           <div>
             <dt>Benchmark</dt>

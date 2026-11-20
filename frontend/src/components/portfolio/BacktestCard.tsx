@@ -1,4 +1,5 @@
 import type { PortfolioBacktestSection } from "../../api/types";
+import type { Currency } from "../../state/currency";
 import { count, dateShort } from "../../format";
 
 function pct(x: number, digits = 1): string {
@@ -21,7 +22,7 @@ function names(list: readonly string[]): string {
  * limit its start, the rebalances, the cost, any unallocated weight or skipped trading days, and the
  * survivorship note that every backtest carries.
  */
-export function BacktestCard({ section }: { section: PortfolioBacktestSection }) {
+export function BacktestCard({ section, currency = "USD" }: { section: PortfolioBacktestSection; currency?: Currency }) {
   const rows: [string, string][] = [
     ["Window", `${dateShort(section.window_start)} to ${dateShort(section.window_end)}`],
     ["Starts when", `${names(section.start_limited_by)} begins`],
@@ -43,7 +44,7 @@ export function BacktestCard({ section }: { section: PortfolioBacktestSection })
     <section className="panel sumcard" aria-labelledby="backtest-title" id="backtest" data-testid="backtest-card">
       <div className="panel-head">
         <h2 id="backtest-title">Backtest</h2>
-        <div className="pm">Monthly rebalancing, in US dollars</div>
+        <div className="pm">Monthly rebalancing, in {currency === "EUR" ? "euros" : "US dollars"}</div>
       </div>
       <dl className="kv">
         {rows.map(([term, value]) => (

@@ -2,6 +2,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { dateLong } from "../format";
+import { DEFAULT_CURRENCY } from "../state/currency";
+import type { Currency } from "../state/currency";
 import { DEFAULT_MODEL, DEFAULT_RANGE, isSuggestQuery } from "../state/url";
 import type { FactorModel, UrlState } from "../state/url";
 import { ApiRequestError, apiRequest, NETWORK_ERROR } from "./client";
@@ -23,16 +25,27 @@ function modelParam(model: FactorModel | undefined): Record<string, string> {
   return { model: model ?? DEFAULT_MODEL };
 }
 
-/** Query parameters of the report endpoints: custom dates win over a preset; neither means the default range. The model is always sent. */
-export function reportParams(state: UrlState): Record<string, string> {
+/** `ccy=EUR` in the euro view; nothing in the USD view, which is the API default. */
+function ccyParam(ccy: Currency): Record<string, string> {
+  return ccy === DEFAULT_CURRENCY ? {} : { ccy };
+}
+
+/**
+ * Query parameters of the report endpoints: custom dates win over a preset; neither means the
+ * default range. The model is always sent. `ccy=EUR` is added in the euro view only: USD is the
+ * default and the USD request stays as it was. `ccy` is the effective currency of the page (URL,
+ * then stored choice, then USD), not the raw URL value.
+ */
+export function reportParams(state: UrlState, ccy: Currency = state.ccy ?? DEFAULT_CURRENCY): Record<string, string> {
   if (state.start || state.end) {
     return {
       ...(state.start ? { start: state.start } : {}),
       ...(state.end ? { end: state.end } : {}),
       ...modelParam(state.model),
+      ...ccyParam(ccy),
     };
   }
-  return { range: state.range ?? DEFAULT_RANGE, ...modelParam(state.model) };
+  return { range: state.range ?? DEFAULT_RANGE, ...modelParam(state.model), ...ccyParam(ccy) };
 }
 
 /** The `rangeOrDates` part of the report query key. */
@@ -42,9 +55,9 @@ export function reportRangeKey(state: UrlState): string {
 }
 
 /** `/api/report/{t}/html?{same range}` for the Download link (dashboard spec DB6.5). */
-export function downloadHref(state: UrlState): string {
+export function downloadHref(state: UrlState, ccy?: Currency): string {
   if (state.ticker === null) return "#";
-  const qs = new URLSearchParams(reportParams(state)).toString();
+  const qs = new URLSearchParams(reportParams(state, ccy)).toString();
   return `/api/report/${encodeURIComponent(state.ticker)}/html?${qs}`;
 }
 
@@ -89,14 +102,14 @@ export function useRanges(ticker: string | null) {
   });
 }
 
-export function useReport(state: UrlState) {
+export function useReport(state: UrlState, ccy: Currency = state.ccy ?? DEFAULT_CURRENCY) {
   const { ticker } = state;
   return useQuery({
-    queryKey: ["report", ticker, reportRangeKey(state), state.model ?? DEFAULT_MODEL],
+    queryKey: ["report", ticker, reportRangeKey(state), state.model ?? DEFAULT_MODEL, ccy],
     queryFn: ({ signal }) =>
       apiRequest<FactorReport>(`/api/report/${encodeURIComponent(ticker ?? "")}`, {
         signal,
-        query: reportParams(state),
+        query: reportParams(state, ccy),
       }),
     enabled: ticker !== null,
     staleTime: Infinity,
@@ -152,15 +165,25 @@ export interface UploadInput {
   grossNet: GrossNet;
   /** The factor model; the dashboard always sends it. */
   model?: FactorModel;
+  /** The currency the record itself is in (`record_currency`); USD when not given. */
+  recordCurrency?: Currency;
+  /** The reference currency of the report (`ccy`); USD when not given. */
+  ccy?: Currency;
 }
 
-/** The multipart body of `POST /api/report/upload`: the file, then the optional name and fee basis, and the model (always sent). */
-export function uploadBody({ file, name, grossNet, model }: UploadInput): FormData {
+/**
+ * The multipart body of `POST /api/report/upload`: the file, then the optional name and fee basis,
+ * the model, the record's own currency (`record_currency`, always sent: the user declares it) and,
+ * in the euro view only, the reference currency (`ccy=EUR`).
+ */
+export function uploadBody({ file, name, grossNet, model, recordCurrency, ccy }: UploadInput): FormData {
   const body = new FormData();
   body.append("file", file);
   if (name.trim() !== "") body.append("name", name.trim());
   if (grossNet !== "") body.append("gross_net", grossNet);
   body.append("model", model ?? DEFAULT_MODEL);
+  body.append("record_currency", recordCurrency ?? DEFAULT_CURRENCY);
+  if (ccy !== undefined && ccy !== DEFAULT_CURRENCY) body.append("ccy", ccy);
   return body;
 }
 
@@ -187,6 +210,8 @@ export interface PortfolioRunInput {
   tree: PortfolioTree;
   /** The factor model; the dashboard always sends it. */
   model: FactorModel;
+  /** The reference currency of the report; USD when not given. */
+  currency?: Currency;
   /** The range of the page: a preset, or custom dates (which win over it). */
   range: string | null;
   start: string | null;
@@ -201,6 +226,11 @@ export function portfolioQuery({ model, range, start, end }: PortfolioRunInput):
   };
 }
 
+/** The JSON body of `POST /api/report/portfolio`: the tree, plus `reference_currency` in the euro view only. */
+export function portfolioBody({ tree, currency }: PortfolioRunInput): PortfolioTree & { reference_currency?: Currency } {
+  return currency === undefined || currency === DEFAULT_CURRENCY ? tree : { ...tree, reference_currency: currency };
+}
+
 /** Runs a portfolio through the API. Like the upload, the result is held by the hook only and never cached. */
 export function usePortfolioReport() {
   return useMutation({
@@ -208,7 +238,7 @@ export function usePortfolioReport() {
       apiRequest<FactorReport>("/api/report/portfolio", {
         method: "POST",
         query: portfolioQuery(input),
-        json: input.tree,
+        json: portfolioBody(input),
       }),
     retry: false,
   });

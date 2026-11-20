@@ -142,3 +142,9 @@
 .ctl-name { display: flex; flex-direction: column; gap: 8px; }
 .controls .ctl-name input[type="text"] { text-transform: none; letter-spacing: normal; }
 .controls .btn:disabled { opacity: 0.5; cursor: default; }
+
+/* reference currency: one compact row under the mode switch (Sprint 3, S3-5) */
+.side-group .ccy-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-3); }
+.ccy-seg { flex: none; }
+.ccy-seg .seg-opt span { min-width: 56px; }
+.ccy-note { margin-top: var(--s-1); }

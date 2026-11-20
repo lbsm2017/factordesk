@@ -25,6 +25,7 @@ import { ErrorFrame } from "./components/report/ErrorFrame";
 import { LoadingFrame } from "./components/report/LoadingFrame";
 import { ReportView } from "./components/report/ReportView";
 import { Shell } from "./components/shell/Shell";
+import { useCurrency } from "./state/currency";
 import { addRecent, useRecent } from "./state/recent";
 import type { RollingWindowDays } from "./state/url";
 import { StatsProvider } from "./state/stats";
@@ -53,6 +54,7 @@ const TRACK_TITLE = "Track record";
 
 function Dashboard() {
   const [state, commit] = useUrlState();
+  const [currency, setCurrency] = useCurrency(state.ccy, commit);
   const [query, setQuery] = useState("");
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const recent = useRecent();
@@ -63,7 +65,7 @@ function Dashboard() {
   const portfolio = state.mode === "portfolio";
   const tickerState = track || portfolio ? { ...state, ticker: null } : state;
   const ranges = useRanges(tickerState.ticker);
-  const report = useReport(tickerState);
+  const report = useReport(tickerState, currency);
   const refresh = useRefreshFactors(setRefreshMessage);
   const upload = useUploadReport();
 
@@ -77,33 +79,36 @@ function Dashboard() {
       : report.data;
   const busy = !track && state.ticker !== null && report.isFetching && shown !== undefined;
 
-  // A model change re-runs the record on screen with the new model (the upload result is not cached).
+  // A model or currency change re-runs the record on screen (the upload result is not cached).
   const lastModel = useRef(state.model);
+  const lastCurrency = useRef(currency);
   useEffect(() => {
-    if (lastModel.current === state.model) return;
+    if (lastModel.current === state.model && lastCurrency.current === currency) return;
     lastModel.current = state.model;
+    lastCurrency.current = currency;
     if (track && upload.variables !== undefined && !upload.isPending) {
-      upload.mutate({ ...upload.variables, model: state.model });
+      upload.mutate({ ...upload.variables, model: state.model, ccy: currency });
     }
-  }, [state.model, track, upload]);
+  }, [state.model, currency, track, upload]);
 
   const loadedTicker = !track && report.isSuccess && !report.isPlaceholderData ? report.data.ticker : null;
   useEffect(() => {
     if (loadedTicker !== null) addRecent(loadedTicker);
   }, [loadedTicker]);
 
-  if (portfolio) return <PortfolioMode state={state} onCommit={commit} />;
+  if (portfolio) return <PortfolioMode state={state} currency={currency} onCurrency={setCurrency} onCommit={commit} />;
 
   return (
     <Shell
       report={shown}
       ticker={track ? (shown?.ticker ?? null) : state.ticker}
+      currency={currency}
       sidebar={
         <>
-          <ModeSwitch mode={state.mode} onSelect={(mode) => commit({ mode })} />
+          <ModeSwitch mode={state.mode} onSelect={(mode) => commit({ mode })} currency={currency} onCurrency={setCurrency} />
           {track ? (
             <>
-              <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate({ ...input, model: state.model })} />
+              <TrackRecordInput busy={upload.isPending} onRun={(input) => upload.mutate({ ...input, model: state.model, ccy: currency })} />
               {shown !== undefined ? (
                 <div className="side-group">
                   <AnalysedRange report={shown} label="Analysed period" />
@@ -152,7 +157,7 @@ function Dashboard() {
       ) : (
         <ReportView
           report={shown}
-          downloadHref={downloadHref(state)}
+          downloadHref={downloadHref(state, currency)}
           win={state.win}
           onWinChange={(win) => commit({ win })}
           busy={busy}

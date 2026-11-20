@@ -9,9 +9,11 @@ import type { PortfolioRunInput } from "../../api/queries";
 import { lineCount } from "../../portfolio/composer";
 import { buildPreset, presetById } from "../../portfolio/presets";
 import type { PresetId } from "../../portfolio/presets";
+import { reportCurrency } from "../../api/currency";
 import { remainder, totalWeight } from "../../portfolio/tree";
 import type { PortfolioTree } from "../../portfolio/tree";
 import { usePortfolioStore } from "../../portfolio/usePortfolioStore";
+import type { Currency } from "../../state/currency";
 import type { UrlState } from "../../state/url";
 import { StatsSwitch } from "../controls/StatsSwitch";
 import { ModeSwitch } from "../controls/ModeSwitch";
@@ -26,6 +28,9 @@ import { UndoToast } from "./UndoToast";
 
 export interface PortfolioModeProps {
   state: UrlState;
+  /** The effective reference currency (URL, stored choice or USD) and its setter. */
+  currency: Currency;
+  onCurrency: (currency: Currency) => void;
   onCommit: (patch: Partial<UrlState>) => void;
 }
 
@@ -41,7 +46,7 @@ function allocationText(tree: PortfolioTree): string {
   return rest > 0 ? `${fmt(invested)} + ${fmt(rest)} USD cash` : `${fmt(invested)} allocated`;
 }
 
-export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
+export function PortfolioMode({ state, currency, onCurrency, onCommit }: PortfolioModeProps) {
   const store = usePortfolioStore();
   const library = useLibrary();
   const run = usePortfolioReport();
@@ -58,6 +63,7 @@ export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
   const input = (tree: PortfolioTree): PortfolioRunInput => ({
     tree,
     model: state.model,
+    currency,
     range: state.range,
     start: state.start,
     end: state.end,
@@ -69,14 +75,16 @@ export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
     run.mutate(input(tree), { onSuccess: () => setRan({ id, tree }) });
   };
 
-  // A model change re-runs the report on screen with the new model (the result is not cached).
+  // A model or currency change re-runs the report on screen (the result is not cached).
   const lastModel = useRef(state.model);
+  const lastCurrency = useRef(currency);
   useEffect(() => {
-    if (lastModel.current === state.model) return;
+    if (lastModel.current === state.model && lastCurrency.current === currency) return;
     lastModel.current = state.model;
+    lastCurrency.current = currency;
     if (ran !== null && !run.isPending) run.mutate(input(ran.tree));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.model]);
+  }, [state.model, currency]);
 
   // Focus follows the view: the summary after a run, the heading after Edit.
   const wasFolded = useRef(false);
@@ -102,7 +110,7 @@ export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
 
   const sidebar = (
     <>
-      <ModeSwitch mode={state.mode} onSelect={(mode) => onCommit({ mode })} />
+      <ModeSwitch mode={state.mode} onSelect={(mode) => onCommit({ mode })} currency={currency} onCurrency={onCurrency} />
       <PortfolioSidebar store={sidebarStore} ready={library.isSuccess} onCreate={create} />
       <StatsSwitch />
     </>
@@ -171,7 +179,9 @@ export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
               </button>
             </div>
           </div>
-          {report.portfolio_backtest ? <BacktestCard section={report.portfolio_backtest} /> : null}
+          {report.portfolio_backtest ? (
+            <BacktestCard section={report.portfolio_backtest} currency={reportCurrency(report)} />
+          ) : null}
         </div>
         <ReportView
           report={report}
@@ -216,6 +226,7 @@ export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
           <Composer
             tree={active.tree}
             library={libraryLines}
+            currency={currency}
             running={run.isPending}
             error={error}
             onChange={(tree) => store.edit(active.id, tree)}
@@ -232,7 +243,7 @@ export function PortfolioMode({ state, onCommit }: PortfolioModeProps) {
 
   return (
     <>
-      <Shell sidebar={sidebar} report={report} ticker={active?.tree.name ?? null}>
+      <Shell sidebar={sidebar} report={report} ticker={active?.tree.name ?? null} currency={currency}>
         {main}
       </Shell>
       <UndoToast deleted={store.state.deleted} onUndo={store.undo} onDismiss={store.dismissUndo} />

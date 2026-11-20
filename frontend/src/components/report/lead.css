@@ -29,3 +29,7 @@ tbody tr:focus-visible > th { box-shadow: inset 2px 0 0 var(--ink); }
   .btn-secondary { min-height: 44px; }
   .masthead .chip, .masthead a.chip { min-height: 44px; }
 }
+
+/* euro view: the "Figures in EUR" pill beside the type badge, and the credits line of the colophon */
+.page-head .ccy-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px solid var(--accent); border-radius: var(--r-control); background: var(--accent-50); color: var(--accent); font-size: var(--fs-cap); font-weight: 600; white-space: nowrap; }
+.report-region .colophon .credits { margin-top: var(--s-1); }

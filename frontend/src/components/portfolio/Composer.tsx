@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { RefObject } from "react";
 import type { ApiError, LibraryLine } from "../../api/types";
+import type { Currency } from "../../state/currency";
 import { addLineWithWeight, libraryById, runnable, withCost } from "../../portfolio/composer";
 import { normalise, remainderToCash } from "../../portfolio/tree";
 import type { PortfolioTree } from "../../portfolio/tree";
@@ -11,6 +12,8 @@ import { TreePanel } from "./TreePanel";
 export interface ComposerProps {
   tree: PortfolioTree;
   library: readonly LibraryLine[];
+  /** The reference currency: in EUR the lines show their hedge status. */
+  currency: Currency;
   running: boolean;
   /** The refusal of the last run, shown above the split view. */
   error: ApiError | null;
@@ -25,7 +28,7 @@ const PICKER_BUTTON = "pf-open-picker";
  * The composer: the allocation tree on the left, the sticky live panel on the right (under the
  * tree on a narrow screen, with the total and Run docked at the bottom), and the library picker.
  */
-export function Composer({ tree, library, running, error, onChange, onRun, headingRef }: ComposerProps) {
+export function Composer({ tree, library, currency, running, error, onChange, onRun, headingRef }: ComposerProps) {
   const [picking, setPicking] = useState(false);
   const byId = useMemo(() => libraryById(library), [library]);
   const inTree = useMemo(
@@ -61,6 +64,7 @@ export function Composer({ tree, library, running, error, onChange, onRun, headi
         <TreePanel
           tree={tree}
           library={byId}
+          currency={currency}
           libraryCount={{ classes, lines: library.length }}
           onChange={onChange}
           onOpenPicker={() => setPicking(true)}

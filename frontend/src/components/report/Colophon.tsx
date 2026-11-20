@@ -1,3 +1,4 @@
+import { currencyOf } from "../../api/currency";
 import { dateLong } from "../../format";
 import type { ReportPanelProps } from "./types";
 import "./lead.css";
@@ -12,6 +13,11 @@ function stamp(iso: string): string | null {
 
 export function Colophon({ report }: ReportPanelProps) {
   const generated = stamp(report.generated_at);
+  const currency = currencyOf(report);
+  const credits = [
+    currency?.fx_source ? `Exchange rates: ${currency.fx_source}` : null,
+    currency?.rate_source ? `Euro cash rate: ${currency.rate_source}` : null,
+  ].filter((c): c is string => c !== null);
   return (
     <footer className="colophon" id="colophon">
       <p>
@@ -19,6 +25,7 @@ export function Colophon({ report }: ReportPanelProps) {
         {generated ? `, generated ${generated}` : ""}. Descriptive statistics on past data; nothing here is a forecast or
         advice.
       </p>
+      {credits.length > 0 ? <p className="credits">{credits.join(". ")}.</p> : null}
     </footer>
   );
 }

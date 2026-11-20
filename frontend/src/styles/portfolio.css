@@ -404,3 +404,7 @@
 .pf-fold-wrap { display: flex; flex-direction: column; gap: var(--gap); max-width: var(--canvas-max); padding: 20px var(--page-x) 0; }
 .sumcard .foot-note { margin-top: var(--s-3); font-size: var(--fs-cap); color: var(--caution); }
 .sumcard .foot { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--grid); font-size: var(--fs-cap); color: var(--ink-2); }
+
+/* euro view: hedge status of a line */
+.t-row .sb .tag.hedge, .t-row .sb .tag.plain { margin-left: 6px; }
+.t-row .sb .tag.hedge { border-color: var(--accent); background: var(--accent-50); color: var(--accent); font-weight: 600; }
