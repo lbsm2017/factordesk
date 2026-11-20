@@ -2,7 +2,6 @@
 
 **See what drives a stock's returns, in plain language, with the statistics one click away.**
 
-[![ci](https://github.com/lbsm2017/factordesk/actions/workflows/ci.yml/badge.svg?branch=prod)](https://github.com/lbsm2017/factordesk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)
 
@@ -294,7 +293,7 @@ Also in place:
   ([docs/validation/](docs/validation));
 - an independent review of every analytics section before merge ([docs/reviews/](docs/reviews));
 - a written [test oracle](docs/test-oracle.md) with tolerances;
-- Monte Carlo tests of the Kalman filter at 200 replications in a nightly job;
+- Monte Carlo tests of the Kalman filter at 200 replications (`uv run pytest -m slow`, run before each release);
 - pinned lockfiles and fixed seeds;
 - a bibliography where every source was checked ([docs/references.md](docs/references.md)).
 
@@ -491,7 +490,8 @@ npm --prefix frontend run e2e      # Playwright, against a fake backend
 ```
 
 GitHub CI runs the Python checks on Ubuntu and Windows, the frontend checks and the end-to-end
-tests on every pull request. A nightly workflow runs the slow and live tests.
+tests on every pull request, and only there. The slow and live tests run by hand before each
+release: `uv run pytest -m slow` and `uv run pytest -m live`.
 
 ## Data sources and licences
 
