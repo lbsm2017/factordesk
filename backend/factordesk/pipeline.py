@@ -30,6 +30,7 @@ from datetime import UTC, date, datetime
 import numpy as np
 import pandas as pd
 
+from factordesk import progress
 from factordesk.analytics.attribution import (
     memo_rows,
     return_contribution_for,
@@ -1059,6 +1060,7 @@ def assemble_subject_report(
         raise ValueError(f"unknown factor model {model!r}; use 'ff5' or 'ff6'")
     codes = model_codes(model)
     _check_subject_currency(subject, reference_currency)
+    progress.step("models")
     is_daily = subject.frequency == "daily"
     periods = subject.periods
     audit = _subject_audit(subject, audit_history)
@@ -1145,6 +1147,7 @@ def assemble_subject_report(
             for f in audit.findings
         ],
     )
+    progress.step("sections")
     core = CoreSections(
         data=data,
         regression=_regression_section(reg, info, gate is not None and gate.fired),

@@ -19,11 +19,12 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from factordesk import progress
 from factordesk.analytics.currency import convert_series
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.analytics.subject import subject_from_monthly_returns
 from factordesk.api.currency_ctx import CurrencyContext
-from factordesk.api.errors import UPLOAD_REPORT_PATH, ApiException, to_api_exception
+from factordesk.api.errors import UPLOAD_PATHS, UPLOAD_REPORT_PATH, ApiException, to_api_exception
 from factordesk.api.runtime import Runtime, get_runtime
 from factordesk.data.factors import FactorError
 from factordesk.data.french import load_ff5_monthly, load_ff6
@@ -78,7 +79,8 @@ class UploadSizeLimit:
         self.limit = limit
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["method"] != "POST" or scope["path"] != UPLOAD_PATH:
+        is_upload = scope["type"] == "http" and scope["method"] == "POST"
+        if not is_upload or scope["path"] not in UPLOAD_PATHS:
             await self.app(scope, receive, send)
             return
         declared = dict(scope["headers"]).get(b"content-length")
@@ -213,6 +215,8 @@ def _build_upload_report(
         flag = parse_gross_net(gross_net)
         returns = parse_monthly_csv(raw)
         ctx = CurrencyContext(ccy, runtime.deps.currency)
+        if "EUR" in (record_currency, ccy):
+            progress.step("fx")
         meta = {} if flag is None else {"gross_net": flag}
         subject = subject_from_monthly_returns(returns, label=label, currency=ccy, meta=meta)
         if record_currency != ccy:  # the checks above ran on the record as sent
@@ -230,6 +234,7 @@ def _build_upload_report(
             "month, no gaps (for example 2021-01-31,0.012).",
         ) from exc
     now = runtime.deps.now().astimezone(UTC)
+    progress.step("factors")
     frame = monthly_frame(model, runtime, now)
     load_macro = runtime.deps.load_macro
     load_energy = runtime.deps.load_energy

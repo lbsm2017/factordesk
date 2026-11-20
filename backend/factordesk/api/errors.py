@@ -237,6 +237,8 @@ def validation_error(errors: Sequence[object], ticker: str | None) -> ApiExcepti
 
 PORTFOLIO_REPORT_PATH = "/api/report/portfolio"
 UPLOAD_REPORT_PATH = "/api/report/upload"
+PORTFOLIO_PATHS = (PORTFOLIO_REPORT_PATH, PORTFOLIO_REPORT_PATH + "/stream")
+UPLOAD_PATHS = (UPLOAD_REPORT_PATH, UPLOAD_REPORT_PATH + "/stream")
 
 
 def _in_body(errors: Sequence[object]) -> bool:
@@ -280,11 +282,9 @@ def portfolio_validation_error(errors: Sequence[object]) -> ApiException:
 async def _validation_handler(request: Request, exc: Exception) -> Response:
     assert isinstance(exc, RequestValidationError)
     errors = jsonable_encoder(exc.errors(), exclude={"input", "ctx", "url"})
-    if request.url.path == PORTFOLIO_REPORT_PATH and _in_body(errors):
+    if request.url.path in PORTFOLIO_PATHS and _in_body(errors):
         return _respond(portfolio_validation_error(errors))
-    if request.url.path == UPLOAD_REPORT_PATH and "file" in {
-        loc[0] for loc in _locations(errors) if loc
-    }:
+    if request.url.path in UPLOAD_PATHS and "file" in {loc[0] for loc in _locations(errors) if loc}:
         return _respond(
             ApiException(
                 "bad_request",
