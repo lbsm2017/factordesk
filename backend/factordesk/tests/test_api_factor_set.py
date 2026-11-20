@@ -272,7 +272,7 @@ def test_eur_gives_one_left_out_notice_with_the_in_window_count(
     report = _report(client, f"?ccy=EUR&factor_set={factor_set}&range=FULL")
     us = with_mom(world.factors.frame, 91)
     frames = [us] if factor_set == "us" else [fake.frame, us]  # the US frame feeds macro
-    left = pd.DatetimeIndex([]).union(frames[0].index.difference(frames[0].index))
+    left = pd.DatetimeIndex([])
     for frame in frames:
         left = left.union(pd.DatetimeIndex(frame.index[1:][frame.index[1:] <= first_rate]))
     first = pd.Timestamp(str(prices[0]))
