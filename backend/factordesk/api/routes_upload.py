@@ -214,7 +214,7 @@ def _build_upload_report(
     factor_set: FactorSet = DEFAULT_FACTOR_SET,
 ) -> tuple[FactorReport, int]:
     from factordesk.pipeline import assemble_subject_report
-    from factordesk.section_hooks.context import ReferenceInput, SectionInputs
+    from factordesk.section_hooks.context import ReferenceInput, SectionInputs, UsFactorsInput
 
     label = clean_name(name)
     try:
@@ -242,9 +242,13 @@ def _build_upload_report(
     load_macro = runtime.deps.load_macro
     load_energy = runtime.deps.load_energy
     reference = None
+    # Macro, energy and world beta keep US inputs: with another factor set they read the US frame.
+    us_frame = frame if factor_set == "us" else monthly_frame(model, runtime, now, "us")
     if ccy == "EUR":
-        usd_rf = frame["RF"]  # the dollar risk-free rate, before the frame is converted
+        usd_rf = us_frame["RF"]  # the dollar risk-free rate, before the frame is converted
         frame = ctx.factors(frame)
+        if factor_set != "us":
+            us_frame = ctx.factors(us_frame)
         reference = ReferenceInput(lambda dates: ctx.returns("USD", dates), usd_rf)
     inputs = (
         None
@@ -253,6 +257,7 @@ def _build_upload_report(
             macro=None if load_macro is None else load_macro(),
             energy=None if load_energy is None else load_energy(),
             reference=reference,
+            us_factors=None if factor_set == "us" else UsFactorsInput(us_frame),
         )
     )
     try:

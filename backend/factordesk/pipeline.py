@@ -23,6 +23,7 @@ tests. Inputs that cannot support a regression raise ``DegenerateInputError`` (D
 from __future__ import annotations
 
 import dataclasses
+import logging
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, date, datetime
@@ -67,6 +68,8 @@ from factordesk.analytics.rolling import (
 from factordesk.analytics.sample import (
     DISPLAY_NAMES,
     AnalysisSample,
+    DegenerateInputError,
+    InsufficientHistoryError,
     build_subject_sample,
 )
 from factordesk.analytics.subject import ReturnSubject, subject_from_history
@@ -132,6 +135,8 @@ from factordesk.section_hooks.registry import run_hooks
 
 STALE_AFTER_DAYS = factor_data.STALE_AFTER_DAYS
 
+logger = logging.getLogger(__name__)
+
 NOTE_VINTAGE = "Uses the current Fama-French data vintage; historical factor values can be revised."
 NOTE_SURVIVORSHIP = (
     "Only tickers that exist today can be analysed. Results for survivors are not "
@@ -155,10 +160,6 @@ NOTE_EUROPE_FACTORS_SERIES = (
     "The factors are Developed Europe Fama-French factors from the Ken French data library, "
     "built in US dollars with the US one-month Treasury bill as the risk-free rate; they start "
     "in July 1990. The returns are taken to be in the report's currency."
-)
-NOTE_EUROPE_WORLD_BETA = (
-    "The market factor of the world beta section's comparison row is the Europe market factor "
-    "in this report; the row is still labelled US market."
 )
 NOTE_DESC = "Every statistic is descriptive and in-sample, not predictive."
 NOTE_US_FACTORS_SERIES = (
@@ -1049,6 +1050,38 @@ def _label_text(present: Mapping[str, object | None], subject: ReturnSubject) ->
     return texts
 
 
+def _with_us_context(ctx: SectionContext, start: date | None, end: date | None) -> SectionContext:
+    """``ctx`` plus the context on the US factor sample, when the inputs carry the US frame.
+
+    The macro, energy and world beta sections keep their US inputs whatever the factor set, so
+    they read this context: the same subject on the US frame (model-filtered as the US report
+    would), with the requested range of ``ctx``. When that sample cannot be built the three
+    sections are left out (``us_unavailable``) rather than computed on the wrong factors.
+    """
+    us = ctx.inputs.us_factors
+    if us is None:
+        return ctx
+    try:
+        frame = _model_frame(us.frame, ctx.model)
+        us_sample = build_subject_sample(ctx.subject, frame, start, end)
+    except (InsufficientHistoryError, DegenerateInputError, ValueError):
+        logger.warning("US factor sample unavailable; macro, energy and world beta left out")
+        return dataclasses.replace(ctx, us_unavailable=True)
+    us_vintage = FactorVintage(last_date=us_sample.factor_last_date, downloaded_at=us.downloaded_at)
+
+    def us_sample_info(window: int | None) -> SampleInfo:
+        return _sample_info(us_sample, us_vintage, window)
+
+    us_ctx = dataclasses.replace(
+        ctx,
+        factor_frame=frame,
+        sample=us_sample,
+        vintage=us_vintage,
+        make_sample_info=us_sample_info,
+    )
+    return dataclasses.replace(ctx, us_context=us_ctx)
+
+
 def assemble_subject_report(
     subject: ReturnSubject,
     factor_frame: pd.DataFrame,
@@ -1218,6 +1251,7 @@ def assemble_subject_report(
         subject=subject,
         model=model,
     )
+    ctx = _with_us_context(ctx, start, end)
     # Optional sections (schema v3 contract SC3.2), in panel-call order. Each hook sees only the
     # core; a hook outside its HookSpec (subject kind, frequency, model) leaves its field None.
     present = run_hooks(ctx)
@@ -1229,8 +1263,6 @@ def assemble_subject_report(
             NOTE_EUROPE_FACTORS if europe else NOTE_US_FACTORS,
             NOTE_SURVIVORSHIP,
         ]
-        if europe and present.get("world_beta") is not None:
-            notes.append(NOTE_EUROPE_WORLD_BETA)
     else:
         notes = [
             NOTE_DESC,
