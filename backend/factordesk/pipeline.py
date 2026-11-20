@@ -30,6 +30,7 @@ from datetime import UTC, date, datetime
 import numpy as np
 import pandas as pd
 
+from factordesk import progress
 from factordesk.analytics.attribution import (
     memo_rows,
     return_contribution_for,
@@ -70,7 +71,6 @@ from factordesk.analytics.sample import (
     build_subject_sample,
 )
 from factordesk.analytics.subject import ReturnSubject, subject_from_history
-from factordesk.api import progress
 from factordesk.data import factors as factor_data
 from factordesk.data import french
 from factordesk.data.audit import AuditReport, audit_levels, audit_prices

@@ -34,8 +34,9 @@ from typing import TYPE_CHECKING, cast
 import pandas as pd
 from fastapi import Request
 
+from factordesk import progress
 from factordesk.analytics.currency import convert_history, listing_currency
-from factordesk.api import progress, ranges
+from factordesk.api import ranges
 from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime
@@ -98,6 +99,9 @@ def assemble_report(
         audit_history=audit_history,
     )
 
+
+SLOW_FACTORS_SECONDS = 0.25
+"""A factor load that takes longer than this (a download) is shown as the factor step."""
 
 PRICE_CACHE_SIZE = 16
 """Price histories kept in memory (DB3 layer 2)."""
@@ -299,7 +303,7 @@ class ReportService:
     ) -> FactorReport:
         ranges.check_request(preset, start, end)
         now = self._now()
-        loaded = await self._factors()
+        loaded = await self._factors_shown()
         cold = (ticker, now.date()) not in self.prices
         if cold:  # a warm run may still end in a cache hit, which reports no steps
             progress.step("prices")
@@ -390,7 +394,7 @@ class ReportService:
             _range_text(preset, start, end),
         )
         now = self._now()
-        loaded = await self._factors()
+        loaded = await self._factors_shown()
         key: PortfolioKey = (
             plan.digest,
             model,
@@ -486,6 +490,18 @@ class ReportService:
         if now.utcoffset() is None:
             raise ValueError("the injected clock must return a timezone-aware time")
         return now.astimezone(UTC)
+
+    async def _factors_shown(self) -> LoadedFactors:
+        """``_factors()``; when it is slow, a progress stream shows the factor step meanwhile.
+
+        A fast load shows nothing, so a cached report still sends no step.
+        """
+        task = asyncio.ensure_future(self._factors())
+        task.add_done_callback(_retrieve)
+        done, _ = await asyncio.wait({task}, timeout=SLOW_FACTORS_SECONDS)
+        if not done:
+            progress.step("factors")
+        return await task
 
     async def _factors(self) -> LoadedFactors:
         loaded = await self.factors.get("factors", self._load_factors)

@@ -19,10 +19,10 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from factordesk import progress
 from factordesk.analytics.currency import convert_series
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.analytics.subject import subject_from_monthly_returns
-from factordesk.api import progress
 from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import UPLOAD_PATHS, UPLOAD_REPORT_PATH, ApiException, to_api_exception
 from factordesk.api.runtime import Runtime, get_runtime
