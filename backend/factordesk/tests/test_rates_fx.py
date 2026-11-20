@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from factordesk.data import ecb
 from factordesk.data.ecb import EcbError, load_ecb_series
 from factordesk.data.fx import (
     FRED_QUOTES,
@@ -21,6 +22,7 @@ from factordesk.data.fx import (
 )
 from factordesk.data.rates import (
     FRED_CREDIT,
+    FRED_EONIA_CREDIT,
     FRED_ESTR_SERIES,
     cash_returns,
     load_eur_overnight,
@@ -140,6 +142,91 @@ def test_overnight_without_eonia_starts_at_the_splice_date(tmp_path: Path) -> No
     res = load_eur_overnight(data_dir=tmp_path, now=NOW, fetch_ecb=fetch)
     assert res.rate is not None and res.notice is not None and "EONIA" in res.notice
     assert list(res.rate.index) == [pd.Timestamp("2019-10-01")]
+    assert "EONIA" not in (res.credit or "")  # the footer must not credit a series not used
+
+
+def test_fred_fallback_keeps_eonia_from_a_cached_copy_and_passes_on_fred_notes(
+    tmp_path: Path,
+) -> None:
+    # Only EONIA is cached (euro STR was never downloaded), so the FRED fallback is needed.
+    eonia = ecb_csv({"2019-09-30": -0.451})
+    load_ecb_series("EON", "D.EONIA_TO.RATE", data_dir=tmp_path, now=NOW, fetch=lambda f, k: eonia)
+    fred = fred_csv(FRED_ESTR_SERIES, {"2019-10-01": -0.549, "2019-10-02": -0.551})
+    # Day 2: the ECB is down; FRED works (and is cached).
+    res = load_eur_overnight(
+        data_dir=tmp_path, now=LATER, fetch_ecb=down, fetch_fred=lambda _s: fred
+    )
+    assert res.rate is not None and res.credit == FRED_EONIA_CREDIT
+    assert list(res.rate.index) == [
+        pd.Timestamp(d) for d in ("2019-09-30", "2019-10-01", "2019-10-02")
+    ]
+    assert res.rate.iloc[0] == pytest.approx(-0.00451, abs=TOL)  # EONIA from the cached copy
+    assert res.notice is not None and "cached ECB copy" in res.notice
+    # Day 3: FRED is down too; its older copy is used and its note reaches the notice.
+    third = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
+
+    def fred_down(_s: str) -> str:
+        raise OSError("no network")
+
+    res = load_eur_overnight(data_dir=tmp_path, now=third, fetch_ecb=down, fetch_fred=fred_down)
+    assert res.rate is not None and res.notice is not None
+    assert "FRED could not be reached" in res.notice
+
+
+def test_one_host_outage_is_remembered_for_all_series_but_a_4xx_is_not(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def host_down(flow: str, key: str) -> str:
+        calls.append(key)
+        raise OSError("timeout")
+
+    for key in ("D.USD.EUR.SP00.A", "D.GBP.EUR.SP00.A"):
+        with pytest.raises(EcbError):
+            load_ecb_series("EXR", key, data_dir=tmp_path, now=NOW, fetch=host_down)
+    assert calls == ["D.USD.EUR.SP00.A"]  # one wait for the whole host
+
+    calls.clear()
+
+    def bad_key(flow: str, key: str) -> str:
+        calls.append(key)
+        raise EcbError(f"{key}: HTTP 404")  # a 4xx is about that series only
+
+    for key in ("D.AAA.EUR.SP00.A", "D.BBB.EUR.SP00.A"):
+        with pytest.raises(EcbError):
+            load_ecb_series("EXR", key, data_dir=tmp_path, now=LATER, fetch=bad_key)
+    assert len(calls) == 2
+
+
+def test_download_stops_at_the_first_4xx_and_retries_a_5xx(monkeypatch: pytest.MonkeyPatch) -> None:
+    status = {"code": 404}
+    calls = {"n": 0}
+
+    class Response:
+        text = "x"
+
+        def __init__(self, code: int) -> None:
+            self.status_code = code
+
+    class FakeClient:
+        def __init__(self, **_kw: object) -> None: ...
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *_a: object) -> None: ...
+
+        def get(self, _url: str) -> Response:
+            calls["n"] += 1
+            return Response(status["code"])
+
+    monkeypatch.setattr(ecb.httpx, "Client", FakeClient)
+    with pytest.raises(EcbError) as err:
+        ecb.download_csv("EXR", "D.USD.EUR.SP00.A")
+    assert calls["n"] == 1 and not err.value.host_down
+    status["code"], calls["n"] = 503, 0
+    with pytest.raises(EcbError) as err:
+        ecb.download_csv("EXR", "D.USD.EUR.SP00.A")
+    assert calls["n"] == ecb.ATTEMPTS and err.value.host_down
 
 
 def test_ecb_cache_is_reused_within_a_day_and_old_copy_serves_an_outage(tmp_path: Path) -> None:
@@ -302,6 +389,30 @@ def test_fallback_to_fred_names_the_source_and_respects_quote_direction(tmp_path
     np.testing.assert_allclose(
         (1 + gbp_eur).to_numpy(), ((1 + gbp_usd) / (1 + eur.series)).to_numpy(), rtol=0, atol=TOL
     )
+
+
+def test_a_stale_fixing_gives_nan_not_zero_returns(tmp_path: Path) -> None:
+    usd = {"2024-04-29": 1.07, "2024-04-30": 1.08}  # a stale cache: nothing after 2024-04-30
+    fetch = ecb_fetcher({"USD": usd})
+    dates = day_index("2024-04-29", "2024-04-30", "2024-05-03", "2024-05-10", "2024-05-13")
+    res = fx_returns("EUR", "USD", dates, data_dir=tmp_path, now=NOW, fetch_ecb=fetch)
+    assert res.series is not None
+    got = res.series.to_numpy()
+    assert got[0] == pytest.approx(1.08 / 1.07 - 1, abs=TOL)
+    assert got[1] == 0.0  # 3 days old: a holiday-sized gap is still carried
+    assert np.isnan(got[2]) and np.isnan(got[3])  # older than 7 days: unknown
+    # The constant leg (EUR as reference) never expires.
+    gbp = {
+        "2024-04-29": 0.85,
+        "2024-04-30": 0.86,
+        "2024-05-03": 0.87,
+        "2024-05-10": 0.86,
+        "2024-05-13": 0.85,
+    }
+    ok = fx_returns(
+        "GBP", "EUR", dates, data_dir=tmp_path, now=NOW, fetch_ecb=ecb_fetcher({"GBP": gbp})
+    )
+    assert ok.series is not None and not ok.series.isna().any()
 
 
 def test_fx_returns_none_and_a_notice_when_both_sources_are_down(tmp_path: Path) -> None:

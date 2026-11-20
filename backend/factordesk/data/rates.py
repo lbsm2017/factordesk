@@ -8,14 +8,16 @@ notice, never an exception; every download stops after the 8 s timeout, twice at
   that starts on D (it applies from D to the next rate date). EONIA (ECB series
   ``EON.D.EONIA_TO.RATE``, as published, no spread) for dates before 2019-10-01, then the euro
   short-term rate (euro STR, ECB series ``EST.B.EU000A2X2A25.WT``) from 2019-10-01. If the ECB
-  is down, FRED ``ECBESTRVOLWGTTRMDMNRT`` replaces euro STR and the series starts on 2019-10-01.
+  is down, FRED ``ECBESTRVOLWGTTRMDMNRT`` replaces euro STR, and EONIA still comes from any
+  cached ECB copy (no download); with no cached EONIA the series starts on 2019-10-01.
 - ``cash_levels(rate, dates)``: the compounded cash index (1.0 at the first rate date) on
   ``dates``. ACT/360: between two rate dates the index grows by
   ``1 + rate * calendar days / 360``.
 - ``cash_returns(rate, dates)``: ``levels[t] / levels[t-1] - 1``, indexed by ``dates[1:]``. A gap
   (weekend, holiday) is compounded day by day with the rate of each business day inside it.
   NaN before the first rate date and more than ``MAX_CARRY_DAYS`` after the last one.
-- ``ECB_CREDIT``, ``FRED_CREDIT``: source lines for the report footer.
+- ``ECB_CREDIT``, ``ECB_ESTR_CREDIT``, ``FRED_CREDIT``, ``FRED_EONIA_CREDIT``: footer lines (the
+  one that matches the sources actually used is in ``RateResult.credit``).
 """
 
 from __future__ import annotations
@@ -38,10 +40,12 @@ SPLICE_DATE = pd.Timestamp("2019-10-01")
 """First date on euro STR; earlier dates use EONIA."""
 MAX_CARRY_DAYS = 5
 """The last rate is carried past its date for at most this many calendar days."""
+ECB_ESTR_CREDIT = "Euro short-term rate: European Central Bank, ECB Data Portal."
 ECB_CREDIT = "Euro short-term rate and EONIA: European Central Bank, ECB Data Portal."
 FRED_CREDIT = (
     "Euro short-term rate: European Central Bank, via FRED, Federal Reserve Bank of St. Louis."
 )
+FRED_EONIA_CREDIT = FRED_CREDIT + " EONIA: European Central Bank, ECB Data Portal (cached copy)."
 
 
 @dataclass(frozen=True)
@@ -66,17 +70,7 @@ def load_eur_overnight(
     try:
         estr, note = load_ecb_series(*ESTR, scale=0.01, data_dir=data_dir, now=now, fetch=fetch_ecb)
     except EcbError as exc:
-        try:
-            fred = load_fred_series(FRED_ESTR_SERIES, data_dir=data_dir, now=now, fetch=fetch_fred)
-        except FredError as exc2:
-            msg = f"The EUR cash rate is unavailable (ECB: {exc}; FRED: {exc2})."
-            return RateResult(None, msg, None)
-        fallback = (fred.values.dropna() / 100.0).rename("eur_rate")  # noqa: PD011
-        notice = (
-            f"The ECB could not be reached ({exc}); the euro short-term rate comes from FRED "
-            "and the EUR cash rate starts on 2019-10-01."
-        )
-        return RateResult(fallback[fallback.index >= SPLICE_DATE], notice, FRED_CREDIT)
+        return _from_fred(str(exc), data_dir, now, fetch_fred)
     if note:
         notes.append(note)
     estr = estr[estr.index >= SPLICE_DATE]
@@ -86,11 +80,41 @@ def load_eur_overnight(
         )
     except EcbError as exc:
         notes.append(f"EONIA is unavailable ({exc}); the EUR cash rate starts on 2019-10-01.")
-        return RateResult(estr.rename("eur_rate"), " ".join(notes), ECB_CREDIT)
+        return RateResult(estr.rename("eur_rate"), " ".join(notes), ECB_ESTR_CREDIT)
     if note:
         notes.append(note)
     rate = pd.concat([eonia[eonia.index < SPLICE_DATE], estr]).rename("eur_rate")
     return RateResult(rate, " ".join(notes) or None, ECB_CREDIT)
+
+
+def _from_fred(
+    ecb_reason: str,
+    data_dir: Path | None,
+    now: datetime | None,
+    fetch_fred: Callable[[str], str] | None,
+) -> RateResult:
+    """Euro STR from FRED (ECB down); EONIA before the splice only from a cached ECB copy."""
+    try:
+        fred = load_fred_series(FRED_ESTR_SERIES, data_dir=data_dir, now=now, fetch=fetch_fred)
+    except FredError as exc:
+        return RateResult(
+            None, f"The EUR cash rate is unavailable (ECB: {ecb_reason}; FRED: {exc})."
+        )
+    estr = (fred.values.dropna() / 100.0).rename("eur_rate")  # noqa: PD011
+    estr = estr[estr.index >= SPLICE_DATE]
+    notice = (
+        f"The ECB could not be reached ({ecb_reason}); the euro short-term rate comes from FRED."
+    )
+    if fred.note:
+        notice += " " + fred.note
+    try:
+        eonia, _ = load_ecb_series(*EONIA, scale=0.01, data_dir=data_dir, now=now, cache_only=True)
+    except EcbError:
+        notice += " The EUR cash rate starts on 2019-10-01."
+        return RateResult(estr, notice, FRED_CREDIT)
+    notice += " EONIA before 2019-10-01 comes from a cached ECB copy."
+    rate = pd.concat([eonia[eonia.index < SPLICE_DATE], estr]).rename("eur_rate")
+    return RateResult(rate, notice, FRED_EONIA_CREDIT)
 
 
 def cash_levels(rate: pd.Series, dates: pd.DatetimeIndex) -> pd.Series:

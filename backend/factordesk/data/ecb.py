@@ -29,11 +29,17 @@ ECB_URL = "https://data-api.ecb.europa.eu/service/data/{flow}/{key}?format=csvda
 _USER_AGENT = "factordesk-ecb-loader/0.1"
 
 _FAILED: dict[tuple[str, str, str], str] = {}
-"""Downloads that failed, by (data folder, series name, day), with the reason."""
+"""Downloads that failed, with the reason, by (data folder, day, scope). The scope is ``*`` for
+the whole ECB host (network error, timeout, HTTP 5xx: one outage costs one wait per day) or a
+series name (HTTP 4xx: only that series is wrong)."""
 
 
 class EcbError(Exception):
     """An ECB series cannot be downloaded or read, and no cached copy exists."""
+
+    def __init__(self, message: str, *, host_down: bool = False) -> None:
+        super().__init__(message)
+        self.host_down = host_down
 
 
 def parse_ecb_csv(text: str, name: str, scale: float = 1.0) -> pd.Series:
@@ -50,7 +56,7 @@ def parse_ecb_csv(text: str, name: str, scale: float = 1.0) -> pd.Series:
     return series
 
 
-def _fetch(flow: str, key: str) -> str:
+def download_csv(flow: str, key: str) -> str:
     url = ECB_URL.format(flow=flow, key=key)
     last = "unknown error"
     for _ in range(ATTEMPTS):
@@ -62,11 +68,13 @@ def _fetch(flow: str, key: str) -> str:
         except httpx.HTTPError as exc:
             last = f"network error: {exc!r}"
             continue
-        if resp.status_code >= 400:
+        if 400 <= resp.status_code < 500:  # a wrong key or request: retrying cannot help
+            raise EcbError(f"{key}: HTTP {resp.status_code}")
+        if resp.status_code >= 500:
             last = f"HTTP {resp.status_code}"
             continue
         return resp.text
-    raise EcbError(f"{key}: download failed after {ATTEMPTS} attempts ({last})")
+    raise EcbError(f"{key}: download failed after {ATTEMPTS} attempts ({last})", host_down=True)
 
 
 def load_ecb_series(
@@ -77,10 +85,11 @@ def load_ecb_series(
     data_dir: Path | None = None,
     now: datetime | None = None,
     fetch: Callable[[str, str], str] | None = None,
+    cache_only: bool = False,
 ) -> tuple[pd.Series, str | None]:
     """One ECB series and a notice (set when an older cached copy was used). Raises ``EcbError``
     when today's cache, the download and every older cache all fail. ``fetch`` replaces the
-    download (tests)."""
+    download (tests). With ``cache_only`` nothing is downloaded: any cached copy is used."""
     name = f"{flow}_" + re.sub(r"[^A-Za-z0-9]", "", key)
     base = data_dir if data_dir is not None else get_settings().data_dir
     edir = Path(base) / "ecb"
@@ -91,15 +100,19 @@ def load_ecb_series(
             return parse_ecb_csv(today_file.read_text("utf-8"), name, scale), None
         except (EcbError, OSError):
             logger.warning("Unreadable ECB cache %s; downloading again", today_file.name)
-    memo = (str(edir), name, day)
-    reason = _FAILED.get(memo)
-    if reason is None:
+    host_memo = (str(edir), day, "*")
+    series_memo = (str(edir), day, name)
+    reason = _FAILED.get(host_memo) or _FAILED.get(series_memo)
+    if cache_only:
+        reason = "not downloaded"
+    elif reason is None:
         try:
-            text = (fetch or _fetch)(flow, key)
+            text = (fetch or download_csv)(flow, key)
             values = parse_ecb_csv(text, name, scale)
         except Exception as exc:  # a failing network layer must not stop the report
             reason = str(exc) if isinstance(exc, EcbError) else f"{type(exc).__name__}: {exc}"
-            _FAILED[memo] = reason
+            whole_host = not isinstance(exc, EcbError) or exc.host_down
+            _FAILED[host_memo if whole_host else series_memo] = reason
         else:
             try:
                 atomic_write(today_file, text)

@@ -6,8 +6,9 @@ exception and never a wait longer than the 8 s download timeout, twice at most):
 - ``fx_returns(ccy, ref, dates)``: the return of holding one unit of ``ccy`` measured in ``ref``,
   as a decimal per interval, indexed by ``dates[1:]``: ``S(t)/S(t-1) - 1``, where ``S`` is the
   price of one unit of ``ccy`` in ``ref`` on the last fixing on or before each date. Days without
-  a fixing (TARGET holidays for the ECB, US holidays for FRED) carry the previous fixing forward.
-  NaN where no fixing exists yet. Equal currencies give zero. Returns an ``FxResult``.
+  a fixing (TARGET holidays for the ECB, US holidays for FRED) carry the previous fixing forward,
+  for at most 7 days. NaN where no fixing exists yet or the last one is older than that.
+  Equal currencies give zero. Returns an ``FxResult``.
 - ``FxResult``: ``series`` (or None), ``notice`` (or None) and ``source`` (``SOURCE_ECB`` or
   ``SOURCE_FRED``, None when no source worked) for the report footer; ``credit(source)`` gives
   the footer line.
@@ -100,9 +101,17 @@ def _fred_leg(
     return (1.0 / values if direction == "units_per_usd" else values), loaded.note
 
 
+MAX_CARRY = pd.Timedelta(days=7)
+"""A fixing is carried forward at most this long (covers holidays); later dates are NaN, so a
+stale cache gives NaN returns, never silent zeros."""
+
+
 def _price_on(leg: pd.Series, dates: pd.DatetimeIndex) -> pd.Series:
-    """The last fixing on or before each date (NaN fixings are skipped, so holidays carry)."""
-    return leg.dropna().reindex(dates, method="ffill")
+    """The last fixing on or before each date, at most ``MAX_CARRY`` old (NaN fixings are
+    skipped, so holidays carry)."""
+    if leg is _ALWAYS_ONE:
+        return pd.Series(1.0, index=dates)
+    return leg.dropna().reindex(dates, method="ffill", tolerance=MAX_CARRY)
 
 
 def fx_returns(
