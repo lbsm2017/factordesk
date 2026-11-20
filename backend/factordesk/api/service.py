@@ -72,6 +72,7 @@ def assemble_report(
     model: FactorModel = "ff5",
     reference_currency: ReferenceCurrency = "USD",
     currency: CurrencyInfo | None = None,
+    audit_history: PriceHistory | None = None,
 ) -> FactorReport:
     """``factordesk.pipeline.assemble_report``, imported on first use.
 
@@ -94,6 +95,7 @@ def assemble_report(
         reference_currency=reference_currency,
         currency=currency,
         converted=True,  # ``ReportService`` has converted the history and the factors
+        audit_history=audit_history,
     )
 
 
@@ -302,6 +304,7 @@ class ReportService:
         listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
         ctx = CurrencyContext(ccy, self.deps.currency)
+        local = history  # the audit reads the prices as the exchange lists them
         history = await self.runtime.run(self._to_reference, ticker, history, listing, scale, ctx)
         cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
         first, last = ranges.resolve(preset, start, end, cov)
@@ -336,6 +339,7 @@ class ReportService:
                     model=model,
                     reference_currency=ccy,
                     currency=None if ccy == "USD" else ctx.info(),
+                    audit_history=local,
                 )
 
             built_at = time.perf_counter()
@@ -625,8 +629,7 @@ class ReportService:
         if bench.history is None:
             return bench
         history, dropped = convert_history(bench.history, lambda d: ctx.prices("USD", d))
-        if dropped:
-            ctx.note(f"{dropped} benchmark dates had no exchange rate and are left out.")
+        _note_left_out(ctx, "benchmark", bench.history, history, dropped)
         return dataclasses.replace(bench, history=history)
 
     @staticmethod
@@ -638,8 +641,7 @@ class ReportService:
         if listing == ctx.ref and scale == 1.0:
             return history
         converted, dropped = convert_history(history, lambda d: ctx.prices(listing, d), scale)
-        if dropped:
-            ctx.note(f"{ticker}: {dropped} dates had no exchange rate and are left out.")
+        _note_left_out(ctx, ticker, history, converted, dropped)
         return converted
 
     async def _with_reference(
@@ -708,6 +710,44 @@ class ReportService:
             return history
 
         return await self.prices.get((ticker, today), make)
+
+
+def _day(moment: pd.Timestamp) -> str:
+    """``4 Jan 1999``."""
+    return f"{moment.day} {moment:%b %Y}"
+
+
+def _note_left_out(
+    ctx: CurrencyContext, label: str, local: PriceHistory, converted: PriceHistory, dropped: int
+) -> None:
+    """Tell the report which dates the conversion left out: the edges (before the first and
+    after the last exchange rate) and, apart from them, dates inside the series with no rate."""
+    if not dropped:
+        return
+    unit = {"EUR": "euro", "USD": "US dollar"}.get(ctx.ref, ctx.ref)
+    kept = converted.frame.index
+    if len(kept) == 0:
+        ctx.note(f"{label}: no date has an exchange rate.")
+        return
+    dates = local.frame.index.unique()
+    before = int((dates < kept[0]).sum())
+    after = int((dates > kept[-1]).sum())
+    if before:
+        ctx.note(
+            f"Dates before the first {unit} exchange rate ({_day(kept[0])}) "
+            f"are left out of the {unit} view ({label})."
+        )
+    if after:
+        ctx.note(
+            f"Dates after the last {unit} exchange rate ({_day(kept[-1])}) "
+            f"are left out of the {unit} view ({label})."
+        )
+    gaps = dropped - before - after
+    if gaps:
+        ctx.note(
+            f"{label}: {gaps} dates inside the series had no exchange rate "
+            "and are left out of the analysis."
+        )
 
 
 def get_report_service(request: Request) -> ReportService:

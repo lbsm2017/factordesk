@@ -903,6 +903,7 @@ def assemble_report(
     reference_currency: str = SUPPORTED_CURRENCY,
     currency: CurrencyInfo | None = None,
     converted: bool = False,
+    audit_history: PriceHistory | None = None,
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
@@ -915,7 +916,10 @@ def assemble_report(
     (default) or FF6, which needs the ``Mom`` column of ``data.french.load_ff6``.
     ``converted`` says the caller already converted ``history`` and ``factor_frame`` to
     ``reference_currency`` (the listing currency is then not refused); ``currency`` is the
-    report's ``currency`` block for a reference other than USD.
+    report's ``currency`` block for a reference other than USD. ``audit_history`` is the price
+    history the audit reads when ``history`` was converted: the audit checks the prices as the
+    exchange lists them, because a conversion breaks the link between ``Close``, ``Adj Close``
+    and each dividend (None: audit ``history``).
     """
     if not converted:
         check_currency(ticker, security)
@@ -941,13 +945,19 @@ def assemble_report(
         security=security,
         reference_currency=reference_currency,
         currency=currency,
+        audit_history=audit_history,
     )
 
 
-def _subject_audit(subject: ReturnSubject) -> AuditReport:
-    """The price audit of a ticker, the level audit otherwise, plus the subject's own findings."""
+def _subject_audit(
+    subject: ReturnSubject, audit_history: PriceHistory | None = None
+) -> AuditReport:
+    """The price audit of a ticker, the level audit otherwise, plus the subject's own findings.
+
+    A ticker is audited on ``audit_history`` (its unconverted prices) when given."""
     if subject.history is not None:
-        audit = audit_prices(subject.history.frame, duplicate_dates=subject.history.duplicate_dates)
+        audited = subject.history if audit_history is None else unique_dates(audit_history)
+        audit = audit_prices(audited.frame, duplicate_dates=audited.duplicate_dates)
     else:
         audit = audit_levels(subject.levels, subject.frequency)
     if not subject.findings:
@@ -1027,6 +1037,7 @@ def assemble_subject_report(
     security: Security | None = None,
     reference_currency: str = SUPPORTED_CURRENCY,
     currency: CurrencyInfo | None = None,
+    audit_history: PriceHistory | None = None,
 ) -> FactorReport:
     """The report of any return subject: the engine behind every mode.
 
@@ -1041,6 +1052,8 @@ def assemble_subject_report(
     A ticker subject's report is exactly ``assemble_report``'s. A subject in a known currency
     other than the reference raises ``UnsupportedCurrencyError``; fewer aligned rows than the
     frequency's floor raise ``InsufficientHistoryError`` (daily 504, monthly 36).
+    ``audit_history`` is the unconverted price history of a ticker subject, audited in place of
+    ``subject.history`` (None: audit ``subject.history``).
     """
     if model not in FACTOR_MODELS:
         raise ValueError(f"unknown factor model {model!r}; use 'ff5' or 'ff6'")
@@ -1048,7 +1061,7 @@ def assemble_subject_report(
     _check_subject_currency(subject, reference_currency)
     is_daily = subject.frequency == "daily"
     periods = subject.periods
-    audit = _subject_audit(subject)
+    audit = _subject_audit(subject, audit_history)
     model_frame = _model_frame(factor_frame, model)
     sample = build_subject_sample(subject, model_frame, start, end)
     vintage = FactorVintage(last_date=sample.factor_last_date, downloaded_at=factors_downloaded_at)

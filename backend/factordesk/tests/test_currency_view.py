@@ -615,3 +615,73 @@ def test_eur_monthly_subject_has_macro_with_the_dollar_leg_and_no_lag_term() -> 
     assert section.rows[-1].label == "US dollar against the euro"
     assert section.usd_lag_note is None and section.rows[-1].beta_lag is None
     assert "in euros" in section.model_note
+
+
+# --------------------------------------------------------------------------- the price audit
+def dividend_world(tmp_path: Any, first_rate: pd.Timestamp | None = None) -> report_tests.World:
+    """A ticker whose Adj Close follows the CRSP method around quarterly dividends, with a
+    fake rate source that has no rate before ``first_rate`` (None: a rate on every date)."""
+    from factordesk.tests.test_audit import crsp_frame
+
+    base = report_tests.make_world(tmp_path)
+    frame = crsp_frame(2008, n=len(base.history.frame), start=100.0)
+    frame.index = base.history.frame.index
+    history = dataclasses.replace(base.history, frame=frame)
+    w = report_tests.make_world(tmp_path, history=history)
+    sources = FAKE
+    if first_rate is not None:
+        edge = first_rate
+
+        def late_prices(ccy: str, ref: str, dates: pd.DatetimeIndex) -> FxResult:
+            result = fake_prices(ccy, ref, dates)
+            assert result.series is not None
+            return FxResult(result.series.where(dates >= edge), None, SOURCE_ECB)
+
+        sources = dataclasses.replace(FAKE, fx_prices=late_prices)
+    with_sources(cast(Any, w), sources)
+    return w
+
+
+def audit_numbers(body: dict[str, Any]) -> tuple[list[str], str]:
+    """The error codes of a report's audit and its distribution summary text."""
+    findings = body["data"]["audit_findings"]
+    errors = [f["code"] for f in findings if f["severity"] == "error"]
+    summary = next(f["message"] for f in findings if f["code"] == "distribution_summary")
+    return errors, summary
+
+
+def test_eur_view_audits_the_prices_as_listed(tmp_path: Any) -> None:
+    w = dividend_world(tmp_path)
+    n_events = int((w.history.frame["dividends"] > 0).sum())
+    assert n_events > 0
+    with report_tests.serve(w.app) as c:
+        usd = c.get("/api/report/SYN").json()
+        eur = c.get("/api/report/SYN?ccy=EUR").json()
+    usd_errors, usd_summary = audit_numbers(usd)
+    eur_errors, eur_summary = audit_numbers(eur)
+    assert usd_errors == []
+    assert eur_errors == []
+    assert eur["data"]["audit_status"] == usd["data"]["audit_status"]
+    assert f"{n_events} distribution events checked" in usd_summary
+    assert f"{n_events} distribution events checked" in eur_summary
+    assert eur_summary == usd_summary  # the same prices, so the same audit
+
+
+def test_edge_cut_note_names_the_first_exchange_rate(tmp_path: Any) -> None:
+    base = report_tests.make_world(tmp_path)
+    first_rate = pd.Timestamp(base.history.frame.index[100])
+    w = dividend_world(tmp_path, first_rate)
+    n_cut = int((w.history.frame.index < first_rate).sum())
+    assert n_cut == 100
+    with report_tests.serve(w.app) as c:
+        body = c.get("/api/report/SYN?ccy=EUR").json()
+    notes = body["currency"]["notes"]
+    day = f"{first_rate.day} {first_rate:%b %Y}"
+    edge = [n for n in notes if "first euro exchange rate" in n]
+    assert edge == [
+        f"Dates before the first euro exchange rate ({day}) are left out of the euro view (SYN)."
+    ]
+    assert not any("had no exchange rate" in n for n in notes)  # no gap inside the series
+    assert not any(str(n_cut) in n for n in notes)
+    errors, _ = audit_numbers(body)
+    assert errors == []
