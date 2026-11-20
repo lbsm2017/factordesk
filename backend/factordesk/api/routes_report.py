@@ -58,9 +58,13 @@ Ccy = Annotated[
 
 
 @router.get("/{ticker}/ranges", responses=_ERRORS)
-async def get_ranges(ticker: str, service: Service) -> RangeOptions:
-    """Availability of every range preset for this ticker, with the reason when one is short."""
-    return await service.range_options(check_ticker(ticker))
+async def get_ranges(ticker: str, service: Service, ccy: Ccy = "USD") -> RangeOptions:
+    """Availability of every range preset for this ticker, with the reason when one is short.
+
+    ``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices
+    leaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).
+    """
+    return await service.range_options(check_ticker(ticker), ccy)
 
 
 @router.get("/{ticker}", responses=_ERRORS)

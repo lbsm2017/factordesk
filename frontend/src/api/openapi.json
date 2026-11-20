@@ -735,7 +735,7 @@
     "/api/report/{ticker}/ranges": {
       "get": {
         "summary": "Get Ranges",
-        "description": "Availability of every range preset for this ticker, with the reason when one is short.",
+        "description": "Availability of every range preset for this ticker, with the reason when one is short.\n\n``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices\nleaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).",
         "operationId": "get_ranges_api_report__ticker__ranges_get",
         "parameters": [
           {
@@ -746,6 +746,22 @@
               "type": "string",
               "title": "Ticker"
             }
+          },
+          {
+            "name": "ccy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "USD",
+                "EUR"
+              ],
+              "type": "string",
+              "description": "Reference currency of every figure: USD (default) or EUR.",
+              "default": "USD",
+              "title": "Ccy"
+            },
+            "description": "Reference currency of every figure: USD (default) or EUR."
           }
         ],
         "responses": {
