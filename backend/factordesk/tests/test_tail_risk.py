@@ -456,9 +456,8 @@ def test_cornish_fisher_cvar_is_na_whenever_its_var_is_na() -> None:
     assert tripped > 0
 
 
-def _cf_far_from_historical(cf: float, hist: float) -> bool:
-    ratio = cf / hist
-    return not (1.0 - CF_FAR_FROM_HISTORICAL <= ratio <= 1.0 + CF_FAR_FROM_HISTORICAL)
+def _cf_far_from_historical(cf: float, hist: float, std: float) -> bool:
+    return abs(cf - hist) > CF_FAR_FROM_HISTORICAL * max(abs(hist), std)
 
 
 def test_cornish_fisher_is_indicative_when_far_from_the_historical_figure() -> None:
@@ -471,13 +470,30 @@ def test_cornish_fisher_is_indicative_when_far_from_the_historical_figure() -> N
             if hist is None or cf.value is None:
                 continue
             bends = cf.reason is not None and CF_INDICATIVE in cf.reason
-            is_far = _cf_far_from_historical(cf.value, hist)
+            is_far = _cf_far_from_historical(cf.value, hist, r.std)
             text = f"far from historical ({cf.value:.1%} vs {hist:.1%})"
             assert cf.indicative == (bends or is_far)
             assert (cf.reason is not None and text in cf.reason) == is_far
             if is_far:
                 far += 1
-                assert abs(cf.value - hist) > CF_FAR_FROM_HISTORICAL * hist - 1e-15
+                assert abs(cf.value - hist) > CF_FAR_FROM_HISTORICAL * max(abs(hist), r.std) - 1e-15
             else:
                 near += 1
     assert far > 0 and near > 0
+
+
+def test_low_volatility_positive_drift_is_rarely_flagged_far_from_historical() -> None:
+    """Near-zero historical figures (mean 0.35%, sd 0.2%) must not flag a correct model."""
+    rng = np.random.default_rng(31)
+    flagged = shown = 0
+    for _ in range(100):
+        r = tail_risk(rng.normal(0.0035, 0.002, 60), "monthly", n_resamples=1)
+        for measure, level in LEVELS["monthly"]:
+            hist = r.figure("historical", measure, level).value
+            cf = r.figure("cornish_fisher", measure, level)
+            if hist is None or cf.value is None:
+                continue
+            shown += 1
+            flagged += cf.reason is not None and "far from historical" in cf.reason
+    assert shown > 0
+    assert flagged / shown < 0.10

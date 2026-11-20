@@ -89,7 +89,7 @@ def build_tail_risk(ctx: SectionContext) -> TailRiskSection | None:
     """The tail risk section of the subject's returns (never ``None`` once built)."""
     frequency = ctx.subject.frequency
     returns = ctx.subject.returns
-    returns = returns[returns.index.isin(ctx.sample.ret.index)].dropna()
+    returns = returns[returns.index.isin(ctx.sample.ret.dropna().index)].dropna()
     if len(returns) < MIN_OBS:
         unit = "daily returns" if frequency == "daily" else "monthly returns"
         return _not_ok(

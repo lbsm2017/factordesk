@@ -53,8 +53,11 @@ Methods
 
   * **Far from historical** (flag only): a Cornish-Fisher VaR or CVaR that differs from the
     historical figure of the same measure and level by more than :data:`CF_FAR_FROM_HISTORICAL`
-    (50%) of the historical figure is flagged ``indicative=True`` too, with the reason
-    ``far from historical (10.2% vs 5.0%)``. It is not applied where the historical figure is n/a.
+    (50%) of ``max(|historical|, s)`` is flagged ``indicative=True`` too, with the reason
+    ``far from historical (10.2% vs 5.0%)``; ``s`` is the sample standard deviation at the
+    series' frequency. The floor ``s`` keeps the test well conditioned when the historical figure
+    is near zero (low volatility with a positive drift), where a pure ratio would flag correct
+    models. It is not applied where the historical figure is n/a.
 
     Share of simulated normal samples flagged (4,000 samples each, seed 7, 2026-11-19):
 
@@ -150,7 +153,8 @@ CF_Z_INDICATIVE = 3.5
 """The map must be increasing on ``[-CF_Z_INDICATIVE, CF_Z_INDICATIVE]`` not to be indicative."""
 CF_FAR_FROM_HISTORICAL = 0.5
 """A Cornish-Fisher figure is indicative when it differs from the historical figure of the same
-measure and level by more than this share of the historical figure (ratio outside [0.5, 1.5])."""
+measure and level by more than this share of ``max(|historical|, sample standard deviation)``.
+For a historical figure above the standard deviation this is a ratio outside [0.5, 1.5]."""
 MIN_CF_VALID_SHARE = 0.80
 """A Cornish-Fisher band needs at least this share of resamples inside the valid range."""
 MIN_OBS = 12
@@ -176,8 +180,9 @@ class TailFigure:
     """One VaR or CVaR figure: one method, one measure, one confidence level.
 
     ``value`` is a positive fraction of value for a loss, or None when the figure is n/a; then
-    ``reason`` says why. A Cornish-Fisher figure whose map bends back on ``[-3.5, 3.5]`` keeps
-    its value with ``indicative=True`` and the caveat in ``reason``. ``tail_count`` is the number of
+    ``reason`` says why. A Cornish-Fisher figure whose map bends back on ``[-3.5, 3.5]``, or that
+    is far from the historical figure (:data:`CF_FAR_FROM_HISTORICAL`), keeps its value with
+    ``indicative=True`` and the caveat in ``reason``. ``tail_count`` is the number of
     observations with a loss at or beyond this method's VaR at ``level`` (for the historical
     method, the observations the figure is computed from). ``expected_tail_obs`` is
     ``n (1 - level)``.
@@ -355,7 +360,9 @@ def _gaussian(m: _Moments, measure: Measure, p: float) -> FloatArray:
 def _cf_var_levels(freq: Frequency, level: float) -> tuple[float, ...]:
     """Levels whose Cornish-Fisher VaR must be valid for the CVaR at ``level`` to be shown.
 
-    ``level`` itself and every reported VaR level at or beyond it.
+    ``level`` itself and every reported VaR level at or beyond it. The guard ranges of these VaR
+    levels are ``[z_v, 0]`` and the CVaR's own is ``[-4, z_level]``, so together the effective
+    rule is ``g'(z) > 0`` on ``[-4, 0]``; the extra level checks are implied by it.
     """
     reported = [lv for measure, lv in LEVELS[freq] if measure == "var" and lv >= level - 1e-12]
     return tuple(sorted({level, *reported}))
@@ -578,12 +585,14 @@ def tail_risk(
     for measure, level in LEVELS[frequency]:
         p = tail_probability(level)
         expected = n * p
+        minimum = min_expected_tail(frequency, level)
         historical_value: float | None = None
+        if expected >= minimum - 1e-9:
+            historical_value = float(point[("historical", measure, level)][0])
         for method in METHODS:
             value = float(point[(method, measure, level)][0])
             reason: str | None = None
             indicative = False
-            minimum = min_expected_tail(frequency, level)
             if method == "historical" and expected < minimum - 1e-9:
                 reason = f"{_tail_text(expected, minimum)} expected tail observations"
             elif method == "cornish_fisher" and math.isnan(value):
@@ -594,8 +603,6 @@ def tail_risk(
                     TailFigure(method, measure, level, None, reason, None, None, expected)
                 )
                 continue
-            if method == "historical":
-                historical_value = value
             if method == "cornish_fisher":
                 reasons: list[str] = []
                 if not bool(
@@ -605,7 +612,8 @@ def tail_risk(
                 ):
                     reasons.append(CF_INDICATIVE)
                 if historical_value is not None and (
-                    abs(value - historical_value) > CF_FAR_FROM_HISTORICAL * abs(historical_value)
+                    abs(value - historical_value)
+                    > CF_FAR_FROM_HISTORICAL * max(abs(historical_value), float(m.std[0]))
                 ):
                     reasons.append(f"far from historical ({value:.1%} vs {historical_value:.1%})")
                 if reasons:

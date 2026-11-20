@@ -37,6 +37,8 @@ Every report shows how much could be lost on a bad day or month, using three met
 - The bands make the results look less certain than peer tools do. That is deliberate.
 - There is no backtest in version 1.
 
+- 2026-11-20: the tail sample became exactly the analysed sample (the same rows as every other section), so multi-day gap returns and other rows the analysis excluded are no longer in it.
+
 ## What would change our mind
 
 - If users need forward-looking risk, conditional methods (GARCH, EVT) come back for long daily series.
