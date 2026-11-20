@@ -5,6 +5,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { toApiError, useLibrary, usePortfolioReport } from "../../api/queries";
+import { expectedPlan, PORTFOLIO_RUN, runView, useRunProgress } from "../../api/runProgress";
+import type { FactorReport } from "../../api/types";
 import type { PortfolioRunInput } from "../../api/queries";
 import { lineCount } from "../../portfolio/composer";
 import { buildPreset, presetById } from "../../portfolio/presets";
@@ -14,10 +16,15 @@ import { remainder, totalWeight } from "../../portfolio/tree";
 import type { PortfolioTree } from "../../portfolio/tree";
 import { usePortfolioStore } from "../../portfolio/usePortfolioStore";
 import type { Currency } from "../../state/currency";
+import { runAnnouncement, useClearFinishedRun, useReveal, useRunVisible } from "../../state/runUi";
 import type { UrlState } from "../../state/url";
 import { StatsSwitch } from "../controls/StatsSwitch";
 import { ModeSwitch } from "../controls/ModeSwitch";
+import { PlaceholderPage } from "../report/PlaceholderPage";
+import { RerunBanner } from "../report/RerunBanner";
+import { RerunBar } from "../report/RerunBar";
 import { ReportView } from "../report/ReportView";
+import { RunAnnouncer } from "../report/RunAnnouncer";
 import { Shell } from "../shell/Shell";
 import { Icon } from "../shell/icons";
 import "../../styles/portfolio.css";
@@ -51,14 +58,24 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
   const library = useLibrary();
   const run = usePortfolioReport();
   const { active } = store;
-  /** The portfolio whose report is on screen, with the tree that was run. */
-  const [ran, setRan] = useState<{ id: string; tree: PortfolioTree } | null>(null);
+  /** The portfolio whose report is on screen, with the tree that was run and its report. */
+  const [ran, setRan] = useState<{ id: string; tree: PortfolioTree; report: FactorReport } | null>(null);
+  const [dismissed, setDismissed] = useState<number | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const foldRef = useRef<HTMLDivElement>(null);
   const libraryLines = library.data?.lines ?? [];
 
-  const folded = ran !== null && active !== null && ran.id === active.id && run.data !== undefined;
-  const report = folded ? run.data : undefined;
+  const folded = ran !== null && active !== null && ran.id === active.id;
+  const report = folded ? ran.report : undefined;
+  const pending = run.isPending;
+  const rerun = pending && folded;
+
+  // The steps of the run, the page that shows them and the reveal of the report that arrives.
+  const progress = useRunProgress(PORTFOLIO_RUN);
+  const view = runView(progress, expectedPlan({ prices: true, fx: currency === "EUR" }));
+  const visible = useRunVisible(pending, progress);
+  const reveal = useReveal(run.data, pending, visible);
+  useClearFinishedRun(PORTFOLIO_RUN, run.isSuccess);
 
   const input = (tree: PortfolioTree): PortfolioRunInput => ({
     tree,
@@ -69,10 +86,13 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
     end: state.end,
   });
 
+  const execute = (id: string, tree: PortfolioTree) => {
+    run.mutate(input(tree), { onSuccess: (data) => setRan({ id, tree, report: data }) });
+  };
+
   const start = () => {
     if (active === null) return;
-    const { id, tree } = active;
-    run.mutate(input(tree), { onSuccess: () => setRan({ id, tree }) });
+    execute(active.id, active.tree);
   };
 
   // A model or currency change re-runs the report on screen (the result is not cached).
@@ -82,7 +102,7 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
     if (lastModel.current === state.model && lastCurrency.current === currency) return;
     lastModel.current = state.model;
     lastCurrency.current = currency;
-    if (ran !== null && !run.isPending) run.mutate(input(ran.tree));
+    if (ran !== null && !run.isPending) execute(ran.id, ran.tree);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.model, currency]);
 
@@ -96,6 +116,7 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
   const select = (id: string) => {
     store.select(id);
     run.reset();
+    setRan(null);
   };
 
   const create = (preset: PresetId, name: string) => {
@@ -113,6 +134,7 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
 
   const sidebarStore = { ...store, select };
   const error = run.isError && !folded ? toApiError(run.error) : null;
+  const rerunError = run.isError && folded ? toApiError(run.error) : null;
 
   const sidebar = (
     <>
@@ -129,7 +151,9 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
   );
 
   let main;
-  if (active === null) {
+  if (pending && visible && !folded && active !== null) {
+    main = <PlaceholderPage mode="portfolio" title={active.tree.name} view={view} />;
+  } else if (active === null) {
     main = (
       <main className="pf-landing" data-testid="portfolio-landing" id="main">
         <h1>
@@ -195,12 +219,23 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
             <BacktestCard section={report.portfolio_backtest} currency={reportCurrency(report)} />
           ) : null}
         </div>
+        {rerun && visible ? <RerunBar title={ran.tree.name} view={view} /> : null}
+        {rerunError !== null && dismissed !== run.submittedAt ? (
+          <RerunBanner
+            error={rerunError}
+            previous={ran.tree.name}
+            onRetry={() => execute(ran.id, ran.tree)}
+            onDismiss={() => setDismissed(run.submittedAt)}
+          />
+        ) : null}
         <ReportView
           report={report}
           downloadHref={null}
           win={state.win}
           onWinChange={(win) => onCommit({ win })}
-          busy={run.isPending}
+          busy={rerun}
+          dim={rerun && visible}
+          reveal={reveal}
         />
       </>
     );
@@ -246,9 +281,6 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
             headingRef={headingRef}
           />
         )}
-        <span className="vh" role="status">
-          {run.isPending ? "Running the backtest." : ""}
-        </span>
       </main>
     );
   }
@@ -256,6 +288,7 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
   return (
     <>
       <Shell sidebar={sidebar} report={report} ticker={active?.tree.name ?? null} currency={currency}>
+        <RunAnnouncer text={runAnnouncement(pending, progress, run.data !== undefined ? run.data.ticker : null)} />
         {main}
       </Shell>
       <UndoToast deleted={store.state.deleted} onUndo={store.undo} onDismiss={store.dismissUndo} />

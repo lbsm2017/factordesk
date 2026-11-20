@@ -566,9 +566,26 @@ describe("ControlsStrip", () => {
     expect(onRefreshFactors).toHaveBeenCalledTimes(1);
   });
 
-  it("announces loading politely while a request runs", () => {
-    strip({ busy: true });
-    expect(screen.getAllByRole("status").map((s) => s.textContent)).toContain("Loading the report.");
+  it("shows a busy Factor it button while a request runs: aria-disabled, not disabled, and ignored", () => {
+    const onCommit = vi.fn();
+    strip({ busy: true, progress: 0.4, onCommit });
+    const button = screen.getByRole("button", { name: "Factoring…" });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(button.querySelector(".btn-prog")?.getAttribute("style")).toContain("--p: 40%");
+    const input = screen.getByRole("combobox", { name: "Ticker" });
+    fireEvent.change(input, { target: { value: "QQQ" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(button);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(input.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("shows Factor it again when the request is done", () => {
+    strip({ busy: false });
+    const button = screen.getByRole("button", { name: "Factor it" });
+    expect(button.hasAttribute("aria-disabled")).toBe(false);
+    expect(button.querySelector(".btn-prog")).toBeNull();
   });
 
   it("focuses the search field on the landing page only", () => {
