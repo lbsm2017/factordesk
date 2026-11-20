@@ -161,6 +161,9 @@ export interface paths {
         /**
          * Get Ranges
          * @description Availability of every range preset for this ticker, with the reason when one is short.
+         *
+         *     ``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices
+         *     leaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).
          */
         get: operations["get_ranges_api_report__ticker__ranges_get"];
         put?: never;
@@ -4276,7 +4279,10 @@ export interface operations {
     };
     get_ranges_api_report__ticker__ranges_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Reference currency of every figure: USD (default) or EUR. */
+                ccy?: "USD" | "EUR";
+            };
             header?: never;
             path: {
                 ticker: string;

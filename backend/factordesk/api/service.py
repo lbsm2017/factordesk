@@ -192,7 +192,7 @@ class LoadedFactors:
 
 type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
-type RangesKey = tuple[str, Vintage, date]
+type RangesKey = tuple[str, Vintage, date, ReferenceCurrency]
 type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel, ReferenceCurrency]
 type PortfolioKey = tuple[
     str, FactorModel, RangePreset | None, date | None, date | None, Vintage, date, ReferenceCurrency
@@ -444,16 +444,28 @@ class ReportService:
             logger.info("Portfolio report refused: reason %s", to_api_exception(exc).code)
             raise
 
-    async def range_options(self, ticker: str) -> RangeOptions:
-        """Availability of every preset for an already validated ticker."""
+    async def range_options(self, ticker: str, ccy: ReferenceCurrency = "USD") -> RangeOptions:
+        """Availability of every preset for an already validated ticker, in ``ccy``.
+
+        The EUR view counts the rows the EUR report would use: prices and factors are converted
+        first, so a rate series that starts after the prices shortens the history here too.
+        """
         now = self._now()
         loaded = await self._factors()
-        await self._security(ticker, now.date())
+        security = await self._security(ticker, now.date())
+        listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
-        key: RangesKey = (ticker, loaded.vintage, now.date())
+        key: RangesKey = (ticker, loaded.vintage, now.date(), ccy)
 
         async def make() -> RangeOptions:
-            return await self.runtime.run(ranges.range_options, ticker, history, loaded.frame)
+            ctx = CurrencyContext(ccy, self.deps.currency)
+
+            def build() -> RangeOptions:
+                converted = self._to_reference(ticker, history, listing, scale, ctx)
+                frame = loaded.frame if ccy == "USD" else ctx.factors(loaded.frame)
+                return ranges.range_options(ticker, converted, frame)
+
+            return await self.runtime.run(build)
 
         return await self.ranges.get(key, make)
 
