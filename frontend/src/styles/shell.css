@@ -106,6 +106,7 @@
 .topbar .where { display: inline-flex; align-items: center; gap: var(--s-2); }
 .topbar .ccy-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid var(--rail-track); border-radius: var(--r-control); color: var(--rail-text); font-size: var(--fs-cap); font-weight: 600; }
 .topbar .ccy-chip.eur { border-color: var(--rail-cyan); color: var(--rail-cyan); }
+.topbar .set-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid var(--rail-cyan); border-radius: var(--r-control); color: var(--rail-cyan); font-size: var(--fs-cap); font-weight: 600; }
 
 /* sidebar footer: the theme switch stays in view while the rest of the rail scrolls */
 .side-foot { flex: none; padding: 12px 16px 16px; border-top: 1px solid var(--rail-line); }

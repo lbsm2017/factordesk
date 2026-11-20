@@ -32,6 +32,8 @@ import { RunAnnouncer } from "./components/report/RunAnnouncer";
 import { ReportView } from "./components/report/ReportView";
 import { Shell } from "./components/shell/Shell";
 import { useCurrency } from "./state/currency";
+import { useFactorSetNote } from "./state/factorSetNote";
+import type { FactorSet } from "./state/factorSet";
 import { addRecent, useRecent } from "./state/recent";
 import type { RollingWindowDays } from "./state/url";
 import { runAnnouncement, useClearFinishedRun, useKept, useReveal, useRunVisible } from "./state/runUi";
@@ -67,6 +69,7 @@ function focusTicker(): void {
 function Dashboard() {
   const [state, commit] = useUrlState();
   const [currency, setCurrency] = useCurrency(state.ccy, commit);
+  const factorSet = state.fs;
   const [query, setQuery] = useState("");
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<number | null>(null);
@@ -77,7 +80,7 @@ function Dashboard() {
   const track = state.mode === "track";
   const portfolio = state.mode === "portfolio";
   const tickerState = track || portfolio ? { ...state, ticker: null } : state;
-  const ranges = useRanges(tickerState.ticker, currency);
+  const ranges = useRanges(tickerState.ticker, currency, factorSet);
   const report = useReport(tickerState, currency);
   const refresh = useRefreshFactors(setRefreshMessage);
   const upload = useUploadReport();
@@ -92,6 +95,12 @@ function Dashboard() {
   const kept = track ? keptTrack : keptTicker;
   const shown = fresh ?? (pending || error !== null ? kept : undefined);
   const rerun = pending && shown !== undefined;
+  // The polite sentence for a factor set change, said until the first step of the new run speaks.
+  const [setNote, noteSet] = useFactorSetNote(pending);
+  const chooseFactorSet = (next: FactorSet) => {
+    noteSet(next);
+    commit({ fs: next });
+  };
   const title = track ? upload.variables?.name.trim() || TRACK_TITLE : (state.ticker ?? "");
 
   // The steps of the run: the expected list gives the names of the steps that have not started.
@@ -105,24 +114,40 @@ function Dashboard() {
   const readyFor = fresh !== undefined && !pending ? fresh.ticker : null;
   useClearFinishedRun(runKey, readyFor !== null && error === null);
 
-  // A model or currency change re-runs the record on screen (the upload result is not cached).
+  // A model, currency or factor set change re-runs the record on screen (the upload result is not cached).
   const lastModel = useRef(state.model);
   const lastCurrency = useRef(currency);
+  const lastSet = useRef(factorSet);
   useEffect(() => {
-    if (lastModel.current === state.model && lastCurrency.current === currency) return;
+    if (lastModel.current === state.model && lastCurrency.current === currency && lastSet.current === factorSet) return;
     lastModel.current = state.model;
     lastCurrency.current = currency;
+    lastSet.current = factorSet;
     if (track && upload.variables !== undefined && !upload.isPending) {
-      upload.mutate({ ...upload.variables, model: state.model, ccy: currency });
+      upload.mutate({ ...upload.variables, model: state.model, ccy: currency, factorSet });
     }
-  }, [state.model, currency, track, upload]);
+  }, [state.model, currency, factorSet, track, upload]);
 
   const loadedTicker = !track && report.isSuccess && !report.isPlaceholderData ? report.data.ticker : null;
   useEffect(() => {
     if (loadedTicker !== null) addRecent(loadedTicker);
   }, [loadedTicker]);
 
-  if (portfolio) return <PortfolioMode state={state} currency={currency} onCurrency={setCurrency} onCommit={commit} />;
+  if (portfolio) {
+    return (
+      <PortfolioMode
+        state={state}
+        currency={currency}
+        onCurrency={setCurrency}
+        factorSet={factorSet}
+        onFactorSet={chooseFactorSet}
+        onCommit={commit}
+      />
+    );
+  }
+
+  const stepSentence = runAnnouncement(pending, progress, readyFor);
+  const announcement = stepSentence === "" && pending ? setNote : stepSentence;
 
   const retry = () => {
     if (track) {
@@ -182,15 +207,23 @@ function Dashboard() {
       report={shown}
       ticker={track ? (shown?.ticker ?? null) : state.ticker}
       currency={currency}
+      factorSet={factorSet}
       sidebar={
         <>
-          <ModeSwitch mode={state.mode} onSelect={(mode) => commit({ mode })} currency={currency} onCurrency={setCurrency} />
+          <ModeSwitch
+            mode={state.mode}
+            onSelect={(mode) => commit({ mode })}
+            currency={currency}
+            onCurrency={setCurrency}
+            factorSet={factorSet}
+            onFactorSet={chooseFactorSet}
+          />
           {track ? (
             <>
               <TrackRecordInput
                 busy={pending}
                 progress={barFraction(view)}
-                onRun={(input) => upload.mutate({ ...input, model: state.model, ccy: currency })}
+                onRun={(input) => upload.mutate({ ...input, model: state.model, ccy: currency, factorSet })}
               />
               {shown !== undefined ? (
                 <div className="side-group">
@@ -222,7 +255,7 @@ function Dashboard() {
         </>
       }
     >
-      <RunAnnouncer text={runAnnouncement(pending, progress, readyFor)} />
+      <RunAnnouncer text={announcement} />
       {main}
     </Shell>
   );

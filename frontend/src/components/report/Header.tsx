@@ -1,7 +1,9 @@
+import { useRef, useState } from "react";
 import { reportCurrency } from "../../api/currency";
 import { dateLong } from "../../format";
 import { isSubjectReport, observations, subjectLine } from "../../report/subject";
 import { Icon } from "../shell/icons";
+import { EurChanges } from "./EurChanges";
 import { noticeItems, plural } from "./leadHelpers";
 import type { ReportPanelProps } from "./types";
 import "./lead.css";
@@ -41,10 +43,16 @@ export function listingLine(security: SecurityLike): string | null {
   return null;
 }
 
+/** The factor set a report was built on: `factor_set` is "europe" for the Europe set and absent for the US one. */
+export function reportFactorSet(report: ReportPanelProps["report"]): "us" | "europe" {
+  return report.factor_set === "europe" ? "europe" : "us";
+}
+
 /**
  * Page header (prototype v4a): the ticker with the company name and the type badge, the listing
  * line, "Download report" on the right, and the analysis bar (analysis period, observations,
- * factor data, benchmark).
+ * factor data, factor set, benchmark). It names the factor set in a pill and, in the euro view, opens
+ * the "What EUR changes" panel from a link beside the pills.
  */
 export function Header({ report, downloadHref }: HeaderProps) {
   const d = report.data;
@@ -54,6 +62,9 @@ export function Header({ report, downloadHref }: HeaderProps) {
   const listing = subjectLine(report) ?? listingLine(security);
   const warnings = noticeItems(report).length;
   const currency = reportCurrency(report);
+  const europe = reportFactorSet(report) === "europe";
+  const [eurOpen, setEurOpen] = useState(false);
+  const eurButton = useRef<HTMLButtonElement>(null);
   return (
     <header className="masthead" id="header">
       <div className="page-head">
@@ -73,6 +84,13 @@ export function Header({ report, downloadHref }: HeaderProps) {
           </span>
         ) : null}
         {currency === "EUR" ? <span className="ccy-pill">Figures in EUR</span> : null}
+        {europe ? <span className="set-pill">Europe factors</span> : <span className="set-pill plain">US factors</span>}
+        {currency === "EUR" ? (
+          <button ref={eurButton} type="button" className="hd-link" aria-haspopup="dialog" onClick={() => setEurOpen(true)}>
+            <Icon name="info" />
+            What EUR changes
+          </button>
+        ) : null}
         {downloadHref !== null ? (
           <div className="head-actions">
             <a className="btn-outline" href={downloadHref} download>
@@ -103,6 +121,10 @@ export function Header({ report, downloadHref }: HeaderProps) {
           <dt>Factor data</dt>
           <dd title={`${plural(d.factors_days_behind, "day", "days")} old`}>To {dateLong(d.factors_last_date)}</dd>
         </div>
+        <div>
+          <dt>Factor set</dt>
+          <dd>{europe ? "Developed Europe" : "US"}</dd>
+        </div>
         {currency === "EUR" ? (
           <div>
             <dt>Currency</dt>
@@ -118,6 +140,13 @@ export function Header({ report, downloadHref }: HeaderProps) {
           </div>
         )}
       </dl>
+      {eurOpen && currency === "EUR" ? (
+        <EurChanges
+          portfolio={report.portfolio_backtest != null}
+          returnFocus={eurButton}
+          onClose={() => setEurOpen(false)}
+        />
+      ) : null}
     </header>
   );
 }

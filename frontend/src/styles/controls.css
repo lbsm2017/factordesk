@@ -156,3 +156,7 @@
 .ccy-seg { flex: none; }
 .ccy-seg .seg-opt span { min-width: 56px; }
 .ccy-note { margin-top: var(--s-1); }
+.side-group .fs-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-2); }
+.fs-seg { flex: none; }
+.fs-seg .seg-opt span { min-width: 64px; }
+.fs-note { margin-top: var(--s-1); }
