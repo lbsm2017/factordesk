@@ -12,6 +12,7 @@ import {
   HOLDINGS_HELP,
   HOLDINGS_HOW,
   buildTree,
+  isEmptyCash,
   holdingsText,
   outcomeSentence,
   points,
@@ -84,13 +85,13 @@ function TreeRow({ line, open, onToggle, color, noRisk }: TreeRowProps) {
   const only = line.single;
   let sub: ReactNode = null;
   if (line.style === "inst") {
-    sub = row.label;
+    sub = row.label === row.ticker ? null : row.label;
   } else if (only !== null) {
     // A sub-asset class with one holding is one row: the ticker goes on its sub-line.
     sub = (
       <>
         <b>{only.ticker ?? only.label}</b>
-        {only.ticker !== null && only.label !== row.label ? ` ${only.label}` : ""}
+        {only.ticker !== null && only.label !== row.label && only.label !== only.ticker ? ` ${only.label}` : ""}
       </>
     );
   } else if (line.multi) {
@@ -170,7 +171,9 @@ function PlainRow({ row, noRisk, eurCash }: { row: HoldingRow; noRisk: boolean; 
 
 function Loaded({ section, eurCash }: { section: HoldingsSection; eurCash: boolean }) {
   const roots = buildTree(section.rows);
-  const { classes, plain } = tops(roots);
+  const { classes, plain: allPlain } = tops(roots);
+  // A cash row with no weight and no return is filler: hidden here, and it adds nothing to the totals.
+  const plain = allPlain.filter((n) => !isEmptyCash(n.row));
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const foldable = classes.filter((n) => n.children.length > 0).map((n) => n.row.id);
   const noRisk = section.risk_share_reason !== null;

@@ -145,3 +145,20 @@ describe("MacroPanel", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 });
+
+describe("MacroPanel with small betas", () => {
+  it("labels distinct axis ticks and keeps two significant digits", () => {
+    const r = report((s) => {
+      for (const row of s.rows) {
+        row.beta = row.beta * 0.001;
+        row.se = row.se * 0.001;
+      }
+    });
+    const { container } = render(<MacroPanel report={r} />);
+    const texts = Array.from(container.querySelectorAll(".mc-axis .axis span, tfoot .axis span")).map((n) => n.textContent ?? "");
+    expect(texts.length).toBeGreaterThan(2);
+    expect(new Set(texts).size).toBe(texts.length);
+    const betas = Array.from(container.querySelectorAll("tbody td.num:nth-child(2)")).map((n) => n.textContent ?? "");
+    for (const b of betas) expect(b).not.toMatch(/^[+−]?0\.00$/);
+  });
+});

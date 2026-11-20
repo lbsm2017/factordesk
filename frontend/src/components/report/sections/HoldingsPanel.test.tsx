@@ -228,6 +228,40 @@ describe("HoldingsPanel", () => {
     expect(top.reduce((a, r) => a + r.contribution, 0)).toBeCloseTo(backend.total_return, 9);
   });
 
+  it("shows the ticker once when the holding label is the ticker", () => {
+    const section = multi();
+    section.rows = section.rows.map((r) => (r.id === "i:ief" ? { ...r, label: "IEF" } : r)).map((r) =>
+      r.id === "i:ivv" ? { ...r, label: "IVV" } : r,
+    );
+    render(<HoldingsPanel report={report(section)} />);
+    // Single holding under a sub-asset class: the sub-line is the ticker alone.
+    expect(rowNamed("Government Bonds").querySelector(".sb")?.textContent).toBe("IEF");
+    // Holding under a sub-asset class with several holdings: no sub-line that repeats the name.
+    const ivv = rowNamed("IVV");
+    expect(ivv.querySelector(".nm")?.textContent).toBe("IVV");
+    expect(ivv.querySelector(".sb")).toBeNull();
+  });
+
+  it("hides a cash row with no weight, no return and no risk, and the totals still tie", () => {
+    const section = multi();
+    section.rows = [
+      ...section.rows,
+      row("usd_cash", "cash", "USD cash (converted to EUR)", 0, null, [0, 0, 0, 0]),
+    ];
+    section.rows = section.rows.map((r) => (r.id === "cash" ? { ...r, label: "EUR cash", target_weight: 0, end_weight: 0, contribution: 0, risk_share: 0 } : r));
+    render(<HoldingsPanel report={report(section)} />);
+    expect(screen.queryByRole("row", { name: /cash/i })).toBeNull();
+    const top = section.rows.filter((r) => r.parent_id === null);
+    const sum = (pick: (r: HoldingRow) => number | null) => top.reduce((a, r) => a + (pick(r) ?? 0), 0);
+    expect(rowOf(rowNamed("Total")).target).toBe(share(sum((r) => r.target_weight)));
+    expect(rowOf(rowNamed("Total")).end).toBe(share(sum((r) => r.end_weight)));
+  });
+
+  it("keeps a cash row that has a weight", () => {
+    render(<HoldingsPanel report={report(multi())} />);
+    expect(rowNamed("USD cash")).toBeTruthy();
+  });
+
   it("has the help text and the method note, with no formula", () => {
     const { container } = render(<HoldingsPanel report={report(multi())} />);
     const foot = container.querySelector(".foot") as HTMLElement;

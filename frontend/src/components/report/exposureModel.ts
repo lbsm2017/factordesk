@@ -1,6 +1,6 @@
 /** Pure values for the factor exposures panel (design D5), ported from `_exposures_panel` in render_html.py. */
 import type { AverageBetaPanel, FactorReport, FactorStat } from "../../api/types";
-import { pval, signed, tstat } from "../../format";
+import { num, pval, signed, tstat } from "../../format";
 import { position } from "../charts/BarCell";
 
 export interface NiceDomain {
@@ -30,6 +30,27 @@ export function niceDomain(lo: number, hi: number, target = 4): NiceDomain {
   const ticks: number[] = [];
   for (let t = nlo; t <= nhi + step / 2; t += step) ticks.push(Number(t.toFixed(10)));
   return { lo: Number(nlo.toFixed(10)), hi: Number(nhi.toFixed(10)), ticks };
+}
+
+/** Decimals that show every tick exactly, at least `min` (a step of 0.0005 needs 4). */
+export function tickDigits(ticks: readonly number[], min = 0): number {
+  for (let d = min; d < 8; d++) {
+    if (ticks.every((t) => Math.abs(t - Number(t.toFixed(d))) < 1e-9)) return d;
+  }
+  return 8;
+}
+
+/** Decimals that show `x` with at least two significant digits, never fewer than `min` (0.0021 needs 4). */
+export function valueDigits(x: number, min = 2): number {
+  if (!Number.isFinite(x) || x === 0) return min;
+  return Math.min(8, Math.max(min, 1 - Math.floor(Math.log10(Math.abs(x)))));
+}
+
+/** Axis label of a tick: "0" for zero, whole numbers plain, else enough decimals (at least `min`) to tell the ticks apart. */
+export function tickLabel(t: number, ticks: readonly number[], min: number): string {
+  if (Math.abs(t) < 1e-12) return "0";
+  if (Math.abs(t) >= 1 && Number.isInteger(t)) return num(t, 0);
+  return num(t, tickDigits(ticks, min));
 }
 
 export interface AxisLabel {

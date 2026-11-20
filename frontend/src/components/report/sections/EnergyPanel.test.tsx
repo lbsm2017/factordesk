@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { FactorReport } from "../../../api/types";
+import { signed } from "../../../format";
+import { tickLabel, valueDigits } from "../exposureModel";
 import { cloneReport } from "../../../test/fixture";
 import { withSection } from "../../../test/sectionFixtures";
 import { EnergyPanel, INTRO, moveFor, overlaps, RISE, sentence, VIF_WARN, whisker } from "./EnergyPanel";
@@ -207,5 +209,53 @@ describe("EnergyPanel", () => {
     expect(screen.getByText(/could not be fetched from FRED/).textContent).toContain("energy and carbon section");
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.getByText(/rest of the report is not affected/i)).toBeTruthy();
+  });
+});
+
+describe("EnergyPanel with small sensitivities", () => {
+  function small(r: FactorReport): void {
+    const s = section(r);
+    for (const m of [s.long_model, s.carbon_model]) {
+      if (!m) continue;
+      for (const row of m.rows) {
+        row.beta = row.beta * 0.001;
+        row.se = row.se * 0.001;
+      }
+      m.gas_robust.beta = m.gas_robust.beta * 0.001;
+      m.gas_robust.se = m.gas_robust.se * 0.001;
+    }
+  }
+
+  it("labels distinct axis ticks and shows at least two significant digits", () => {
+    const r = report();
+    small(r);
+    const { container } = render(<EnergyPanel report={r} />);
+    const axes = Array.from(container.querySelectorAll(".en-axis .axis"));
+    expect(axes.length).toBeGreaterThan(0);
+    for (const axis of axes) {
+      const texts = Array.from(axis.querySelectorAll("span")).map((n) => n.textContent ?? "");
+      expect(new Set(texts).size).toBe(texts.length);
+    }
+    const betas = Array.from(container.querySelectorAll("tbody td.num:nth-child(2)")).map((n) => n.textContent ?? "");
+    expect(betas.length).toBeGreaterThan(0);
+    for (const b of betas) expect(b).not.toMatch(/^[+−]?0\.000$/);
+  });
+});
+
+describe("axis and value formats", () => {
+  it("tickLabel keeps ticks apart at a tiny scale and is unchanged at a normal one", () => {
+    const tiny = [-0.001, -0.0005, 0, 0.0005, 0.001];
+    const texts = tiny.map((t) => tickLabel(t, tiny, 2));
+    expect(new Set(texts).size).toBe(tiny.length);
+    expect(texts[2]).toBe("0");
+    const normal = [-1, -0.5, 0, 0.5, 1];
+    expect(normal.map((t) => tickLabel(t, normal, 2))).toEqual(["−1", "−0.50", "0", "0.50", "1"]);
+  });
+
+  it("valueDigits gives two significant digits, never fewer than the minimum", () => {
+    expect(signed(0.0021, valueDigits(0.0021, 3))).toBe("+0.0021");
+    expect(signed(0.0000123, valueDigits(0.0000123, 3))).toBe("+0.000012");
+    expect(signed(0.412, valueDigits(0.412, 3))).toBe("+0.412");
+    expect(valueDigits(0, 3)).toBe(3);
   });
 });

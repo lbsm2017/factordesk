@@ -23,8 +23,8 @@ import { Shell } from "./shell/Shell";
 
 const CURRENCY = {
   reference: "EUR",
-  fx_source: "ECB euro reference rates",
-  rate_source: "ECB euro short-term rate",
+  fx_source: "Exchange rates: European Central Bank, euro foreign exchange reference rates.",
+  rate_source: "Euro short-term rate and EONIA: European Central Bank, ECB Data Portal.",
   notes: ["Cash earns the euro overnight rate, not the US rate."],
 };
 
@@ -115,9 +115,12 @@ describe("SummaryPanel", () => {
 describe("Colophon", () => {
   it("credits the exchange-rate and cash-rate sources when the report has them", () => {
     const { container, rerender } = render(<Colophon report={eurReport()} />);
-    expect(container.querySelector(".credits")?.textContent).toBe(
-      "Exchange rates: ECB euro reference rates. Euro cash rate: ECB euro short-term rate.",
-    );
+    // Each credit shows once, as the backend wrote it: no doubled label, no doubled full stop.
+    const lines = Array.from(container.querySelectorAll(".credits .credit")).map((n) => n.textContent);
+    expect(lines).toEqual([CURRENCY.fx_source, CURRENCY.rate_source]);
+    const text = container.querySelector(".credits")?.textContent ?? "";
+    expect(text.match(/Exchange rates:/g)).toHaveLength(1);
+    expect(text).not.toContain("..");
     rerender(<Colophon report={{ ...eurReport(), currency: { reference: "EUR" } } as FactorReport} />);
     expect(container.querySelector(".credits")).toBeNull();
     rerender(<Colophon report={mockReport} />);

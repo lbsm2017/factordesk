@@ -2,7 +2,7 @@ import type { MacroRow, MacroSection } from "../../../api/types";
 import { count, dateLong, dateShort, num, pval, signed, tstat } from "../../../format";
 import { observations } from "../../../report/subject";
 import { position } from "../../charts/BarCell";
-import { niceDomain } from "../exposureModel";
+import { niceDomain, tickLabel, valueDigits } from "../exposureModel";
 import type { NiceDomain } from "../exposureModel";
 import { Panel } from "../Panel";
 import type { ReportPanelProps } from "../types";
@@ -42,16 +42,20 @@ function domainOf(rows: readonly MacroRow[]): NiceDomain {
   return niceDomain(Math.min(...values), Math.max(...values), 3);
 }
 
-function tickText(t: number): string {
-  if (Math.abs(t) < 1e-12) return "0";
-  return num(t, Math.abs(t) >= 1 && Number.isInteger(t) ? 0 : 1);
+function tickText(t: number, ticks: readonly number[]): string {
+  return tickLabel(t, ticks, 1);
+}
+
+/** A beta with at least two significant digits and at least two decimals: "0.0021", "0.41". */
+function betaText(x: number): string {
+  return signed(x, valueDigits(x, 2));
 }
 
 function textOf(row: MacroRow): string {
   const w = whisker(row);
-  const tail = w ? `, approximate 95% range ${signed(w.low, 2)} to ${signed(w.high, 2)}` : "";
+  const tail = w ? `, approximate 95% range ${betaText(w.low)} to ${betaText(w.high)}` : "";
   const vif = overlaps(row) ? `, overlaps strongly with the other factors (VIF ${num(row.vif, 1)})` : "";
-  return `${row.label}: beta ${signed(row.beta, 2)}${tail}${vif}`;
+  return `${row.label}: beta ${betaText(row.beta)}${tail}${vif}`;
 }
 
 function pair(codes: readonly string[], labels: Map<string, string>, matrix: readonly (readonly number[])[]): string {
@@ -99,7 +103,7 @@ function how(s: MacroSection, rows: string): string {
       : "",
     s.rows
       .filter((r) => r.beta_same_day != null && r.beta_lag != null)
-      .map((r) => `${r.label}: same day ${signed(r.beta_same_day ?? 0, 3)}, previous day ${signed(r.beta_lag ?? 0, 3)}.`)
+      .map((r) => `${r.label}: same day ${signed(r.beta_same_day ?? 0, valueDigits(r.beta_same_day ?? 0, 3))}, previous day ${signed(r.beta_lag ?? 0, valueDigits(r.beta_lag ?? 0, 3))}.`)
       .join(" "),
     `A VIF badge shows when the variance inflation factor is above ${VIF_WARN}: that factor overlaps strongly with the others and its beta is imprecise.`,
     "Tag of each factor (Benjamini-Hochberg across these factors): " +
@@ -150,7 +154,7 @@ function Row({ row, domain }: { row: MacroRow; domain: NiceDomain }) {
         <span className="mc-label">{row.label}</span>
         {row.note ? <span className="mc-note">{row.note}</span> : null}
       </th>
-      <td className="num">{finite(row.beta) ? signed(row.beta, 2) : "n/a"}</td>
+      <td className="num">{finite(row.beta) ? betaText(row.beta) : "n/a"}</td>
       <td className="mc-plot">
         <MacroPlot row={row} domain={domain} />
         <span className="vh">{textOf(row)}</span>
@@ -239,7 +243,7 @@ export function MacroPanel({ report }: ReportPanelProps) {
                 <div className="axis">
                   {domain.ticks.map((t) => (
                     <span key={t} style={{ left: `${position(t, domain.lo, domain.hi)}%` }}>
-                      {tickText(t)}
+                      {tickText(t, domain.ticks)}
                     </span>
                   ))}
                 </div>

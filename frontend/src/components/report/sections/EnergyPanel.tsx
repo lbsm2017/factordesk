@@ -2,7 +2,7 @@ import type { EnergyModel, EnergyRow, EnergySection, FactorReport } from "../../
 import { count, dateLong, dateShort, num, pct, pval, signed, tstat } from "../../../format";
 import { observations } from "../../../report/subject";
 import { position } from "../../charts/BarCell";
-import { niceDomain } from "../exposureModel";
+import { niceDomain, tickLabel, valueDigits } from "../exposureModel";
 import type { NiceDomain } from "../exposureModel";
 import { Panel } from "../Panel";
 import type { ReportPanelProps } from "../types";
@@ -69,9 +69,13 @@ function domainOf(model: EnergyModel): NiceDomain {
   return niceDomain(Math.min(...values), Math.max(...values), 3);
 }
 
-function tickText(t: number): string {
-  if (Math.abs(t) < 1e-12) return "0";
-  return num(t, Math.abs(t) >= 1 && Number.isInteger(t) ? 0 : 2);
+function tickText(t: number, ticks: readonly number[]): string {
+  return tickLabel(t, ticks, 2);
+}
+
+/** A sensitivity with at least two significant digits and at least three decimals: "0.0021", "0.412". */
+function betaText(x: number): string {
+  return signed(x, valueDigits(x, 3));
 }
 
 function wordFor(s: EnergySection): string {
@@ -84,8 +88,8 @@ function robustLabel(s: EnergySection, model: EnergyModel): string {
 
 function textOf(label: string, row: { beta: number; se: number }): string {
   const w = whisker(row);
-  const tail = w ? `, approximate 95% range ${signed(w.low, 3)} to ${signed(w.high, 3)}` : "";
-  return `${label}: sensitivity ${signed(row.beta, 3)}${tail}`;
+  const tail = w ? `, approximate 95% range ${betaText(w.low)} to ${betaText(w.high)}` : "";
+  return `${label}: sensitivity ${betaText(row.beta)}${tail}`;
 }
 
 /** The first dates of the series behind the legs, in words. */
@@ -201,7 +205,7 @@ function Line({ label, note, title, beta, se, t, domain, chart, vif, variant }: 
         <span className="en-label">{label}</span>
         {note ? <span className="en-note">{note}</span> : null}
       </th>
-      <td className="num">{finite(beta) ? signed(beta, 3) : "n/a"}</td>
+      <td className="num">{finite(beta) ? betaText(beta) : "n/a"}</td>
       <td className="en-plot">
         {chart ? (
           <>
@@ -296,7 +300,7 @@ function Model({ s, model, subject, rows }: { s: EnergySection; model: EnergyMod
                 <div className="axis">
                   {domain.ticks.map((t) => (
                     <span key={t} style={{ left: `${position(t, domain.lo, domain.hi)}%` }}>
-                      {tickText(t)}
+                      {tickText(t, domain.ticks)}
                     </span>
                   ))}
                 </div>

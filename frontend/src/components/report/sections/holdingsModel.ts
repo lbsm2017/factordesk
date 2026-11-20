@@ -54,6 +54,17 @@ export function tops(roots: readonly HoldingNode[]): { classes: HoldingNode[]; p
   };
 }
 
+/** A cash row ("cash" or "usd_cash") with no target, no end weight, no return and no risk: filler, not shown. */
+export function isEmptyCash(row: HoldingRow): boolean {
+  return (
+    (row.id === "cash" || row.id === "usd_cash") &&
+    row.target_weight === 0 &&
+    row.end_weight === 0 &&
+    row.contribution === 0 &&
+    (row.risk_share ?? 0) === 0
+  );
+}
+
 /** The visible lines of the tree (asset classes in `folded` hide their members), in table order. */
 export function treeLines(classes: readonly HoldingNode[], folded: ReadonlySet<string>): Line[] {
   const out: Line[] = [];

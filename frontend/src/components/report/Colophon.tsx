@@ -14,10 +14,10 @@ function stamp(iso: string): string | null {
 export function Colophon({ report }: ReportPanelProps) {
   const generated = stamp(report.generated_at);
   const currency = currencyOf(report);
-  const credits = [
-    currency?.fx_source ? `Exchange rates: ${currency.fx_source}` : null,
-    currency?.rate_source ? `Euro cash rate: ${currency.rate_source}` : null,
-  ].filter((c): c is string => c !== null);
+  // The backend strings carry their own label and full stop: shown as they are, one per line.
+  const credits = [currency?.fx_source, currency?.rate_source].filter(
+    (c): c is string => typeof c === "string" && c.trim() !== "",
+  );
   return (
     <footer className="colophon" id="colophon">
       <p>
@@ -25,7 +25,15 @@ export function Colophon({ report }: ReportPanelProps) {
         {generated ? `, generated ${generated}` : ""}. Descriptive statistics on past data; nothing here is a forecast or
         advice.
       </p>
-      {credits.length > 0 ? <p className="credits">{credits.join(". ")}.</p> : null}
+      {credits.length > 0 ? (
+        <p className="credits">
+          {credits.map((c) => (
+            <span key={c} className="credit">
+              {c}
+            </span>
+          ))}
+        </p>
+      ) : null}
     </footer>
   );
 }

@@ -19,8 +19,8 @@ async function euroBackend(page: Page): Promise<string[]> {
       asked.push(url);
       body["currency"] = {
         reference: "EUR",
-        fx_source: "ECB euro reference rates",
-        rate_source: "ECB euro short-term rate",
+        fx_source: "Exchange rates: European Central Bank, euro foreign exchange reference rates.",
+        rate_source: "Euro short-term rate and EONIA: European Central Bank, ECB Data Portal.",
         notes: ["Cash earns the euro overnight rate, not the US rate."],
       };
     }
@@ -50,8 +50,8 @@ test("switch to EUR: the request, the header pill, the credits, the remembered c
   await expect(page.locator(".ccy-pill")).toHaveText("Figures in EUR", { timeout: FIRST_REPORT_MS });
   expect(asked.length).toBeGreaterThan(0);
   await expect(page.locator("#summary .cur-notes")).toContainText("Cash earns the euro overnight rate");
-  await expect(page.locator("footer.colophon")).toContainText("Exchange rates: ECB euro reference rates");
-  await expect(page.locator("footer.colophon")).toContainText("Euro cash rate: ECB euro short-term rate");
+  await expect(page.locator("footer.colophon")).toContainText("Exchange rates: European Central Bank, euro foreign exchange reference rates.");
+  await expect(page.locator("footer.colophon")).toContainText("Euro short-term rate and EONIA: European Central Bank, ECB Data Portal.");
 
   // The choice is remembered: a URL without ccy opens in EUR, and ccy=USD in the URL wins over it.
   await page.goto("/?t=SYN&range=3Y");
