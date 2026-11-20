@@ -100,7 +100,7 @@ describe("dark contrast (WCAG 2.2 AA)", () => {
     expect(contrast(d("--rail"), d("--rail-cyan"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  const marks = ["--f1", "--f2", "--f3", "--f4", "--f5", "--f6", "--ac-equities", "--ac-fixed", "--ac-alts", "--ac-real", "--ac-comm", "--ac-cash", "--ac-other", "--pos", "--neg", "--axis", "--control-line"];
+  const marks = ["--f1", "--f2", "--f3", "--f4", "--f5", "--f6", "--ac-equities", "--ac-fixed", "--ac-alts", "--ac-real", "--ac-comm", "--ac-cash", "--ac-other", "--m-hist", "--m-fc", "--pos", "--neg", "--axis", "--control-line"];
 
   it.each(marks)("chart mark or control %s reaches 3:1 on the surface and the page", (name) => {
     for (const ground of ["--surface", "--page"]) expect(contrast(d(name), d(ground)), `${name} on ${ground}`).toBeGreaterThanOrEqual(3);
