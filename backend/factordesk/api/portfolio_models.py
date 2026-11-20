@@ -40,6 +40,10 @@ USD_CASH_LIBRARY_ID: Final = "cash_usd"
 EUR_CASH_LIBRARY_ID: Final = "cash_eur"
 """Library id of the EUR cash line: the EUR view replaces its proxy (FXE) by the euro cash index."""
 
+CHF_CASH_LIBRARY_ID: Final = "cash_chf"
+"""Library id of the CHF Cash line: both views replace its proxy (FXF) by the SARON cash index,
+converted to the reference currency, unless SARON or the franc's rate is unavailable."""
+
 _TICKER_RE = re.compile(r"^[A-Za-z0-9.^=-]{1,12}$")  # same rule as data.prices.validate_ticker
 
 Text = Annotated[str, Field(min_length=1, max_length=80)]

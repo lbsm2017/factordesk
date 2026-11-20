@@ -43,7 +43,8 @@ The euro view starts in January 1999. Days without an ECB rate (euro-area bank h
 | Library line | Proxy | Euro view |
 |---|---|---|
 | EUR Cash | FXE | Replaced by the euro cash index |
-| USD Cash, CHF Cash | RF, FXF | Unhedged: holding them is a currency position |
+| USD Cash | RF | Unhedged: holding it is a currency position |
+| CHF Cash | SARON, FXF | Replaced by the Swiss franc cash index (SARON, below), converted at the franc's own rate, unhedged. FXF is used only when SARON is unavailable, with a notice |
 | N. American government, corporate investment grade and high yield bonds; EM bonds in USD; inflation-linked bonds | IEF, LQD, HYG, EMB, TIP | Hedged |
 | European and global bond lines | IGOV, PICB, IHY, BNDW, GHYG | Unhedged, labelled "several currencies" |
 | Equities, alternatives, real estate, commodities | all | Unhedged |
@@ -66,7 +67,14 @@ The euro view starts in January 1999. Days without an ECB rate (euro-area bank h
 - The ECB rate is fixed at 14:10 Frankfurt time, about 8 hours before the US close. Daily euro returns of US assets therefore carry some timing noise. Monthly figures are not affected.
 - On 2026-11-20 the validation on real data ([results](../docs/research/sprint-3-validation.md)) found a monthly correlation of 0.972 between SPY in euros and SXR8.DE, a euro-listed S&P 500 fund. The cause is the difference in closing times: Xetra closes at 17:30 Frankfurt, New York later, and the ECB rate is fixed at 14:10, so a month-end can differ by about one day of US move. The correlation is 0.990 over quarters and 0.9996 over years, and the annual return gap is +0.30%. The earlier claim "Monthly figures are not affected" is superseded.
 - The factors stay US factors, converted into euros. Regional factor files (see [European mode](decision-european-mode-and-currency.md)) remain a separate, later decision.
-- CHF cash on SARON, and hedging for multi-currency bond funds, are not in scope.
+- Hedging for multi-currency bond funds is not in scope.
+
+## CHF cash on SARON (Sprint 4, S4-10)
+
+- The "CHF Cash" line of a portfolio, in the USD view and in the EUR view, earns the Swiss franc overnight rate instead of the FXF currency trust. The franc return is built as the euro cash index is (ACT/360, compounded across gaps) and then converted with the same exchange-rate code. It is not hedged.
+- Source: the Swiss National Bank data portal (data.snb.ch). From 2009-08-24: SARON, the fixing at the close of the trading day (cube `snbgwdzid`, item `SARON`). The portal publishes it rounded to two decimals of a percent. Before 2009-08-24: the SNB's earlier overnight history (cube `zirepo`, item `H0`, daily from 1999-06-21), as published and unadjusted, as EONIA is used for the euro. The portal has no daily TOIS series, so TOIS is not used.
+- If the SNB portal or the franc exchange rate is down, the line keeps FXF and the report shows a notice. The report never fails for this reason.
+- The report names SARON in its notes and in the source credit. A USD portfolio with a CHF Cash line therefore carries the `currency` block too (reference USD); other USD reports do not.
 
 ## What would change our mind
 

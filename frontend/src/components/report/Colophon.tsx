@@ -1,4 +1,3 @@
-import { currencyOf } from "../../api/currency";
 import { dateLong } from "../../format";
 import type { ReportPanelProps } from "./types";
 import "./lead.css";
@@ -13,7 +12,8 @@ function stamp(iso: string): string | null {
 
 export function Colophon({ report }: ReportPanelProps) {
   const generated = stamp(report.generated_at);
-  const currency = currencyOf(report);
+  // A USD portfolio carries the block too when its CHF Cash line earns SARON.
+  const currency = report.currency;
   // The backend strings carry their own label and full stop: shown as they are, one per line.
   const credits = [currency?.fx_source, currency?.rate_source].filter(
     (c): c is string => typeof c === "string" && c.trim() !== "",

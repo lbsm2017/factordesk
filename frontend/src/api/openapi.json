@@ -1649,7 +1649,10 @@
         "properties": {
           "reference": {
             "type": "string",
-            "const": "EUR",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
             "title": "Reference",
             "description": "Currency of every figure in the report."
           },
@@ -1675,7 +1678,7 @@
               }
             ],
             "title": "Rate Source",
-            "description": "Source credit of the euro cash rate (overnight rate); None when not used."
+            "description": "Source credit of the overnight rates used (euro cash rate, SARON); None when not used."
           },
           "notes": {
             "items": {
@@ -1695,7 +1698,7 @@
           "notes"
         ],
         "title": "CurrencyInfo",
-        "description": "The reference currency of a report that is not in US dollars (written only for those)."
+        "description": "The reference currency, its exchange-rate and rate sources, and notices. Written for a\nreport that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON."
       },
       "DataInfo": {
         "properties": {
@@ -2605,7 +2608,7 @@
                 "type": "null"
               }
             ],
-            "description": "Reference currency of the report when it is not US dollars; absent (not null) for a USD report."
+            "description": "Reference currency of the report when it is not US dollars, or a USD portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report."
           },
           "generated_at": {
             "type": "string",

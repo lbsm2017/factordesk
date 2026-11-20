@@ -593,15 +593,16 @@ export interface components {
         };
         /**
          * CurrencyInfo
-         * @description The reference currency of a report that is not in US dollars (written only for those).
+         * @description The reference currency, its exchange-rate and rate sources, and notices. Written for a
+         *     report that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON.
          */
         CurrencyInfo: {
             /**
              * Reference
              * @description Currency of every figure in the report.
-             * @constant
+             * @enum {string}
              */
-            reference: "EUR";
+            reference: "USD" | "EUR";
             /**
              * Fx Source
              * @description Source credit of the exchange rates used; None when none were needed.
@@ -609,7 +610,7 @@ export interface components {
             fx_source: string | null;
             /**
              * Rate Source
-             * @description Source credit of the euro cash rate (overnight rate); None when not used.
+             * @description Source credit of the overnight rates used (euro cash rate, SARON); None when not used.
              */
             rate_source: string | null;
             /**
@@ -1086,7 +1087,7 @@ export interface components {
              * @description Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report.
              */
             model?: "ff6" | null;
-            /** @description Reference currency of the report when it is not US dollars; absent (not null) for a USD report. */
+            /** @description Reference currency of the report when it is not US dollars, or a USD portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report. */
             currency?: components["schemas"]["CurrencyInfo"] | null;
             /**
              * Generated At
