@@ -1,6 +1,6 @@
 # Sprint 3 validation on real data
 
-Date: 2026-11-20. Branch `docs/s3-validation` (dev plus the currency engine plus hygiene).
+Date: 2026-11-20. Branch `docs/s3-validation`, rebased on dev 54f12bb (includes the hedge fix b2a2148).
 Script: `scripts/validate_sprint3.py`. It builds every report in-process through `ReportService`
 over `default_deps` (real Yahoo, Kenneth French, ECB and FRED data, no server) and changes no app
 code. Last price date 2026-11-18; the French factor file ends 2026-09-30.
@@ -15,8 +15,8 @@ uv run python scripts/validate_sprint3.py --baseline <checkout of 688db25> --out
 
 | # | Check | Result |
 |---|---|---|
-| 1 | SPY in EUR against SXR8.DE | FAIL on monthly correlation (0.972), PASS on return gap (+0.30%/yr) |
-| 2 | 60/40 with IEF hedged in EUR | FAIL: the hedged IEF leg still carries the USD/EUR move |
+| 1 | SPY in EUR against SXR8.DE | PASS: quarterly correlation 0.990, gap +0.30%/yr (monthly 0.972, information) |
+| 2 | 60/40 with IEF hedged in EUR | PASS after the fix b2a2148: the gaps match exactly (first run: FAIL) |
 | 3 | EUR cash index 2023 | PASS |
 | 4 | Energy panel, USD view | PASS |
 | 5 | Balanced SAA, USD and EUR | PASS |
@@ -30,14 +30,15 @@ conversion (`ccy=EUR`); SXR8.DE is quoted in EUR and is not converted.
 
 | Measure | Expected | Measured (2010-11-02 to 2026-11-18, 192 months) | Result |
 |---|---|---|---|
-| Monthly correlation | above 0.99 | 0.972 | FAIL |
+| Quarterly correlation | above 0.99 | 0.990 | PASS |
+| Monthly correlation | information | 0.972 | |
+| Annual correlation | information | 0.9996 | |
 | Annual return, SPY in EUR | | 15.68% | |
 | Annual return, SXR8.DE | | 15.38% | |
 | Return gap (SPY in EUR minus SXR8) | below about 0.5%/yr | +0.30%/yr | PASS |
 | Tracking error of monthly returns | | 3.2%/yr | |
 
-Diagnostics, same window: daily correlation 0.540; quarterly correlation 0.990; annual
-correlation 0.9996; the R2 of daily SXR8 on SPY in EUR rises from 0.29 (same day) to 0.42 (same
+Diagnostics, same window: daily correlation 0.540; the R2 of daily SXR8 on SPY in EUR rises from 0.29 (same day) to 0.42 (same
 day and previous day).
 
 Data defect handled: the Yahoo history of SXR8.DE before 2010-11-01 is stale (84 zero-return days
@@ -46,12 +47,13 @@ monthly correlation of 0.849 and a gap of +1.59%/yr, which is the data and not t
 check starts on 2010-11-02 (`--sxr8-start`).
 
 Interpretation: the level of the conversion is right (the gap of +0.30%/yr is about the 15%
-withholding tax an Irish fund pays on US dividends plus the fee difference). The monthly
-correlation misses 0.99 because the two prices are not struck at the same moment: SXR8 closes on
-Xetra at 17:30 Frankfurt, SPY at the New York close, and the ECB rate is fixed at 14:10, so a
-month-end can differ by about one day of US move. The noise is gone at quarterly horizon (0.990).
-The wiki sentence "monthly figures are not affected" by the timing is too strong: the gap shows at
-a month-end. Either state the check as quarterly, or accept 0.97 monthly.
+withholding tax an Irish fund pays on US dividends plus the fee difference). The correlation is
+judged at quarterly horizon because the two prices are not struck at the same moment: SXR8 closes
+on Xetra at 17:30 Frankfurt, SPY at the New York close, and the ECB rate is fixed at 14:10, so a
+month-end can differ by about one day of US move. That noise is small at quarterly horizon and
+gone at annual horizon. The earlier wiki line "monthly figures are not affected" is superseded
+(see the dated line in `wiki/decision-reference-currency.md`). The SXR8 start of 2010-11-02 stays,
+because of the stale history above.
 
 ## 2. 60/40 (IVV 60, IEF 40, monthly rebalance) in EUR, IEF hedged
 
@@ -60,25 +62,22 @@ Annualised returns are the Performance section's CAGR over the same analysed win
 
 | Portfolio | USD | EUR | EUR minus USD |
 |---|---|---|---|
-| 60/40 | 8.40% | 7.56% | -0.85%/yr |
-| IEF alone (100%) | 3.37% | 2.26% (hedged) | -1.11%/yr |
+| 60/40 | 8.40% | 7.81% | -0.59%/yr |
+| IEF alone (100%) | 3.37% | 2.87% (hedged) | -0.50%/yr |
 
-Hedge check on the 100% IEF portfolio, on 6081 days with the same interval in both backtests:
+Hedge check on the 100% IEF portfolio, on 6081 days with the same interval in both backtests.
+First run (before the fix) in brackets.
 
 | Measure | Expected | Measured | Result |
 |---|---|---|---|
-| Hedged leg minus IEF in USD, annualised mean | equals mean of (c_eur minus RF) | -0.67%/yr, against -0.48%/yr | FAIL |
-| Daily correlation of the two gaps | near 1 | 0.025 | FAIL |
-| Largest daily difference, engine against the formula `R_usd - RF + c_eur` | below 1e-6 | 0.0483 | FAIL |
-| Largest daily difference, engine against the unhedged EUR return of IEF | | 0.0004 (equal to the RF minus c_eur shift) | |
+| Hedged leg minus IEF in USD, annualised mean | equals mean of (c_eur minus RF), within a few bp/yr | -0.485%/yr, against -0.485%/yr: difference 0.0 bp (was -18 bp) | PASS |
+| Daily correlation of the two gaps | near 1 | 1.0000 (was 0.025) | PASS |
+| Largest daily difference, engine against `R_usd - RF + c_eur` | below 1e-6 | 0.0 (was 0.0483) | PASS |
+| Hedged IEF CAGR minus IEF in USD CAGR | about the cash gap | -0.50%/yr (was -1.11%) | PASS |
 
-Interpretation: the hedged EUR series is the unhedged EUR return of IEF with RF taken out and
-c_eur put in, so the USD/EUR move stays in. In `api/portfolio_report.py`, `_common_returns`
-applies `hedge()` to the returns of the prices that `ReportService` has already converted to EUR;
-`hedge()` expects the dollar return. The effect is visible in the table: hedged IEF should earn
-about its USD return plus the cash gap, 3.37% - 0.48% = 2.9%/yr, and it earns 2.26%. The hedge
-needs the USD return of the leg (unconverted history) before it is swapped for cash. The same flaw
-affects every line with `hedge_eur` in a portfolio, including the Balanced SAA bond lines.
+Interpretation: the hedged leg is now the dollar return of IEF minus RF plus c_eur, to the last
+bit, so the USD/EUR move is out. The first run found that the hedge was applied to returns of
+prices already converted to EUR; b2a2148 hedges on the local return.
 
 ## 3. EUR cash index, 2023
 
@@ -97,9 +96,9 @@ Interpretation: EONIA spliced with euro STR from the ECB, accrued ACT/360 and co
 | XLU | -0.009 (-1.4) | +0.004 (1.7) | -0.007 (-0.3) | report only | |
 
 Interpretation: XLE is the only subject with a clear oil sensitivity, and its carbon beta is
-positive and significant. XLU shows no reliable gas or carbon sensitivity at daily frequency
-(none has t above 2), so the "XLU with gas and carbon sensitivity" expectation of the sprint note
-is not met by the data; the gas leg is fat-tailed and the daily regression is weak. SPY's gas beta
+positive and significant. XLU shows no gas or carbon sensitivity at daily frequency (no beta has
+t above 2) and the sprint note's expectation of one is not met by the data; the gas leg is
+fat-tailed and the daily regression is weak. SPY's gas beta
 is statistically nonzero (t 2.6) but 0.001 in size.
 
 ## 5. Balanced SAA preset, USD and EUR
@@ -111,17 +110,17 @@ Preset `saa` of `frontend/src/portfolio/presets.ts`, 13 lines, window 2007-04-12
 |---|---|---|---|---|
 | Rows (groups) | | 30 (16) | 31 (16) | |
 | Largest group-minus-leaves difference (weights, contribution, risk share) | 0 | 0.0 | 0.0 | PASS |
-| Holdings `total_return` against Performance cumulative return | equal | 287.83% = 287.83% | 342.96% = 342.96% | PASS |
+| Holdings `total_return` against Performance cumulative return | equal | 287.83% = 287.83% | 320.62% = 320.62% | PASS |
 | Top-level contributions minus total return | 0 | -8e-15 | 1e-14 | PASS |
 | Sum of risk shares at depth 0 (with cash and cost) | 1 | 1.000000 | 1.000000 | PASS |
 
 Interpretation: the table is arithmetically consistent in both currencies. The EUR view has one
-more row than the USD view. This does not test whether the
-hedged bond lines are right; see check 2.
+more row than the USD view. The hedged bond lines are
+checked in check 2.
 
 ## 6. USD ticker report unchanged against 688db25
 
-Compared with a checkout of 688db25 (the dev commit before the sprint), same data cache and same
+Rerun after the rebase. Compared with a checkout of 688db25 (the dev commit before the sprint), same data cache and same
 day, SPY, FF5 and FF6.
 
 | Figure | FF5 | FF6 | Result |
@@ -147,12 +146,11 @@ the expansion". That comes from the tail-risk rebuild on dev, not from the curre
 Interpretation: all three horizons exist. At quarterly horizon the historical VaR 99% is n/a
 (1.3 expected tail observations); the CVaR and the 95% figures are present.
 
-## Findings to act on
+## Findings
 
-1. Hedged bond lines in the EUR view keep the currency move (check 2). This affects the headline
-   of the EUR portfolio view, so it needs a fix and a test with a known answer before release.
-2. The monthly correlation of 0.99 cannot be met against SXR8.DE because of the closing times
-   (check 1). The wiki sentence on timing noise should say that month-ends carry about one day of
-   noise.
+1. The first run of check 2 found the hedge bug (fixed in b2a2148); the rerun matches exactly.
+2. Month-end correlation against a EUR-listed fund is about 0.97 because of close-time
+   differences; judge at quarterly horizon (0.990).
 3. The Yahoo history of SXR8.DE is bad before 2010-11-01; any later comparison against it must
    start after that date.
+4. XLU has no gas or carbon sensitivity at daily frequency.

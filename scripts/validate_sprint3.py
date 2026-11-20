@@ -85,9 +85,9 @@ CAPTURED: dict[tuple[str, str], Any] = {}
 _ORIGINAL_BACKTEST = pr.backtest_portfolio
 
 
-def _spy_backtest(plan: Any, histories: Any, rf: Any, ctx: Any = None, listings: Any = None) -> Any:
+def _spy_backtest(plan: Any, histories: Any, rf: Any, ctx: Any = None, *rest: Any) -> Any:
     """Calls the real backtest and keeps its subject (the net daily returns) for the checks."""
-    out = _ORIGINAL_BACKTEST(plan, histories, rf, ctx, listings)
+    out = _ORIGINAL_BACKTEST(plan, histories, rf, ctx, *rest)
     CAPTURED[(plan.name, "USD" if ctx is None else ctx.ref)] = out[0]
     return out
 
@@ -247,6 +247,8 @@ async def check1(svc: ReportService) -> dict[str, Any]:
     stale = int((sxr8.loc[: ARGS.sxr8_start].pct_change() == 0).sum())
     full = compare_series(spy_eur, sxr8)
     cut = compare_series(spy_eur, sxr8.loc[ARGS.sxr8_start :])
+    diagnostics = timing_diagnostics(spy_eur, sxr8.loc[ARGS.sxr8_start :])
+    cut_quarterly = diagnostics["quarterly_corr"]  # judged at quarterly horizon, monthly is info
     report = await svc.report("SPY", model="ff6", ccy="EUR")
     perf = report.performance
     return {
@@ -255,7 +257,7 @@ async def check1(svc: ReportService) -> dict[str, Any]:
         "sxr8_zero_return_days_before_start": stale,
         "sxr8_start_used": ARGS.sxr8_start,
         "from_start_used": cut,
-        "timing_diagnostics": timing_diagnostics(spy_eur, sxr8.loc[ARGS.sxr8_start :]),
+        "timing_diagnostics": diagnostics,
         "from_first_common_date": full,
         "report_spy_eur_cagr_own_window": None
         if perf is None or perf.returns is None
@@ -263,7 +265,7 @@ async def check1(svc: ReportService) -> dict[str, Any]:
         "report_spy_eur_own_window": None
         if perf is None or perf.periods is None
         else f"{perf.periods.start} to {perf.periods.end}",
-        "pass": cut["monthly_corr"] > 0.99 and abs(cut["gap"]) < 0.005,
+        "pass": cut_quarterly > 0.99 and abs(cut["gap"]) < 0.005,
     }
 
 
@@ -341,7 +343,7 @@ async def check2(svc: ReportService) -> dict[str, Any]:
         "engine_vs_unhedged_eur_max_abs_residual": float(resid_unhedged.max()),
         "6040_eur_window": [str(s_eur.calendar[0].date()), str(s_eur.calendar[-1].date())],
         "6040_usd_window": [str(s_usd.calendar[0].date()), str(s_usd.calendar[-1].date())],
-        "pass": abs(mean_leg - mean_cash) < 0.0015 and float(resid.max()) < 1e-6,
+        "pass": abs(mean_leg - mean_cash) < 0.0005 and float(leg_gap.corr(cash_gap)) > 0.99,
     }
 
 

@@ -64,6 +64,7 @@ The euro view starts in January 1999. Days without an ECB rate (euro-area bank h
 ## What it costs us
 
 - The ECB rate is fixed at 14:10 Frankfurt time, about 8 hours before the US close. Daily euro returns of US assets therefore carry some timing noise. Monthly figures are not affected.
+- On 2026-11-20 the validation on real data ([results](../docs/research/sprint-3-validation.md)) found a monthly correlation of 0.972 between SPY in euros and SXR8.DE, a euro-listed S&P 500 fund. The cause is the difference in closing times: Xetra closes at 17:30 Frankfurt, New York later, and the ECB rate is fixed at 14:10, so a month-end can differ by about one day of US move. The correlation is 0.990 over quarters and 0.9996 over years, and the annual return gap is +0.30%. The earlier claim "Monthly figures are not affected" is superseded.
 - The factors stay US factors, converted into euros. Regional factor files (see [European mode](decision-european-mode-and-currency.md)) remain a separate, later decision.
 - CHF cash on SARON, and hedging for multi-currency bond funds, are not in scope.
 
