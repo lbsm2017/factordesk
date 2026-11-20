@@ -6,7 +6,7 @@
 import type { FactorReport, FactorStat, PerformanceSection, WorldBetaSection } from "../api/types";
 import { dateLong, num, pct, signed } from "../format";
 import { countWord, factorCount } from "../report/derive";
-import { TILT } from "./plain";
+import { isLean, TILT } from "./plain";
 
 const STYLE_ORDER = ["SMB", "HML", "RMW", "CMA"] as const;
 const WORD_LIMIT = 40;
@@ -70,7 +70,8 @@ function reliableTilts(report: FactorReport): Tilt[] {
   for (const name of STYLE_ORDER) {
     const f = factorOf(report, name);
     const pair = TILT[name];
-    if (!f || !pair || f.tag !== "reliable" || !fin(f.beta) || f.beta === 0) continue;
+    // The lean floor of the exposures reading: reliable and not negligible (|beta| >= MIN_LEAN).
+    if (!f || !pair || !isLean(f) || !fin(f.beta)) continue;
     out.push({ name, text: pair[f.beta > 0 ? 0 : 1], abs: Math.abs(f.beta) });
   }
   return out;

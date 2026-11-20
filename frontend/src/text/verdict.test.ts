@@ -53,10 +53,10 @@ function setFactor(r: FactorReport, name: string, patch: { beta?: number; tag?: 
 }
 
 describe("verdict (DV4.4, appendix A)", () => {
-  it("A.1: the mock fixture, with the gate hedge", () => {
+  it("A.1: the mock fixture, with the gate hedge (its RMW beta, 0.027, is under the lean floor)", () => {
     const v = verdict(mockReport);
     expect(v.headline).toBe(
-      "SPY moves with the market (about one-for-one), leans toward large companies and highly profitable firms, and shows no reliable return beyond its exposures.",
+      "SPY moves with the market (about one-for-one), leans toward large companies, and shows no reliable return beyond its exposures.",
     );
     expect(v.hedge).toBe(HEDGE);
     expect(v.text).toBe(`${v.headline} ${HEDGE}`);
@@ -81,7 +81,7 @@ describe("verdict (DV4.4, appendix A)", () => {
     });
     const v = verdict(r);
     expect(v.text).toBe(
-      "The price audit found errors in SPY's prices, so these results are not interpretable until the errors are explained. Taken at face value, SPY moves with the market (about one-for-one) and leans toward large companies and highly profitable firms.",
+      "The price audit found errors in SPY's prices, so these results are not interpretable until the errors are explained. Taken at face value, SPY moves with the market (about one-for-one) and leans toward large companies.",
     );
     expect(v.hedge).toBeNull();
   });
@@ -93,7 +93,7 @@ describe("verdict (DV4.4, appendix A)", () => {
       x.quality_gate.fired = false;
     });
     expect(verdict(r).text).toBe(
-      "SPY moves with the market (about one-for-one), leans toward large companies and highly profitable firms, and earned 3.4% a year less than its exposures explain over this range.",
+      "SPY moves with the market (about one-for-one), leans toward large companies, and earned 3.4% a year less than its exposures explain over this range.",
     );
   });
 
@@ -107,9 +107,9 @@ describe("verdict (DV4.4, appendix A)", () => {
     });
     const v = verdict(r);
     expect(v.text).toBe(
-      "SPY amplifies market moves (about 1.42 times as much), leans toward large companies, growth stocks and highly profitable firms, and earned 5.2% a year more than its exposures explain over this range.",
+      "SPY amplifies market moves (about 1.42 times as much), leans toward large companies and growth stocks, and earned 5.2% a year more than its exposures explain over this range.",
     );
-    expect(v.text.split(" ").length).toBe(32);
+    expect(v.text.split(" ").length).toBe(29);
   });
 
   it("keeps the longest headline within 40 words by naming only the largest tilts", () => {
@@ -129,6 +129,20 @@ describe("verdict (DV4.4, appendix A)", () => {
     expect(v.headline).toContain("tends to move against the market (about 0.50 times as much, in the opposite direction)");
   });
 
+  it("applies the lean floor: a reliable but negligible style beta is not a tilt", () => {
+    const r = edit((x) => {
+      for (const f of x.regression.factors) f.tag = "reliable";
+      setFactor(x, "SMB", { beta: -0.01 });
+      setFactor(x, "HML", { beta: 0.049 });
+      setFactor(x, "RMW", { beta: 0.05 });
+      setFactor(x, "CMA", { beta: 0 });
+      x.quality_gate.fired = false;
+    });
+    const { headline } = verdict(r);
+    expect(headline).toContain("leans toward highly profitable firms");
+    expect(headline).not.toMatch(/large companies|small companies|value stocks|growth stocks/);
+  });
+
   it("says a failed fit in words and never claims a result", () => {
     const r = edit((x) => {
       x.regression.status = "insufficient_data";
@@ -143,7 +157,7 @@ describe("verdict (DV4.4, appendix A)", () => {
       x.regression.alpha_annual = null;
       x.quality_gate.fired = false;
     });
-    expect(verdict(r).headline).toBe("SPY leans toward large companies and highly profitable firms.");
+    expect(verdict(r).headline).toBe("SPY leans toward large companies.");
   });
 });
 
