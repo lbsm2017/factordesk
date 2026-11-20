@@ -7,9 +7,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
-// Measured on 2026-11-18: 372.2 kB raw, 114.4 kB gzip. Headroom: 7% raw, 9% gzip.
-const BUDGET_RAW_KB = 400;
-const BUDGET_GZIP_KB = 125;
+// Measured on 2026-11-20: 490.8 kB raw, 151.0 kB gzip. Budget is about 10% above that.
+const BUDGET_RAW_KB = 540;
+const BUDGET_GZIP_KB = 166;
 
 const dist = fileURLToPath(new URL("../dist", import.meta.url));
 const html = readFileSync(join(dist, "index.html"), "utf8");

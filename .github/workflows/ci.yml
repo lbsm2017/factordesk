@@ -68,6 +68,9 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      # The initial JavaScript must stay inside the budget set in frontend/scripts/size.mjs.
+      - run: npm run size
+        working-directory: frontend
       # The committed OpenAPI document and generated types must match the backend models.
       - run: uv sync --locked
       - run: uv run python -m factordesk.api.openapi_dump frontend/src/api/openapi.json
