@@ -117,7 +117,7 @@ def _dir(data_dir: Path | None) -> Path:
     return Path(base) / "fred"
 
 
-def _atomic_write(path: Path, text: str) -> None:
+def atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
     os.close(fd)
@@ -130,7 +130,7 @@ def _atomic_write(path: Path, text: str) -> None:
         raise
 
 
-def _cached_files(fdir: Path, series_id: str) -> list[Path]:
+def cached_files(fdir: Path, series_id: str) -> list[Path]:
     """Cache files of the series, newest day last."""
     pattern = re.compile(rf"^{re.escape(series_id)}_\d{{4}}-\d{{2}}-\d{{2}}\.csv$")
     if not fdir.is_dir():
@@ -174,8 +174,8 @@ def load_fred_series(
         _FAILED[memo] = reason
         return _from_old_cache(fdir, series_id, reason)
     try:
-        _atomic_write(today_file, text)
-        for old in _cached_files(fdir, series_id):
+        atomic_write(today_file, text)
+        for old in cached_files(fdir, series_id):
             if old != today_file:
                 old.unlink(missing_ok=True)
     except OSError:
@@ -184,7 +184,7 @@ def load_fred_series(
 
 
 def _from_old_cache(fdir: Path, series_id: str, why: str) -> FredSeries:
-    for path in reversed(_cached_files(fdir, series_id)):
+    for path in reversed(cached_files(fdir, series_id)):
         try:
             values = parse_fred_csv(path.read_text("utf-8"), series_id)
         except (FredError, OSError):
