@@ -1,6 +1,8 @@
 import { useId, useState } from "react";
 import type { DragEvent } from "react";
 import type { GrossNet, UploadInput } from "../../api/queries";
+import { CURRENCIES } from "../../state/currency";
+import type { Currency } from "../../state/currency";
 
 export interface TrackRecordInputProps {
   /** An upload is running. */
@@ -18,14 +20,15 @@ const NEED_FILE = "Choose a CSV file first.";
 
 /**
  * The track-record controls in the sidebar: a drop zone for the CSV (a native file input laid over
- * the zone, so click, keyboard and drag and drop all work), a name, the fee basis as a segmented
- * control like the date range, and the run button. The file is sent to the server and held there in
+ * the zone, so click, keyboard and drag and drop all work), a name, the fee basis and the currency
+ * of the record as segmented controls like the date range, and the run button. The file is sent to the server and held there in
  * memory for the one request only; this component never reads it.
  */
 export function TrackRecordInput({ busy, onRun }: TrackRecordInputProps) {
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [grossNet, setGrossNet] = useState<GrossNet>("");
+  const [recordCurrency, setRecordCurrency] = useState<Currency>("USD");
   const [over, setOver] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const hintId = useId();
@@ -51,7 +54,7 @@ export function TrackRecordInput({ busy, onRun }: TrackRecordInputProps) {
           setMessage(NEED_FILE);
           return;
         }
-        onRun({ file, name, grossNet });
+        onRun({ file, name, grossNet, recordCurrency });
       }}
     >
       <div className="side-group">
@@ -106,6 +109,23 @@ export function TrackRecordInput({ busy, onRun }: TrackRecordInputProps) {
                   onChange={() => setGrossNet(value)}
                 />
                 <span>{label}</span>
+              </label>
+            ))}
+          </span>
+        </fieldset>
+        <fieldset className="ctl-range">
+          <legend className="side-label">Record is in</legend>
+          <span className="seg-range">
+            {CURRENCIES.map((value) => (
+              <label key={value} className="seg-opt">
+                <input
+                  type="radio"
+                  name="record-currency"
+                  value={value}
+                  checked={recordCurrency === value}
+                  onChange={() => setRecordCurrency(value)}
+                />
+                <span>{value}</span>
               </label>
             ))}
           </span>

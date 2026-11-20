@@ -26,5 +26,7 @@
   "tail_risk": {},
   "alpha_strip": {},
   "portfolio_backtest": {},
-  "macro": {}
+  "holdings": {},
+  "macro": {},
+  "energy": {}
 }

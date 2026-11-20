@@ -9,9 +9,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Literal
 
 import pandas as pd
 
+from factordesk.analytics.backtest import BacktestResult
 from factordesk.analytics.diagnostics import DiagnosticsResult, GateResult, MultiDayFit
 from factordesk.analytics.regression import FullSampleRegression
 from factordesk.analytics.rolling import RollingBetas
@@ -51,6 +53,43 @@ class WorldBenchmarkInput:
     note: str | None = None
 
 
+USD_CASH_LEAF = "usd_cash"
+"""Backtest leaf of the USD cash instruments in the EUR view (their return is converted); the
+unallocated weight stays in the backtest's own cash leaf, which is euro cash in that view."""
+
+
+@dataclass(frozen=True)
+class HoldingsNode:
+    """One group or holding of the portfolio tree, as the holdings table lists it."""
+
+    id: str
+    """A holding: its backtest leaf id (``i:<tree id>``). A group: ``g:<tree id>``."""
+    kind: Literal["group", "holding"]
+    label: str
+    ticker: str | None
+    parent_id: str | None
+    """The group that contains this node; ``None`` for an asset class."""
+    depth: int
+    """0 for an asset class, 1 for a sub-asset class, 2 for a holding."""
+    path: tuple[str, ...]
+    """Group ids from the asset class down to this node's own group. For a group the path ends
+    with its own id; for a holding it is the path of its parent group."""
+
+
+@dataclass(frozen=True)
+class HoldingsInput:
+    """The backtest and the tree layout the holdings section is built from.
+
+    ``nodes`` are the groups and the holdings that took part in the backtest, in tree order (a
+    group before its members). A group with no holding above 0 is not listed. Cash and the
+    trading cost are not nodes: the backtest has one cash leaf, and the section adds both as rows
+    of their own.
+    """
+
+    backtest: BacktestResult
+    nodes: tuple[HoldingsNode, ...]
+
+
 @dataclass(frozen=True)
 class PortfolioBacktestInput:
     """What the backtest of a portfolio subject says about itself (read by the
@@ -73,6 +112,10 @@ class PortfolioBacktestInput:
     unallocated_weight: float
     survivorship_note: str
     weights: tuple[tuple[str, str | None, float], ...]
+    holdings: HoldingsInput | None = None
+    """The backtest and tree layout behind the holdings section (read by the ``holdings`` hook)."""
+    unallocated_currency: str | None = None
+    """``"EUR"`` when the unallocated weight is held as euro cash (the EUR view); ``None``: USD."""
 
 
 @dataclass(frozen=True)
@@ -102,6 +145,44 @@ class MacroInput:
 
 
 @dataclass(frozen=True)
+class SeriesInput:
+    """The levels of one FRED series, or why there are none (same shape as ``DollarInput``).
+
+    ``levels`` is ``None`` when the series could not be fetched and no cached copy exists.
+    ``note`` is set when an older cached copy was used.
+    """
+
+    levels: pd.Series | None
+    unavailable_reason: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class EnergyInput:
+    """The data of the energy section: Brent and Henry Hub spot prices and the KRBN history.
+
+    ``carbon`` is the KRBN history (or the reason it is missing), as for the macro funds.
+    """
+
+    oil: SeriesInput
+    gas: SeriesInput
+    carbon: WorldBenchmarkInput
+
+
+@dataclass(frozen=True)
+class ReferenceInput:
+    """What the macro and energy sections need in the EUR view.
+
+    ``fx_returns(calendar)`` is the return of one US dollar in euros over each interval of the
+    subject's calendar (origin first), indexed by ``calendar[1:]``. ``usd_rf`` is the French
+    (US dollar) risk-free return on the factor frame's dates; the euro frame's ``RF`` is euro cash.
+    """
+
+    fx_returns: Callable[[pd.DatetimeIndex], pd.Series]
+    usd_rf: pd.Series
+
+
+@dataclass(frozen=True)
 class SectionInputs:
     """Data a section needs that ``assemble_report`` does not already have.
 
@@ -122,6 +203,11 @@ class SectionInputs:
     macro: MacroInput | None = None
     """Fund prices and the dollar index of the macro section; ``None``: not fetched, the section
     does not run. Owned by the macro feature."""
+    energy: EnergyInput | None = None
+    """Brent, Henry Hub and KRBN of the energy section; ``None``: not fetched, the section does
+    not run. Owned by the energy feature."""
+    reference: ReferenceInput | None = None
+    """The EUR view of the macro and energy sections; ``None``: the US-dollar view."""
 
 
 @dataclass(frozen=True)

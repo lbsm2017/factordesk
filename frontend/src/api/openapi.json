@@ -182,6 +182,16 @@
               }
             }
           },
+          "400": {
+            "description": "The request has no file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "413": {
             "description": "The file is larger than 1 MB.",
             "content": {
@@ -487,7 +497,7 @@
     "/api/report/{ticker}": {
       "get": {
         "summary": "Get Report",
-        "description": "The factor report for a range preset or custom dates (neither: Full history).",
+        "description": "The factor report for a range preset or custom dates (neither: Full history).\n\n``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro\nrate, factors converted. The report then carries a ``currency`` block. 503 when the\nexchange rates or the euro rate cannot be reached (the USD view does not need them).",
         "operationId": "get_report_api_report__ticker__get",
         "parameters": [
           {
@@ -576,6 +586,22 @@
               "title": "Model"
             },
             "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum)."
+          },
+          {
+            "name": "ccy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "USD",
+                "EUR"
+              ],
+              "type": "string",
+              "description": "Reference currency of every figure: USD (default) or EUR.",
+              "default": "USD",
+              "title": "Ccy"
+            },
+            "description": "Reference currency of every figure: USD (default) or EUR."
           }
         ],
         "responses": {
@@ -1566,6 +1592,26 @@
             "title": "Model",
             "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
             "default": "ff5"
+          },
+          "record_currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Record Currency",
+            "description": "Currency of the record itself: USD (default) or EUR.",
+            "default": "USD"
+          },
+          "ccy": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Ccy",
+            "description": "Reference currency of the report: USD or EUR.",
+            "default": "USD"
           }
         },
         "type": "object",
@@ -1598,6 +1644,58 @@
         ],
         "title": "CorrPair",
         "description": "A factor pair whose sample correlation exceeds 0.6 in absolute value (M3.4)."
+      },
+      "CurrencyInfo": {
+        "properties": {
+          "reference": {
+            "type": "string",
+            "const": "EUR",
+            "title": "Reference",
+            "description": "Currency of every figure in the report."
+          },
+          "fx_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Source",
+            "description": "Source credit of the exchange rates used; None when none were needed."
+          },
+          "rate_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Source",
+            "description": "Source credit of the euro cash rate (overnight rate); None when not used."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "Plain-words notices: dates dropped for lack of an exchange rate, sections left out in this currency, a source that fell back to its second choice."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reference",
+          "fx_source",
+          "rate_source",
+          "notes"
+        ],
+        "title": "CurrencyInfo",
+        "description": "The reference currency of a report that is not in US dollars (written only for those)."
       },
       "DataInfo": {
         "properties": {
@@ -1960,6 +2058,397 @@
         "title": "DrawdownSeries",
         "description": "The fall from the running peak at every date of the compounded return path, for a chart."
       },
+      "EnergyLeg": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker",
+            "description": "FRED series id or Yahoo ticker."
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "mkt_rf",
+              "oil",
+              "gas",
+              "co2"
+            ],
+            "title": "Code"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "What it feeds, for example \"OIL = log change of Brent\"."
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date",
+            "description": "First price date; None when not fetched."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "code",
+          "role",
+          "first_date"
+        ],
+        "title": "EnergyLeg",
+        "description": "One price series behind a leg, with its first date."
+      },
+      "EnergyModel": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "long",
+              "carbon"
+            ],
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "\"Market, oil and gas\" or \"Market, oil, gas and carbon\"."
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Short-sample label of the carbon model; None otherwise."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Rows of the regression."
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start",
+            "description": "First date of the regression."
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End",
+            "description": "Last date of the regression."
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lag of the fit."
+          },
+          "t_reference": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "student_t"
+            ],
+            "title": "T Reference"
+          },
+          "r2": {
+            "type": "number",
+            "title": "R2"
+          },
+          "adj_r2": {
+            "type": "number",
+            "title": "Adj R2"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EnergyRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Market, oil, gas (and carbon)."
+          },
+          "gas_robust": {
+            "$ref": "#/components/schemas/GasRobustness"
+          },
+          "window_limited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Limited By",
+            "description": "The leg whose first date starts the window, when it is later than the subject's own start; None otherwise."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "label",
+          "n_obs",
+          "start",
+          "end",
+          "hac_lags",
+          "t_reference",
+          "r2",
+          "adj_r2",
+          "rows",
+          "gas_robust",
+          "window_limited_by"
+        ],
+        "title": "EnergyModel",
+        "description": "One regression of the section."
+      },
+      "EnergyRow": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "mkt_rf",
+              "oil",
+              "gas",
+              "co2"
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name: \"Mkt-RF\", \"OIL\", \"GAS\", \"CO2\"."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Plain label: Market, Oil, Natural gas, Carbon."
+          },
+          "definition": {
+            "type": "string",
+            "title": "Definition",
+            "description": "How the leg is built."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Caveat on the leg."
+          },
+          "beta": {
+            "type": "number",
+            "title": "Beta",
+            "description": "Raw sensitivity: excess return per 1.00 of the leg return."
+          },
+          "se": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Se",
+            "description": "Newey-West HAC standard error of beta."
+          },
+          "t": {
+            "type": "number",
+            "title": "T",
+            "description": "HAC t-statistic of beta."
+          },
+          "p": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P",
+            "description": "Two-sided p-value of t."
+          },
+          "ci_low": {
+            "type": "number",
+            "title": "Ci Low",
+            "description": "Lower end of the 95% interval, beta - q * se."
+          },
+          "ci_high": {
+            "type": "number",
+            "title": "Ci High",
+            "description": "Upper end of the 95% interval, beta + q * se."
+          },
+          "tag": {
+            "type": "string",
+            "enum": [
+              "reliable",
+              "noise"
+            ],
+            "title": "Tag",
+            "description": "Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the legs of this model."
+          },
+          "vif": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Vif",
+            "description": "Variance inflation factor among the legs."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "label",
+          "definition",
+          "note",
+          "beta",
+          "se",
+          "t",
+          "p",
+          "ci_low",
+          "ci_high",
+          "tag",
+          "vif"
+        ],
+        "title": "EnergyRow",
+        "description": "One leg of an energy regression."
+      },
+      "EnergySection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "model_note": {
+            "type": "string",
+            "title": "Model Note",
+            "description": "Fixed note: separate regression, raw sensitivities."
+          },
+          "gas_note": {
+            "type": "string",
+            "title": "Gas Note",
+            "description": "Caveat on the fat-tailed gas leg."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Frequency"
+          },
+          "n_sample": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Sample",
+            "description": "Rows of the analysis sample before the legs."
+          },
+          "long_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnergyModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Market, oil, gas; None unless ok."
+          },
+          "carbon_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnergyModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Market, oil, gas, carbon; None when hidden (see carbon_note)."
+          },
+          "carbon_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carbon Note",
+            "description": "Why the carbon model is not shown; None if shown."
+          },
+          "fred_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fred Note",
+            "description": "Set when an older cached copy of Brent or Henry Hub was used (FRED could not be reached); None otherwise."
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/EnergyLeg"
+            },
+            "type": "array",
+            "title": "Legs",
+            "description": "The series behind the legs, with first dates."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "model_note",
+          "gas_note",
+          "frequency",
+          "n_sample",
+          "long_model",
+          "carbon_model",
+          "carbon_note",
+          "fred_note",
+          "legs"
+        ],
+        "title": "EnergySection",
+        "description": "Sensitivity to oil, gas and carbon prices, after the market."
+      },
       "ExcludedRow": {
         "properties": {
           "date": {
@@ -2106,6 +2595,17 @@
             ],
             "title": "Model",
             "description": "Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reference currency of the report when it is not US dollars; absent (not null) for a USD report."
           },
           "generated_at": {
             "type": "string",
@@ -2285,6 +2785,17 @@
             ],
             "description": "How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio."
           },
+          "holdings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldingsSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Holdings table of a portfolio: target and end weight, return contribution and risk share of each holding, group, cash and trading cost over the analysed window; absent (not null) for every subject except a portfolio."
+          },
           "macro": {
             "anyOf": [
               {
@@ -2295,6 +2806,17 @@
               }
             ],
             "description": "Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed."
+          },
+          "energy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnergySection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Energy and carbon sensitivities: a separate regression on the market and oil, gas and (on a short sample) carbon price legs; absent (not null) when not computed."
           }
         },
         "additionalProperties": false,
@@ -2532,6 +3054,64 @@
         "title": "FragilitySection",
         "description": "Flip counts, leave-one-year-out table and influential days (FR0.1). In-sample, ``T_end``."
       },
+      "GasRobustness": {
+        "properties": {
+          "beta": {
+            "type": "number",
+            "title": "Beta",
+            "description": "Gas beta without the excluded rows."
+          },
+          "se": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Se"
+          },
+          "t": {
+            "type": "number",
+            "title": "T"
+          },
+          "p": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P"
+          },
+          "n_excluded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Excluded",
+            "description": "Rows left out: the largest absolute gas returns."
+          },
+          "excluded_dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Excluded Dates",
+            "description": "Dates of the rows left out, largest first."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Rows of this second fit."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "beta",
+          "se",
+          "t",
+          "p",
+          "n_excluded",
+          "excluded_dates",
+          "n_obs"
+        ],
+        "title": "GasRobustness",
+        "description": "The gas sensitivity of the same model fitted without the largest gas moves."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2570,6 +3150,205 @@
         ],
         "title": "Health",
         "description": "Liveness answer; reads no disk and no network."
+      },
+      "HoldingRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique in the section. A holding is i:<tree id>, a group g:<tree id>; cash and trading cost are cash and cost."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "group",
+              "holding",
+              "cash",
+              "cost"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Display name of the holding, group, cash or cost line."
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "Yahoo ticker of a holding; None for every other row."
+          },
+          "depth": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Depth",
+            "description": "0 asset class, cash or cost; 1 sub-asset class; 2 holding."
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Id of the group that contains the row; None at depth 0."
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight",
+            "description": "Weight the portfolio rebalances to; None for the trading cost row."
+          },
+          "end_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Weight",
+            "description": "Weight on the last day of the window, after drift; None for the cost row."
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution",
+            "description": "Frongello-linked contribution to the portfolio's net return over the window, as a decimal fraction (negative for the cost row)."
+          },
+          "risk_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share",
+            "description": "Ex-post share of the portfolio's variance; None when the section's risk_share_reason says it is not defined."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "ticker",
+          "depth",
+          "parent_id",
+          "target_weight",
+          "end_weight",
+          "contribution",
+          "risk_share"
+        ],
+        "title": "HoldingRow",
+        "description": "One line of the holdings table."
+      },
+      "HoldingsSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Window Start",
+            "description": "First day of the analysed window."
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Window End",
+            "description": "Last day of the analysed window."
+          },
+          "n_days": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "N Days",
+            "description": "Daily portfolio returns in the window."
+          },
+          "total_return": {
+            "type": "number",
+            "title": "Total Return",
+            "description": "Net compounded return of the portfolio over the window; the contributions of the rows with no parent add up to it."
+          },
+          "risk_share_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share Reason",
+            "description": "Plain-words reason when no risk share is defined; None when they are."
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Table rows in tree order, then cash, then cost."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "window_start",
+          "window_end",
+          "n_days",
+          "total_return",
+          "risk_share_reason",
+          "rows"
+        ],
+        "title": "HoldingsSection",
+        "description": "The holdings table of a portfolio report. Status is always ``ok`` when it exists."
       },
       "Instrument": {
         "properties": {
@@ -3063,6 +3842,18 @@
             ],
             "title": "Currency",
             "description": "Quote currency of the proxy."
+          },
+          "hedge_eur": {
+            "type": "boolean",
+            "title": "Hedge Eur",
+            "description": "True for a bond line with only US-dollar underlying: the EUR view hedges it to euros (its return above US cash, plus euro cash).",
+            "default": false
+          },
+          "multi_currency": {
+            "type": "boolean",
+            "title": "Multi Currency",
+            "description": "True for a bond fund that holds several currencies: the EUR view leaves it unhedged and says so.",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -3075,7 +3866,9 @@
           "proxy_kind",
           "note",
           "first_date",
-          "currency"
+          "currency",
+          "hedge_eur",
+          "multi_currency"
         ],
         "title": "LibraryLine",
         "description": "One sub-asset class of the owner's Asset Class Library and the proxy that stands for it."
@@ -4264,7 +5057,20 @@
             "maximum": 1.0,
             "minimum": 0.0,
             "title": "Unallocated Weight",
-            "description": "Weight left over by the targets; held in USD cash."
+            "description": "Weight left over by the targets; held in USD cash, or as euro cash when unallocated_currency says so."
+          },
+          "unallocated_currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "EUR"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Currency",
+            "description": "EUR when the unallocated weight is held as euro cash (the EUR view); absent (not null) in the USD view, where it is held in USD cash."
           },
           "survivorship_note": {
             "type": "string",
@@ -4323,6 +5129,16 @@
             "minimum": 0.0,
             "title": "Cost Bps",
             "description": "Cost per unit of turnover."
+          },
+          "reference_currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Reference Currency",
+            "description": "Currency of the backtest and of every figure of the report; left out of the JSON when USD.",
+            "default": "USD"
           },
           "root": {
             "$ref": "#/components/schemas/RootGroup"
@@ -8104,7 +8920,7 @@
           "indicative": {
             "type": "boolean",
             "title": "Indicative",
-            "description": "True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5]: the value is shown, as an indication only."
+            "description": "True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5], or that differs from the historical figure by more than 50% of it: the value is shown, as an indication only (reason says which)."
           },
           "band": {
             "anyOf": [
@@ -8183,6 +8999,76 @@
         "title": "TailFigureInfo",
         "description": "One VaR or CVaR figure: one method, one measure, one confidence level."
       },
+      "TailHorizon": {
+        "properties": {
+          "horizon": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly",
+              "quarterly"
+            ],
+            "title": "Horizon"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the horizon has no figures; None when ok."
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TailSeriesStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "figures": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TailFigureInfo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figures",
+            "description": "Same order as TailRiskSection.figures; the 95% rows exist for monthly and quarterly horizons only."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "horizon",
+          "status",
+          "reason",
+          "series",
+          "figures"
+        ],
+        "title": "TailHorizon",
+        "description": "The tail risk figures of one horizon (one day, one month or one quarter).\n\nStatuses: ``ok``; ``insufficient_data`` (fewer than 12 complete periods); ``failed`` (the\nperiodic returns have no usable tail statistic). A horizon that is not ok holds no part."
+      },
       "TailRiskSection": {
         "properties": {
           "status": {
@@ -8250,6 +9136,21 @@
             ],
             "title": "Figures",
             "description": "Every figure: levels in the order VaR 99%, CVaR 97.5%, then (monthly only) VaR 95% and CVaR 95%; within a level historical, Gaussian, Cornish-Fisher."
+          },
+          "by_horizon": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TailHorizon"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By Horizon",
+            "description": "The figures of every horizon the series supports, in the order daily, monthly, quarterly (daily only for a daily series). The horizon that equals `frequency` repeats the top-level figures exactly. Absent (not null) for a section that is not ok, or in reports made before this field existed."
           }
         },
         "additionalProperties": false,
@@ -8271,7 +9172,7 @@
             "type": "integer",
             "minimum": 1.0,
             "title": "N Obs",
-            "description": "Returns used (days or months)."
+            "description": "Returns used (days, months or quarters)."
           },
           "mean": {
             "type": "number",
@@ -8300,7 +9201,7 @@
               "stationary"
             ],
             "title": "Bootstrap",
-            "description": "iid for monthly series; stationary block bootstrap for daily series."
+            "description": "iid for monthly and quarterly series; stationary block bootstrap for daily series."
           },
           "mean_block_length": {
             "anyOf": [

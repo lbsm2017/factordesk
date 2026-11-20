@@ -21,6 +21,7 @@ from factordesk.report.schema import (
     FactorReport,
     RangeOptions,
     RangePreset,
+    ReferenceCurrency,
 )
 
 router = APIRouter(prefix="/api/report")
@@ -50,6 +51,12 @@ Model = Annotated[
 ]
 
 
+Ccy = Annotated[
+    ReferenceCurrency,
+    Query(description="Reference currency of every figure: USD (default) or EUR."),
+]
+
+
 @router.get("/{ticker}/ranges", responses=_ERRORS)
 async def get_ranges(ticker: str, service: Service) -> RangeOptions:
     """Availability of every range preset for this ticker, with the reason when one is short."""
@@ -64,9 +71,15 @@ async def get_report(
     start: Start = None,
     end: End = None,
     model: Model = "ff5",
+    ccy: Ccy = "USD",
 ) -> FactorReport:
-    """The factor report for a range preset or custom dates (neither: Full history)."""
-    return await service.report(check_ticker(ticker), preset, start, end, model)
+    """The factor report for a range preset or custom dates (neither: Full history).
+
+    ``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro
+    rate, factors converted. The report then carries a ``currency`` block. 503 when the
+    exchange rates or the euro rate cannot be reached (the USD view does not need them).
+    """
+    return await service.report(check_ticker(ticker), preset, start, end, model, ccy)
 
 
 @router.get(

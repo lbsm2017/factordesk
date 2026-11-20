@@ -14,8 +14,12 @@ Declarations:
 * world beta: daily only (ACWI and IEUR prices are daily), every model.
 * tail risk (VaR and CVaR): every subject, every frequency, every model.
 * portfolio backtest: portfolio subjects only (it describes the backtest behind the series).
+* holdings (S3-10): portfolio subjects only (contribution and risk share of each holding).
 * macro sensitivities (E4): every subject, every frequency, every model (a separate regression;
   daily funds, compounded to month-ends for a monthly subject).
+* energy and carbon sensitivities (S3-8): every subject, every frequency, every model (a separate
+  regression on market, oil, gas and, on a short sample, carbon; same daily or month-end timing
+  as macro).
 * lead-lag, shrunk betas, fragility, residual alpha analysis, Kalman betas: daily and FF5 only.
   Their methods are built on trading-day windows (252-row windows, 5-day blocks, a lag of one
   trading day, an FF5 prior) and on the five factors, and are not defined for monthly data or
@@ -38,7 +42,9 @@ from dataclasses import dataclass
 from factordesk.analytics.sample import Frequency
 from factordesk.analytics.subject import FREQUENCIES, SUBJECT_KINDS, SubjectKind
 from factordesk.section_hooks import alpha_strip as alpha_strip_hook
+from factordesk.section_hooks import energy as energy_hook
 from factordesk.section_hooks import fragility as fragility_hook
+from factordesk.section_hooks import holdings as holdings_hook
 from factordesk.section_hooks import kalman as kalman_hook
 from factordesk.section_hooks import lead_lag as lead_lag_hook
 from factordesk.section_hooks import macro as macro_hook
@@ -150,8 +156,22 @@ HOOKS: tuple[HookSpec, ...] = (
         ALL_MODELS,
     ),
     HookSpec(
+        "holdings",
+        lambda ctx: holdings_hook.build_holdings(ctx),
+        PORTFOLIO,
+        ALL_FREQUENCIES,
+        ALL_MODELS,
+    ),
+    HookSpec(
         "macro",
         lambda ctx: macro_hook.build_macro(ctx),
+        ALL_SOURCES,
+        ALL_FREQUENCIES,
+        ALL_MODELS,
+    ),
+    HookSpec(
+        "energy",
+        lambda ctx: energy_hook.build_energy(ctx),
         ALL_SOURCES,
         ALL_FREQUENCIES,
         ALL_MODELS,

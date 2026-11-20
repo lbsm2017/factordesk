@@ -94,3 +94,20 @@ Every report can switch between the five-factor and six-factor (with momentum) m
 - **If FRED is unreachable:** the section runs without the dollar and says "dollar index unavailable". An older cached copy is used first, with a note.
 - **Overlap:** VIF and the correlation matrix show how much the factors share. The VIF is computed on the six factors without the lag term. A badge shows when VIF is above 5.
 - **Tags:** reliable or noise by the same Benjamini-Hochberg rule as the headline betas, across the factors of this regression.
+
+## Update, 2026-11-20: oil, gas and carbon get their own section
+
+- **What changed:** an Energy & carbon section now follows the macro section. Its legs are the Brent oil change, the Henry Hub gas change and KRBN (carbon), with the market as a control. Details are on the [energy and carbon page](energy-and-carbon-factors.md).
+- **Why a separate section:** the legs do not belong in the macro regression. Broad commodities (COMM) already sit there, and oil and COMM correlate +0.6 to +0.8, so mixing them would inflate the VIF.
+- **Also fixed:** the macro correlation matrix was computed twice (and a third time for the condition number). It is now computed once. The output is the same.
+
+## Update, 2026-11-20: the macro section in the euro view
+
+- **What changed:** the macro section now runs in the EUR view. It no longer hides there.
+- **How the legs are converted** (`f` is the return of the US dollar in euros over the same interval, `c` the euro cash return):
+  - TERM, DEF and INFL are spreads of two US-dollar returns, so each becomes the USD spread times `(1 + f)`. TERM still uses the US-dollar risk-free rate inside the spread.
+  - COMM becomes `(1 + DBC)(1 + f) − 1 − c`.
+  - The market leg and the subject's excess return are already in euros.
+- **The dollar leg:** in the euro view the Fed broad dollar index is replaced by `f`, the dollar measured in euros. The row is labelled "US dollar against the euro". Daily regressions keep the one-day lag term and the summed beta.
+- **What we did not change:** the US-dollar view, including its golden report, is the same as before.
+- Details: [reference currency](decision-reference-currency.md).

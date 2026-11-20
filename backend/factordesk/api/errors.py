@@ -132,8 +132,7 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
         return ApiException(
             "unsupported_currency",
             str(exc),
-            "Choose a ticker quoted in US dollars. Other currencies need European factors, "
-            "which factordesk does not have yet.",
+            "Choose a ticker quoted in US dollars, euros or another major currency.",
         )
     if isinstance(exc, PriceDataError):
         return ApiException(
@@ -237,6 +236,7 @@ def validation_error(errors: Sequence[object], ticker: str | None) -> ApiExcepti
 
 
 PORTFOLIO_REPORT_PATH = "/api/report/portfolio"
+UPLOAD_REPORT_PATH = "/api/report/upload"
 
 
 def _in_body(errors: Sequence[object]) -> bool:
@@ -282,6 +282,16 @@ async def _validation_handler(request: Request, exc: Exception) -> Response:
     errors = jsonable_encoder(exc.errors(), exclude={"input", "ctx", "url"})
     if request.url.path == PORTFOLIO_REPORT_PATH and _in_body(errors):
         return _respond(portfolio_validation_error(errors))
+    if request.url.path == UPLOAD_REPORT_PATH and "file" in {
+        loc[0] for loc in _locations(errors) if loc
+    }:
+        return _respond(
+            ApiException(
+                "bad_request",
+                "No file was sent.",
+                "Choose a CSV file with a date and a return column, then send it again.",
+            )
+        )
     return _respond(validation_error(errors, _ticker_of(request)))
 
 

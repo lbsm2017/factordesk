@@ -11,18 +11,22 @@ import statistics
 from statistics import NormalDist
 
 import numpy as np
+import pandas as pd
 import pytest
 from scipy import integrate  # pyright: ignore[reportMissingTypeStubs]
 
 from factordesk.analytics.tail_risk import (
+    CF_FAR_FROM_HISTORICAL,
     CF_INDICATIVE,
     CF_INVALID,
+    CF_VAR_NA,
     CF_Z_INDICATIVE,
     LEVELS,
     Frequency,
     Measure,
     Method,
     band_quality,
+    complete_period_returns,
     cornish_fisher_monotone,
     cornish_fisher_quantile,
     cornish_fisher_range,
@@ -139,7 +143,7 @@ def test_guard_trips_on_heavy_skew_and_passes_on_mild_data() -> None:
     for measure, level in LEVELS["monthly"]:
         f = r.figure("cornish_fisher", measure, level)
         assert f.value is None and f.band is None and f.tail_count is None
-        assert f.reason == CF_INVALID
+        assert f.reason == CF_INVALID or (measure == "cvar" and f.reason == CF_VAR_NA)
     mild = _normal(3, 240)
     r = tail_risk(mild, "monthly", n_resamples=50)
     assert abs(r.skewness) < 0.5 and 0.0 < r.excess_kurtosis < 1.0
@@ -189,13 +193,14 @@ def test_high_kurtosis_daily_cvar_is_indicative() -> None:
     x = np.random.default_rng(1).standard_t(4, size=2500) * 0.01
     r = tail_risk(x, "daily", n_resamples=200)
     assert r.excess_kurtosis == pytest.approx(22.2, abs=0.1)
-    cvar = r.figure("cornish_fisher", "cvar", 0.975)
-    assert cvar.value is not None
-    assert cvar.indicative and cvar.reason == CF_INDICATIVE
-    assert cvar.tail_count is not None and cvar.tail_count > 0
     # g'(0) = 1 - K/8 + 5 S^2/36 < 0: the map from the centre to z_0.01 is not increasing.
     var = r.figure("cornish_fisher", "var", 0.99)
     assert var.value is None and var.reason == CF_INVALID and not var.indicative
+    # The CVaR guard on [-4, z_0.025] passes on its own, but a CVaR next to an n/a VaR is n/a too.
+    z_low, z_high = cornish_fisher_range("cvar", 0.975)
+    assert bool(cornish_fisher_monotone(r.skewness, r.excess_kurtosis, z_high=z_high, z_low=z_low))
+    cvar = r.figure("cornish_fisher", "cvar", 0.975)
+    assert cvar.value is None and cvar.reason == CF_VAR_NA and not cvar.indicative
 
 
 @pytest.mark.parametrize("seed", range(8))
@@ -421,3 +426,199 @@ def test_band_quality_labels() -> None:
     assert r.figure("cornish_fisher", "var", 0.99).band_quality == "approximate"
     na = tail_risk(_normal(1, 36), "monthly", n_resamples=50).figure("historical", "var", 0.99)
     assert na.band is None and na.band_quality is None
+
+
+# ----------------------------------------------------------------------------- S3-7 fixes
+def _heavy_tailed_cases() -> list[tuple[Frequency, list[float]]]:
+    """Series of both frequencies with heavy tails, so that the guards and the flag both trip."""
+    cases: list[tuple[Frequency, list[float]]] = []
+    for seed in range(12):
+        rng = np.random.default_rng(100 + seed)
+        cases.append(("daily", [float(v) for v in rng.standard_t(3, 1500) * 0.01]))
+        cases.append(("monthly", [float(v) for v in rng.standard_t(3, 60) * 0.03]))
+        cases.append(("monthly", [float(v) for v in rng.standard_t(5, 120) * 0.03 + 0.004]))
+    return cases
+
+
+def test_cornish_fisher_cvar_is_na_whenever_its_var_is_na() -> None:
+    tripped = 0
+    for freq, x in _heavy_tailed_cases():
+        r = tail_risk(x, freq, n_resamples=20)
+        var_levels = [lv for measure, lv in LEVELS[freq] if measure == "var"]
+        for measure, level in LEVELS[freq]:
+            if measure != "cvar":
+                continue
+            needed = [lv for lv in var_levels if lv >= level - 1e-9]
+            if not any(r.figure("cornish_fisher", "var", lv).value is None for lv in needed):
+                continue
+            tripped += 1
+            f = r.figure("cornish_fisher", "cvar", level)
+            assert f.value is None and f.band is None and f.tail_count is None
+            assert f.reason in (CF_VAR_NA, CF_INVALID) and not f.indicative
+    assert tripped > 0
+
+
+def _cf_far_from_historical(cf: float, hist: float, std: float) -> bool:
+    return abs(cf - hist) > CF_FAR_FROM_HISTORICAL * max(abs(hist), std)
+
+
+def test_cornish_fisher_is_indicative_when_far_from_the_historical_figure() -> None:
+    far = near = 0
+    for freq, x in _heavy_tailed_cases():
+        r = tail_risk(x, freq, n_resamples=20)
+        for measure, level in LEVELS[freq]:
+            hist = r.figure("historical", measure, level).value
+            cf = r.figure("cornish_fisher", measure, level)
+            if hist is None or cf.value is None:
+                continue
+            bends = cf.reason is not None and CF_INDICATIVE in cf.reason
+            is_far = _cf_far_from_historical(cf.value, hist, r.std)
+            text = f"far from historical ({cf.value:.1%} vs {hist:.1%})"
+            assert cf.indicative == (bends or is_far)
+            assert (cf.reason is not None and text in cf.reason) == is_far
+            if is_far:
+                far += 1
+                assert abs(cf.value - hist) > CF_FAR_FROM_HISTORICAL * max(abs(hist), r.std) - 1e-15
+            else:
+                near += 1
+    assert far > 0 and near > 0
+
+
+def test_low_volatility_positive_drift_is_rarely_flagged_far_from_historical() -> None:
+    """Near-zero historical figures (mean 0.35%, sd 0.2%) must not flag a correct model."""
+    rng = np.random.default_rng(31)
+    flagged = shown = 0
+    for _ in range(100):
+        r = tail_risk(rng.normal(0.0035, 0.002, 60), "monthly", n_resamples=1)
+        for measure, level in LEVELS["monthly"]:
+            hist = r.figure("historical", measure, level).value
+            cf = r.figure("cornish_fisher", measure, level)
+            if hist is None or cf.value is None:
+                continue
+            shown += 1
+            flagged += cf.reason is not None and "far from historical" in cf.reason
+    assert shown > 0
+    assert flagged / shown < 0.10
+
+
+# ----------------------------------------------------------------------------- horizons
+def _daily_returns(start: str, end: str, seed: int = 5) -> pd.Series:
+    """Business-day returns, a few percent of a point a day, stamped on the dates."""
+    dates = pd.bdate_range(start, end)
+    rng = np.random.default_rng(seed)
+    return pd.Series(rng.normal(0.0004, 0.01, len(dates)), index=dates)
+
+
+def _arrays(s: pd.Series) -> tuple[np.ndarray, np.ndarray]:
+    return s.index.to_numpy(dtype="datetime64[D]"), s.to_numpy(dtype=float)
+
+
+def period_label(stamp: object, freq: str) -> str:
+    """``2020-03`` (monthly) or ``2020Q1`` (quarterly) of a date."""
+    t = pd.Timestamp(stamp)  # pyright: ignore[reportArgumentType]
+    return f"{t.year}-{t.month:02d}" if freq == "M" else f"{t.year}Q{(t.month - 1) // 3 + 1}"
+
+
+def period_groups(s: pd.Series, freq: str) -> dict[str, list[float]]:
+    """The returns of each calendar period, in date order (independent of the code under test)."""
+    groups: dict[str, list[float]] = {}
+    for stamp, value in s.items():
+        groups.setdefault(period_label(stamp, freq), []).append(float(value))
+    return groups
+
+
+def compounded(s: pd.Series, freq: str, keep: list[str]) -> list[float]:
+    """``prod(1 + r) - 1`` of the listed periods."""
+    groups = period_groups(s, freq)
+    return [math.prod(1.0 + r for r in groups[k]) - 1.0 for k in keep]
+
+
+def test_daily_returns_compound_into_complete_calendar_months_only() -> None:
+    s = _daily_returns("2019-12-09", "2021-02-26")  # starts mid December, ends Friday 26 Feb
+    dates, values = _arrays(s)
+    out = complete_period_returns(dates, values, dates, "monthly", "daily")
+    # December 2019 starts after its first days (and the history has no earlier row).
+    # February 2021 ends within four days of the month end, so it counts.
+    months = [str(p) for p in pd.period_range("2020-01", "2021-02", freq="M")]
+    assert list(out.labels) == months
+    np.testing.assert_allclose(out.returns, compounded(s, "M", months), rtol=0, atol=1e-14)
+
+
+def test_the_last_month_is_dropped_when_the_data_stop_early_in_it() -> None:
+    s = _daily_returns("2019-11-01", "2021-02-12")
+    dates, values = _arrays(s)
+    out = complete_period_returns(dates, values, dates, "monthly", "daily")
+    assert out.labels[-1] == "2021-01" and "2021-02" not in out.labels
+    assert out.labels[0] == "2019-12"  # November 2019 is the first month of the history: dropped
+
+
+def test_months_are_complete_when_the_subject_continues_beyond_the_sample() -> None:
+    full = _daily_returns("2019-06-03", "2021-06-30")
+    sample = full.loc["2020-01-01":"2020-12-15"]
+    out = complete_period_returns(
+        *_arrays(sample), full.index.to_numpy(dtype="datetime64[D]"), "monthly", "daily"
+    )  # noqa: E501
+    # January 2020 has history before it; December 2020 is cut in the middle by the window.
+    months = [f"2020-{m:02d}" for m in range(1, 12)]
+    assert list(out.labels) == months
+    np.testing.assert_allclose(out.returns, compounded(full, "M", months), rtol=0, atol=1e-14)
+
+
+def test_a_month_with_an_excluded_day_is_left_out_not_patched() -> None:
+    full = _daily_returns("2019-06-03", "2021-06-30")
+    hole = full.index[full.index.get_loc(pd.Timestamp("2020-03-18"))]
+    sample = full.drop(hole)
+    out = complete_period_returns(
+        *_arrays(sample), full.index.to_numpy(dtype="datetime64[D]"), "monthly", "daily"
+    )  # noqa: E501
+    assert "2020-03" not in out.labels and "2020-02" in out.labels and "2020-04" in out.labels
+
+
+def test_daily_returns_compound_into_non_overlapping_complete_quarters() -> None:
+    s = _daily_returns("2018-02-01", "2021-05-14")
+    dates, values = _arrays(s)
+    out = complete_period_returns(dates, values, dates, "quarterly", "daily")
+    quarters = [f"{y}Q{q}" for y in (2018, 2019, 2020) for q in (1, 2, 3, 4)][1:]
+    quarters.append("2021Q1")
+    assert list(out.labels) == quarters  # 2018Q1 starts late, 2021Q1 is complete, 2021Q2 is not
+    expected = compounded(s, "Q", list(out.labels))
+    np.testing.assert_allclose(out.returns, expected, rtol=0, atol=1e-14)
+    # Non-overlapping: every day is in at most one period, so the compounded periods multiply to
+    # the compounded days they cover.
+    covered = [r for k in out.labels for r in period_groups(s, "Q")[k]]
+    assert math.isclose(
+        float(np.prod(1.0 + out.returns)), math.prod(1.0 + r for r in covered), rel_tol=1e-12
+    )
+
+
+def test_monthly_returns_compound_into_complete_quarters() -> None:
+    dates = pd.date_range("2015-01-31", periods=30, freq="ME")
+    m = pd.Series(np.random.default_rng(3).normal(0.006, 0.04, 30), index=dates)
+    sample = m.drop(m.index[7])  # August 2015 missing: 2015Q3 is incomplete
+    out = complete_period_returns(
+        *_arrays(sample), dates.to_numpy(dtype="datetime64[D]"), "quarterly", "monthly"
+    )
+    quarters = [f"{y}Q{q}" for y in (2015, 2016, 2017) for q in (1, 2, 3, 4)][:10]
+    quarters.remove("2015Q3")
+    assert list(out.labels) == quarters
+    np.testing.assert_allclose(out.returns, compounded(m, "Q", quarters), rtol=0, atol=1e-14)
+
+
+def test_an_empty_sample_has_no_periods() -> None:
+    empty = np.zeros(0, dtype="datetime64[D]")
+    out = complete_period_returns(empty, np.zeros(0), empty, "monthly", "daily")
+    assert out.labels == () and out.returns.size == 0
+
+
+def test_quarterly_series_use_the_iid_bootstrap_and_the_95_rows() -> None:
+    x = _normal(8, 48, 0.02, 0.07)
+    r = tail_risk(x, "quarterly", n_resamples=200)
+    assert r.frequency == "quarterly" and r.bootstrap == "iid" and r.mean_block_length is None
+    keys = [(f.measure, f.level) for f in r.figures if f.method == "gaussian"]
+    assert keys == [("var", 0.99), ("cvar", 0.975), ("var", 0.95), ("cvar", 0.95)]
+    # 48 x 5% = 2.4 expected tail quarters: the 95% VaR is shown, the 99% one is n/a.
+    assert r.figure("historical", "var", 0.95).value is not None
+    h99 = r.figure("historical", "var", 0.99)
+    assert h99.value is None and h99.reason == "0.5 expected tail observations"
+    assert min_expected_tail("quarterly", 0.95) == min_expected_tail("monthly", 0.95) == 2.0
+    assert min_expected_tail("quarterly", 0.99) == 3.0

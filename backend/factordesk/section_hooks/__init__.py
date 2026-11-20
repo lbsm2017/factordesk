@@ -9,6 +9,7 @@ One module per feature, each owned by its feature branch:
 * ``residual_alpha.py``: ``build_residual_analysis``
 * ``world_beta.py``: ``build_world_beta`` and ``load_world_benchmark``
 * ``macro.py``: ``build_macro`` and ``load_macro_input``
+* ``energy.py``: ``build_energy`` and ``load_energy_input``
 
 ``pipeline.assemble_subject_report`` calls every hook with one ``SectionContext`` through
 ``registry.run_hooks``, which skips a hook whose ``HookSpec`` does not cover the subject's kind,
@@ -24,6 +25,7 @@ from datetime import date, datetime
 from factordesk.analytics.world_beta import EUROPE_TICKER
 from factordesk.data.prices import PriceProvider
 from factordesk.section_hooks.context import SectionInputs
+from factordesk.section_hooks.energy import load_energy_input
 from factordesk.section_hooks.macro import load_macro_input
 from factordesk.section_hooks.shrunk import load_shrinkage_inputs
 from factordesk.section_hooks.world_beta import load_world_benchmark
@@ -57,5 +59,10 @@ def load_section_inputs(
         ),
         macro=(
             None if offline or price_provider is None else load_macro_input(price_provider, now=now)
+        ),
+        energy=(
+            None
+            if offline or price_provider is None
+            else load_energy_input(price_provider, now=now)
         ),
     )

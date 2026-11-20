@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from statistics import NormalDist
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -243,6 +244,28 @@ def test_vif_matches_the_existing_collinearity_code() -> None:
     ref = collinearity(design.x, [f.name for f in FACTORS])
     for row, f in zip(fit.rows, FACTORS, strict=True):
         assert row.vif == pytest.approx(ref.vif[f.name], rel=1e-12)
+
+
+def test_the_correlation_matrix_is_computed_once_and_is_unchanged() -> None:
+    from factordesk.analytics.regression import collinearity
+
+    design, _ = run_case(make_macro_case(8108, n=600))
+    real: Any = np.corrcoef
+    calls: list[tuple[int, ...]] = []
+
+    def counting(x: FloatArray, *args: Any, **kwargs: Any) -> FloatArray:
+        calls.append(tuple(np.shape(x)))
+        return cast(FloatArray, real(x, *args, **kwargs))
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(np, "corrcoef", counting)
+        fit = fit_macro(design)
+    assert len(calls) == 1, calls  # it was computed twice before (and a third time for kappa)
+    expected = real(design.x, rowvar=False)
+    np.testing.assert_allclose(fit.correlation, expected, rtol=0, atol=1e-15)
+    ref = collinearity(design.x, [f.name for f in FACTORS])
+    assert ref.correlation is not None
+    np.testing.assert_array_equal(ref.correlation, fit.correlation)
 
 
 # ---------------------------------------------------------------------- leg returns (daily)

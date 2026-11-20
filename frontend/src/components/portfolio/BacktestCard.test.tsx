@@ -13,7 +13,8 @@ describe("BacktestCard", () => {
     expect(card.getByRole("heading", { name: "Backtest" })).toBeTruthy();
     expect(card.getByText("Jan 2010 to Oct 2012")).toBeTruthy();
     expect(card.getByText("Emerging Markets Bonds (EMB) begins")).toBeTruthy();
-    expect(card.getByText("USD cash (risk-free rate) ends")).toBeTruthy();
+    expect(card.queryByText("Ends when")).toBeNull();
+    expect(card.queryByText("Skipped days")).toBeNull();
     expect(card.getByText("33 monthly")).toBeTruthy();
     expect(card.getByText(/5 bps one way, 0.21% paid in total/)).toBeTruthy();
     expect(card.getByText("10.0% held as USD cash")).toBeTruthy();
@@ -28,7 +29,8 @@ describe("BacktestCard", () => {
     );
     const card = within(screen.getByTestId("backtest-card"));
     expect(card.getByText("A, B and C begins")).toBeTruthy();
-    expect(card.getByText("None", { selector: "dd" })).toBeTruthy();
+    expect(card.queryByText("Unallocated")).toBeNull();
+    expect(card.queryByText("None", { selector: "dd" })).toBeNull();
     expect(card.getByText("4 trading days without a full set of prices")).toBeTruthy();
     expect(card.getByText("Four days were skipped.")).toBeTruthy();
   });

@@ -14,6 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
+import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
@@ -23,12 +24,17 @@ from factordesk.analytics.tail_risk import MIN_OBS, tail_risk
 from factordesk.pipeline import assemble_report, assemble_subject_report
 from factordesk.report import FactorReport, load_report
 from factordesk.report.schema import SECTIONS
-from factordesk.report.sections.tail_risk import TAIL_RISK_SECTION, TailRiskSection
+from factordesk.report.sections.tail_risk import (
+    TAIL_RISK_SECTION,
+    TailHorizon,
+    TailRiskSection,
+)
 from factordesk.section_hooks import tail_risk as hook
 from factordesk.section_hooks.context import SectionContext
 from factordesk.section_hooks.registry import HOOKS
 from factordesk.tests.fixtures.sections import report_with_section
 from factordesk.tests.test_subject import monthly_case
+from factordesk.tests.test_tail_risk import compounded, period_groups
 from factordesk.tests.test_world_beta import make_case
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -45,9 +51,9 @@ MONTHLY_KEYS = [("var", 0.99), ("cvar", 0.975), ("var", 0.95), ("cvar", 0.95)]
 METHODS = ["historical", "gaussian", "cornish_fisher"]
 
 
-def daily_report() -> tuple[FactorReport, SectionContext]:
-    """A ticker report (720 trading days) and the context its tail risk hook saw."""
-    case = make_case(3001, n=720)
+def daily_report(n: int = 720) -> tuple[FactorReport, SectionContext]:
+    """A ticker report (720 trading days by default) and the context its tail risk hook saw."""
+    case = make_case(3001, n=n)
     seen: list[SectionContext] = []
     real = hook.build_tail_risk
 
@@ -196,11 +202,159 @@ def test_cornish_fisher_na_and_indicative_figures_carry_a_reason() -> None:
                 assert "indicative" in f.reason
 
 
+# ----------------------------------------------------------------------------- horizons
+def _horizons(section: TailRiskSection) -> dict[str, TailHorizon]:
+    assert section.by_horizon is not None
+    return {h.horizon: h for h in section.by_horizon}
+
+
+def _expected_periods(returns: pd.Series, freq: str) -> pd.Series:
+    """Complete calendar periods of a business-day history, derived from the dates alone.
+
+    The first period holds the first return of the history, so it is not whole; the last one is
+    whole when the data reach within four days of its end.
+    """
+    keys = list(period_groups(returns, freq))[1:]
+    last = pd.Timestamp(returns.index[-1])  # pyright: ignore[reportArgumentType]
+    end = pd.Period(keys[-1], freq=freq).end_time.normalize()
+    if last < end - pd.Timedelta(days=4):
+        keys = keys[:-1]
+    return pd.Series(compounded(returns, freq, keys), index=keys)
+
+
+def test_a_daily_report_carries_daily_monthly_and_quarterly_horizons() -> None:
+    report, ctx = daily_report(1500)
+    section = report.tail_risk
+    assert section is not None and section.figures is not None
+    horizons = _horizons(section)
+    assert list(horizons) == ["daily", "monthly", "quarterly"]
+    assert all(h.status == "ok" and h.reason is None for h in horizons.values())
+    # The default horizon repeats the top-level result exactly.
+    assert horizons["daily"].series == section.series
+    assert horizons["daily"].figures == section.figures
+    returns = ctx.subject.returns.dropna()
+    for name, freq in (("monthly", "M"), ("quarterly", "Q")):
+        want = _expected_periods(returns, freq)
+        h = horizons[name]
+        assert h.series is not None and h.figures is not None
+        assert h.series.n_obs == len(want)
+        assert h.series.bootstrap == "iid" and h.series.mean_block_length is None
+        direct = tail_risk(
+            want.to_numpy(dtype=float), "monthly" if name == "monthly" else "quarterly"
+        )
+        assert h.series.mean == pytest.approx(float(want.mean()), abs=1e-12)
+        for got, ref in zip(h.figures, direct.figures, strict=True):
+            assert (got.method, got.measure, got.level) == (ref.method, ref.measure, ref.level)
+            assert got.value == pytest.approx(ref.value, abs=1e-12)
+            assert got.indicative == ref.indicative and got.tail_count == ref.tail_count
+        assert [(f.measure, f.level) for f in h.figures[::3]] == MONTHLY_KEYS
+    # No scaling with the square root of time: the monthly Gaussian VaR is not the daily one
+    # times sqrt(21).
+    daily = horizons["daily"].figures
+    monthly = horizons["monthly"].figures
+    assert daily is not None and monthly is not None
+    daily_g = daily[1].value
+    monthly_g = monthly[1].value
+    assert daily_g is not None and monthly_g is not None
+    assert monthly_g != pytest.approx(daily_g * math.sqrt(21), rel=1e-3)
+
+
+def test_the_quarterly_99_rows_are_na_with_a_reason_when_the_tail_is_too_short() -> None:
+    report, _ = daily_report(1500)
+    section = report.tail_risk
+    assert section is not None
+    quarterly = _horizons(section)["quarterly"]
+    assert quarterly.series is not None and quarterly.figures is not None
+    assert quarterly.series.n_obs < 40
+    hist = {(f.measure, f.level): f for f in quarterly.figures if f.method == "historical"}
+    for key in (("var", 0.99), ("cvar", 0.975)):
+        f = hist[key]
+        assert f.value is None and f.band is None and f.tail_count is None
+        assert f.reason is not None and f.reason.endswith("expected tail observations")
+
+
+def test_a_horizon_with_too_few_periods_is_listed_with_its_reason() -> None:
+    report, _ = daily_report(720)  # about 32 complete months, 10 complete quarters
+    section = report.tail_risk
+    assert section is not None
+    horizons = _horizons(section)
+    assert horizons["monthly"].status == "ok"
+    quarterly = horizons["quarterly"]
+    assert quarterly.status == "insufficient_data"
+    assert quarterly.series is None and quarterly.figures is None
+    assert quarterly.reason is not None and "at least 12 quarterly returns" in quarterly.reason
+
+
+def test_a_monthly_record_has_monthly_and_quarterly_horizons_and_no_daily() -> None:
+    report = monthly_report(120, 13)
+    section = report.tail_risk
+    assert section is not None and section.status == "ok"
+    horizons = _horizons(section)
+    assert list(horizons) == ["monthly", "quarterly"]
+    assert "daily" not in horizons
+    assert horizons["monthly"].series == section.series
+    assert horizons["monthly"].figures == section.figures
+    quarterly = horizons["quarterly"]
+    assert quarterly.status == "ok" and quarterly.series is not None
+    assert quarterly.series.n_obs == 40  # 120 months make 40 whole quarters
+    assert quarterly.figures is not None and len(quarterly.figures) == 12
+    # 40 x 5% = 2.0 expected tail quarters: the 95% historical VaR is shown, 99% is n/a.
+    by = {(f.method, f.measure, f.level): f for f in quarterly.figures}
+    assert by[("historical", "var", 0.95)].value is not None
+    assert by[("historical", "var", 0.99)].value is None
+
+
+def test_quarterly_returns_of_a_monthly_record_are_the_compounded_months() -> None:
+    returns, factors, _ = monthly_case(60, 11)
+    subject = subject_from_monthly_returns(returns, label="Example Fund")
+    report = assemble_subject_report(subject, factors, now=NOW, factors_downloaded_at=None)
+    section = report.tail_risk
+    assert section is not None
+    quarterly = _horizons(section)["quarterly"]
+    groups = period_groups(returns, "Q")
+    keys = [k for k, v in groups.items() if len(v) == 3]
+    want = compounded(returns, "Q", keys)
+    assert quarterly.series is not None and quarterly.series.n_obs == len(want)
+    direct = tail_risk(want, "quarterly")
+    assert quarterly.series.mean == pytest.approx(direct.mean, abs=1e-12)
+    assert quarterly.series.std == pytest.approx(direct.std, abs=1e-12)
+
+
+def test_horizon_models_hold_every_part_exactly_when_ok() -> None:
+    report, _ = daily_report(720)
+    section = report.tail_risk
+    assert section is not None
+    ok = _horizons(section)["daily"]
+    payload = json.loads(ok.model_dump_json())
+    with pytest.raises(ValidationError, match="exactly when status is 'ok'"):
+        TailHorizon.model_validate_json(json.dumps({**payload, "figures": None}))
+    with pytest.raises(ValidationError, match="reason must be None"):
+        TailHorizon.model_validate_json(json.dumps({**payload, "reason": "no"}))
+    bad = {**payload, "status": "failed", "reason": "x", "series": None, "figures": None}
+    TailHorizon.model_validate_json(json.dumps(bad))
+    with pytest.raises(ValidationError, match="holds a reason and no part"):
+        TailHorizon.model_validate_json(json.dumps({**bad, "reason": None}))
+
+
+def test_by_horizon_is_absent_from_the_json_when_it_is_none() -> None:
+    section = TailRiskSection.model_validate_json(FIXTURE.read_text(encoding="utf-8"))
+    assert "by_horizon" in json.loads(section.model_dump_json())
+    stripped = section.model_copy(update={"by_horizon": None})
+    assert "by_horizon" not in json.loads(stripped.model_dump_json())
+    _, ctx = daily_report()
+    short = hook.build_tail_risk(_with_returns(ctx, ctx.subject.returns.iloc[: MIN_OBS - 1]))
+    assert short is not None and short.by_horizon is None
+    assert "by_horizon" not in json.loads(short.model_dump_json())
+
+
 # ----------------------------------------------------------------------------- failure paths
 def _with_returns(ctx: SectionContext, returns: pd.Series) -> SectionContext:
-    """The hook reads only the subject's frequency and returns and ``sample_info``."""
+    """The hook reads only the subject's frequency and returns, the sample and ``sample_info``."""
     subject = SimpleNamespace(frequency=ctx.subject.frequency, returns=returns)
-    return cast(SectionContext, SimpleNamespace(subject=subject, sample_info=ctx.sample_info))
+    return cast(
+        SectionContext,
+        SimpleNamespace(subject=subject, sample=ctx.sample, sample_info=ctx.sample_info),
+    )
 
 
 def test_short_series_is_insufficient_and_constant_series_fails() -> None:
@@ -232,6 +386,35 @@ def test_the_tail_risk_window_is_the_analysed_window_for_a_3y_range() -> None:
     assert cut.tail_risk.sample.start == cut.regression.sample.start
     assert cut.tail_risk.series.n_obs < full.tail_risk.series.n_obs
     assert full.tail_risk.series.n_obs == full.regression.sample.n
+
+
+def test_based_on_counts_exactly_the_returns_of_the_analysed_sample(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Days inside the window that the sample excludes are not in the tail series or its count."""
+    case = make_case(3001, n=720)
+    factors = case.factors.drop(case.factors.index[[10, 200, 400]])  # no factor row on 3 days
+    used: list[np.ndarray] = []
+    real = hook.tail_risk
+
+    def spy(returns: np.ndarray, frequency: str, **kwargs: object) -> object:
+        used.append(np.asarray(returns))
+        return real(returns, frequency, **kwargs)  # pyright: ignore[reportArgumentType]
+
+    monkeypatch.setattr(hook, "tail_risk", spy)
+    report = assemble_report("STK", case.stock, factors, now=NOW, factors_downloaded_at=None)
+    section = report.tail_risk
+    assert section is not None and section.series is not None
+    sample = report.regression.sample
+    assert sample.n_excluded == 3
+    # Every return the window holds, before the sample drops any.
+    in_window = case.stock.total_returns.loc[str(sample.start) : str(sample.end)].dropna()
+    assert len(in_window) == sample.n + sample.n_excluded
+    series = used[0]  # the default horizon; the coarser ones follow
+    assert section.series.n_obs == len(series) == sample.n == len(in_window) - 3
+    excluded = {pd.Timestamp(e.date) for e in sample.excluded}
+    kept = in_window[~in_window.index.isin(excluded)]
+    assert np.allclose(series, kept.to_numpy(), rtol=0.0, atol=1e-15)
 
 
 def test_missing_returns_are_dropped_not_fatal() -> None:

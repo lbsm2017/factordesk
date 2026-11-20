@@ -1,3 +1,4 @@
+import { currencyOf, reportCurrency } from "../../api/currency";
 import type { FactorReport } from "../../api/types";
 import { dateLong, pct, signed, tstat } from "../../format";
 import { useShowStats } from "../../state/stats";
@@ -16,6 +17,7 @@ import {
 import type { Reading } from "../../text/verdict";
 import { countWord, factorCount } from "../../report/derive";
 import { frequencyWord, isSubjectReport } from "../../report/subject";
+import { Icon } from "../shell/icons";
 import { DataNotes } from "./DataNotes";
 import { Panel } from "./Panel";
 import type { ReportPanelProps } from "./types";
@@ -31,6 +33,10 @@ interface Row {
   reading: Reading;
   t: string | null;
   interval: string | null;
+  /** The currency code printed after a key figure (euro view only). */
+  unit?: string;
+  /** A small line under the label, for example "against EUR cash". */
+  sub?: string;
 }
 
 const DASH = "–";
@@ -69,6 +75,9 @@ function row(key: keyof typeof METRIC, o: Partial<Omit<Row, "label" | "tip">> = 
 
 /** The performance rows; every value is a dash while the section is absent or not ok. */
 function performanceRows(report: FactorReport): { rows: Row[]; reason: string | null } {
+  // The euro view puts the currency code on the key figures (return, worst fall) and names the cash behind the Sharpe ratio.
+  const eur = reportCurrency(report) === "EUR";
+  const unit = eur ? ({ unit: "EUR" } as const) : {};
   const section = report.performance;
   const ok = section?.status === "ok" ? section : null;
   const sh = ok?.sharpe ?? null;
@@ -78,15 +87,16 @@ function performanceRows(report: FactorReport): { rows: Row[]; reason: string | 
   return {
     reason: ok ? null : section ? (section.reason ?? "Performance could not be computed.") : "Performance is not in this report.",
     rows: [
-      row("ret", { value: show(cagr, (n) => pct(n, 1)), signed: true }),
+      row("ret", { value: show(cagr, (n) => pct(n, 1)), signed: true, ...unit }),
       row("vol", { value: show(ok?.volatility_annual, (n) => pct(n, 1, false)) }),
       row("sharpe", {
         value: show(ratio, (n) => signed(n, 2)),
         signed: true,
         reading: ok ? sharpeReading(sh, report) : NO_TEST,
         interval: range(sh?.ci95_low, sh?.ci95_high, signedRange),
+        ...(eur ? { sub: "against EUR cash" } : {}),
       }),
-      row("dd", { value: show(dd, (n) => pct(n, 1)), signed: true, reading: ok ? drawdownReading(ok) : NO_TEST }),
+      row("dd", { value: show(dd, (n) => pct(n, 1)), signed: true, reading: ok ? drawdownReading(ok) : NO_TEST, ...unit }),
     ],
   };
 }
@@ -178,8 +188,12 @@ function KvTable({ id, title, rows, stats }: { id: string; title: string; rows: 
                   <span className="tip" title={r.tip}>
                     {r.label}
                   </span>
+                  {r.sub ? <span className="ccy-sub">{r.sub}</span> : null}
                 </th>
-                <td className={`num v${r.value === null ? " na" : signClass(r)}`}>{r.value ?? DASH}</td>
+                <td className={`num v${r.value === null ? " na" : signClass(r)}`}>
+                  {r.value ?? DASH}
+                  {r.value !== null && r.unit ? <span className="ccy">{r.unit}</span> : null}
+                </td>
                 <td className={`rd${r.reading.evidence === "none" ? " na" : ""}`} title={r.reading.note}>
                   {r.reading.word}
                 </td>
@@ -212,10 +226,13 @@ export function SummaryPanel({ report }: ReportPanelProps) {
       ...r,
       tip: r.tip
         .replace("daily", frequencyWord(report))
+        .replace("the risk-free rate", reportCurrency(report) === "EUR" ? "the euro cash rate" : "the risk-free rate")
         .replace("five", countWord(k))
         .replace("other four", `other ${countWord(k - 1)}`),
       label: r.label.replace("five-factor", `${countWord(k)}-factor`),
     }));
+  const currency = currencyOf(report);
+  const notes = currency?.reference === "EUR" ? (currency.notes ?? []).filter((n) => n.trim() !== "") : [];
   const { actual_start: start, actual_end: end } = report.data;
   const period = start && end ? `${dateLong(start)} to ${dateLong(end)}. ` : "";
   const reasons = [...(perf.reason ? [perf.reason] : []), ...model.reasons];
@@ -223,7 +240,12 @@ export function SummaryPanel({ report }: ReportPanelProps) {
     <Panel
       id="summary"
       title="Summary"
-      legend={<div className="pm">{period}Past data, not a forecast.</div>}
+      legend={
+        <div className="pm">
+          {currency?.reference === "EUR" ? "Figures in EUR. " : ""}
+          {period}Past data, not a forecast.
+        </div>
+      }
       footnote={`Annualised from ${frequencyWord(report)} data.${isSubjectReport(report) ? "" : " ACWI is an ETF used as a stand-in for the MSCI ACWI index."}`}
     >
       <p className="verdict">
@@ -231,6 +253,16 @@ export function SummaryPanel({ report }: ReportPanelProps) {
         {v.hedge ? <span className="hedge"> {v.hedge}</span> : null}
       </p>
       <DataNotes report={report} />
+      {notes.length > 0 ? (
+        <ul className="cur-notes" aria-label="Currency notes">
+          {notes.map((n) => (
+            <li key={n}>
+              <Icon name="info" />
+              <span>{n}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <div className="sum-tables">
         <KvTable id="sum-perf" title="Performance" rows={worded(perf.rows)} stats={stats} />
         <KvTable id="sum-model" title="Factor model" rows={worded(model.rows)} stats={stats} />

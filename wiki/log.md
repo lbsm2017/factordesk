@@ -7,6 +7,10 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
 
+## 2026-11-20 (Energy & carbon section)
+
+- Sprint 3, item S3-8: added the Energy & carbon section. Added [the decision page](energy-and-carbon-factors.md) and a dated update on the [macro decision page](decision-factor-models-and-macro.md). The macro correlation matrix is now computed once.
+
 ## 2026-11-20 (Sprint 2 closed)
 
 - Sprint 2 shipped the portfolio composer: the Asset Class Library, the portfolio backtest API and the macro sensitivities section. Added [docs/sprints/sprint-2.md](../docs/sprints/sprint-2.md), which records what shipped, the owner's decisions, the demo results and the retro.
@@ -185,3 +189,7 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 
 - The world beta section gets an optional `europe` block (IEUR, stand-in for MSCI Europe), computed by the same hook, cache and refresh as ACWI, with its own status. Schema version stays 4. `wiki/decision-world-beta.md` has the plain-English entry; the hand-off has the field names and live numbers (section 10).
 - The static world beta panel moved from position 350 to 505, and the static header company line is now a sentence.
+
+## 2026-11-20 (Sprint 3: reference currency)
+
+- New page [USD or EUR reference currency](decision-reference-currency.md): the owner chose the euro view as the Sprint 3 headline, per-asset daily conversion, and ECB rates with FRED H.10 as fallback. The coordinator set the hedge table and approved the mockups in docs/design/sprint-3.

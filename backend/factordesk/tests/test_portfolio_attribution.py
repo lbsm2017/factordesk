@@ -125,7 +125,7 @@ def test_ta08_risk_share_undefined_cases() -> None:
     )
     att = attribute(flat)
     assert att.risk_share is None
-    assert att.risk_share_reason == "the portfolio return does not vary"
+    assert att.risk_share_reason == "Risk shares are not shown: the portfolio return does not vary."
     one = run_backtest(
         pd.DataFrame({"A": [0.01]}, index=idx[:1]), {"A": 1.0}, pd.Series(0.0, index=idx[:1])
     )
@@ -178,3 +178,21 @@ def test_ta10_roll_up_rejects_missing_paths() -> None:
         roll_up({"A": 1.0}, {"A": ("X",), "B": ("Y",)})
     with pytest.raises(ValueError, match="non-empty"):
         roll_up({"A": 1.0}, {"A": ("X", "")})
+
+
+def test_ta11_a_window_relinks_from_its_first_day() -> None:
+    res = _backtest()
+    att = attribute(res, days=res.ret.index[200:501])
+    window = slice(200, 501)
+    net = res.ret.to_numpy(dtype=np.float64)[window]
+    assert len(att.daily_contribution) == len(net)
+    assert att.total_return == pytest.approx(float((1.0 + net).prod() - 1.0), abs=1e-15)
+    assert abs(math.fsum(att.contribution.values()) - att.total_return) < TOL
+    # daily rows are the backtest's own weights times that day's returns
+    expected = res.applied_weights.iloc[window, 0].to_numpy() * res.leaf_ret.iloc[window, 0]
+    np.testing.assert_allclose(att.daily_contribution["SPY"].to_numpy(), expected, atol=1e-16)
+    assert att.risk_share is not None and abs(math.fsum(att.risk_share.values()) - 1.0) < TOL
+    # no window is the whole backtest
+    assert attribute(res).contribution == attribute(res, days=res.ret.index).contribution
+    with pytest.raises(ValueError, match="no day"):
+        attribute(res, days=res.ret.index[:0])

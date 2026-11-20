@@ -33,6 +33,11 @@ MODEL_NOTE = (
     "Not the headline alpha."
 )
 """Fixed note under the section."""
+EUR_MODEL_NOTE = (
+    "Separate regression, in euros. Raw betas: correlated factors share explanatory power. "
+    "Not the headline alpha."
+)
+"""Fixed note under the section in the EUR view."""
 USD_UNAVAILABLE = "dollar index unavailable"
 """Shown in place of the dollar row when the FRED download failed and no copy exists."""
 

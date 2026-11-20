@@ -1,0 +1,64 @@
+/* Holdings panel: from the approved mockup S3-0 (docs/design/sprint-3/2-holdings-table.html). Tokens only. */
+#holdings .t-head, #holdings .t-row {
+  grid-template-columns: minmax(0, 1fr) 76px 76px 124px 208px;
+  grid-template-areas: "label tgt end con risk";
+  column-gap: 12px;
+}
+#holdings .t-head { padding: 0 0 7px 0; }
+#holdings .t-head .hl { text-align: left; }
+#holdings .t-row .tgt { grid-area: tgt; }
+#holdings .t-row .end { grid-area: end; }
+#holdings .t-row .con { grid-area: con; }
+#holdings .t-row .risk { grid-area: risk; }
+#holdings .t-row { min-height: 52px; padding: 5px 0; }
+#holdings .t-row.group { min-height: 48px; margin-top: var(--s-3); padding-right: 0; }
+#holdings .t-row.group .tgt, #holdings .t-row.group .end, #holdings .t-row.group .con { font-size: var(--fs-sub); }
+#holdings .t-head + .t-row.group { margin-top: var(--s-2); }
+#holdings .hn { display: block; text-align: right; font-weight: 500; }
+#holdings .group .hn { font-weight: 600; }
+#holdings .t-row.line .hn, #holdings .t-row.inst .hn { color: var(--ink); font-weight: 400; }
+#holdings .t-row.line .hn.num-pos, #holdings .t-row.line .hn.num-neg, #holdings .t-row.inst .hn.num-pos, #holdings .t-row.inst .hn.num-neg { font-weight: 600; }
+#holdings .t-row.line.multi .hn { font-weight: 500; }
+#holdings .hn.dash { color: var(--ink-3); }
+#holdings .rs { display: grid; grid-template-columns: 62px minmax(0, 1fr); column-gap: 10px; align-items: center; }
+#holdings .rs .hn { font-weight: 500; }
+#holdings .group .rs .hn { font-weight: 600; font-size: var(--fs-sub); }
+#holdings .sbar, #holdings .group .sbar { height: 6px; background: var(--grid); }
+#holdings .t-row.line .label { padding-left: 40px; }
+#holdings .t-row.inst .label { padding-left: 68px; }
+#holdings .t-row.inst { min-height: 48px; }
+#holdings .t-row.inst .sb .nmfull { color: var(--ink-2); }
+#holdings .hold-tools { display: flex; gap: var(--s-3); margin-left: auto; align-self: center; }
+#holdings .hold-tools .textbtn { margin-left: 0; }
+#holdings .t-row.plain-row { border-bottom: 1px solid var(--grid); }
+#holdings .t-row.plain-row .label { padding-left: 4px; gap: 10px; }
+#holdings .t-row.plain-row .label .key-sq, #holdings .t-row.plain-row .label .key-ring { margin-left: 11px; }
+#holdings .t-row.sep { margin-top: var(--s-3); border-top: 1px solid var(--line); }
+#holdings .t-row.sep ~ .t-row.plain-row { margin-top: 0; }
+#holdings .key-ring { width: 10px; height: 10px; flex: none; border: 1.5px solid var(--axis); border-radius: var(--r-mark); }
+#holdings .t-row.total { min-height: 56px; margin-top: 2px; border-top: 1px solid var(--rule); border-bottom: 0; }
+#holdings .t-row.total .hn { font-size: var(--fs-panel); font-weight: 600; }
+#holdings .t-row.total .rs .hn { font-size: var(--fs-sub); }
+#holdings .total-note { margin-top: var(--s-1); text-align: right; font-size: var(--fs-cap); color: var(--ink-2); }
+#holdings .foot-note { margin-top: var(--s-3); font-size: var(--fs-cap); color: var(--caution); }
+
+@media (max-width: 719px) {
+  #holdings .t-head { display: none; }
+  #holdings .t-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1.25fr);
+    grid-template-areas: "label label label label" "tgt end con risk";
+    row-gap: 6px; column-gap: 8px; padding: 10px 0; min-height: 0;
+  }
+  #holdings .t-row.group { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1.25fr); padding: 8px 0 12px; }
+  #holdings .t-row.line.multi, #holdings .t-row.unalloc { grid-template-areas: "label label label label" "tgt end con risk"; }
+  #holdings .t-row.line .label { padding-left: 4px; }
+  #holdings .t-row.inst .label { padding-left: 24px; }
+  #holdings .t-row.inst .label::before { left: 6px; }
+  #holdings .hn { text-align: left; }
+  #holdings [data-l]::before { content: attr(data-l); display: block; font-size: var(--fs-cap); font-weight: 400; color: var(--ink-2); }
+  #holdings .group .hn, #holdings .group .rs .hn { font-size: var(--fs-body); }
+  #holdings .rs { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+  #holdings .t-row.total .hn, #holdings .t-row.total .rs .hn { font-size: var(--fs-sub); }
+  #holdings .total-note { text-align: left; }
+  #holdings .hold-tools { margin-left: 0; width: 100%; }
+}

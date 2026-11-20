@@ -17,8 +17,10 @@ no footnote keys of its own and no nested ``StatisticModel``.
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
+from pydantic.config import JsonDict
 
 from factordesk.report.base import FrozenModel, SectionModel, SectionSpec
 
@@ -31,8 +33,17 @@ class TargetWeightRow(FrozenModel):
     weight: float = Field(gt=0.0, le=1.0, description="Target weight as a decimal fraction.")
 
 
+def _currency_not_required(schema: JsonDict) -> None:
+    """``unallocated_currency`` is left out of the JSON when ``None``, so never required."""
+    required = schema.get("required")
+    if isinstance(required, list):
+        schema["required"] = [n for n in required if n != "unallocated_currency"]
+
+
 class PortfolioBacktestSection(SectionModel):
     """The backtest behind a portfolio report. Status is always ``ok`` when the section exists."""
+
+    model_config = ConfigDict(json_schema_extra=_currency_not_required)
 
     window_start: date = Field(description="First day with a portfolio return.")
     window_end: date = Field(description="Last day with a portfolio return.")
@@ -68,7 +79,16 @@ class PortfolioBacktestSection(SectionModel):
         "when there was no rebalance.",
     )
     unallocated_weight: float = Field(
-        ge=0.0, le=1.0, description="Weight left over by the targets; held in USD cash."
+        ge=0.0,
+        le=1.0,
+        description="Weight left over by the targets; held in USD cash, or as euro cash when "
+        "unallocated_currency says so.",
+    )
+    unallocated_currency: Literal["EUR"] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="EUR when the unallocated weight is held as euro cash (the EUR view); absent "
+        "(not null) in the USD view, where it is held in USD cash.",
     )
     survivorship_note: str = Field(description="Fixed warning carried by every backtest.")
     weights: list[TargetWeightRow] = Field(description="Target weights, in tree order.")

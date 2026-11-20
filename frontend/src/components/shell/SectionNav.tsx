@@ -21,12 +21,14 @@ interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: "summary", label: "Summary", icon: "summary" },
   { id: "price", label: "Price", icon: "price" },
+  { id: "holdings", label: "Holdings", icon: "pie" },
   { id: "performance", label: "Drawdown", icon: "drawdown" },
   { id: "tail-risk", label: "Tail risk", icon: "risk" },
   { id: "exposures", label: "Factor exposures", icon: "exposures" },
   { id: "alpha-strip", label: "Alpha across models", icon: "residual" },
   { id: "world-beta", label: "World beta", icon: "world" },
   { id: "macro", label: "Macro sensitivities", icon: "exposures" },
+  { id: "energy", label: "Energy & carbon", icon: "exposures" },
   { id: "returns", label: "Return sources", icon: "returns" },
   { id: "risk", label: "Risk sources", icon: "risk" },
   { id: "rolling", label: "Exposure over time", icon: "rolling" },
@@ -41,11 +43,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
 
 /** Report field behind each optional section; its item is hidden while the field is null or absent. */
 const SECTION_FIELD: Readonly<Record<string, keyof FactorReport>> = {
+  holdings: "holdings",
   performance: "performance",
   "tail-risk": "tail_risk",
   "alpha-strip": "alpha_strip",
   "world-beta": "world_beta",
   macro: "macro",
+  energy: "energy",
   residual: "residual",
   kalman: "kalman_betas",
   shrunk: "shrunk_betas",

@@ -103,6 +103,20 @@ describe("MacroPanel", () => {
     expect(container.querySelector("table")?.textContent ?? "").not.toContain("Correlations");
   });
 
+  it("names the dollar against the euro and the exchange rate in the euro view", () => {
+    const r = report((s) => {
+      s.model_note = "Separate regression, in euros. Raw betas: correlated factors share explanatory power. Not the headline alpha.";
+      s.legs = [...s.legs.filter((l) => l.ticker !== "DTWEXBGS"), { ticker: "USD/EUR", role: "USD = return of the US dollar measured in euros", first_date: "1999-01-04" }];
+      s.rows = s.rows.map((row) => (row.code === "usd" ? { ...row, label: "US dollar against the euro" } : row));
+    });
+    const { container } = render(<MacroPanel report={r} />);
+    expect(container.textContent).toContain("US dollar against the euro");
+    const how = container.querySelector("details.how")?.textContent ?? "";
+    expect(how).toContain("in euros");
+    expect(how).toContain("the exchange rate has no value there");
+    expect(how).not.toContain("the dollar index has no value there");
+  });
+
   it("says the dollar index is unavailable and shows no dollar row", () => {
     const r = report((s) => {
       s.usd_included = false;
@@ -129,5 +143,22 @@ describe("MacroPanel", () => {
     render(<MacroPanel report={r} />);
     expect(screen.getByText(/needs more data/).textContent).toContain("only 80 rows");
     expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
+describe("MacroPanel with small betas", () => {
+  it("labels distinct axis ticks and keeps two significant digits", () => {
+    const r = report((s) => {
+      for (const row of s.rows) {
+        row.beta = row.beta * 0.001;
+        row.se = row.se * 0.001;
+      }
+    });
+    const { container } = render(<MacroPanel report={r} />);
+    const texts = Array.from(container.querySelectorAll(".mc-axis .axis span, tfoot .axis span")).map((n) => n.textContent ?? "");
+    expect(texts.length).toBeGreaterThan(2);
+    expect(new Set(texts).size).toBe(texts.length);
+    const betas = Array.from(container.querySelectorAll("tbody td.num:nth-child(2)")).map((n) => n.textContent ?? "");
+    for (const b of betas) expect(b).not.toMatch(/^[+−]?0\.00$/);
   });
 });

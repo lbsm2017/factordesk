@@ -51,8 +51,10 @@ out of the JSON) for FF5, so FF5 reports are byte-identical to the ones written 
 optional section ``alpha_strip`` (alpha under CAPM, FF3, FF5 and FF6 on the same rows;
 ``report/sections/alpha_strip.py``) is also left out of the JSON when ``None``, and so is
 ``portfolio_backtest`` (the backtest behind a portfolio report;
-``report/sections/portfolio_backtest.py``), and so is ``macro`` (macro sensitivities;
-``report/sections/macro.py``).
+``report/sections/portfolio_backtest.py``), and so is ``holdings`` (the holdings table of a
+portfolio report; ``report/sections/holdings.py``), and so is ``macro`` (macro sensitivities;
+``report/sections/macro.py``), and so is ``energy`` (energy and carbon sensitivities;
+``report/sections/energy.py``).
 All are additive and do not bump the version (contract SC5).
 """
 
@@ -82,7 +84,9 @@ from factordesk.report.base import StatisticModel as StatisticModel
 from factordesk.report.base import Status as Status
 from factordesk.report.base import Tag as Tag
 from factordesk.report.sections.alpha_strip import ALPHA_STRIP_SECTION, AlphaStrip
+from factordesk.report.sections.energy import ENERGY_SECTION, EnergySection
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
+from factordesk.report.sections.holdings import HOLDINGS_SECTION, HoldingsSection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.macro import MACRO_SECTION, MacroSection
@@ -120,7 +124,9 @@ SECTIONS: tuple[SectionSpec, ...] = (
     TAIL_RISK_SECTION,
     ALPHA_STRIP_SECTION,
     PORTFOLIO_BACKTEST_SECTION,
+    HOLDINGS_SECTION,
     MACRO_SECTION,
+    ENERGY_SECTION,
 )
 """The optional sections of the schema v3 contract, in panel order (contract SC3.1, SC4)."""
 
@@ -510,20 +516,43 @@ class PriceSeries(FrozenModel):
 
 _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
     "subject",
+    "currency",
     "model",
     "alpha_strip",
     "portfolio_backtest",
+    "holdings",
     "macro",
+    "energy",
 )
 """Fields left out of the JSON when ``None``, so never required."""
 
 
 def _subject_not_required(schema: JsonDict) -> None:
-    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest`` and ``macro`` are left out
-    of the JSON when ``None``, so they are never required."""
+    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest``, ``holdings``, ``macro`` and
+    ``energy`` are left out of the JSON when ``None``, so they are never required."""
     required = schema.get("required")
     if isinstance(required, list):
         schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
+
+
+ReferenceCurrency = Literal["USD", "EUR"]
+"""The currencies a report can be shown in (decision: reference currency)."""
+
+
+class CurrencyInfo(FrozenModel):
+    """The reference currency of a report that is not in US dollars (written only for those)."""
+
+    reference: Literal["EUR"] = Field(description="Currency of every figure in the report.")
+    fx_source: str | None = Field(
+        description="Source credit of the exchange rates used; None when none were needed."
+    )
+    rate_source: str | None = Field(
+        description="Source credit of the euro cash rate (overnight rate); None when not used."
+    )
+    notes: list[str] = Field(
+        description="Plain-words notices: dates dropped for lack of an exchange rate, sections "
+        "left out in this currency, a source that fell back to its second choice."
+    )
 
 
 class FactorReport(FrozenModel):
@@ -544,6 +573,12 @@ class FactorReport(FrozenModel):
         exclude_if=lambda value: value is None,
         description="Factor model of the regression when it is not FF5: ff6 = FF5 + momentum "
         "(Mom). Absent (not null) for an FF5 report.",
+    )
+    currency: CurrencyInfo | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Reference currency of the report when it is not US dollars; absent (not "
+        "null) for a USD report.",
     )
     generated_at: datetime = Field(description="Timezone-aware UTC timestamp.")
     data: DataInfo
@@ -611,11 +646,24 @@ class FactorReport(FrozenModel):
         "rebalances, cost, survivorship note and target weights; absent (not null) for every "
         "subject except a portfolio.",
     )
+    holdings: HoldingsSection | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Holdings table of a portfolio: target and end weight, return contribution "
+        "and risk share of each holding, group, cash and trading cost over the analysed window; "
+        "absent (not null) for every subject except a portfolio.",
+    )
     macro: MacroSection | None = Field(
         default=None,
         exclude_if=lambda value: value is None,
         description="Macro sensitivities: a separate regression on market, rates, credit, "
         "commodity, inflation and dollar factors; absent (not null) when not computed.",
+    )
+    energy: EnergySection | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Energy and carbon sensitivities: a separate regression on the market and "
+        "oil, gas and (on a short sample) carbon price legs; absent (not null) when not computed.",
     )
 
     @field_validator("schema_version")
@@ -636,6 +684,8 @@ class FactorReport(FrozenModel):
             present = [s.report_field for s in SECTIONS if getattr(self, s.report_field)]
             if self.subject is not None:
                 present.append("subject")
+            if self.currency is not None:
+                present.append("currency")
             if self.model is not None:
                 present.append("model")
             if present:

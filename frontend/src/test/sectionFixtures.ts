@@ -5,6 +5,7 @@
  */
 import type { FactorReport } from "../api/types";
 import alphaStrip from "@fixtures/sections/alpha_strip.json";
+import energy from "@fixtures/sections/energy.json";
 import fragility from "@fixtures/sections/fragility.json";
 import labels from "@fixtures/sections/label_text.json";
 import kalman from "@fixtures/sections/kalman.json";
@@ -29,6 +30,7 @@ export const SECTION_FIELDS = [
   "tail_risk",
   "alpha_strip",
   "macro",
+  "energy",
 ] as const;
 export type SectionField = (typeof SECTION_FIELDS)[number];
 
@@ -43,6 +45,7 @@ const PAYLOADS: Record<SectionField, unknown> = {
   tail_risk: tailRisk,
   alpha_strip: alphaStrip,
   macro,
+  energy,
 };
 
 /** The monthly (60 months) tail risk section, for a report with a monthly subject. */

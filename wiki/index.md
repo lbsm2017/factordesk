@@ -19,6 +19,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Prices from Yahoo, with adjusted-close care](decision-prices-from-yahoo-with-adjusted-close-care.md) [Decided]: raw bars, total return from adjusted close, independent recomputation, same-day cache.
 - [Parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) [Decided-pending-implementation]: a few tickers at a time, spaced requests, slow retries and a stop switch, because Yahoo publishes no rate limit.
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md) [Proposed]: regional factor files, US dollar conversion and an optional currency regressor.
+- [USD or EUR reference currency](decision-reference-currency.md) [Decided-pending-implementation]: every report in USD or EUR; each asset converted daily at ECB rates; USD-only bond lines hedged in the euro view (2026-11-20).
 
 ### Statistics
 
@@ -60,6 +61,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 Spec: [next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md). Status for all eight: Decided, not yet built.
 
 - [Factor models (FF5 and FF6) and a separate macro section](decision-factor-models-and-macro.md) [Decided]: a five/six-factor switch, alpha under four models side by side, and rates, credit and euro sensitivities in their own section.
+- [Energy & carbon section](energy-and-carbon-factors.md) [Decided]: sensitivities to oil, gas and carbon prices after the market, with a short-sample carbon model and a gas result without the 5 largest moves.
 - [Monthly track-record uploads](decision-monthly-track-records.md) [Decided]: uploaded fund records, daily or monthly, checked and analysed in memory; monthly needs 36 months. Amends the daily-returns decision.
 - [Portfolio backtest rules](decision-portfolio-backtest-rules.md) [Decided]: month-end rebalancing with drift, a cost line, cash at the risk-free rate, common start and end dates, and contribution and risk per holding.
 - [SAA tree and default proxies](decision-saa-tree-and-proxies.md) [Decided]: a three-level tree (asset class, sub-asset class, ETF) prefilled with US-listed proxy ETFs; alternatives later.

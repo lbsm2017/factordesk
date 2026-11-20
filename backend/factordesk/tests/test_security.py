@@ -580,7 +580,7 @@ def error_of(response: httpx.Response, status: int, code: str) -> ApiError:
 def test_the_api_refuses_a_non_us_dollar_ticker_in_the_error_envelope(
     tmp_path: Path, history: PriceHistory
 ) -> None:
-    provider = MetadataProvider(history, EUR)
+    provider = MetadataProvider(history, Security(name="Rand fund", currency="ZAR"))
     app = make_app(tmp_path, provider)
     with serve(app) as client:
         for path in (
@@ -590,7 +590,7 @@ def test_the_api_refuses_a_non_us_dollar_ticker_in_the_error_envelope(
         ):
             error = error_of(client.get(path), 422, "unsupported_currency")
             assert "US dollars" in error.message
-            assert "SAP.DE" in error.message and "EUR" in error.message
+            assert "SAP.DE" in error.message and "ZAR" in error.message
     assert provider.calls == []  # no price history was downloaded
 
 

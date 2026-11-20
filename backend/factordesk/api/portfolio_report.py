@@ -15,7 +15,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import cast
@@ -24,11 +24,17 @@ import numpy as np
 import pandas as pd
 
 from factordesk.analytics.backtest import CASH_ID, WEIGHT_TOLERANCE, BacktestResult, run_backtest
+from factordesk.analytics.currency import convert, hedge
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.analytics.subject import LEVEL_BASE, ReturnSubject
 from factordesk.api import ranges
+from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import ApiException, one_line, to_api_exception
-from factordesk.api.portfolio_models import PortfolioTree, load_library
+from factordesk.api.portfolio_models import (
+    EUR_CASH_LIBRARY_ID,
+    PortfolioTree,
+    load_library,
+)
 from factordesk.data.prices import (
     BatchPriceProvider,
     PriceDataError,
@@ -38,9 +44,20 @@ from factordesk.data.prices import (
     validate_ticker,
 )
 from factordesk.report.schema import FactorModel, FactorReport, RangePreset
-from factordesk.section_hooks.context import PortfolioBacktestInput, SectionInputs
+from factordesk.section_hooks.context import (
+    USD_CASH_LEAF,
+    HoldingsInput,
+    HoldingsNode,
+    PortfolioBacktestInput,
+    SectionInputs,
+)
 
 CASH_LABEL = "USD cash (risk-free rate)"
+EUR_CASH_LABEL = "EUR cash (overnight rate)"
+USD_CASH_KEY = USD_CASH_LEAF
+"""Backtest leaf of the USD cash instruments in the EUR view (their return is converted)."""
+USD_CASH_LABEL = "USD cash (converted to EUR)"
+RF_LIMIT_LABEL = "US risk-free rate (factor file)"
 RF_COLUMN = "RF"
 LEAF_PREFIX = "i:"
 """Backtest leaf ids are ``i:<instrument id>``, so no instrument id can clash with ``CASH_ID``."""
@@ -56,6 +73,10 @@ class PlanRow:
     name: str
     ticker: str | None
     weight: float
+    groups: tuple[tuple[str, str], ...] = ()
+    """``(id, label)`` of the asset class and the sub-asset class that hold the instrument."""
+    library_id: str = ""
+    """The library line the instrument sits under."""
 
     @property
     def label(self) -> str:
@@ -104,11 +125,14 @@ def plan_of(tree: PortfolioTree) -> PortfolioPlan:
                     f"The line {sub.label!r} is not in the Asset Class Library.",
                     "Add the line from the library picker.",
                 )
+            groups = ((ac.id, ac.label), (sub.id, sub.label))
             for item in sub.children:
                 if item.weight <= 0.0:
                     continue
                 if item.kind == "cash" or item.ticker is None:
-                    rows.append(PlanRow(None, item.label, None, item.weight))
+                    rows.append(
+                        PlanRow(None, item.label, None, item.weight, groups, sub.library_id)
+                    )
                     continue
                 try:
                     ticker = validate_ticker(item.ticker)
@@ -120,7 +144,16 @@ def plan_of(tree: PortfolioTree) -> PortfolioPlan:
                     ) from exc
                 if ticker not in tickers:
                     tickers.append(ticker)
-                rows.append(PlanRow(LEAF_PREFIX + item.id, item.label, ticker, item.weight))
+                rows.append(
+                    PlanRow(
+                        LEAF_PREFIX + item.id,
+                        item.label,
+                        ticker,
+                        item.weight,
+                        groups,
+                        sub.library_id,
+                    )
+                )
     if not any(row.key is not None for row in rows):
         raise _invalid(
             "The portfolio holds no instrument with a ticker and a weight above 0.",
@@ -134,6 +167,44 @@ def plan_of(tree: PortfolioTree) -> PortfolioPlan:
         tickers=tuple(tickers),
         digest=canonical_digest(tree),
     )
+
+
+def eur_cash_keys(plan: PortfolioPlan, ccy: str) -> set[str]:
+    """Leaves that become the euro cash index: holdings of the EUR Cash line in the EUR view."""
+    if ccy != "EUR":
+        return set()
+    return {r.key for r in plan.holdings if r.key and r.library_id == EUR_CASH_LIBRARY_ID}
+
+
+def usd_cash_weight(plan: PortfolioPlan) -> float:
+    """Total target weight of the USD cash instruments."""
+    return sum(r.weight for r in plan.rows if r.key is None)
+
+
+def tickers_for(plan: PortfolioPlan, ccy: str) -> tuple[str, ...]:
+    """The tickers to fetch: ``plan.tickers`` less those only the euro cash index replaces."""
+    skip = eur_cash_keys(plan, ccy)
+    out: list[str] = []
+    for row in plan.holdings:
+        if row.key not in skip and row.ticker is not None and row.ticker not in out:
+            out.append(row.ticker)
+    return tuple(out)
+
+
+def hedged_keys(plan: PortfolioPlan, ccy: str, listings: Mapping[str, str]) -> set[str]:
+    """Leaves hedged to euros in the EUR view: the library lines marked ``hedge_eur``, when the
+    instrument is quoted in US dollars."""
+    if ccy != "EUR":
+        return set()
+    flagged = {line.id for line in load_library().lines if line.hedge_eur}
+    return {
+        r.key
+        for r in plan.holdings
+        if r.key
+        and r.library_id in flagged
+        and r.ticker is not None
+        and listings.get(r.ticker, "USD") == "USD"
+    }
 
 
 # ------------------------------------------------------------------------------------ prices
@@ -205,6 +276,9 @@ class CommonReturns:
     """Leaves whose first price is the latest: they set the start of the common calendar."""
     end_keys: tuple[str, ...]
     """Leaves whose last price is the earliest: they set the end of the common calendar."""
+    rf_keys: frozenset[str] = frozenset()
+    """Leaves that carry the US risk-free rate (hedged lines, USD cash): it ends with the factor
+    file, so it can set the end of the window."""
 
 
 def _adjusted_close(history: PriceHistory) -> pd.Series:
@@ -232,7 +306,12 @@ def _compounded_rf(rf: pd.Series, calendar: pd.DatetimeIndex) -> pd.Series:
 
 
 def _common_returns(
-    plan: PortfolioPlan, histories: dict[str, PriceHistory], rf: pd.Series
+    plan: PortfolioPlan,
+    histories: dict[str, PriceHistory],
+    rf: pd.Series,
+    ctx: CurrencyContext | None = None,
+    listings: Mapping[str, str] | None = None,
+    local_histories: dict[str, PriceHistory] | None = None,
 ) -> CommonReturns:
     """Returns of every weighted leaf between consecutive dates all of them have a price on.
 
@@ -241,11 +320,19 @@ def _common_returns(
     close, not a sum of daily returns). Raises ``ApiException`` (422) when the instruments share
     fewer than two price dates.
     """
+    ccy = "USD" if ctx is None else ctx.ref
+    cash_keys = eur_cash_keys(plan, ccy)
     prices: dict[str, pd.Series] = {}
     for row in plan.holdings:
         assert row.key is not None and row.ticker is not None
-        prices[row.key] = _adjusted_close(histories[row.ticker])
-    labels = _labels(plan)
+        if row.key not in cash_keys:
+            prices[row.key] = _adjusted_close(histories[row.ticker])
+    if not prices:
+        raise _invalid(
+            "The portfolio holds no instrument with prices.",
+            "Add an instrument other than euro cash: cash alone is not a backtest.",
+        )
+    labels = _labels(plan, ccy)
     common: pd.DatetimeIndex | None = None
     for series in prices.values():
         idx = pd.DatetimeIndex(series.index)
@@ -265,11 +352,35 @@ def _common_returns(
     frame.index = pd.DatetimeIndex(frame.index, name="date")
     first = {k: s.index[0] for k, s in prices.items()}
     last = {k: s.index[-1] for k, s in prices.items()}
+    rf_leaf = _compounded_rf(rf, common)
+    rf_keys: set[str] = set()
+    if ctx is not None and ccy == "EUR":
+        cash = ctx.cash(common)
+        hedged = hedged_keys(plan, ccy, listings or {})
+        for row in plan.holdings:
+            if row.key in hedged:
+                # hedged on the local return, not on the one converted to euros
+                assert row.key is not None and row.ticker is not None
+                source = (local_histories or histories)[row.ticker]
+                local = _adjusted_close(source).loc[common].pct_change().iloc[1:]
+                local.index = pd.DatetimeIndex(local.index, name="date")
+                frame[row.key] = hedge(local, rf_leaf, cash)
+        for key in cash_keys:
+            frame[key] = cash
+        keys = [row.key for row in plan.holdings if row.key]
+        rf_keys = set(hedged)
+        if usd_cash_weight(plan) > 0.0:  # USD cash is a currency position: its own leaf
+            frame[USD_CASH_KEY] = convert(rf_leaf, ctx.returns("USD", common))
+            keys.append(USD_CASH_KEY)
+            rf_keys.add(USD_CASH_KEY)
+        frame = frame[keys]
+        rf_leaf = cash  # the unallocated weight is held as euro cash
     return CommonReturns(
         start_keys=tuple(k for k in prices if first[k] == max(first.values())),
         end_keys=tuple(k for k in prices if last[k] == min(last.values())),
         leaf_ret=frame,
-        rf=_compounded_rf(rf, common),
+        rf=rf_leaf,
+        rf_keys=frozenset(rf_keys),
         calendar=common,
         n_dropped=in_span - len(common),
     )
@@ -293,9 +404,10 @@ def _no_common_period(prices: dict[str, pd.Series], labels: dict[str, str]) -> A
     )
 
 
-def _labels(plan: PortfolioPlan) -> dict[str, str]:
+def _labels(plan: PortfolioPlan, ccy: str = "USD") -> dict[str, str]:
     labels = {row.key: row.label for row in plan.holdings if row.key is not None}
-    labels[CASH_ID] = CASH_LABEL
+    labels[CASH_ID] = CASH_LABEL if ccy == "USD" else EUR_CASH_LABEL
+    labels[USD_CASH_KEY] = USD_CASH_LABEL
     return labels
 
 
@@ -346,18 +458,52 @@ def _limiting(
     bt_edge: date,
     own_edge: date,
     labels: dict[str, str],
+    rf_keys: frozenset[str] = frozenset(),
 ) -> tuple[str, ...]:
     """Display names of what limits one edge of the window.
 
     ``keys`` are the instruments that limit the common price calendar, ``bt_keys`` the backtest's
     own answer, which adds USD cash (its risk-free rate ends with the factor file). Cash alone
-    limits an edge when the window is cut inside the common calendar.
+    limits an edge when the window is cut inside the common calendar. In the EUR view the hedged
+    lines and USD cash (``rf_keys``) carry the same rate, and are named as such.
     """
+    if rf_keys & set(bt_keys):
+        if bt_edge != own_edge:
+            return (RF_LIMIT_LABEL,)
+        return (*(labels[k] for k in keys), RF_LIMIT_LABEL)
     if CASH_ID not in bt_keys:
         return tuple(labels[k] for k in keys)
     if bt_edge != own_edge:
         return (labels[CASH_ID],)
     return (*(labels[k] for k in keys), labels[CASH_ID])
+
+
+GROUP_PREFIX = "g:"
+"""Group ids of the holdings table are ``g:<tree id>``, so they cannot clash with a leaf id."""
+
+
+def _holdings_nodes(plan: PortfolioPlan) -> tuple[HoldingsNode, ...]:
+    """The groups and holdings of the backtest in tree order, each group before its members.
+
+    Rows are in tree order already, so a group is listed when its first member appears. A group
+    that holds only cash instruments, or nothing above 0, is not listed.
+    """
+    nodes: list[HoldingsNode] = []
+    listed: set[str] = set()
+    for row in plan.holdings:
+        assert row.key is not None
+        path: tuple[str, ...] = ()
+        for depth, (group_id, label) in enumerate(row.groups):
+            parent = path[-1] if path else None
+            path = (*path, GROUP_PREFIX + group_id)
+            if path[-1] not in listed:
+                listed.add(path[-1])
+                nodes.append(HoldingsNode(path[-1], "group", label, None, parent, depth, path))
+        assert path, "an instrument sits in at least one group"
+        nodes.append(
+            HoldingsNode(row.key, "holding", row.name, row.ticker, path[-1], len(path), path)
+        )
+    return tuple(nodes)
 
 
 def _summary(
@@ -375,9 +521,15 @@ def _summary(
             bt.start,
             _day(common.leaf_ret.index[0]),
             labels,
+            common.rf_keys,
         ),
         end_limited_by=_limiting(
-            common.end_keys, bt.end_leaves, bt.end, _day(common.leaf_ret.index[-1]), labels
+            common.end_keys,
+            bt.end_leaves,
+            bt.end,
+            _day(common.leaf_ret.index[-1]),
+            labels,
+            common.rf_keys,
         ),
         n_dates_dropped=common.n_dropped,
         n_instruments=len(plan.rows),
@@ -388,10 +540,13 @@ def _summary(
         unallocated_weight=plan.unallocated,
         survivorship_note=bt.survivorship_note,
         weights=tuple((row.name, row.ticker, row.weight) for row in plan.rows),
+        holdings=HoldingsInput(bt, _holdings_nodes(plan)),
     )
 
 
-def _subject(plan: PortfolioPlan, bt: BacktestResult, common: pd.DatetimeIndex) -> ReturnSubject:
+def _subject(
+    plan: PortfolioPlan, bt: BacktestResult, common: pd.DatetimeIndex, currency: str = "USD"
+) -> ReturnSubject:
     """The daily portfolio subject: net returns on the backtest window.
 
     The calendar's origin is the last common price date before the window; the level index is
@@ -414,12 +569,17 @@ def _subject(plan: PortfolioPlan, bt: BacktestResult, common: pd.DatetimeIndex) 
         calendar=calendar,
         levels=levels,
         source=f"backtest of {_plural(len(plan.rows))} ({PRICE_SOURCE})",
-        currency="USD",
+        currency=currency,
     )
 
 
 def backtest_portfolio(
-    plan: PortfolioPlan, histories: dict[str, PriceHistory], rf: pd.Series
+    plan: PortfolioPlan,
+    histories: dict[str, PriceHistory],
+    rf: pd.Series,
+    ctx: CurrencyContext | None = None,
+    listings: Mapping[str, str] | None = None,
+    local_histories: dict[str, PriceHistory] | None = None,
 ) -> tuple[ReturnSubject, PortfolioBacktestInput]:
     """Run the backtest of the plan and build its subject and summary (pure; blocking).
 
@@ -427,10 +587,13 @@ def backtest_portfolio(
     on the whole common window of the instruments with a weight above 0; USD cash, at ``rf``,
     joins it only when some weight is held there. A refusal is an ``ApiException`` (422).
     """
-    common = _common_returns(plan, histories, rf)
+    common = _common_returns(plan, histories, rf, ctx, listings, local_histories)
     frame = common.leaf_ret
     weights = {row.key: row.weight for row in plan.holdings if row.key is not None}
-    labels = _labels(plan)
+    eur = ctx is not None and ctx.ref == "EUR"
+    if eur and usd_cash_weight(plan) > 0.0:
+        weights[USD_CASH_KEY] = usd_cash_weight(plan)
+    labels = _labels(plan, "EUR" if eur else "USD")
     try:
         bt = run_backtest(frame, weights, common.rf, plan.cost_bps)
     except ValueError as exc:
@@ -438,7 +601,11 @@ def backtest_portfolio(
         seen = rf.dropna().index
         span = (_day(seen[0]), _day(seen[-1])) if cash_held and len(seen) else None
         raise _window_refusal(exc, frame, span, labels) from exc
-    return _subject(plan, bt, common.calendar), _summary(plan, bt, common, labels)
+    currency = "USD" if ctx is None else ctx.ref
+    summary = _summary(plan, bt, common, labels)
+    if eur:
+        summary = dataclasses.replace(summary, unallocated_currency="EUR")
+    return _subject(plan, bt, common.calendar, currency), summary
 
 
 def build_portfolio_report(
@@ -453,17 +620,31 @@ def build_portfolio_report(
     start: date | None,
     end: date | None,
     inputs: SectionInputs | None,
+    ctx: CurrencyContext | None = None,
+    usd_rf: pd.Series | None = None,
+    listings: Mapping[str, str] | None = None,
+    local_histories: dict[str, PriceHistory] | None = None,
 ) -> FactorReport:
     """Backtest the plan and analyse the net daily returns (blocking; run in a worker).
 
     The range cuts the analysis sample, as for a ticker; the backtest itself always runs on the
-    whole common window.
+    whole common window. ``histories`` and ``factor_frame`` are already in the reference currency
+    of ``ctx`` (None: USD). In the EUR view ``usd_rf`` is the original US risk-free rate: USD
+    cash earns it, converted to euros, and a hedged line swaps it for the euro cash return.
+    ``listings`` gives each ticker's quote currency (default USD). ``local_histories`` are the
+    histories before conversion: a hedged line is hedged on its local return.
     """
     from factordesk.pipeline import assemble_subject_report
 
     if RF_COLUMN not in factor_frame.columns:
         raise ValueError("the factor frame has no RF column for the USD cash leaf")
-    subject, summary = backtest_portfolio(plan, histories, factor_frame[RF_COLUMN])
+    eur = ctx is not None and ctx.ref == "EUR"
+    if eur and usd_rf is None:
+        raise ValueError("the EUR view needs the US risk-free rate (usd_rf) for USD cash")
+    rf = usd_rf if eur and usd_rf is not None else factor_frame[RF_COLUMN]
+    subject, summary = backtest_portfolio(plan, histories, rf, ctx, listings, local_histories)
+    if ctx is not None and eur:
+        _note_hedges(plan, ctx, listings or {})
     cov = ranges.Coverage(
         first_return_date=summary.window_start,
         last_price_date=summary.window_end,
@@ -481,6 +662,8 @@ def build_portfolio_report(
             start=first_day,
             end=last_day,
             section_inputs=section_inputs,
+            reference_currency="EUR" if eur else "USD",
+            currency=ctx.info() if ctx is not None and eur else None,
         )
     except InsufficientHistoryError as exc:
         raise to_api_exception(exc, subject.label) from exc
@@ -490,3 +673,17 @@ def build_portfolio_report(
             f"Cannot analyse {subject.label}: {one_line(exc.reason)}.",
             "Check that the portfolio does not sit entirely in USD cash.",
         ) from exc
+
+
+def _note_hedges(plan: PortfolioPlan, ctx: CurrencyContext, listings: Mapping[str, str]) -> None:
+    """Tell the EUR report which lines were hedged and which bond funds were not."""
+    hedged = hedged_keys(plan, "EUR", listings)
+    names = [r.label for r in plan.holdings if r.key in hedged]
+    if names:
+        ctx.note("Hedged to EUR: " + ", ".join(names) + ".")
+    multi = {line.id for line in load_library().lines if line.multi_currency}
+    open_ = [r.label for r in plan.holdings if r.library_id in multi]
+    if open_:
+        ctx.note("Not hedged, several currencies: " + ", ".join(open_) + ".")
+    if eur_cash_keys(plan, "EUR"):
+        ctx.note("The EUR Cash line earns the euro overnight rate.")

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from factordesk.api.currency_ctx import CurrencySources, default_sources
 from factordesk.config import get_settings
 from factordesk.data.factors import (
     FactorDownloadError,
@@ -26,7 +27,12 @@ from factordesk.data.factors import (
 from factordesk.data.prices import PriceProvider, YFinanceProvider
 
 if TYPE_CHECKING:
-    from factordesk.section_hooks.context import MacroInput, SectionInputs, WorldBenchmarkInput
+    from factordesk.section_hooks.context import (
+        EnergyInput,
+        MacroInput,
+        SectionInputs,
+        WorldBenchmarkInput,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +74,18 @@ class AppDeps:
     """The fund histories and the dollar index of the macro section, refreshed like the world
     beta proxies (the dollar file is cached per day). Never raises. ``None``: not wired, so the
     macro section is not computed."""
+    load_energy: Callable[[], EnergyInput] | None = None
+    """Brent, Henry Hub and KRBN of the energy section, refreshed like the macro funds (the FRED
+    files are cached per day). Never raises. ``None``: not wired, so the energy section is not
+    computed."""
     load_ff6: Callable[[datetime], pd.DataFrame] | None = None
     """The daily FF6 frame (FF5 + RF + ``Mom``, ``data.french.load_ff6("daily")``). It feeds the
     FF6 model and the alpha strip of every report. May raise ``FactorError``: an FF6 report then
     fails, an FF5 report falls back to ``load_factors`` without the strip. ``None``: not wired, so
     FF6 is refused and FF5 reports have no alpha strip."""
+    currency: CurrencySources | None = None
+    """Exchange rates and the euro cash rate of the EUR view. ``None``: not wired, so the EUR view
+    is refused with a 503 (and a listing in another currency cannot be converted)."""
 
     def __post_init__(self) -> None:
         if self.max_workers < 1:
@@ -138,6 +151,11 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
 
         return load_macro_input(price_provider, data_dir=data_dir, now=utc_now())
 
+    def energy() -> EnergyInput:
+        from factordesk.section_hooks.energy import load_energy_input
+
+        return load_energy_input(price_provider, data_dir=data_dir, now=utc_now())
+
     return AppDeps(
         price_provider=price_provider,
         load_factors=load_factors,
@@ -150,5 +168,7 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         load_world_benchmark=world_benchmark,
         load_europe_benchmark=europe_benchmark,
         load_macro=macro,
+        load_energy=energy,
         load_ff6=load_ff6_daily,
+        currency=default_sources(data_dir),
     )

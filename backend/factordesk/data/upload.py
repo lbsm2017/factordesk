@@ -20,6 +20,8 @@ MAX_UPLOAD_BYTES = 1024 * 1024
 """Largest request body accepted (1 MB); a 40-year monthly record is about 10 KB."""
 DEFAULT_NAME = "Uploaded track record"
 MAX_NAME_LENGTH = 80
+MAX_ECHO = 40
+"""Longest cell text echoed back in a message; longer text is cut and ends with an ellipsis."""
 GrossNet = Literal["gross", "net"]
 _COLUMNS = ("date", "return")
 
@@ -44,6 +46,15 @@ def parse_gross_net(value: str | None) -> GrossNet | None:
     raise UploadError("gross_net must be gross or net")
 
 
+def _cut(text: str, limit: int = MAX_ECHO) -> str:
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _shown(text: str) -> str:
+    """``text`` as it is echoed in a message: quoted, and cut at ``MAX_ECHO`` characters."""
+    return repr(_cut(text))
+
+
 def _decode(raw: bytes) -> str:
     try:
         return raw.decode("utf-8-sig")
@@ -53,12 +64,14 @@ def _decode(raw: bytes) -> str:
         ) from exc
 
 
-def _rows(text: str) -> list[list[str]]:
+def _rows(text: str) -> list[tuple[int, list[str]]]:
+    """The non-blank rows, each with its line number in the file (blank lines count)."""
     sample = text[:4096]
     delimiter = ";" if sample.count(";") > sample.count(",") else ","
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     rows = [
-        [cell.strip() for cell in row]
-        for row in csv.reader(io.StringIO(text), delimiter=delimiter)
+        (reader.line_num, [cell.strip() for cell in row])
+        for row in reader
         if any(cell.strip() for cell in row)
     ]
     if not rows:
@@ -75,10 +88,10 @@ def _date(text: str, line: int) -> pd.Timestamp:
         stamp = datetime.fromisoformat(text)
     except ValueError:
         raise UploadError(
-            f"line {line}: {text!r} is not a date; write dates as YYYY-MM-DD or YYYY-MM"
+            f"line {line}: {_shown(text)} is not a date; write dates as YYYY-MM-DD or YYYY-MM"
         ) from None
     if stamp.tzinfo is not None:
-        raise UploadError(f"line {line}: {text!r} has a time zone; write dates without one")
+        raise UploadError(f"line {line}: {_shown(text)} has a time zone; write dates without one")
     return pd.Timestamp(stamp).normalize()
 
 
@@ -87,16 +100,18 @@ def _number(text: str, line: int) -> float:
         raise UploadError(f"line {line}: the return is missing")
     if "%" in text:
         raise UploadError(
-            f"line {line}: {text!r} is a percentage; write returns as decimals (0.012 for 1.2%)"
+            f"line {line}: {_shown(text)} is a percentage; "
+            "write returns as decimals (0.012 for 1.2%)"
         )
     try:
         value = float(text.replace(",", ".") if text.count(",") == 1 and "." not in text else text)
     except ValueError:
         raise UploadError(
-            f"line {line}: {text!r} is not a number; write returns as decimals (0.012 for 1.2%)"
+            f"line {line}: {_shown(text)} is not a number; "
+            "write returns as decimals (0.012 for 1.2%)"
         ) from None
     if not math.isfinite(value):
-        raise UploadError(f"line {line}: the return {text!r} is not a finite number")
+        raise UploadError(f"line {line}: the return {_shown(text)} is not a finite number")
     return value
 
 
@@ -109,11 +124,15 @@ def parse_monthly_csv(raw: bytes) -> pd.Series:
     ``subject_from_monthly_returns``, which also moves each date to its month-end.
     """
     rows = _rows(_decode(raw))
-    header = [cell.lower() for cell in rows[0]]
+    first_line, first = rows[0]
+    header = [cell.lower() for cell in first]
     if sorted(header) != sorted(_COLUMNS):
+        found = ", ".join(_cut(cell) for cell in first)
+        if len(found) > 80:
+            found = found[:79] + "…"
         raise UploadError(
-            "the first row must name two columns, date and return "
-            f"(found: {', '.join(rows[0])[:80] or 'nothing'})"
+            f"line {first_line}: the first row must name two columns, date and return "
+            f"(found: {found or 'nothing'})"
         )
     at_date, at_return = header.index("date"), header.index("return")
     body = rows[1:]
@@ -121,7 +140,7 @@ def parse_monthly_csv(raw: bytes) -> pd.Series:
         raise UploadError("the file has a header but no rows")
     dates: list[pd.Timestamp] = []
     values: list[float] = []
-    for number, row in enumerate(body, start=2):
+    for number, row in body:
         if len(row) != 2:
             raise UploadError(f"line {number}: expected 2 columns, found {len(row)}")
         dates.append(_date(row[at_date], number))

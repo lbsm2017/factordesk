@@ -22,7 +22,9 @@ import { RiskPanel } from "./RiskPanel";
 import { RollingPanel } from "./RollingPanel";
 import { SummaryPanel } from "./SummaryPanel";
 import { AlphaStripPanel } from "./sections/AlphaStripPanel";
+import { EnergyPanel } from "./sections/EnergyPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
+import { HoldingsPanel } from "./sections/HoldingsPanel";
 import { LazyKalmanPanel, LazyRegressionDetail, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
 import { MacroPanel } from "./sections/MacroPanel";
@@ -53,12 +55,14 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "header", position: 100, Component: Header },
   { name: "summary", position: 200, Component: SummaryPanel },
   { name: "price", position: 400, Component: PricePanel },
+  { name: "holdings", position: 420, Component: HoldingsPanel },
   { name: "performance", position: 450, Component: PerformancePanel },
   { name: "tail_risk", position: 460, Component: TailRiskPanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
   { name: "alpha_strip", position: 502, Component: AlphaStripPanel },
   { name: "world_beta", position: 505, Component: WorldBetaPanel },
   { name: "macro", position: 508, Component: MacroPanel },
+  { name: "energy", position: 509, Component: EnergyPanel },
   { name: "returns", position: 600, Component: ReturnPanel },
   { name: "risk", position: 700, Component: RiskPanel },
   { name: "rolling", position: 710, Component: RollingPanel },

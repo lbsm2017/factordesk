@@ -163,6 +163,30 @@ def test_monthly_join_keeps_both_files_as_published() -> None:
     assert ff6.attrs["key"] == "ff6_monthly"
 
 
+def test_stamp_notices_are_empty_when_the_files_agree() -> None:
+    ff5 = _parse(FF5_MONTHLY_2020, FF5_MONTHLY)
+    mom = _parse(MOM_MONTHLY_2020, MOM_MONTHLY)
+    assert french.stamp_notices(join_momentum(ff5, mom).attrs) == []
+    assert french.stamp_notices({}) == []  # not a joined frame
+
+
+def test_stamp_notice_names_different_last_dates() -> None:
+    ff5 = _parse(FF5_MONTHLY_2020, FF5_MONTHLY)
+    mom = _parse(MOM_MONTHLY_2020, MOM_MONTHLY).loc[:"2020-10-31"]
+    ff6 = join_momentum(ff5, mom)
+    assert ff6.attrs["mom_last_date"] == "2020-10-31"
+    (notice,) = french.stamp_notices(ff6.attrs)
+    assert "2020-12-31" in notice and "2020-10-31" in notice and "momentum" in notice
+
+
+def test_stamp_notice_names_different_crsp_vintages() -> None:
+    ff5 = _parse(FF5_MONTHLY_2020, FF5_MONTHLY)
+    mom = _parse(MOM_MONTHLY_2020, MOM_MONTHLY)
+    mom.attrs["crsp_stamp"] = "202608"
+    (notice,) = french.stamp_notices(join_momentum(ff5, mom).attrs)
+    assert "202609" in notice and "202608" in notice
+
+
 def _nan_mom_dates(ff6: pd.DataFrame) -> list[pd.Timestamp]:
     return list(pd.DatetimeIndex(ff6.index)[ff6["Mom"].isna().to_numpy()])
 

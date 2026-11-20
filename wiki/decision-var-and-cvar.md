@@ -11,7 +11,7 @@ Every report shows how much could be lost on a bad day or month, using three met
 
 - **Methods:** historical, Gaussian (normal) and Cornish-Fisher (normal adjusted for skewness and fat tails), side by side.
 - **Levels:** 99% VaR and 97.5% CVaR (expected shortfall) are the headline everywhere. Monthly series also get a 95% row.
-- **Horizon:** results stay at the series' own frequency (1-day for daily data, 1-month for monthly). No square-root-of-time scaling.
+- **Horizon:** daily, monthly and quarterly, each from its own returns (see the 2026-11-20 note below). No square-root-of-time scaling.
 - **Uncertainty:** each figure shows a 90% bootstrap band and how many bad days or months it rests on. A historical figure with fewer than about three expected tail observations shows "n/a" and the reason.
 - **Portfolios:** each holding's share of CVaR, rolled up through the SAA tree.
 - **Deferred:** backtests (Kupiec, Christoffersen), GARCH and extreme-value methods, Student-t.
@@ -36,6 +36,9 @@ Every report shows how much could be lost on a bad day or month, using three met
 - Monthly records will often show "n/a" at 99%, which may surprise users. The reason is always printed.
 - The bands make the results look less certain than peer tools do. That is deliberate.
 - There is no backtest in version 1.
+
+- 2026-11-20: the tail sample became exactly the analysed sample (the same rows as every other section), so multi-day gap returns and other rows the analysis excluded are no longer in it.
+- 2026-11-20: tail risk now has three horizons: daily, monthly and quarterly. A monthly or quarterly figure uses non-overlapping returns compounded over complete calendar months or quarters of the same days, never a square-root-of-time scaling. Uploaded monthly records get monthly and quarterly only. The same minimum-tail rule applies, so quarterly 99% is often n/a. The panel shows one line per method and level, with the band as a whisker and a Daily | Monthly | Quarterly switch.
 
 ## What would change our mind
 

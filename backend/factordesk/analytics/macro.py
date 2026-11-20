@@ -27,6 +27,13 @@ Inference is ``regression.ols_hac`` (Newey-West; the small-sample scaling and St
 monthly subjects). The tag is the Benjamini-Hochberg rule of the headline betas applied to the
 factors of this regression. The window starts at the latest first date among the legs.
 
+EUR view (``EuroLegs``). The subject's excess return and the market factor are already in euros
+(the sample's ``rf`` is the euro cash return ``c``). The traded legs are converted with ``f``, the
+return of the US dollar in euros over the same interval: TERM, DEF and INFL are the USD spreads
+times ``(1 + f)`` (TERM uses the dollar risk-free rate, ``EuroLegs.usd_rf``); COMM is
+``(1 + DBC)(1 + f) - 1 - c``. The dollar leg is ``f`` itself (the dollar measured in euros) in place
+of the Fed index, with the same previous-day term for daily subjects and the summed beta.
+
 Pure: no I/O, no clock. Inputs are not mutated.
 """
 
@@ -40,6 +47,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from factordesk.analytics.currency import EuroLegs, excess_in_reference, spread_in_reference
 from factordesk.analytics.regression import (
     Z_975,
     Tag,
@@ -100,6 +108,37 @@ USD_LAG_NOTE = (
     "The index is a noon New York fixing, so a daily regression adds the previous day's return "
     "and reports the summed beta."
 )
+EUR_FACTORS: tuple[MacroFactor, ...] = (
+    MacroFactor("mkt_rf", "Mkt-RF", "Market", "French market excess return, in euros"),
+    MacroFactor("term", "TERM", "Rates", "IEF minus the US dollar cash rate, in euros"),
+    MacroFactor(
+        "def",
+        "DEF",
+        "Credit",
+        "LQD minus IEF, in euros",
+        "credit minus rates, not duration-matched",
+    ),
+    MacroFactor("comm", "COMM", "Commodities", "DBC in euros minus the euro cash rate"),
+    MacroFactor("infl", "INFL", "Inflation", "TIP minus IEI, in euros", "breakeven proxy"),
+    MacroFactor(
+        "usd",
+        "USD",
+        "US dollar against the euro",
+        "return of the US dollar measured in euros (euro reference rate, see the currency footer)",
+        "positive beta: gains when the dollar strengthens against the euro",
+    ),
+)
+EUR_BY_CODE: dict[str, MacroFactor] = {f.code: f for f in EUR_FACTORS}
+EUR_USD_LAG_NOTE = (
+    "The euro reference rate is fixed before the subject's close, so the previous-day term is "
+    "expected to be near zero. It is kept for consistency with the US-dollar view: read the "
+    "summed beta."
+)
+
+
+def factors_of(euro: bool) -> dict[str, MacroFactor]:
+    """The factor descriptions of the USD view or of the EUR view (wording only)."""
+    return EUR_BY_CODE if euro else BY_CODE
 
 
 # ------------------------------------------------------------------------------ leg returns
@@ -185,33 +224,49 @@ def build_design(
     calendar: pd.DatetimeIndex,
     levels: Mapping[str, pd.Series],
     dollar: pd.Series | None,
+    euro: EuroLegs | None = None,
 ) -> MacroDesign:
     """The factors on the sample's rows; ``levels`` holds the five fund price series.
 
     ``calendar`` is the subject's calendar (origin first). ``dollar`` is the index level series
-    (NaN where FRED has no value) or None to run without it. Raises ``KeyError`` for a missing
-    fund. The rows kept are those where the excess return and every column are finite.
+    (NaN where FRED has no value) or None to run without it. With ``euro`` (the EUR view) the
+    legs are converted to euros and the dollar leg is the USD/EUR return; ``dollar`` is then not
+    used. Raises ``KeyError`` for a missing fund. The rows kept are those where the excess return
+    and every column are finite.
     """
     freq = sample.frequency
     rets = {t: leg_returns(levels[t], calendar, freq) for t in LEG_TICKERS}
     rows = pd.DatetimeIndex(sample.xret.index)
     rf = sample.rf.to_numpy(dtype=np.float64)
-    cols: dict[str, FloatArray] = {
-        "mkt_rf": sample.factors["mkt_rf"].to_numpy(dtype=np.float64),
-        "term": rets["IEF"].reindex(rows).to_numpy(dtype=np.float64) - rf,
-        "def": rets["LQD"].reindex(rows).to_numpy(dtype=np.float64)
-        - rets["IEF"].reindex(rows).to_numpy(dtype=np.float64),
-        "comm": rets["DBC"].reindex(rows).to_numpy(dtype=np.float64) - rf,
-        "infl": rets["TIP"].reindex(rows).to_numpy(dtype=np.float64)
-        - rets["IEI"].reindex(rows).to_numpy(dtype=np.float64),
-    }
+    ief = rets["IEF"].reindex(rows).to_numpy(dtype=np.float64)
+    lqd = rets["LQD"].reindex(rows).to_numpy(dtype=np.float64)
+    dbc = rets["DBC"].reindex(rows).to_numpy(dtype=np.float64)
+    tip = rets["TIP"].reindex(rows).to_numpy(dtype=np.float64)
+    iei = rets["IEI"].reindex(rows).to_numpy(dtype=np.float64)
+    cols: dict[str, FloatArray] = {"mkt_rf": sample.factors["mkt_rf"].to_numpy(dtype=np.float64)}
     lag: FloatArray | None = None
-    if dollar is not None:
-        usd = leg_returns(dollar, calendar, freq)
-        cols["usd"] = usd.reindex(rows).to_numpy(dtype=np.float64)
+    if euro is None:
+        cols["term"] = ief - rf
+        cols["def"] = lqd - ief
+        cols["comm"] = dbc - rf
+        cols["infl"] = tip - iei
+        if dollar is not None:
+            usd = leg_returns(dollar, calendar, freq)
+            cols["usd"] = usd.reindex(rows).to_numpy(dtype=np.float64)
+            if freq == "daily":
+                previous = _previous_dates(pd.DatetimeIndex(calendar)).reindex(rows)
+                lag = usd.reindex(pd.DatetimeIndex(previous)).to_numpy(dtype=np.float64)
+    else:
+        f = euro.fx.reindex(rows).to_numpy(dtype=np.float64)
+        rf_usd = euro.usd_rf.reindex(rows).to_numpy(dtype=np.float64)
+        cols["term"] = spread_in_reference(ief - rf_usd, f)
+        cols["def"] = spread_in_reference(lqd - ief, f)
+        cols["comm"] = excess_in_reference(dbc, f, rf)  # rf is the euro cash return here
+        cols["infl"] = spread_in_reference(tip - iei, f)
+        cols["usd"] = f
         if freq == "daily":
             previous = _previous_dates(pd.DatetimeIndex(calendar)).reindex(rows)
-            lag = usd.reindex(pd.DatetimeIndex(previous)).to_numpy(dtype=np.float64)
+            lag = euro.fx.reindex(pd.DatetimeIndex(previous)).to_numpy(dtype=np.float64)
     codes = tuple(f.code for f in FACTORS if f.code in cols)
     x: FloatArray = np.column_stack([cols[c] for c in codes]).astype(np.float64)
     y = sample.xret.to_numpy(dtype=np.float64)
@@ -311,7 +366,8 @@ def fit_macro(design: MacroDesign) -> MacroFit:
         )
         for i, code in enumerate(design.codes)
     )
-    correlation = np.asarray(np.corrcoef(design.x, rowvar=False), dtype=np.float64)
+    assert cc.correlation is not None  # set by ``collinearity``: the matrix is computed once
+    correlation = cc.correlation
     return MacroFit(
         rows=rows,
         codes=design.codes,
@@ -331,10 +387,13 @@ def run_macro(
     calendar: pd.DatetimeIndex,
     levels: Mapping[str, pd.Series],
     dollar: pd.Series | None,
+    euro: EuroLegs | None = None,
 ) -> tuple[MacroDesign, MacroFit]:
-    """Build the design and fit it. Raises ``TooFewRowsError`` when fewer than ``MIN_ROWS`` rows
-    remain and ``DegenerateInputError`` when the design is singular."""
-    design = build_design(sample, calendar, levels, dollar)
+    """Build the design and fit it (``euro``: the EUR view, see ``build_design``).
+
+    Raises ``TooFewRowsError`` when fewer than ``MIN_ROWS`` rows remain and
+    ``DegenerateInputError`` when the design is singular."""
+    design = build_design(sample, calendar, levels, dollar, euro)
     floor = MIN_ROWS[design.frequency]
     if design.n < floor:
         raise TooFewRowsError(

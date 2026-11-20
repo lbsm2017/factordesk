@@ -86,9 +86,20 @@ class Security:
 class UnsupportedCurrencyError(Exception):
     """The ticker is quoted in a currency other than US dollars (roadmap N1, methodology M1.5)."""
 
-    def __init__(self, ticker: str, currency: str) -> None:
+    def __init__(
+        self, ticker: str, currency: str, *, convertible: bool = False, detail: str | None = None
+    ) -> None:
         self.ticker = ticker
         self.currency = currency
+        if detail:
+            super().__init__(detail)
+            return
+        if convertible:  # the listing is checked against the currencies that can be converted
+            super().__init__(
+                f"{ticker} is quoted in {currency}, which factordesk cannot convert. It accepts "
+                "US dollars, euros and the other major currencies."
+            )
+            return
         super().__init__(
             f"Only tickers quoted in US dollars are supported for now. "
             f"{ticker} is quoted in {currency}."

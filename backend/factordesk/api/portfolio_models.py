@@ -30,12 +30,15 @@ from pydantic import Field, model_validator
 
 from factordesk.analytics.backtest import WEIGHT_TOLERANCE
 from factordesk.report.base import FrozenModel
+from factordesk.report.schema import ReferenceCurrency
 
 TREE_VERSION: Final = 1
 MAX_INSTRUMENTS: Final = 50
 MAX_COST_BPS: Final = 1000.0
 USD_CASH_LIBRARY_ID: Final = "cash_usd"
 """Library id of the USD cash line: the unallocated remainder goes there."""
+EUR_CASH_LIBRARY_ID: Final = "cash_eur"
+"""Library id of the EUR cash line: the EUR view replaces its proxy (FXE) by the euro cash index."""
 
 _TICKER_RE = re.compile(r"^[A-Za-z0-9.^=-]{1,12}$")  # same rule as data.prices.validate_ticker
 
@@ -95,6 +98,12 @@ class PortfolioTree(FrozenModel):
     version: Literal[1]
     name: Text
     cost_bps: float = Field(ge=0.0, le=MAX_COST_BPS, description="Cost per unit of turnover.")
+    reference_currency: ReferenceCurrency = Field(
+        default="USD",
+        exclude_if=lambda value: value == "USD",
+        description="Currency of the backtest and of every figure of the report; left out of the "
+        "JSON when USD.",
+    )
     root: RootGroup
 
     @model_validator(mode="after")
@@ -163,6 +172,16 @@ class LibraryLine(FrozenModel):
     note: str = Field(min_length=1, description="The caveat a reader should see with the proxy.")
     first_date: date | None = Field(description="First daily price date of the proxy.")
     currency: str | None = Field(description="Quote currency of the proxy.")
+    hedge_eur: bool = Field(
+        default=False,
+        description="True for a bond line with only US-dollar underlying: the EUR view hedges it "
+        "to euros (its return above US cash, plus euro cash).",
+    )
+    multi_currency: bool = Field(
+        default=False,
+        description="True for a bond fund that holds several currencies: the EUR view leaves it "
+        "unhedged and says so.",
+    )
 
     @model_validator(mode="after")
     def _check(self) -> LibraryLine:

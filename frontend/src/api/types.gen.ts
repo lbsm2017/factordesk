@@ -181,6 +181,10 @@ export interface paths {
         /**
          * Get Report
          * @description The factor report for a range preset or custom dates (neither: Full history).
+         *
+         *     ``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro
+         *     rate, factors converted. The report then carries a ``currency`` block. 503 when the
+         *     exchange rates or the euro rate cannot be reached (the USD view does not need them).
          */
         get: operations["get_report_api_report__ticker__get"];
         put?: never;
@@ -560,6 +564,20 @@ export interface components {
              * @enum {string}
              */
             model: "ff5" | "ff6";
+            /**
+             * Record Currency
+             * @description Currency of the record itself: USD (default) or EUR.
+             * @default USD
+             * @enum {string}
+             */
+            record_currency: "USD" | "EUR";
+            /**
+             * Ccy
+             * @description Reference currency of the report: USD or EUR.
+             * @default USD
+             * @enum {string}
+             */
+            ccy: "USD" | "EUR";
         };
         /**
          * CorrPair
@@ -572,6 +590,33 @@ export interface components {
             b: string;
             /** Corr */
             corr: number;
+        };
+        /**
+         * CurrencyInfo
+         * @description The reference currency of a report that is not in US dollars (written only for those).
+         */
+        CurrencyInfo: {
+            /**
+             * Reference
+             * @description Currency of every figure in the report.
+             * @constant
+             */
+            reference: "EUR";
+            /**
+             * Fx Source
+             * @description Source credit of the exchange rates used; None when none were needed.
+             */
+            fx_source: string | null;
+            /**
+             * Rate Source
+             * @description Source credit of the euro cash rate (overnight rate); None when not used.
+             */
+            rate_source: string | null;
+            /**
+             * Notes
+             * @description Plain-words notices: dates dropped for lack of an exchange rate, sections left out in this currency, a source that fell back to its second choice.
+             */
+            notes: string[];
         };
         /**
          * DataInfo
@@ -767,6 +812,223 @@ export interface components {
             values: number[];
         };
         /**
+         * EnergyLeg
+         * @description One price series behind a leg, with its first date.
+         */
+        EnergyLeg: {
+            /**
+             * Ticker
+             * @description FRED series id or Yahoo ticker.
+             */
+            ticker: string;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "mkt_rf" | "oil" | "gas" | "co2";
+            /**
+             * Role
+             * @description What it feeds, for example "OIL = log change of Brent".
+             */
+            role: string;
+            /**
+             * First Date
+             * @description First price date; None when not fetched.
+             */
+            first_date: string | null;
+        };
+        /**
+         * EnergyModel
+         * @description One regression of the section.
+         */
+        EnergyModel: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "long" | "carbon";
+            /**
+             * Title
+             * @description "Market, oil and gas" or "Market, oil, gas and carbon".
+             */
+            title: string;
+            /**
+             * Label
+             * @description Short-sample label of the carbon model; None otherwise.
+             */
+            label: string | null;
+            /**
+             * N Obs
+             * @description Rows of the regression.
+             */
+            n_obs: number;
+            /**
+             * Start
+             * Format: date
+             * @description First date of the regression.
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             * @description Last date of the regression.
+             */
+            end: string;
+            /**
+             * Hac Lags
+             * @description Newey-West lag of the fit.
+             */
+            hac_lags: number;
+            /**
+             * T Reference
+             * @enum {string}
+             */
+            t_reference: "normal" | "student_t";
+            /** R2 */
+            r2: number;
+            /** Adj R2 */
+            adj_r2: number;
+            /**
+             * Rows
+             * @description Market, oil, gas (and carbon).
+             */
+            rows: components["schemas"]["EnergyRow"][];
+            gas_robust: components["schemas"]["GasRobustness"];
+            /**
+             * Window Limited By
+             * @description The leg whose first date starts the window, when it is later than the subject's own start; None otherwise.
+             */
+            window_limited_by: string | null;
+        };
+        /**
+         * EnergyRow
+         * @description One leg of an energy regression.
+         */
+        EnergyRow: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "mkt_rf" | "oil" | "gas" | "co2";
+            /**
+             * Name
+             * @description Display name: "Mkt-RF", "OIL", "GAS", "CO2".
+             */
+            name: string;
+            /**
+             * Label
+             * @description Plain label: Market, Oil, Natural gas, Carbon.
+             */
+            label: string;
+            /**
+             * Definition
+             * @description How the leg is built.
+             */
+            definition: string;
+            /**
+             * Note
+             * @description Caveat on the leg.
+             */
+            note: string | null;
+            /**
+             * Beta
+             * @description Raw sensitivity: excess return per 1.00 of the leg return.
+             */
+            beta: number;
+            /**
+             * Se
+             * @description Newey-West HAC standard error of beta.
+             */
+            se: number;
+            /**
+             * T
+             * @description HAC t-statistic of beta.
+             */
+            t: number;
+            /**
+             * P
+             * @description Two-sided p-value of t.
+             */
+            p: number;
+            /**
+             * Ci Low
+             * @description Lower end of the 95% interval, beta - q * se.
+             */
+            ci_low: number;
+            /**
+             * Ci High
+             * @description Upper end of the 95% interval, beta + q * se.
+             */
+            ci_high: number;
+            /**
+             * Tag
+             * @description Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the legs of this model.
+             * @enum {string}
+             */
+            tag: "reliable" | "noise";
+            /**
+             * Vif
+             * @description Variance inflation factor among the legs.
+             */
+            vif: number;
+        };
+        /**
+         * EnergySection
+         * @description Sensitivity to oil, gas and carbon prices, after the market.
+         */
+        EnergySection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Model Note
+             * @description Fixed note: separate regression, raw sensitivities.
+             */
+            model_note: string;
+            /**
+             * Gas Note
+             * @description Caveat on the fat-tailed gas leg.
+             */
+            gas_note: string;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "monthly";
+            /**
+             * N Sample
+             * @description Rows of the analysis sample before the legs.
+             */
+            n_sample: number;
+            /** @description Market, oil, gas; None unless ok. */
+            long_model: components["schemas"]["EnergyModel"] | null;
+            /** @description Market, oil, gas, carbon; None when hidden (see carbon_note). */
+            carbon_model: components["schemas"]["EnergyModel"] | null;
+            /**
+             * Carbon Note
+             * @description Why the carbon model is not shown; None if shown.
+             */
+            carbon_note: string | null;
+            /**
+             * Fred Note
+             * @description Set when an older cached copy of Brent or Henry Hub was used (FRED could not be reached); None otherwise.
+             */
+            fred_note: string | null;
+            /**
+             * Legs
+             * @description The series behind the legs, with first dates.
+             */
+            legs: components["schemas"]["EnergyLeg"][];
+        };
+        /**
          * ExcludedRow
          * @description One return row left out of the analysis sample, with the reason (M2).
          */
@@ -824,6 +1086,8 @@ export interface components {
              * @description Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report.
              */
             model?: "ff6" | null;
+            /** @description Reference currency of the report when it is not US dollars; absent (not null) for a USD report. */
+            currency?: components["schemas"]["CurrencyInfo"] | null;
             /**
              * Generated At
              * Format: date-time
@@ -881,8 +1145,12 @@ export interface components {
             alpha_strip?: components["schemas"]["AlphaStrip"] | null;
             /** @description How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio. */
             portfolio_backtest?: components["schemas"]["PortfolioBacktestSection"] | null;
+            /** @description Holdings table of a portfolio: target and end weight, return contribution and risk share of each holding, group, cash and trading cost over the analysed window; absent (not null) for every subject except a portfolio. */
+            holdings?: components["schemas"]["HoldingsSection"] | null;
             /** @description Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed. */
             macro?: components["schemas"]["MacroSection"] | null;
+            /** @description Energy and carbon sensitivities: a separate regression on the market and oil, gas and (on a short sample) carbon price legs; absent (not null) when not computed. */
+            energy?: components["schemas"]["EnergySection"] | null;
         };
         /**
          * FactorStat
@@ -968,6 +1236,38 @@ export interface components {
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
         };
+        /**
+         * GasRobustness
+         * @description The gas sensitivity of the same model fitted without the largest gas moves.
+         */
+        GasRobustness: {
+            /**
+             * Beta
+             * @description Gas beta without the excluded rows.
+             */
+            beta: number;
+            /** Se */
+            se: number;
+            /** T */
+            t: number;
+            /** P */
+            p: number;
+            /**
+             * N Excluded
+             * @description Rows left out: the largest absolute gas returns.
+             */
+            n_excluded: number;
+            /**
+             * Excluded Dates
+             * @description Dates of the rows left out, largest first.
+             */
+            excluded_dates: string[];
+            /**
+             * N Obs
+             * @description Rows of this second fit.
+             */
+            n_obs: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -987,6 +1287,111 @@ export interface components {
             version: string;
             /** Schema Version */
             schema_version: string;
+        };
+        /**
+         * HoldingRow
+         * @description One line of the holdings table.
+         */
+        HoldingRow: {
+            /**
+             * Id
+             * @description Unique in the section. A holding is i:<tree id>, a group g:<tree id>; cash and trading cost are cash and cost.
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "group" | "holding" | "cash" | "cost";
+            /**
+             * Label
+             * @description Display name of the holding, group, cash or cost line.
+             */
+            label: string;
+            /**
+             * Ticker
+             * @description Yahoo ticker of a holding; None for every other row.
+             */
+            ticker: string | null;
+            /**
+             * Depth
+             * @description 0 asset class, cash or cost; 1 sub-asset class; 2 holding.
+             */
+            depth: number;
+            /**
+             * Parent Id
+             * @description Id of the group that contains the row; None at depth 0.
+             */
+            parent_id: string | null;
+            /**
+             * Target Weight
+             * @description Weight the portfolio rebalances to; None for the trading cost row.
+             */
+            target_weight: number | null;
+            /**
+             * End Weight
+             * @description Weight on the last day of the window, after drift; None for the cost row.
+             */
+            end_weight: number | null;
+            /**
+             * Contribution
+             * @description Frongello-linked contribution to the portfolio's net return over the window, as a decimal fraction (negative for the cost row).
+             */
+            contribution: number;
+            /**
+             * Risk Share
+             * @description Ex-post share of the portfolio's variance; None when the section's risk_share_reason says it is not defined.
+             */
+            risk_share: number | null;
+        };
+        /**
+         * HoldingsSection
+         * @description The holdings table of a portfolio report. Status is always ``ok`` when it exists.
+         */
+        HoldingsSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Window Start
+             * Format: date
+             * @description First day of the analysed window.
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date
+             * @description Last day of the analysed window.
+             */
+            window_end: string;
+            /**
+             * N Days
+             * @description Daily portfolio returns in the window.
+             */
+            n_days: number;
+            /**
+             * Total Return
+             * @description Net compounded return of the portfolio over the window; the contributions of the rows with no parent add up to it.
+             */
+            total_return: number;
+            /**
+             * Risk Share Reason
+             * @description Plain-words reason when no risk share is defined; None when they are.
+             */
+            risk_share_reason: string | null;
+            /**
+             * Rows
+             * @description Table rows in tree order, then cash, then cost.
+             */
+            rows: components["schemas"]["HoldingRow"][];
         };
         /**
          * Instrument
@@ -1230,6 +1635,18 @@ export interface components {
              * @description Quote currency of the proxy.
              */
             currency: string | null;
+            /**
+             * Hedge Eur
+             * @description True for a bond line with only US-dollar underlying: the EUR view hedges it to euros (its return above US cash, plus euro cash).
+             * @default false
+             */
+            hedge_eur: boolean;
+            /**
+             * Multi Currency
+             * @description True for a bond fund that holds several currencies: the EUR view leaves it unhedged and says so.
+             * @default false
+             */
+            multi_currency: boolean;
         };
         /**
          * MacroLeg
@@ -1781,9 +2198,14 @@ export interface components {
             average_turnover: number;
             /**
              * Unallocated Weight
-             * @description Weight left over by the targets; held in USD cash.
+             * @description Weight left over by the targets; held in USD cash, or as euro cash when unallocated_currency says so.
              */
             unallocated_weight: number;
+            /**
+             * Unallocated Currency
+             * @description EUR when the unallocated weight is held as euro cash (the EUR view); absent (not null) in the USD view, where it is held in USD cash.
+             */
+            unallocated_currency?: "EUR" | null;
             /**
              * Survivorship Note
              * @description Fixed warning carried by every backtest.
@@ -1812,6 +2234,13 @@ export interface components {
              * @description Cost per unit of turnover.
              */
             cost_bps: number;
+            /**
+             * Reference Currency
+             * @description Currency of the backtest and of every figure of the report; left out of the JSON when USD.
+             * @default USD
+             * @enum {string}
+             */
+            reference_currency: "USD" | "EUR";
             root: components["schemas"]["RootGroup"];
         };
         /**
@@ -3246,7 +3675,7 @@ export interface components {
             reason: string | null;
             /**
              * Indicative
-             * @description True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5]: the value is shown, as an indication only.
+             * @description True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5], or that differs from the historical figure by more than 50% of it: the value is shown, as an indication only (reason says which).
              */
             indicative: boolean;
             /** @description Bootstrap band; None when none is shown. */
@@ -3271,6 +3700,36 @@ export interface components {
              * @description Observations expected in the tail: n x (1 - level).
              */
             expected_tail_obs: number;
+        };
+        /**
+         * TailHorizon
+         * @description The tail risk figures of one horizon (one day, one month or one quarter).
+         *
+         *     Statuses: ``ok``; ``insufficient_data`` (fewer than 12 complete periods); ``failed`` (the
+         *     periodic returns have no usable tail statistic). A horizon that is not ok holds no part.
+         */
+        TailHorizon: {
+            /**
+             * Horizon
+             * @enum {string}
+             */
+            horizon: "daily" | "monthly" | "quarterly";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "failed";
+            /**
+             * Reason
+             * @description Why the horizon has no figures; None when ok.
+             */
+            reason: string | null;
+            series: components["schemas"]["TailSeriesStats"] | null;
+            /**
+             * Figures
+             * @description Same order as TailRiskSection.figures; the 95% rows exist for monthly and quarterly horizons only.
+             */
+            figures: components["schemas"]["TailFigureInfo"][] | null;
         };
         /**
          * TailRiskSection
@@ -3302,6 +3761,11 @@ export interface components {
              * @description Every figure: levels in the order VaR 99%, CVaR 97.5%, then (monthly only) VaR 95% and CVaR 95%; within a level historical, Gaussian, Cornish-Fisher.
              */
             figures: components["schemas"]["TailFigureInfo"][] | null;
+            /**
+             * By Horizon
+             * @description The figures of every horizon the series supports, in the order daily, monthly, quarterly (daily only for a daily series). The horizon that equals `frequency` repeats the top-level figures exactly. Absent (not null) for a section that is not ok, or in reports made before this field existed.
+             */
+            by_horizon?: components["schemas"]["TailHorizon"][] | null;
         };
         /**
          * TailSeriesStats
@@ -3310,7 +3774,7 @@ export interface components {
         TailSeriesStats: {
             /**
              * N Obs
-             * @description Returns used (days or months).
+             * @description Returns used (days, months or quarters).
              */
             n_obs: number;
             /**
@@ -3335,7 +3799,7 @@ export interface components {
             excess_kurtosis: number;
             /**
              * Bootstrap
-             * @description iid for monthly series; stationary block bootstrap for daily series.
+             * @description iid for monthly and quarterly series; stationary block bootstrap for daily series.
              * @enum {string}
              */
             bootstrap: "iid" | "stationary";
@@ -3676,6 +4140,15 @@ export interface operations {
                     "application/json": components["schemas"]["FactorReport"];
                 };
             };
+            /** @description The request has no file. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description The file is larger than 1 MB. */
             413: {
                 headers: {
@@ -3888,6 +4361,8 @@ export interface operations {
                 end?: string | null;
                 /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
                 model?: "ff5" | "ff6";
+                /** @description Reference currency of every figure: USD (default) or EUR. */
+                ccy?: "USD" | "EUR";
             };
             header?: never;
             path: {

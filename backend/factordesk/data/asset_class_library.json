@@ -39,7 +39,8 @@
       "proxy_kind": "etf",
       "note": "international (ex-US) government bonds, not Europe only; unhedged: returns include EUR/USD moves; hedged version comes with reference-currency support",
       "first_date": "2009-01-30",
-      "currency": "USD"
+      "currency": "USD",
+      "multi_currency": true
     },
     {
       "id": "fi_eur_ig",
@@ -49,7 +50,8 @@
       "proxy_kind": "etf",
       "note": "international (ex-US) corporate bonds, not Europe only; unhedged: returns include EUR/USD moves; hedged version comes with reference-currency support",
       "first_date": "2010-06-03",
-      "currency": "USD"
+      "currency": "USD",
+      "multi_currency": true
     },
     {
       "id": "fi_eur_hy",
@@ -59,7 +61,8 @@
       "proxy_kind": "etf",
       "note": "international (ex-US) high yield, not Europe only; the first choice HYXU has no price data; unhedged: returns include EUR/USD moves; hedged version comes with reference-currency support",
       "first_date": "2012-04-03",
-      "currency": "USD"
+      "currency": "USD",
+      "multi_currency": true
     },
     {
       "id": "fi_na_gov",
@@ -69,7 +72,8 @@
       "proxy_kind": "etf",
       "note": "7-10 year US Treasuries",
       "first_date": "2002-07-30",
-      "currency": "USD"
+      "currency": "USD",
+      "hedge_eur": true
     },
     {
       "id": "fi_na_ig",
@@ -79,7 +83,8 @@
       "proxy_kind": "etf",
       "note": "US investment grade corporate bonds",
       "first_date": "2002-07-30",
-      "currency": "USD"
+      "currency": "USD",
+      "hedge_eur": true
     },
     {
       "id": "fi_na_hy",
@@ -89,7 +94,8 @@
       "proxy_kind": "etf",
       "note": "US high yield corporate bonds",
       "first_date": "2007-04-11",
-      "currency": "USD"
+      "currency": "USD",
+      "hedge_eur": true
     },
     {
       "id": "fi_global",
@@ -99,7 +105,8 @@
       "proxy_kind": "etf",
       "note": "total world bond market",
       "first_date": "2018-09-06",
-      "currency": "USD"
+      "currency": "USD",
+      "multi_currency": true
     },
     {
       "id": "fi_global_hy",
@@ -109,7 +116,8 @@
       "proxy_kind": "etf",
       "note": "US and international high yield corporate bonds; partly unhedged: non-USD bonds include currency moves",
       "first_date": "2012-04-09",
-      "currency": "USD"
+      "currency": "USD",
+      "multi_currency": true
     },
     {
       "id": "fi_em",
@@ -119,7 +127,8 @@
       "proxy_kind": "etf",
       "note": "USD-denominated emerging market government bonds",
       "first_date": "2007-12-19",
-      "currency": "USD"
+      "currency": "USD",
+      "hedge_eur": true
     },
     {
       "id": "fi_infl_linked",
@@ -129,7 +138,8 @@
       "proxy_kind": "etf",
       "note": "home-market linkers for a USD investor",
       "first_date": "2003-12-05",
-      "currency": "USD"
+      "currency": "USD",
+      "hedge_eur": true
     },
     {
       "id": "fi_tips",
@@ -139,7 +149,8 @@
       "proxy_kind": "etf",
       "note": "US Treasury inflation-protected securities",
       "first_date": "2003-12-05",
-      "currency": "USD"
+      "currency": "USD",
+      "hedge_eur": true
     },
     {
       "id": "eq_eur_large",

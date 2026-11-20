@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useTickerSuggestions } from "../../api/queries";
+import { EUR_CASH_ID, hedgeFlags } from "../../api/currency";
 import type { LibraryLine } from "../../api/types";
 import {
   isShortHistory,
@@ -19,6 +20,7 @@ import {
   totalWeight,
 } from "../../portfolio/tree";
 import type { Instrument, PortfolioTree, SubAssetClassGroup } from "../../portfolio/tree";
+import type { Currency } from "../../state/currency";
 import { useRecent } from "../../state/recent";
 import { checkTicker } from "../../state/url";
 import { TickerSearch } from "../controls/TickerSearch";
@@ -30,6 +32,8 @@ import { WeightInput } from "./WeightInput";
 export interface TreePanelProps {
   tree: PortfolioTree;
   library: ReadonlyMap<string, LibraryLine>;
+  /** The reference currency: in EUR the lines show their hedge status. */
+  currency: Currency;
   libraryCount: { classes: number; lines: number };
   onChange: (tree: PortfolioTree) => void;
   onOpenPicker: () => void;
@@ -42,6 +46,24 @@ type Pop = { kind: "swap" | "add" | "rename"; id: string };
 
 function pctText(weight: number): string {
   return `${(weight * 100).toFixed(1)}%`;
+}
+
+/**
+ * The currency status of a line in the euro view (nothing in the USD view): the hedge badge of the
+ * bond lines the library marks `hedge_eur`, "not hedged: several currencies" for the multi-currency
+ * bond funds, the euro overnight rate for the EUR Cash line, and USD cash as an unhedged position.
+ */
+export function currencyTags(currency: Currency, line: LibraryLine | undefined, inst: Instrument | undefined): ReactNode {
+  if (currency !== "EUR") return null;
+  const flags = hedgeFlags(line);
+  return (
+    <>
+      {inst?.kind === "cash" ? <span className="tag plain">USD cash, not hedged</span> : null}
+      {line?.id === EUR_CASH_ID ? <span className="tag hedge">earns the EUR overnight rate</span> : null}
+      {flags.hedgeEur ? <span className="tag hedge">hedged to EUR</span> : null}
+      {flags.multiCurrency ? <span className="tag plain">not hedged: several currencies</span> : null}
+    </>
+  );
 }
 
 function focusLater(id: string): void {
@@ -141,7 +163,7 @@ function RenamePop({ initial, onSave, onCancel }: { initial: string; onSave: (na
  * totals; each line shows its library name, proxy ticker and start year, and each instrument has a
  * typed percent field with a share bar. Swap, add an instrument, rename and remove are on the row.
  */
-export function TreePanel({ tree, library, libraryCount, onChange, onOpenPicker, pickerButtonId, headingRef }: TreePanelProps) {
+export function TreePanel({ tree, library, currency, libraryCount, onChange, onOpenPicker, pickerButtonId, headingRef }: TreePanelProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [pop, setPop] = useState<Pop | null>(null);
   const baseId = useId();
@@ -184,6 +206,7 @@ export function TreePanel({ tree, library, libraryCount, onChange, onOpenPicker,
       return (
         <>
           Risk-free rate{year !== null ? <> · from {year}</> : null}
+          {currencyTags(currency, line, inst)}
         </>
       );
     }
@@ -195,6 +218,7 @@ export function TreePanel({ tree, library, libraryCount, onChange, onOpenPicker,
           {showTicker ? <b>{inst.ticker}</b> : null}
           {showTicker ? " · chosen by you" : "Chosen by you"}
           <span className="tag">swapped</span>
+          {currencyTags(currency, line, inst)}
         </>
       );
     }
@@ -211,6 +235,7 @@ export function TreePanel({ tree, library, libraryCount, onChange, onOpenPicker,
         ) : null}
         {line.proxy_kind === "listed_proxy" ? <span className="tag">listed proxy</span> : null}
         {late ? <span className="tag warn">short history</span> : null}
+        {currencyTags(currency, line, inst)}
       </>
     );
   };
@@ -335,6 +360,7 @@ export function TreePanel({ tree, library, libraryCount, onChange, onOpenPicker,
                     {proxyYear !== null ? <>, from {proxyYear}</> : null}
                   </>
                 ) : null}
+                {currencyTags(currency, line, undefined)}
               </span>
             </div>
           </div>
@@ -483,7 +509,7 @@ export function TreePanel({ tree, library, libraryCount, onChange, onOpenPicker,
             <span className="key-hatch" aria-hidden="true" />
             <div className="txt">
               <span className="nm">Unallocated</span>
-              <span className="sb">Goes to USD cash when you run the backtest</span>
+              <span className="sb">Goes to {currency} cash when you run the backtest</span>
             </div>
           </div>
           <div className="wcell">

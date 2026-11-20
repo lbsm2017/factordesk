@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holdings table mockup</title>
+<link rel="stylesheet" href="../../../frontend/src/styles/fonts.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/tokens.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/report.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/shell.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/controls.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/portfolio.css">
+<link rel="stylesheet" href="sprint3.css">
+</head>
+<body data-ccy="USD">
+<div class="shell" id="shell">
+<header class="topbar">
+  <button type="button" class="menu-btn" id="menu" aria-controls="sidebar"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 5.5h14M3 10h14M3 14.5h14"/></svg><span class="vh">Menu</span></button>
+  <span class="mark"><svg class="mark-svg" viewBox="0 0 28 28" aria-hidden="true" focusable="false"><rect class="m-bg" width="28" height="28" rx="6"/><rect class="m-bar" x="7" y="13" width="3" height="8"/><rect class="m-bar" x="12.5" y="7" width="3" height="14"/><rect class="m-bar" x="18" y="10.5" width="3" height="10.5"/></svg><span>factordesk</span></span>
+  <p class="where">Balanced SAA<span class="ccy-chip">USD</span></p>
+</header>
+<div class="scrim" id="scrim" hidden aria-hidden="true"></div>
+<aside class="sidebar" id="sidebar" aria-label="Controls and sections">
+  <div class="side-scroll">
+    <div class="side-top"><span class="mark"><svg class="mark-svg" viewBox="0 0 28 28" aria-hidden="true" focusable="false"><rect class="m-bg" width="28" height="28" rx="6"/><rect class="m-bar" x="7" y="13" width="3" height="8"/><rect class="m-bar" x="12.5" y="7" width="3" height="14"/><rect class="m-bar" x="18" y="10.5" width="3" height="10.5"/></svg><span>factordesk</span></span>
+      <button type="button" class="drawer-close" id="close"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5 5 10 10M15 5 5 15"/></svg><span class="vh">Close menu</span></button></div>
+    <div class="side-group">
+  <fieldset class="ctl-range">
+    <legend class="side-label">Analyse</legend>
+    <span class="seg-range"><label class="seg-opt"><input type="radio" name="mode" value="ticker"><span>Ticker</span></label><label class="seg-opt"><input type="radio" name="mode" value="track"><span>Track record</span></label><label class="seg-opt"><input type="radio" name="mode" value="portfolio" checked><span>Portfolio</span></label></span>
+  </fieldset>
+  <div class="ccy-row">
+    <span class="side-label" id="ccy-label">Currency</span>
+    <span class="seg-range ccy-seg" role="radiogroup" aria-labelledby="ccy-label">
+      <label class="seg-opt"><input type="radio" name="ccy" value="USD" checked><span>USD</span></label>
+      <label class="seg-opt"><input type="radio" name="ccy" value="EUR"><span>EUR</span></label>
+    </span>
+  </div>
+  
+</div>
+    <div class="side-group">
+  <h2 class="side-label">Saved portfolios</h2>
+  <ul class="pf-list">
+    <li><button type="button" aria-current="true"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4 16V9M10 16V4M16 16v-5"/></svg><span class="nav-label">Balanced SAA</span><span class="nav-meta">13 lines</span></button></li>
+    <li><button type="button"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4 16V9M10 16V4M16 16v-5"/></svg><span class="nav-label">60/40</span><span class="nav-meta">2 lines</span></button></li>
+    <li><button type="button"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4 16V9M10 16V4M16 16v-5"/></svg><span class="nav-label">Growth</span><span class="nav-meta">11 lines</span></button></li>
+  </ul>
+  <div class="side-actions"><button type="button" class="linkbtn">Duplicate</button><button type="button" class="linkbtn">Rename</button><button type="button" class="linkbtn">Delete</button></div>
+</div><div class="side-group"><button type="button" class="switch" role="switch" aria-checked="false"><span class="switch-text">Show statistics<span class="sw-hint">t, p-values, intervals</span></span><span class="track"><span class="thumb"></span></span></button></div>
+    <nav class="nav" aria-label="Sections"><ul><li><a href="#summary"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 15a7 7 0 0 1 14 0"/><path d="m10 15 3.5-4.5"/></svg><span class="nav-label">Summary</span></a></li><li><a href="#price"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 16.5h14"/><path d="m3.5 12.5 4-4 3 3 6-6"/></svg><span class="nav-label">Growth of 100</span></a></li><li><a href="#holdings" aria-current="location"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4 16V9M10 16V4M16 16v-5"/></svg><span class="nav-label">Holdings</span><span class="nav-badge" style="background:var(--accent-50);color:var(--accent)">New</span></a></li><li><a href="#performance"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 4.5h14"/><path d="m3.5 4.5 4 6.5 3-3 6 7"/></svg><span class="nav-label">Drawdown</span></a></li><li><a href="#tail-risk"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M2.5 10c1.8-4.5 3.7-4.5 5.5 0s3.7 4.5 5.5 0c.9-2.2 2.2-3.3 4-2.5"/></svg><span class="nav-label">Tail risk</span></a></li><li><a href="#exposures"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4 5h8M4 10h12M4 15h5"/></svg><span class="nav-label">Factor exposures</span></a></li><li><a href="#world"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.4 2.2 2.4 11.8 0 14M10 3c-2.4 2.2-2.4 11.8 0 14"/></svg><span class="nav-label">World beta</span></a></li><li><a href="#returns"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 2.5v15"/><path d="M13.5 6H8.3a2.2 2.2 0 0 0 0 4.4h3.4a2.2 2.2 0 0 1 0 4.4H6"/></svg><span class="nav-label">Return sources</span></a></li><li><a href="#risk"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M2.5 10c1.8-4.5 3.7-4.5 5.5 0s3.7 4.5 5.5 0c.9-2.2 2.2-3.3 4-2.5"/></svg><span class="nav-label">Risk sources</span></a></li><li><a href="#rolling"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg><span class="nav-label">Exposure over time</span></a></li></ul></nav>
+  </div>
+</aside>
+<div class="canvas" id="report">
+
+<div class="mk-note"><span class="chip">Mockup S3-0 &middot; holdings table</span><span>Static page with mock figures. The carets open and close the groups.</span></div>
+<main class="mk-screen" aria-label="Portfolio report">
+  <header class="masthead" id="header">
+    <div class="page-head">
+      <h1><span class="ticker">Balanced SAA</span></h1>
+      <span class="badge">Portfolio</span>
+      <div class="head-actions"><a class="btn-outline" href="#"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 3v10M6 9.5l4 4 4-4"/><path d="M3.5 15.5v1h13v-1"/></svg>Download report</a></div>
+      <p class="listing">Portfolio, returns after cost, in US dollars</p>
+    </div>
+    <dl class="abar" aria-label="Analysis settings">
+      <div><dt>Analysis period</dt><dd>3 Jan 2022 to 31 Dec 2025</dd></div>
+      <div><dt>Observations</dt><dd>1,005 trading days</dd></div>
+      <div><dt>Factor data</dt><dd>To 31 Oct 2026</dd></div>
+    </dl>
+  </header>
+
+  <section class="panel hold" id="holdings" aria-labelledby="hold-title">
+    <div class="panel-head">
+      <h2 id="hold-title">Holdings</h2>
+      <div class="hold-tools"><button type="button" class="textbtn" id="expand">Expand all</button><button type="button" class="textbtn" id="collapse">Collapse all</button></div>
+    </div>
+    <p class="q">Equities gave 26 of the 33 points of return and 72% of the risk.</p>
+    <div class="t-head" aria-hidden="true">
+      <span class="hl">Holding</span><span class="r">Target</span><span class="r">End</span><span class="r">Return (pp)</span><span class="hl">Risk share</span>
+    </div>
+    <ul class="tree">
+        <li>
+          <div class="t-row group">
+            <div class="label">
+              <button type="button" class="caret" aria-expanded="true" aria-controls="hg0" aria-label="Equities"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 8 4.5 4.5L14.5 8"/></svg></button>
+              <span class="key-sq" aria-hidden="true" style="--c:var(--ac-equities)"></span>
+              <span class="nm">Equities <span class="cnt">6 holdings</span></span>
+            </div>
+            <div class="tgt" data-l="Target"><span class="hn">55.0%</span></div><div class="end" data-l="End"><span class="hn">59.5%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+25.8</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">71.8%</span><div class="sbar" aria-hidden="true" style="--p:71.8%;--c:var(--ac-equities)"><i></i></div></div></div>
+          </div>
+          <ul class="group-body" id="hg0">
+            <li><div class="t-row line multi">
+              <div class="label"><div class="txt"><span class="nm">Equity N. America - Large Cap</span><span class="sb">2 holdings</span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">33.0%</span></div><div class="end" data-l="End"><span class="hn">37.4%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+20.6</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">45.3%</span><div class="sbar" aria-hidden="true" style="--p:45.3%;--c:var(--ac-equities)"><i></i></div></div></div>
+            </div>
+              <ul>
+                <li><div class="t-row inst">
+                  <div class="label"><div class="txt"><span class="nm">IVV</span><span class="sb">iShares Core S&P 500</span></div></div>
+                  <div class="tgt" data-l="Target"><span class="hn">25.0%</span></div><div class="end" data-l="End"><span class="hn">28.1%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+15.2</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">31.2%</span><div class="sbar" aria-hidden="true" style="--p:31.2%;--c:var(--ac-equities)"><i></i></div></div></div>
+                </div></li>
+                <li><div class="t-row inst">
+                  <div class="label"><div class="txt"><span class="nm">QQQ</span><span class="sb">Invesco QQQ Trust</span></div></div>
+                  <div class="tgt" data-l="Target"><span class="hn">8.0%</span></div><div class="end" data-l="End"><span class="hn">9.3%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+5.4</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">14.1%</span><div class="sbar" aria-hidden="true" style="--p:14.1%;--c:var(--ac-equities)"><i></i></div></div></div>
+                </div></li>
+              </ul></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Equity Europe - Large Cap</span><span class="sb"><b>IEV</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">8.0%</span></div><div class="end" data-l="End"><span class="hn">8.5%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+2.5</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">9.4%</span><div class="sbar" aria-hidden="true" style="--p:9.4%;--c:var(--ac-equities)"><i></i></div></div></div>
+            </div></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Equity Japan and Pacific</span><span class="sb"><b>VPL</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">4.0%</span></div><div class="end" data-l="End"><span class="hn">4.0%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+0.8</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">4.0%</span><div class="sbar" aria-hidden="true" style="--p:4.0%;--c:var(--ac-equities)"><i></i></div></div></div>
+            </div></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Equity Emerging Markets</span><span class="sb"><b>EEM</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">6.0%</span></div><div class="end" data-l="End"><span class="hn">5.7%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+1.2</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">7.0%</span><div class="sbar" aria-hidden="true" style="--p:7.0%;--c:var(--ac-equities)"><i></i></div></div></div>
+            </div></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Equity USA - Small Cap</span><span class="sb"><b>IJR</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">4.0%</span></div><div class="end" data-l="End"><span class="hn">3.9%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+0.7</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">6.1%</span><div class="sbar" aria-hidden="true" style="--p:6.1%;--c:var(--ac-equities)"><i></i></div></div></div>
+            </div></li>
+          </ul>
+        </li>
+        <li>
+          <div class="t-row group">
+            <div class="label">
+              <button type="button" class="caret" aria-expanded="true" aria-controls="hg1" aria-label="Fixed Income"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 8 4.5 4.5L14.5 8"/></svg></button>
+              <span class="key-sq" aria-hidden="true" style="--c:var(--ac-fixed)"></span>
+              <span class="nm">Fixed Income <span class="cnt">4 holdings</span></span>
+            </div>
+            <div class="tgt" data-l="Target"><span class="hn">28.0%</span></div><div class="end" data-l="End"><span class="hn">21.1%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-neg">−0.7</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">8.0%</span><div class="sbar" aria-hidden="true" style="--p:8.0%;--c:var(--ac-fixed)"><i></i></div></div></div>
+          </div>
+          <ul class="group-body" id="hg1">
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">N. American Government Bonds</span><span class="sb"><b>IEF</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">10.0%</span></div><div class="end" data-l="End"><span class="hn">7.4%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-neg">−0.4</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">2.2%</span><div class="sbar" aria-hidden="true" style="--p:2.2%;--c:var(--ac-fixed)"><i></i></div></div></div>
+            </div></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">N. American Corporate Investment Grade Bonds</span><span class="sb"><b>LQD</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">10.0%</span></div><div class="end" data-l="End"><span class="hn">7.3%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-neg">−0.5</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">2.9%</span><div class="sbar" aria-hidden="true" style="--p:2.9%;--c:var(--ac-fixed)"><i></i></div></div></div>
+            </div></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Inflation Linked Bonds (TIPS)</span><span class="sb"><b>TIP</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">5.0%</span></div><div class="end" data-l="End"><span class="hn">3.8%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-neg">−0.1</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">1.4%</span><div class="sbar" aria-hidden="true" style="--p:1.4%;--c:var(--ac-fixed)"><i></i></div></div></div>
+            </div></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">N. American High Yield Bonds</span><span class="sb"><b>HYG</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">3.0%</span></div><div class="end" data-l="End"><span class="hn">2.6%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+0.3</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">1.5%</span><div class="sbar" aria-hidden="true" style="--p:1.5%;--c:var(--ac-fixed)"><i></i></div></div></div>
+            </div></li>
+          </ul>
+        </li>
+        <li>
+          <div class="t-row group">
+            <div class="label">
+              <button type="button" class="caret" aria-expanded="false" aria-controls="hg2" aria-label="Alternatives"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 8 4.5 4.5L14.5 8"/></svg></button>
+              <span class="key-sq" aria-hidden="true" style="--c:var(--ac-alts)"></span>
+              <span class="nm">Alternatives <span class="cnt">2 holdings</span></span>
+            </div>
+            <div class="tgt" data-l="Target"><span class="hn">10.0%</span></div><div class="end" data-l="End"><span class="hn">9.4%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+2.1</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">11.5%</span><div class="sbar" aria-hidden="true" style="--p:11.5%;--c:var(--ac-alts)"><i></i></div></div></div>
+          </div>
+          <ul class="group-body" id="hg2" hidden>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Private Equity</span><span class="sb"><b>PSP</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">4.0%</span></div><div class="end" data-l="End"><span class="hn">4.6%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+1.8</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">6.3%</span><div class="sbar" aria-hidden="true" style="--p:6.3%;--c:var(--ac-alts)"><i></i></div></div></div>
+            </div></li>
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Real Estate</span><span class="sb"><b>VNQ</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">6.0%</span></div><div class="end" data-l="End"><span class="hn">4.8%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+0.3</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">5.2%</span><div class="sbar" aria-hidden="true" style="--p:5.2%;--c:var(--ac-alts)"><i></i></div></div></div>
+            </div></li>
+          </ul>
+        </li>
+        <li>
+          <div class="t-row group">
+            <div class="label">
+              <button type="button" class="caret" aria-expanded="true" aria-controls="hg3" aria-label="Commodities"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 8 4.5 4.5L14.5 8"/></svg></button>
+              <span class="key-sq" aria-hidden="true" style="--c:var(--ac-comm)"></span>
+              <span class="nm">Commodities <span class="cnt">1 holding</span></span>
+            </div>
+            <div class="tgt" data-l="Target"><span class="hn">5.0%</span></div><div class="end" data-l="End"><span class="hn">8.3%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+5.9</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">8.6%</span><div class="sbar" aria-hidden="true" style="--p:8.6%;--c:var(--ac-comm)"><i></i></div></div></div>
+          </div>
+          <ul class="group-body" id="hg3">
+            <li><div class="t-row line">
+              <div class="label"><div class="txt"><span class="nm">Gold</span><span class="sb"><b>GLD</b></span></div></div>
+              <div class="tgt" data-l="Target"><span class="hn">5.0%</span></div><div class="end" data-l="End"><span class="hn">8.3%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+5.9</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">8.6%</span><div class="sbar" aria-hidden="true" style="--p:8.6%;--c:var(--ac-comm)"><i></i></div></div></div>
+            </div></li>
+          </ul>
+        </li>
+    </ul>
+      <div class="t-row plain-row sep">
+        <div class="label"><span class="key-sq" aria-hidden="true" style="--c:var(--ac-cash)"></span><div class="txt"><span class="nm">Cash</span><span class="sb">USD cash at the risk-free rate</span></div></div>
+        <div class="tgt" data-l="Target"><span class="hn">2.0%</span></div><div class="end" data-l="End"><span class="hn">1.7%</span></div><div class="con" data-l="Return (pp)"><span class="hn num-pos">+0.3</span></div><div class="risk" data-l="Risk share"><div class="rs"><span class="hn">0.1%</span><div class="sbar" aria-hidden="true" style="--p:0.1%;--c:var(--ac-cash)"><i></i></div></div></div>
+      </div>
+      <div class="t-row plain-row">
+        <div class="label"><span class="key-ring" aria-hidden="true"></span><div class="txt"><span class="nm">Cost</span><span class="sb">Trading cost of the rebalances, 10 bps per trade</span></div></div>
+        <div class="tgt" data-l="Target"><span class="hn dash">&ndash;</span></div>
+        <div class="end" data-l="End"><span class="hn dash">&ndash;</span></div>
+        <div class="con" data-l="Return (pp)"><span class="hn num-neg">−0.5</span></div>
+        <div class="risk" data-l="Risk share"><div class="rs"><span class="hn dash">&ndash;</span></div></div>
+      </div>
+      <div class="t-row total">
+        <div class="label"><div class="txt"><span class="nm">Total</span></div></div>
+        <div class="tgt" data-l="Target"><span class="hn">100.0%</span></div>
+        <div class="end" data-l="End"><span class="hn">100.0%</span></div>
+        <div class="con" data-l="Return (pp)"><span class="hn num-pos">+32.9</span></div>
+        <div class="risk" data-l="Risk share"><div class="rs"><span class="hn">100.0%</span><div class="sbar" aria-hidden="true" style="--p:100%;--c:var(--ink)"><i></i></div></div></div>
+      </div>
+    <p class="total-note">Total return after cost: <b class="num-pos">+32.9%</b> over 3 Jan 2022 to 31 Dec 2025</p>
+    <div class="foot">
+      <p>Return is in percentage points (pp) of the starting value, and the lines add up to the portfolio's total return. Risk share is each line's part of the portfolio's total risk; the shares add up to 100%. Target is the weight you set, end is the weight at the end of the period.</p>
+      <details class="how"><summary>How this is computed</summary>
+        <p>Each holding's return is linked through the rebalances, so the contributions add up exactly to the total return. Group rows are the sums of their holdings. Cash and cost are shown on their own rows and are not part of any asset class.</p>
+        <p>Risk share splits the portfolio's volatility by holding, using each holding's weight and how it moves with the rest of the portfolio.</p>
+      </details>
+    </div>
+  </section>
+  <div class="mk-end"></div>
+</main>
+
+</div>
+</div>
+<script>
+(function () {
+  var shell = document.getElementById('shell'), scrim = document.getElementById('scrim');
+  function set(open) { shell.classList.toggle('drawer-open', open); scrim.hidden = !open; }
+  document.getElementById('menu').addEventListener('click', function () { set(true); });
+  document.getElementById('close').addEventListener('click', function () { set(false); });
+  scrim.addEventListener('click', function () { set(false); });
+
+  var tree = document.querySelector('.hold');
+  function setGroup(btn, open) {
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.getElementById(btn.getAttribute('aria-controls')).hidden = !open;
+  }
+  tree.querySelectorAll('.caret').forEach(function (btn) {
+    btn.addEventListener('click', function () { setGroup(btn, btn.getAttribute('aria-expanded') !== 'true'); });
+  });
+  document.getElementById('expand').addEventListener('click', function () { tree.querySelectorAll('.caret').forEach(function (b) { setGroup(b, true); }); });
+  document.getElementById('collapse').addEventListener('click', function () { tree.querySelectorAll('.caret').forEach(function (b) { setGroup(b, false); }); });
+
+})();
+</script>
+</body>
+</html>

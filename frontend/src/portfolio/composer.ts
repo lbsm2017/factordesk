@@ -181,7 +181,7 @@ function joinNames(names: string[]): string {
 }
 
 /** The checks of the live panel, in reading order. */
-export function checks(tree: PortfolioTree, library: ReadonlyMap<string, LibraryLine>): Check[] {
+export function checks(tree: PortfolioTree, library: ReadonlyMap<string, LibraryLine>, currency: "USD" | "EUR" = "USD"): Check[] {
   const out: Check[] = [];
   const all = leaves(tree, library);
   const weighted = all.filter((l) => l.weight > 0);
@@ -205,7 +205,7 @@ export function checks(tree: PortfolioTree, library: ReadonlyMap<string, Library
     out.push({
       id: "unallocated",
       tone: "warn",
-      title: `Unallocated ${((1 - total) * 100).toFixed(1)}% to USD cash.`,
+      title: `Unallocated ${((1 - total) * 100).toFixed(1)}% to ${currency} cash.`,
       detail: "Held as cash in the backtest. Move it into a line to invest it.",
     });
   }

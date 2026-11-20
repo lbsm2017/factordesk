@@ -44,3 +44,10 @@
   #summary .tbl tbody th { white-space: normal; line-height: 1.3; padding-top: 6px; padding-bottom: 6px; }
   #summary .tbl .rd { min-width: 0; }
 }
+
+/* euro view: the currency code after a key figure, the line under the Sharpe label, and the currency notes */
+#summary .ccy { margin-left: 4px; font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); letter-spacing: 0.02em; }
+#summary .ccy-sub { display: block; font-size: var(--fs-cap); color: var(--ink-2); line-height: 1.3; }
+#summary .cur-notes { margin-top: var(--s-3); display: grid; gap: var(--s-1); }
+#summary .cur-notes li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; font-size: var(--fs-cap); color: var(--ink-2); line-height: 1.45; }
+#summary .cur-notes .icon { width: 16px; height: 16px; margin-top: 1px; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
