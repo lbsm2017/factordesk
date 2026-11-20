@@ -37,7 +37,7 @@ release month (202609).
 | 4 | EUR market factor against the hand-built formula, 5 dates | PASS (largest difference 0.0) |
 | 5 | VGK monthly in EUR: same ordering | PASS |
 | 6 | Balanced SAA with the Europe set, USD and EUR | PASS |
-| 7 | World beta, macro and energy the same with both sets (SPY) | FAIL on this branch; fix pending |
+| 7 | World beta, macro and energy the same with both sets (SPY) | PASS after the fix in #43 (commit 9474d2e): identical, largest difference 0.0 |
 
 ## 1. VGK and EXSA.DE in EUR, both sets (daily)
 
@@ -173,3 +173,11 @@ repeated on the fixed branch.
 4. The EUR market factor is built correctly from the raw Europe file, the ECB dollar rate and the
    euro cash index.
 5. Check 7 fails on this commit (macro, energy and world beta use the Europe frame).
+
+## Rerun after the fix (2026-11-20)
+
+The coordinator reran the script after merging `feat/factor-set-engine` at 9474d2e, with `--baseline` set to a checkout of dev at 5eb6c3d. Results:
+
+- Checks 2 to 7 pass.
+- Check 7 now passes. With Europe selected, world beta, macro and energy run on their own US-aligned sample with the US market factor. Their output is identical to the US set: zero differing fields, largest difference 0.0.
+- Check 1 still fails for VGK on daily data. This is the close-time effect explained above, not a product bug. VGK on monthly data (check 5) and EXSA.DE on daily data both show the Europe set fitting far better. Guidance: for a European fund listed in the US, read the Europe set on monthly data.
