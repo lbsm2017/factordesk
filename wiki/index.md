@@ -11,7 +11,7 @@ Last updated 2026-11-20. This is the project's knowledge base. Its main purpose 
 
 ## Decisions
 
-Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implemented, not yet validated.
+Status in brackets: Decided, Proposed, Decided-pending-implementation, Implemented, not yet validated, or Superseded.
 
 ### Data
 
@@ -20,7 +20,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) [Decided-pending-implementation]: a few tickers at a time, spaced requests, slow retries and a stop switch, because Yahoo publishes no rate limit.
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md) [Proposed]: regional factor files, US dollar conversion and an optional currency regressor.
 - [USD or EUR reference currency](decision-reference-currency.md) [Decided-pending-implementation]: every report in USD or EUR; each asset converted daily at ECB rates; USD-only bond lines hedged in the euro view (2026-11-20).
-- [A Europe factor set next to the US one](decision-europe-factor-set.md) [Decided; built on branches, not on dev as of 2026-11-20]: Ken French Developed Europe factors chosen by the user, default US; macro, energy and world beta keep the US factors; validation on real data (2026-11-20).
+- [A Europe factor set next to the US one](decision-europe-factor-set.md) [Decided; on dev in v0.5.0, 2026-11-20]: Ken French Developed Europe factors chosen by the user, default US; macro, energy and world beta keep the US factors; validation on real data (2026-11-20).
 
 ### Statistics
 
@@ -43,7 +43,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Report density, width cap and range controls](decision-report-density-and-range-controls.md) [Decided-pending-implementation]: a narrow, less dense report; range and ticker pickers belong to the dashboard.
 - [Dashboard server and interface](decision-dashboard-server-and-interface.md) [Decided-pending-implementation]: FastAPI server plus one scrolling React page with ticker search and range chips; plain CSS tokens; static report stays as export.
 - [Dashboard v2: outcome first with a sidebar](decision-dashboard-v2.md) [Decided-pending-implementation]: navy sidebar with controls and section links, a plain verdict sentence instead of the formula, a Show statistics switch, company name, performance and a quick world beta (specified 2026-11-18, not built).
-- [Factor it shows real progress](decision-factor-it-progress.md) [Decided; built on branches, not on dev as of 2026-11-20]: real progress steps over server-sent events, a placeholder page that matches the report, and a failed re-run that keeps the old report under a banner.
+- [Factor it shows real progress](decision-factor-it-progress.md) [Decided; on dev in v0.5.0, 2026-11-20]: real progress steps over server-sent events, a placeholder page that matches the report, and a failed re-run that keeps the old report under a banner.
 
 ### Engineering and process
 
@@ -72,9 +72,11 @@ Spec: [next-stage spec](../docs/specs/next-stage-track-record-and-portfolio.md).
 - [Joint tail behaviour of portfolios](decision-joint-tail.md) [Decided]: a 'crash together' heatmap against a normal baseline, a co-crash histogram and one t copula; no EVT in version 1; Labovitz's method parked for large stock universes.
 - [Causal-discipline guardrails](decision-causal-discipline-guardrails.md) [Decided]: model-dependence wording and notes, a specification curve and Minimum Track Record Length, after López de Prado (2023).
 
-### Open source
+### Licence and publishing
 
-- [Open source under the MIT license](decision-open-source-mit-license.md) [Decided]: a short permissive license.
+- [A noncommercial licence, with commercial use by consent](decision-noncommercial-license.md) [Decided]: free for personal and noncommercial use with credit; commercial, government and investment-management use needs the owner's consent (2026-11-20).
+- [Open source under the MIT license](decision-open-source-mit-license.md) [Superseded 2026-11-20]: the earlier permissive choice, never published.
+- [Making the repository public](decision-going-public.md) [Decided]: what was checked before the switch and the publish checklist (2026-11-20).
 - [Project name: factordesk](decision-project-name-factordesk.md) [Decided]: the name, and the rule not to imply endorsement by data providers.
 
 ## Concepts (glossary)

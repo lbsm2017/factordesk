@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/lbsm2017/factordesk/security/advisories/new
+    about: Report a vulnerability privately. Do not open a public issue.
+  - name: Commercial use
+    url: https://github.com/lbsm2017/factordesk#can-i-use-it
+    about: factordesk is free for noncommercial use. For commercial use, see how to ask.

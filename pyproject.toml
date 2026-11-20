@@ -1,8 +1,25 @@
 [project]
 name = "factordesk"
 version = "0.5.0"
-description = "factordesk: Fama-French 5-factor analyzer for single tickers"
+description = "Fama-French factor analysis dashboard for stocks, ETFs, fund track records and portfolios"
 requires-python = ">=3.12"
+license = "LicenseRef-factordesk-Noncommercial-1.0"
+authors = [{ name = "Lorenzo Bassetti" }]
+keywords = [
+    "fama-french",
+    "factor-model",
+    "factor-investing",
+    "factor-analysis",
+    "asset-pricing",
+    "portfolio-analysis",
+    "risk-attribution",
+    "performance-attribution",
+    "value-at-risk",
+    "backtesting",
+    "quantitative-finance",
+    "finance",
+]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
@@ -19,6 +36,11 @@ dependencies = [
 
 [project.scripts]
 factordesk = "factordesk.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/lbsm2017/factordesk"
+Documentation = "https://github.com/lbsm2017/factordesk#readme"
+Issues = "https://github.com/lbsm2017/factordesk/issues"
 
 [build-system]
 requires = ["hatchling"]
@@ -37,7 +59,7 @@ artifacts = [
 ]
 
 [tool.hatch.build.targets.sdist]
-include = ["backend", "hatch_build.py", "LICENSE"]
+include = ["backend", "hatch_build.py", "LICENSE", "THIRD_PARTY_NOTICES.md"]
 artifacts = ["backend/factordesk/web/**"]
 
 # Fails a wheel build when the dashboard was not copied in (see hatch_build.py).
