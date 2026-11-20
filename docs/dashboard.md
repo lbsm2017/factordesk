@@ -309,13 +309,12 @@ As of commit f36255e, `.github/workflows/ci.yml` runs on pull requests to `dev` 
 - `frontend`: typecheck, lint, test, build, and a check that the generated API types match.
 - `e2e`: the browser smoke test, after the other two pass.
 
-`.github/workflows/nightly.yml` runs every day at 03:17 UTC and can be started by hand
-(`workflow_dispatch`). It runs the tests that the pytest defaults skip:
+On 2026-11-20 the owner removed the nightly workflow: GitHub runs tests for pull requests only. The
+tests that the pytest defaults skip now run by hand before each release:
 
-- `slow`: `pytest -m slow` (Monte Carlo and seed sweeps) on Ubuntu, with a 45-minute limit. A
-  failure fails the run.
-- `live`: `pytest -m live` (3 tests that call Yahoo and the Ken French library) on Ubuntu, with a
-  15-minute limit. It is allowed to fail, and its job summary says whether it passed.
+- `slow`: `uv run pytest -m slow` (Monte Carlo and seed sweeps). A failure blocks the release.
+- `live`: `uv run pytest -m live` (3 tests that call Yahoo and the Ken French library). A failure
+  is reported in the release PR.
 
 See [the decision](../wiki/decision-nightly-slow-tests.md).
 
