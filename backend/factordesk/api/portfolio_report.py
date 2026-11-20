@@ -187,9 +187,12 @@ def usd_cash_weight(plan: PortfolioPlan) -> float:
     return sum(r.weight for r in plan.rows if r.key is None)
 
 
-def tickers_for(plan: PortfolioPlan, ccy: str) -> tuple[str, ...]:
-    """The tickers to fetch: ``plan.tickers`` less those only the euro cash index replaces."""
+def tickers_for(plan: PortfolioPlan, ccy: str, saron: bool = False) -> tuple[str, ...]:
+    """The tickers to fetch: ``plan.tickers`` less those only the euro cash index replaces, and
+    (``saron``: ``CurrencyContext.chf_ready`` answered True) those only SARON cash replaces."""
     skip = eur_cash_keys(plan, ccy)
+    if saron:
+        skip = skip | chf_cash_keys(plan)
     out: list[str] = []
     for row in plan.holdings:
         if row.key not in skip and row.ticker is not None and row.ticker not in out:

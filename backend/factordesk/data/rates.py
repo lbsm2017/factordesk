@@ -11,22 +11,23 @@ notice, never an exception; every download stops after the 8 s timeout, twice at
   is down, FRED ``ECBESTRVOLWGTTRMDMNRT`` replaces euro STR, and EONIA still comes from any
   cached ECB copy (no download); with no cached EONIA the series starts on 2019-10-01.
 - ``load_chf_overnight()``: the CHF overnight rate (decimal annual rate, one value per Swiss
-  business day, dated like the EUR one). SARON (SNB data portal, cube ``snbgwdzid``, item
-  ``SARON``, the fixing at the close of the trading day; first value 2009-08-24, published
-  rounded to two decimals of a percent) from 2009-08-24. Before that date the SNB's earlier
-  overnight history (cube ``zirepo``, item ``H0``, daily from 1999-06-21, six decimals) as
-  published, no adjustment, as EONIA is used for the EUR rate. The portal has no daily TOIS
-  series. If the portal is down, ``rate`` is ``None`` and the caller falls back to FXF. If only
-  the earlier history is missing, the rate starts on 2009-08-24 and the notice says so. CHF cash
-  uses the same ACT/360 index as EUR cash (``cash_levels``, ``cash_returns``).
+  business day, dated like the EUR one): SARON, the fixing at the close of the trading day, from
+  the SNB data portal. One series: cube ``zirepo``, item ``H0`` ("Overnight (SARON), close of
+  trading": daily from 1999-06-21, six decimals, published with a lag of about a month), then
+  cube ``snbgwdzid``, item ``SARON`` (daily, fresh, rounded to two decimals of a percent) for the
+  days after the last ``zirepo`` day. The portal has no daily TOIS series. The values are used as
+  published. If the fresh cube is down (and has no cached copy), ``rate`` is ``None`` and the
+  caller falls back to FXF. If only ``zirepo`` is missing, the rate starts on 2009-08-24, the
+  first fixing of the fresh cube, and the notice says so. CHF cash uses the same ACT/360 index as
+  EUR cash (``cash_levels``, ``cash_returns``).
 - ``cash_levels(rate, dates)``: the compounded cash index (1.0 at the first rate date) on
   ``dates``. ACT/360: between two rate dates the index grows by
   ``1 + rate * calendar days / 360``.
 - ``cash_returns(rate, dates)``: ``levels[t] / levels[t-1] - 1``, indexed by ``dates[1:]``. A gap
   (weekend, holiday) is compounded day by day with the rate of each business day inside it.
   NaN before the first rate date and more than ``MAX_CARRY_DAYS`` after the last one.
-- ``ECB_CREDIT``, ``ECB_ESTR_CREDIT``, ``FRED_CREDIT``, ``FRED_EONIA_CREDIT``, ``SNB_CREDIT``,
-  ``SNB_SARON_CREDIT``: footer lines (the one that matches the sources actually used is in
+- ``ECB_CREDIT``, ``ECB_ESTR_CREDIT``, ``FRED_CREDIT``, ``FRED_EONIA_CREDIT``,
+  ``snb_credit(start)``: footer lines (the one that matches the sources actually used is in
   ``RateResult.credit``).
 """
 
@@ -50,9 +51,9 @@ FRED_ESTR_SERIES = "ECBESTRVOLWGTTRMDMNRT"
 SPLICE_DATE = pd.Timestamp("2019-10-01")
 """First date on euro STR; earlier dates use EONIA."""
 SARON = ("snbgwdzid", "SARON")
-SARON_EARLIER = ("zirepo", "H0")
+SARON_HISTORY = ("zirepo", "H0")
 SARON_START = pd.Timestamp("2009-08-24")
-"""First SARON fixing in the SNB cube; earlier dates use the SNB's earlier overnight history."""
+"""First fixing of the fresh cube; the rate starts here when ``zirepo`` is missing."""
 MAX_CARRY_DAYS = 5
 """The last rate is carried past its date for at most this many calendar days."""
 ECB_ESTR_CREDIT = "Euro short-term rate: European Central Bank, ECB Data Portal."
@@ -61,11 +62,14 @@ FRED_CREDIT = (
     "Euro short-term rate: European Central Bank, via FRED, Federal Reserve Bank of St. Louis."
 )
 FRED_EONIA_CREDIT = FRED_CREDIT + " EONIA: European Central Bank, ECB Data Portal (cached copy)."
-SNB_SARON_CREDIT = "Swiss franc overnight rate (SARON): Swiss National Bank, SNB data portal."
-SNB_CREDIT = (
-    "Swiss franc overnight rate (SARON): Swiss National Bank, SNB data portal. Before 2009-08-24: "
-    "the SNB's earlier overnight rate history."
-)
+
+
+def snb_credit(start: pd.Timestamp) -> str:
+    """The footer line for CHF cash: SARON, with the first date of the series used."""
+    return (
+        "Swiss franc overnight rate (SARON): Swiss National Bank data portal, "
+        f"from {start:%Y-%m-%d}."
+    )
 
 
 @dataclass(frozen=True)
@@ -113,32 +117,33 @@ def load_chf_overnight(
     now: datetime | None = None,
     fetch_snb: Callable[[str, str], str] | None = None,
 ) -> RateResult:
-    """The earlier SNB overnight history spliced with SARON; see the module docstring.
-    ``fetch_snb`` replaces the downloads (tests)."""
+    """SARON from the SNB data portal; see the module docstring. ``fetch_snb`` replaces the
+    downloads (tests)."""
     notes: list[str] = []
     try:
-        saron, note = load_snb_series(
+        fresh, note = load_snb_series(
             *SARON, scale=0.01, data_dir=data_dir, now=now, fetch=fetch_snb
         )
     except SnbError as exc:
         return RateResult(None, f"SARON is unavailable (Swiss National Bank: {exc}).")
     if note:
         notes.append(note)
-    saron = saron[saron.index >= SARON_START]
+    fresh = fresh[fresh.index >= SARON_START]
     try:
-        earlier, note = load_snb_series(
-            *SARON_EARLIER, scale=0.01, data_dir=data_dir, now=now, fetch=fetch_snb
+        history, note = load_snb_series(
+            *SARON_HISTORY, scale=0.01, data_dir=data_dir, now=now, fetch=fetch_snb
         )
     except SnbError as exc:
         notes.append(
-            f"The earlier SNB rate history is unavailable ({exc}); "
+            f"The SARON history before 2009-08-24 is unavailable ({exc}); "
             "the CHF cash rate starts on 2009-08-24."
         )
-        return RateResult(saron.rename("chf_rate"), " ".join(notes), SNB_SARON_CREDIT)
+        rate = fresh.rename("chf_rate")
+        return RateResult(rate, " ".join(notes), snb_credit(rate.index[0]))
     if note:
         notes.append(note)
-    rate = pd.concat([earlier[earlier.index < SARON_START], saron]).rename("chf_rate")
-    return RateResult(rate, " ".join(notes) or None, SNB_CREDIT)
+    rate = pd.concat([history, fresh[fresh.index > history.index[-1]]]).rename("chf_rate")
+    return RateResult(rate, " ".join(notes) or None, snb_credit(rate.index[0]))
 
 
 def _from_fred(

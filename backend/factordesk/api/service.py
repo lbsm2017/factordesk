@@ -375,7 +375,6 @@ class ReportService:
         ranges.check_request(preset, start, end)
         plan = pr.plan_of(tree)
         ccy = tree.reference_currency
-        tickers = pr.tickers_for(plan, ccy)
         logger.info(
             "Portfolio report start: %d instruments, model %s, %s, range %s",
             len(plan.rows),
@@ -400,6 +399,9 @@ class ReportService:
 
         async def make() -> FactorReport:
             ctx = CurrencyContext(ccy, self.deps.currency)
+            # FXF, the proxy of the CHF Cash line, is fetched only when SARON is not used
+            saron = bool(pr.chf_cash_keys(plan)) and await self.runtime.run(ctx.chf_ready)
+            tickers = pr.tickers_for(plan, ccy, saron)
             listings: dict[str, tuple[str, float]] = {}
             for ticker in tickers:  # refuses a currency that cannot be converted
                 security = await self._security(ticker, now.date())

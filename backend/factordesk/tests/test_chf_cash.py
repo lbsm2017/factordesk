@@ -129,48 +129,60 @@ def test_download_retries_a_5xx_and_stops_at_a_4xx(monkeypatch: pytest.MonkeyPat
 
 
 # ------------------------------------------------------------------------------ the rate splice
-EARLIER = {"2009-08-20": 0.0155, "2009-08-21": 0.0158, "2009-08-24": 0.0178, "2009-08-25": 0.0163}
-SARON = {"2009-08-24": 0.02, "2009-08-25": 0.02, "2026-11-19": -0.04}
+# zirepo H0: six decimals, ends on 2026-11-10 (it lags); snbgwdzid SARON: two decimals, fresh.
+HISTORY = {
+    "2009-08-20": 0.0155,
+    "2009-08-21": 0.0158,
+    "2009-08-24": 0.0178,
+    "2009-08-25": 0.0163,
+    "2026-11-10": -0.0446,
+}
+FRESH = {"2009-08-24": 0.02, "2009-08-25": 0.02, "2026-11-10": -0.04, "2026-11-11": -0.05}
 
 
-def snb_fetch(*, saron: bool = True, earlier: bool = True) -> Any:
+def snb_fetch(*, fresh: bool = True, history: bool = True) -> Any:
     def fetch(cube: str, item: str) -> str:
-        if cube == "snbgwdzid" and saron:
-            return snb_csv(item, {"2009-08-21": None, **SARON})
-        if cube == "zirepo" and earlier:
-            return snb_csv(item, EARLIER)
+        if cube == "snbgwdzid" and fresh:
+            return snb_csv(item, {"2009-08-21": None, **FRESH})
+        if cube == "zirepo" and history:
+            return snb_csv(item, HISTORY)
         raise SnbError(f"{cube}: simulated outage", host_down=True)
 
     return fetch
 
 
-def test_rate_is_the_earlier_history_before_saron_and_saron_from_its_first_fixing(
+def test_rate_is_one_saron_series_with_the_precise_history_then_the_fresh_days(
     tmp_path: Path,
 ) -> None:
     result = rates.load_chf_overnight(data_dir=tmp_path, now=NOW, fetch_snb=snb_fetch())
     assert result.rate is not None and result.notice is None
-    assert result.credit == rates.SNB_CREDIT and "SARON" in result.credit
+    assert result.credit == (
+        "Swiss franc overnight rate (SARON): Swiss National Bank data portal, from 2009-08-20."
+    )
     rate = result.rate
-    # before 2009-08-24: the earlier series, raw (percent / 100), no adjustment
+    # every day the history has is the history's value (six decimals), as published
     assert rate.loc["2009-08-20"] == pytest.approx(0.000155)
-    assert rate.loc["2009-08-21"] == pytest.approx(0.000158)
-    # from 2009-08-24: SARON, even where the earlier series has a value too
-    assert rate.loc["2009-08-24"] == pytest.approx(0.0002)
-    assert rate.loc["2026-11-19"] == pytest.approx(-0.0004)
+    assert rate.loc["2009-08-24"] == pytest.approx(0.000178)
+    assert rate.loc["2026-11-10"] == pytest.approx(-0.000446)
+    # after the last day of the history: the fresh cube's SARON
+    assert rate.loc["2026-11-11"] == pytest.approx(-0.0005)
     assert rate.index.is_monotonic_increasing and not rate.index.has_duplicates
 
 
-def test_rate_starts_at_saron_when_the_earlier_history_is_missing(tmp_path: Path) -> None:
+def test_rate_starts_at_the_first_fresh_fixing_when_the_history_is_missing(
+    tmp_path: Path,
+) -> None:
     result = rates.load_chf_overnight(
-        data_dir=tmp_path, now=NOW, fetch_snb=snb_fetch(earlier=False)
+        data_dir=tmp_path, now=NOW, fetch_snb=snb_fetch(history=False)
     )
     assert result.rate is not None and result.rate.index[0] == pd.Timestamp("2009-08-24")
     assert result.notice and "2009-08-24" in result.notice
-    assert result.credit == rates.SNB_SARON_CREDIT
+    assert result.credit is not None and result.credit.endswith("from 2009-08-24.")
+    assert result.rate.loc["2009-08-24"] == pytest.approx(0.0002)
 
 
-def test_rate_is_none_with_a_notice_when_saron_is_down(tmp_path: Path) -> None:
-    result = rates.load_chf_overnight(data_dir=tmp_path, now=NOW, fetch_snb=snb_fetch(saron=False))
+def test_rate_is_none_with_a_notice_when_the_fresh_cube_is_down(tmp_path: Path) -> None:
+    result = rates.load_chf_overnight(data_dir=tmp_path, now=NOW, fetch_snb=snb_fetch(fresh=False))
     assert result.rate is None and result.notice and "SARON is unavailable" in result.notice
 
 
@@ -211,7 +223,7 @@ CHF_RATE = -0.0004
 def chf_rate() -> rates.RateResult:
     days = pd.bdate_range("1999-06-21", "2035-01-01")
     series = pd.Series(CHF_RATE, index=days, name="chf_rate")
-    return rates.RateResult(series, None, rates.SNB_CREDIT)
+    return rates.RateResult(series, None, rates.snb_credit(series.index[0]))
 
 
 def chf_down() -> rates.RateResult:
@@ -281,7 +293,7 @@ def test_chf_cash_line_is_saron_converted_to_the_reference_currency(view: str) -
     np.testing.assert_allclose(common.leaf_ret[key].to_numpy(), expected.to_numpy(), atol=1e-15)
     # the ETF is not in the backtest calendar, and the columns keep the tree order
     assert list(common.leaf_ret.columns) == [r.key for r in plan.holdings]
-    assert ctx.chf_credit == rates.SNB_CREDIT
+    assert ctx.chf_credit == rates.snb_credit(chf_rate().rate.index[0])  # type: ignore[union-attr]
     assert any("CHF Cash line earns SARON" in n for n in ctx.notes)
 
 
@@ -317,10 +329,11 @@ def test_chf_cash_falls_back_to_fxf_with_a_notice(failure: str) -> None:
     assert ctx.chf_credit is None
 
 
-def test_the_etf_is_still_fetched_because_it_is_the_fallback() -> None:
+def test_the_etf_is_fetched_only_when_saron_is_not_used() -> None:
     plan = pr.plan_of(PortfolioTree.model_validate(chf_tree()))
-    assert pr.tickers_for(plan, "USD") == ("AAA", "FXF")
-    assert pr.tickers_for(plan, "EUR") == ("AAA", "FXF")
+    for view in ("USD", "EUR"):
+        assert pr.tickers_for(plan, view) == ("AAA", "FXF")
+        assert pr.tickers_for(plan, view, True) == ("AAA",)
 
 
 # --------------------------------------------------------------------------------- the report
@@ -345,6 +358,7 @@ def post_tree(client: ApiClient, body: dict[str, Any]) -> httpx.Response:
 def test_usd_report_names_saron_in_the_currency_block(world: World, client: ApiClient) -> None:
     with_sources(world, SOURCES)
     response = post_tree(client, chf_tree("USD"))
+    assert world.provider.many_calls == [("AAA",)]  # FXF is not fetched: SARON is used
     assert response.status_code == 200, response.text
     body = response.json()
     block = body["currency"]
@@ -376,6 +390,7 @@ def test_the_report_differs_from_the_etf_and_survives_a_dead_source(
         body["name"] = f"Same weights, {view} view, SARON down"  # a new name is a new cache key
         down = post_tree(client, body)
         assert down.status_code == 200, down.text
+        assert world.provider.many_calls[-1] == ("AAA", "FXF")  # the fallback needs the ETF
         block = down.json()["currency"] if view == "EUR" else down.json().get("currency")
         if view == "EUR":
             assert any("The CHF Cash line uses FXF." in n for n in block["notes"])

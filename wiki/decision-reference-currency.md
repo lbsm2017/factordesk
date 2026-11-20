@@ -72,8 +72,8 @@ The euro view starts in January 1999. Days without an ECB rate (euro-area bank h
 ## CHF cash on SARON (Sprint 4, S4-10)
 
 - The "CHF Cash" line of a portfolio, in the USD view and in the EUR view, earns the Swiss franc overnight rate instead of the FXF currency trust. The franc return is built as the euro cash index is (ACT/360, compounded across gaps) and then converted with the same exchange-rate code. It is not hedged.
-- Source: the Swiss National Bank data portal (data.snb.ch). From 2009-08-24: SARON, the fixing at the close of the trading day (cube `snbgwdzid`, item `SARON`). The portal publishes it rounded to two decimals of a percent. Before 2009-08-24: the SNB's earlier overnight history (cube `zirepo`, item `H0`, daily from 1999-06-21), as published and unadjusted, as EONIA is used for the euro. The portal has no daily TOIS series, so TOIS is not used.
-- If the SNB portal or the franc exchange rate is down, the line keeps FXF and the report shows a notice. The report never fails for this reason.
+- Source: SARON, the fixing at the close of the trading day, from the Swiss National Bank data portal (data.snb.ch), as one series. Up to the last day of cube `zirepo` (item `H0`, "Overnight (SARON), close of trading", daily from 1999-06-21, six decimals, published about a month late): that cube. After that day: cube `snbgwdzid` (item `SARON`, fresh, rounded to two decimals of a percent). Values are used as published. The portal has no daily TOIS series, so TOIS is not used. If `zirepo` is missing, the series starts on 2009-08-24, the first fixing of the fresh cube.
+- If the SNB portal or the franc exchange rate is down, the line keeps FXF and the report shows a notice. The report never fails for this reason. FXF is downloaded only in that case.
 - The report names SARON in its notes and in the source credit. A USD portfolio with a CHF Cash line therefore carries the `currency` block too (reference USD); other USD reports do not.
 
 ## What would change our mind
