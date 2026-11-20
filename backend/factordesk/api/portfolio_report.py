@@ -38,7 +38,12 @@ from factordesk.data.prices import (
     validate_ticker,
 )
 from factordesk.report.schema import FactorModel, FactorReport, RangePreset
-from factordesk.section_hooks.context import PortfolioBacktestInput, SectionInputs
+from factordesk.section_hooks.context import (
+    HoldingsInput,
+    HoldingsNode,
+    PortfolioBacktestInput,
+    SectionInputs,
+)
 
 CASH_LABEL = "USD cash (risk-free rate)"
 RF_COLUMN = "RF"
@@ -56,6 +61,8 @@ class PlanRow:
     name: str
     ticker: str | None
     weight: float
+    groups: tuple[tuple[str, str], ...] = ()
+    """``(id, label)`` of the asset class and the sub-asset class that hold the instrument."""
 
     @property
     def label(self) -> str:
@@ -104,11 +111,12 @@ def plan_of(tree: PortfolioTree) -> PortfolioPlan:
                     f"The line {sub.label!r} is not in the Asset Class Library.",
                     "Add the line from the library picker.",
                 )
+            groups = ((ac.id, ac.label), (sub.id, sub.label))
             for item in sub.children:
                 if item.weight <= 0.0:
                     continue
                 if item.kind == "cash" or item.ticker is None:
-                    rows.append(PlanRow(None, item.label, None, item.weight))
+                    rows.append(PlanRow(None, item.label, None, item.weight, groups))
                     continue
                 try:
                     ticker = validate_ticker(item.ticker)
@@ -120,7 +128,7 @@ def plan_of(tree: PortfolioTree) -> PortfolioPlan:
                     ) from exc
                 if ticker not in tickers:
                     tickers.append(ticker)
-                rows.append(PlanRow(LEAF_PREFIX + item.id, item.label, ticker, item.weight))
+                rows.append(PlanRow(LEAF_PREFIX + item.id, item.label, ticker, item.weight, groups))
     if not any(row.key is not None for row in rows):
         raise _invalid(
             "The portfolio holds no instrument with a ticker and a weight above 0.",
@@ -360,6 +368,34 @@ def _limiting(
     return (*(labels[k] for k in keys), labels[CASH_ID])
 
 
+GROUP_PREFIX = "g:"
+"""Group ids of the holdings table are ``g:<tree id>``, so they cannot clash with a leaf id."""
+
+
+def _holdings_nodes(plan: PortfolioPlan) -> tuple[HoldingsNode, ...]:
+    """The groups and holdings of the backtest in tree order, each group before its members.
+
+    Rows are in tree order already, so a group is listed when its first member appears. A group
+    that holds only cash instruments, or nothing above 0, is not listed.
+    """
+    nodes: list[HoldingsNode] = []
+    listed: set[str] = set()
+    for row in plan.holdings:
+        assert row.key is not None
+        path: tuple[str, ...] = ()
+        for depth, (group_id, label) in enumerate(row.groups):
+            parent = path[-1] if path else None
+            path = (*path, GROUP_PREFIX + group_id)
+            if path[-1] not in listed:
+                listed.add(path[-1])
+                nodes.append(HoldingsNode(path[-1], "group", label, None, parent, depth, path))
+        assert path, "an instrument sits in at least one group"
+        nodes.append(
+            HoldingsNode(row.key, "holding", row.name, row.ticker, path[-1], len(path), path)
+        )
+    return tuple(nodes)
+
+
 def _summary(
     plan: PortfolioPlan, bt: BacktestResult, common: CommonReturns, labels: dict[str, str]
 ) -> PortfolioBacktestInput:
@@ -388,6 +424,7 @@ def _summary(
         unallocated_weight=plan.unallocated,
         survivorship_note=bt.survivorship_note,
         weights=tuple((row.name, row.ticker, row.weight) for row in plan.rows),
+        holdings=HoldingsInput(bt, _holdings_nodes(plan)),
     )
 
 

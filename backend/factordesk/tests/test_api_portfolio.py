@@ -7,6 +7,7 @@ one), the factor frame is ``dgp_a``'s, the clock is fixed and ``tmp_path`` is th
 from __future__ import annotations
 
 import dataclasses
+import json
 import socket
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
@@ -39,7 +40,7 @@ from factordesk.data.prices import (
     Security,
     TickerOutcome,
 )
-from factordesk.report.schema import ApiError, FactorReport
+from factordesk.report.schema import ApiError, FactorReport, HoldingsSection
 from factordesk.section_hooks.context import DollarInput, MacroInput, WorldBenchmarkInput
 from factordesk.section_hooks.registry import HOOKS
 from factordesk.tests.fixtures.dgp import dgp_a, price_history, rng_for
@@ -649,3 +650,175 @@ def test_the_wording_fits_a_portfolio(client: ApiClient) -> None:
     assert not any("stock" in line for line in report.residual.caveats)
     assert "this series" in report.label_text["L-KTAIL"]
     assert "ticker" not in report.label_text["L-KTAIL"]
+
+
+# --------------------------------------------------------------------------- holdings table (S3-10)
+def group_tree(
+    classes: Sequence[tuple[str, Sequence[tuple[str, Sequence[dict[str, Any]]]]]],
+    *,
+    cost_bps: float = 0.0,
+) -> dict[str, Any]:
+    """A valid tree from ``[(asset class label, [(sub label, [instruments])])]``."""
+    asset_classes = [
+        {
+            "id": f"ac{a}",
+            "kind": "group",
+            "label": ac_label,
+            "children": [
+                {
+                    "id": f"s{a}{b}",
+                    "kind": "group",
+                    "label": sub_label,
+                    "library_id": "eq_na_large",
+                    "children": list(items),
+                }
+                for b, (sub_label, items) in enumerate(subs)
+            ],
+        }
+        for a, (ac_label, subs) in enumerate(classes)
+    ]
+    return {
+        "version": 1,
+        "name": "Mixed",
+        "cost_bps": cost_bps,
+        "root": {"id": "root", "kind": "group", "label": "Portfolio", "children": asset_classes},
+    }
+
+
+def mixed_tree(cost_bps: float = 10.0) -> dict[str, Any]:
+    """Two holdings in one sub-asset class, one more (same ticker) in another asset class, an
+    explicit cash line in a third asset class, and 20% left over (it goes to cash)."""
+    cash = {"id": "c0", "kind": "cash", "ticker": None, "label": "USD Cash", "weight": 0.1}
+    return group_tree(
+        [
+            ("Equities", [("US", [holding(0, "AAA", 0.3), holding(1, "BBB", 0.2)])]),
+            ("Fixed Income", [("Bonds", [holding(2, "AAA", 0.2)])]),
+            ("Cash", [("USD Cash", [cash])]),
+        ],
+        cost_bps=cost_bps,
+    )
+
+
+def compounded(returns: pd.Series, start: Any, end: Any) -> float:
+    window = returns.loc[pd.Timestamp(start) : pd.Timestamp(end)]
+    return float((1.0 + window.to_numpy(dtype=np.float64)).prod() - 1.0)
+
+
+def holdings_of(report: FactorReport) -> HoldingsSection:
+    section = report.holdings
+    assert section is not None and section.status == "ok"
+    return section
+
+
+def test_the_holdings_rows_follow_the_tree(client: ApiClient) -> None:
+    section = holdings_of(report_of(post(client, mixed_tree())))
+    shape = [(r.id, r.kind, r.depth, r.parent_id, r.label, r.ticker) for r in section.rows]
+    assert shape == [
+        ("g:ac0", "group", 0, None, "Equities", None),
+        ("g:s00", "group", 1, "g:ac0", "US", None),
+        ("i:h0", "holding", 2, "g:s00", "AAA", "AAA"),
+        ("i:h1", "holding", 2, "g:s00", "BBB", "BBB"),
+        ("g:ac1", "group", 0, None, "Fixed Income", None),
+        ("g:s10", "group", 1, "g:ac1", "Bonds", None),
+        ("i:h2", "holding", 2, "g:s10", "AAA", "AAA"),
+        ("cash", "cash", 0, None, "USD cash", None),  # the Cash group holds no backtest leaf
+        ("cost", "cost", 0, None, "Trading cost", None),
+    ]
+    by_id = {r.id: r for r in section.rows}
+    # target weights are the tree's; cash is the cash line plus the unallocated remainder
+    assert [by_id[k].target_weight for k in ("i:h0", "i:h1", "i:h2")] == [0.3, 0.2, 0.2]
+    assert by_id["cash"].target_weight == pytest.approx(1.0 - 0.7)
+    assert by_id["cost"].target_weight is None and by_id["cost"].end_weight is None
+    assert section.risk_share_reason is None
+
+
+def test_group_rows_are_the_sum_of_their_leaves(client: ApiClient) -> None:
+    section = holdings_of(report_of(post(client, mixed_tree())))
+    by_id = {r.id: r for r in section.rows}
+    leaves = {r.id: r for r in section.rows if r.kind == "holding"}
+    members = {
+        "g:ac0": ["i:h0", "i:h1"],
+        "g:s00": ["i:h0", "i:h1"],
+        "g:ac1": ["i:h2"],
+        "g:s10": ["i:h2"],
+    }
+    for group_id, leaf_ids in members.items():
+        for name in ("target_weight", "end_weight", "contribution", "risk_share"):
+            expected = sum(getattr(leaves[k], name) for k in leaf_ids)
+            assert getattr(by_id[group_id], name) == pytest.approx(expected, abs=1e-12)
+
+
+def test_contributions_add_up_to_the_net_return_of_the_window(
+    world: World, client: ApiClient
+) -> None:
+    body = mixed_tree(cost_bps=25.0)
+    section = holdings_of(report_of(post(client, body)))
+    plan = plan_of(PortfolioTree.model_validate(body))
+    subject, summary = backtest_portfolio(plan, world.provider.histories, rf_of(world))
+    expected = compounded(subject.returns, section.window_start, section.window_end)
+    top = [r for r in section.rows if r.parent_id is None]
+    assert sum(r.contribution for r in top) == pytest.approx(expected, abs=1e-12)
+    assert section.total_return == pytest.approx(expected, abs=1e-12)
+    cost = next(r for r in section.rows if r.kind == "cost")
+    assert cost.contribution < 0.0 and summary.total_cost > 0.0
+    # the risk shares of the rows with no parent add up to 100%
+    assert sum(r.risk_share or 0.0 for r in top) == pytest.approx(1.0, abs=1e-9)
+    # target and end weights of the rows with no parent (the cost row has none) add up to 1
+    weighted = [r for r in top if r.kind != "cost"]
+    assert sum(r.target_weight or 0.0 for r in weighted) == pytest.approx(1.0, abs=1e-12)
+    assert sum(r.end_weight or 0.0 for r in weighted) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_the_window_is_the_analysed_window_not_the_backtest(
+    world: World, client: ApiClient
+) -> None:
+    body = mixed_tree()
+    full = report_of(post(client, body))
+    short = report_of(post(client, body, "?range=3Y"))
+    plan = plan_of(PortfolioTree.model_validate(body))
+    subject, summary = backtest_portfolio(plan, world.provider.histories, rf_of(world))
+    assert short.data.actual_start > full.data.actual_start
+    for report in (full, short):
+        section = holdings_of(report)
+        assert section.window_start == report.data.actual_start
+        assert section.window_end == report.data.actual_end
+        assert section.n_days == report.data.n_obs
+        assert section.total_return == pytest.approx(
+            compounded(subject.returns, section.window_start, section.window_end), abs=1e-12
+        )
+    assert holdings_of(short).total_return != pytest.approx(holdings_of(full).total_return)
+    # the end weight is the backtest's drifted weight on the last day of the window
+    assert summary.holdings is not None
+    drifted = summary.holdings.backtest.drifted_weights
+    last = drifted.loc[pd.Timestamp(holdings_of(short).window_end)]
+    leaf = next(r for r in holdings_of(short).rows if r.id == "i:h1")
+    assert leaf.end_weight == pytest.approx(float(cast(float, last["i:h1"])), abs=1e-15)
+
+
+def test_a_single_holding_at_100_percent_gets_the_whole_return_and_risk(
+    world: World, client: ApiClient
+) -> None:
+    section = holdings_of(report_of(post(client, tree([holding(0, "AAA", 1.0)]))))
+    expected = compounded(total_returns(world, "AAA"), section.window_start, section.window_end)
+    by_id = {r.id: r for r in section.rows}
+    leaf = by_id["i:h0"]
+    assert leaf.contribution == pytest.approx(expected, abs=1e-12)
+    assert leaf.contribution == pytest.approx(section.total_return, abs=1e-12)
+    assert leaf.risk_share == pytest.approx(1.0, abs=1e-9)
+    assert leaf.target_weight == 1.0 and leaf.end_weight == pytest.approx(1.0, abs=1e-12)
+    for other in ("cash", "cost"):
+        assert by_id[other].contribution == pytest.approx(0.0, abs=1e-12)
+        assert by_id[other].risk_share == pytest.approx(0.0, abs=1e-9)
+
+
+def test_a_ticker_report_has_no_holdings_field() -> None:
+    mock = Path(__file__).parent / "fixtures" / "mock_report.json"
+    report = FactorReport.model_validate_json(mock.read_text(encoding="utf-8"))
+    assert report.holdings is None
+    assert "holdings" not in json.loads(report.model_dump_json())
+    assert "holdings" not in FactorReport.model_json_schema()["required"]
+    spec = {s.field: s for s in HOOKS}["holdings"]
+    assert spec.applies("portfolio", "daily", "ff6") and spec.applies("portfolio", "daily", "ff5")
+    assert not spec.applies("ticker", "daily", "ff6")
+    assert not spec.applies("upload", "daily", "ff6")
+    assert not spec.applies("upload", "monthly", "ff5")

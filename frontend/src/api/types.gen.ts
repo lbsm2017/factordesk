@@ -1098,6 +1098,8 @@ export interface components {
             alpha_strip?: components["schemas"]["AlphaStrip"] | null;
             /** @description How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio. */
             portfolio_backtest?: components["schemas"]["PortfolioBacktestSection"] | null;
+            /** @description Holdings table of a portfolio: target and end weight, return contribution and risk share of each holding, group, cash and trading cost over the analysed window; absent (not null) for every subject except a portfolio. */
+            holdings?: components["schemas"]["HoldingsSection"] | null;
             /** @description Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed. */
             macro?: components["schemas"]["MacroSection"] | null;
             /** @description Energy and carbon sensitivities: a separate regression on the market and oil, gas and (on a short sample) carbon price legs; absent (not null) when not computed. */
@@ -1238,6 +1240,111 @@ export interface components {
             version: string;
             /** Schema Version */
             schema_version: string;
+        };
+        /**
+         * HoldingRow
+         * @description One line of the holdings table.
+         */
+        HoldingRow: {
+            /**
+             * Id
+             * @description Unique in the section. A holding is i:<tree id>, a group g:<tree id>; cash and trading cost are cash and cost.
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "group" | "holding" | "cash" | "cost";
+            /**
+             * Label
+             * @description Display name of the holding, group, cash or cost line.
+             */
+            label: string;
+            /**
+             * Ticker
+             * @description Yahoo ticker of a holding; None for every other row.
+             */
+            ticker: string | null;
+            /**
+             * Depth
+             * @description 0 asset class, cash or cost; 1 sub-asset class; 2 holding.
+             */
+            depth: number;
+            /**
+             * Parent Id
+             * @description Id of the group that contains the row; None at depth 0.
+             */
+            parent_id: string | null;
+            /**
+             * Target Weight
+             * @description Weight the portfolio rebalances to; None for the trading cost row.
+             */
+            target_weight: number | null;
+            /**
+             * End Weight
+             * @description Weight on the last day of the window, after drift; None for the cost row.
+             */
+            end_weight: number | null;
+            /**
+             * Contribution
+             * @description Frongello-linked contribution to the portfolio's net return over the window, as a decimal fraction (negative for the cost row).
+             */
+            contribution: number;
+            /**
+             * Risk Share
+             * @description Ex-post share of the portfolio's variance; None when the section's risk_share_reason says it is not defined.
+             */
+            risk_share: number | null;
+        };
+        /**
+         * HoldingsSection
+         * @description The holdings table of a portfolio report. Status is always ``ok`` when it exists.
+         */
+        HoldingsSection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Window Start
+             * Format: date
+             * @description First day of the analysed window.
+             */
+            window_start: string;
+            /**
+             * Window End
+             * Format: date
+             * @description Last day of the analysed window.
+             */
+            window_end: string;
+            /**
+             * N Days
+             * @description Daily portfolio returns in the window.
+             */
+            n_days: number;
+            /**
+             * Total Return
+             * @description Net compounded return of the portfolio over the window; the contributions of the rows with no parent add up to it.
+             */
+            total_return: number;
+            /**
+             * Risk Share Reason
+             * @description Plain-words reason when no risk share is defined; None when they are.
+             */
+            risk_share_reason: string | null;
+            /**
+             * Rows
+             * @description Table rows in tree order, then cash, then cost.
+             */
+            rows: components["schemas"]["HoldingRow"][];
         };
         /**
          * Instrument

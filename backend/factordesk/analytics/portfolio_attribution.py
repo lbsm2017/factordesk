@@ -37,6 +37,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 from types import MappingProxyType
 
 import numpy as np
@@ -81,15 +82,31 @@ class RollUp:
     """Row ids counted in each group, in input order."""
 
 
-def attribute(result: BacktestResult) -> PortfolioAttribution:
-    """Linked return contribution and ex-post risk share of every leaf, cash and cost."""
-    index = result.ret.index
-    leaf_part = result.applied_weights.to_numpy() * result.leaf_ret.to_numpy()
-    cost_part = result.ret.to_numpy() - result.gross_ret.to_numpy()
+def attribute(
+    result: BacktestResult, *, start: date | None = None, end: date | None = None
+) -> PortfolioAttribution:
+    """Linked return contribution and ex-post risk share of every leaf, cash and cost.
+
+    ``start`` and ``end`` (inclusive) cut the days that count, for a report whose analysed window
+    is shorter than the backtest. Linking restarts at ``start`` (``R_0 = 0``) and the weights that
+    earn each day stay the backtest's own, so the first day uses the weights as drifted until then.
+    Raises ``ValueError`` when no day is left.
+    """
+    first = None if start is None else pd.Timestamp(start)
+    last = None if end is None else pd.Timestamp(end)
+    ret = result.ret.loc[first:last]
+    if len(ret) == 0:
+        raise ValueError("no day of the backtest falls inside the window")
+    index = ret.index
+    applied = result.applied_weights.loc[first:last]
+    leaf_ret = result.leaf_ret.loc[first:last]
+    gross = result.gross_ret.loc[first:last]
+    leaf_part = applied.to_numpy() * leaf_ret.to_numpy()
+    cost_part = ret.to_numpy() - gross.to_numpy()
     daily = np.column_stack([leaf_part, cost_part])
     row_ids = (*result.leaf_ids, COST_ID)
 
-    net = result.ret.to_numpy(dtype=np.float64)
+    net = ret.to_numpy(dtype=np.float64)
     growth = np.cumprod(1.0 + net)
     prior_growth = np.concatenate([[1.0], growth[:-1]])
     linked = (daily * prior_growth[:, None]).sum(axis=0)

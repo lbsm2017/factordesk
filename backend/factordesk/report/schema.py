@@ -51,7 +51,8 @@ out of the JSON) for FF5, so FF5 reports are byte-identical to the ones written 
 optional section ``alpha_strip`` (alpha under CAPM, FF3, FF5 and FF6 on the same rows;
 ``report/sections/alpha_strip.py``) is also left out of the JSON when ``None``, and so is
 ``portfolio_backtest`` (the backtest behind a portfolio report;
-``report/sections/portfolio_backtest.py``), and so is ``macro`` (macro sensitivities;
+``report/sections/portfolio_backtest.py``), and so is ``holdings`` (the holdings table of a
+portfolio report; ``report/sections/holdings.py``), and so is ``macro`` (macro sensitivities;
 ``report/sections/macro.py``), and so is ``energy`` (energy and carbon sensitivities;
 ``report/sections/energy.py``).
 All are additive and do not bump the version (contract SC5).
@@ -85,6 +86,7 @@ from factordesk.report.base import Tag as Tag
 from factordesk.report.sections.alpha_strip import ALPHA_STRIP_SECTION, AlphaStrip
 from factordesk.report.sections.energy import ENERGY_SECTION, EnergySection
 from factordesk.report.sections.fragility import FRAGILITY_SECTION, FragilitySection
+from factordesk.report.sections.holdings import HOLDINGS_SECTION, HoldingsSection
 from factordesk.report.sections.kalman import KALMAN_SECTION, KalmanBetaSeries
 from factordesk.report.sections.lead_lag import LEAD_LAG_SECTION, LeadLagSection
 from factordesk.report.sections.macro import MACRO_SECTION, MacroSection
@@ -122,6 +124,7 @@ SECTIONS: tuple[SectionSpec, ...] = (
     TAIL_RISK_SECTION,
     ALPHA_STRIP_SECTION,
     PORTFOLIO_BACKTEST_SECTION,
+    HOLDINGS_SECTION,
     MACRO_SECTION,
     ENERGY_SECTION,
 )
@@ -516,6 +519,7 @@ _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
     "model",
     "alpha_strip",
     "portfolio_backtest",
+    "holdings",
     "macro",
     "energy",
 )
@@ -523,8 +527,8 @@ _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
 
 
 def _subject_not_required(schema: JsonDict) -> None:
-    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest``, ``macro`` and ``energy`` are
-    left out of the JSON when ``None``, so they are never required."""
+    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest``, ``holdings``, ``macro`` and
+    ``energy`` are left out of the JSON when ``None``, so they are never required."""
     required = schema.get("required")
     if isinstance(required, list):
         schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
@@ -614,6 +618,13 @@ class FactorReport(FrozenModel):
         description="How a portfolio's return series was made: window, limiting instruments, "
         "rebalances, cost, survivorship note and target weights; absent (not null) for every "
         "subject except a portfolio.",
+    )
+    holdings: HoldingsSection | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Holdings table of a portfolio: target and end weight, return contribution "
+        "and risk share of each holding, group, cash and trading cost over the analysed window; "
+        "absent (not null) for every subject except a portfolio.",
     )
     macro: MacroSection | None = Field(
         default=None,

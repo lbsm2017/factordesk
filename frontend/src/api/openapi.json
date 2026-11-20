@@ -2676,6 +2676,17 @@
             ],
             "description": "How a portfolio's return series was made: window, limiting instruments, rebalances, cost, survivorship note and target weights; absent (not null) for every subject except a portfolio."
           },
+          "holdings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldingsSection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Holdings table of a portfolio: target and end weight, return contribution and risk share of each holding, group, cash and trading cost over the analysed window; absent (not null) for every subject except a portfolio."
+          },
           "macro": {
             "anyOf": [
               {
@@ -3030,6 +3041,205 @@
         ],
         "title": "Health",
         "description": "Liveness answer; reads no disk and no network."
+      },
+      "HoldingRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique in the section. A holding is i:<tree id>, a group g:<tree id>; cash and trading cost are cash and cost."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "group",
+              "holding",
+              "cash",
+              "cost"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Display name of the holding, group, cash or cost line."
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "Yahoo ticker of a holding; None for every other row."
+          },
+          "depth": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Depth",
+            "description": "0 asset class, cash or cost; 1 sub-asset class; 2 holding."
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Id of the group that contains the row; None at depth 0."
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight",
+            "description": "Weight the portfolio rebalances to; None for the trading cost row."
+          },
+          "end_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Weight",
+            "description": "Weight on the last day of the window, after drift; None for the cost row."
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution",
+            "description": "Frongello-linked contribution to the portfolio's net return over the window, as a decimal fraction (negative for the cost row)."
+          },
+          "risk_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share",
+            "description": "Ex-post share of the portfolio's variance; None when the section's risk_share_reason says it is not defined."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "ticker",
+          "depth",
+          "parent_id",
+          "target_weight",
+          "end_weight",
+          "contribution",
+          "risk_share"
+        ],
+        "title": "HoldingRow",
+        "description": "One line of the holdings table."
+      },
+      "HoldingsSection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Window Start",
+            "description": "First day of the analysed window."
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Window End",
+            "description": "Last day of the analysed window."
+          },
+          "n_days": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "N Days",
+            "description": "Daily portfolio returns in the window."
+          },
+          "total_return": {
+            "type": "number",
+            "title": "Total Return",
+            "description": "Net compounded return of the portfolio over the window; the contributions of the rows with no parent add up to it."
+          },
+          "risk_share_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share Reason",
+            "description": "Plain-words reason when no risk share is defined; None when they are."
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Table rows in tree order, then cash, then cost."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "window_start",
+          "window_end",
+          "n_days",
+          "total_return",
+          "risk_share_reason",
+          "rows"
+        ],
+        "title": "HoldingsSection",
+        "description": "The holdings table of a portfolio report. Status is always ``ok`` when it exists."
       },
       "Instrument": {
         "properties": {

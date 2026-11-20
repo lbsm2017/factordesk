@@ -9,9 +9,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Literal
 
 import pandas as pd
 
+from factordesk.analytics.backtest import BacktestResult
 from factordesk.analytics.diagnostics import DiagnosticsResult, GateResult, MultiDayFit
 from factordesk.analytics.regression import FullSampleRegression
 from factordesk.analytics.rolling import RollingBetas
@@ -52,6 +54,38 @@ class WorldBenchmarkInput:
 
 
 @dataclass(frozen=True)
+class HoldingsNode:
+    """One group or holding of the portfolio tree, as the holdings table lists it."""
+
+    id: str
+    """A holding: its backtest leaf id (``i:<tree id>``). A group: ``g:<tree id>``."""
+    kind: Literal["group", "holding"]
+    label: str
+    ticker: str | None
+    parent_id: str | None
+    """The group that contains this node; ``None`` for an asset class."""
+    depth: int
+    """0 for an asset class, 1 for a sub-asset class, 2 for a holding."""
+    path: tuple[str, ...]
+    """Group ids from the asset class down to this node's own group. For a group the path ends
+    with its own id; for a holding it is the path of its parent group."""
+
+
+@dataclass(frozen=True)
+class HoldingsInput:
+    """The backtest and the tree layout the holdings section is built from.
+
+    ``nodes`` are the groups and the holdings that took part in the backtest, in tree order (a
+    group before its members). A group with no holding above 0 is not listed. Cash and the
+    trading cost are not nodes: the backtest has one cash leaf, and the section adds both as rows
+    of their own.
+    """
+
+    backtest: BacktestResult
+    nodes: tuple[HoldingsNode, ...]
+
+
+@dataclass(frozen=True)
 class PortfolioBacktestInput:
     """What the backtest of a portfolio subject says about itself (read by the
     ``portfolio_backtest`` hook; built by ``api.portfolio_report``).
@@ -73,6 +107,8 @@ class PortfolioBacktestInput:
     unallocated_weight: float
     survivorship_note: str
     weights: tuple[tuple[str, str | None, float], ...]
+    holdings: HoldingsInput | None = None
+    """The backtest and tree layout behind the holdings section (read by the ``holdings`` hook)."""
 
 
 @dataclass(frozen=True)
