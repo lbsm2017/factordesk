@@ -43,7 +43,8 @@ The euro view starts in January 1999. Days without an ECB rate (euro-area bank h
 | Library line | Proxy | Euro view |
 |---|---|---|
 | EUR Cash | FXE | Replaced by the euro cash index |
-| USD Cash, CHF Cash | RF, FXF | Unhedged: holding them is a currency position |
+| USD Cash | RF | Unhedged: holding it is a currency position |
+| CHF Cash | SARON, FXF | Replaced by the Swiss franc cash index (SARON, below), converted at the franc's own rate, unhedged. FXF is used only when SARON is unavailable, with a notice |
 | N. American government, corporate investment grade and high yield bonds; EM bonds in USD; inflation-linked bonds | IEF, LQD, HYG, EMB, TIP | Hedged |
 | European and global bond lines | IGOV, PICB, IHY, BNDW, GHYG | Unhedged, labelled "several currencies" |
 | Equities, alternatives, real estate, commodities | all | Unhedged |
@@ -66,7 +67,14 @@ The euro view starts in January 1999. Days without an ECB rate (euro-area bank h
 - The ECB rate is fixed at 14:10 Frankfurt time, about 8 hours before the US close. Daily euro returns of US assets therefore carry some timing noise. Monthly figures are not affected.
 - On 2026-11-20 the validation on real data ([results](../docs/research/sprint-3-validation.md)) found a monthly correlation of 0.972 between SPY in euros and SXR8.DE, a euro-listed S&P 500 fund. The cause is the difference in closing times: Xetra closes at 17:30 Frankfurt, New York later, and the ECB rate is fixed at 14:10, so a month-end can differ by about one day of US move. The correlation is 0.990 over quarters and 0.9996 over years, and the annual return gap is +0.30%. The earlier claim "Monthly figures are not affected" is superseded.
 - The factors stay US factors, converted into euros. Regional factor files (see [European mode](decision-european-mode-and-currency.md)) remain a separate, later decision.
-- CHF cash on SARON, and hedging for multi-currency bond funds, are not in scope.
+- Hedging for multi-currency bond funds is not in scope.
+
+## CHF cash on SARON (Sprint 4, S4-10)
+
+- The "CHF Cash" line of a portfolio, in the USD view and in the EUR view, earns the Swiss franc overnight rate instead of the FXF currency trust. The franc return is built as the euro cash index is (ACT/360, compounded across gaps) and then converted with the same exchange-rate code. It is not hedged.
+- Source: SARON, the fixing at the close of the trading day, from the Swiss National Bank data portal (data.snb.ch), as one series. Up to the last day of cube `zirepo` (item `H0`, "Overnight (SARON), close of trading", daily from 1999-06-21, six decimals, published about a month late): that cube. After that day: cube `snbgwdzid` (item `SARON`, fresh, rounded to two decimals of a percent). Values are used as published. The portal has no daily TOIS series, so TOIS is not used. If `zirepo` is missing, the series starts on 2009-08-24, the first fixing of the fresh cube.
+- If the SNB portal or the franc exchange rate is down, the line keeps FXF and the report shows a notice. The report never fails for this reason. FXF is downloaded only in that case.
+- The report names SARON in its notes and in the source credit. A USD portfolio with a CHF Cash line therefore carries the `currency` block too (reference USD); other USD reports do not.
 
 ## What would change our mind
 
@@ -78,3 +86,10 @@ The euro view starts in January 1999. Days without an ECB rate (euro-area bank h
 - [Reference-currency method notes](../docs/research/reference-currency-and-benchmarks.md)
 - [Sprint 3 record](../docs/sprints/sprint-3.md)
 - Related: [European mode](decision-european-mode-and-currency.md), [USD-only v1 portfolios](decision-usd-only-v1-portfolios.md), [SAA tree and proxies](decision-saa-tree-and-proxies.md)
+
+## Update, 2026-11-20 (Sprint 4): SARON, ranges and a dollar lead
+
+- **Ranges honour the currency.** PR #36 (S4-1, open on 2026-11-20): the ranges endpoint takes `ccy`, and the cache key includes it. Before this change the preset day counts ignored the currency, so in the euro view they could exceed what the euro report could use when the exchange-rate series started later than the prices ([Sprint 4](../docs/sprints/sprint-4.md), "Recap" item 3).
+- **CHF cash on SARON.** The cost "CHF cash on SARON is not in scope" above was true on 2026-11-20 for Sprint 3 and is superseded by PR #44 (S4-10, open on 2026-11-20). It moves the CHF Cash line from the FXF currency trust to the Swiss franc overnight rate (SARON) from the SNB data portal, in both views. The series is spliced: cube `zirepo` (item `H0`) is daily from 1999-06-21 but about a month late, and cube `snbgwdzid` (item `SARON`) is fresh but rounded to two decimals, so it fills the days after the last `zirepo` day. The index maths is the euro cash code (ACT/360, compounding across gaps). The franc return is converted unhedged. If the portal or the franc rate is down, the line keeps FXF with a notice. Hedging for multi-currency bond funds is still out of scope.
+- **The dollar term needs a lead, not a lag.** On 2026-11-20 the spike in [dollar lag and lead](../docs/research/dollar-lag-lead-spike.md) (PR #41, merged at 5eb6c3d) measured the macro regression in the euro view for SPY, VGK, EFA, IEF and a 60/40 mix, 2007-01 to 2026-09. The one-day lag adds at most 0.3 bp of adjusted R-squared. The one-day lead adds 184, 115 and 105 bp for VGK, EFA and IEF (t = -15.2, -13.6, -8.2). The reading is close time: the ECB rate is fixed at about 14:10 CET and a US fund closes at 22:00 CET, so the last hours of the fund's day sit in the next day's dollar return. The lead is about three times smaller with a noon New York rate. The USD view, with the Fed index, shows a smaller lead of the same sign (VGK t = -5.8, IEF t = -4.9). The Xetra control EXSA.DE has a positive lead that this reading does not explain; the note says to repeat it after the Europe factor set.
+- **Not built.** A lead is a negative shift, which [no look-ahead rule](decision-no-look-ahead-rule.md) forbids. On 2026-11-20 the note recommended a lead in the euro view only, and the decision is with the owner. Options: keep the rule and the lag; allow a lead that is labelled as using the next day's dollar move; or use a fixing nearer the US close. Until the owner decides, the euro view keeps the lag term described in [factor models and macro](decision-factor-models-and-macro.md).

@@ -92,11 +92,15 @@ export function useTickerSuggestions(text: string) {
   });
 }
 
-export function useRanges(ticker: string | null) {
+/** The range presets of a ticker, counted in the reference currency of the page. */
+export function useRanges(ticker: string | null, ccy: Currency = DEFAULT_CURRENCY) {
   return useQuery({
-    queryKey: ["ranges", ticker],
+    queryKey: ["ranges", ticker, ccy],
     queryFn: ({ signal }) =>
-      apiRequest<RangeOptions>(`/api/report/${encodeURIComponent(ticker ?? "")}/ranges`, { signal }),
+      apiRequest<RangeOptions>(`/api/report/${encodeURIComponent(ticker ?? "")}/ranges`, {
+        signal,
+        query: ccyParam(ccy),
+      }),
     enabled: ticker !== null,
     staleTime: 5 * 60_000,
     retry: false,

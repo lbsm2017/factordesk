@@ -27,7 +27,7 @@
       "sub_asset_class": "CHF Cash",
       "proxy": "FXF",
       "proxy_kind": "etf",
-      "note": "currency deposit trust: deposit rate plus the franc move against USD",
+      "note": "currency deposit trust: deposit rate plus the franc move against USD; reports use SARON (Swiss franc overnight rate) plus the franc move instead, and this ETF when SARON is unavailable",
       "first_date": "2006-06-26",
       "currency": "USD"
     },
