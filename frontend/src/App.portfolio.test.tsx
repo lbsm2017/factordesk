@@ -7,7 +7,7 @@ import { LIBRARY } from "./portfolio/testLibrary";
 import { STORAGE_KEY } from "./portfolio/store";
 import { resetRecentCache } from "./state/recent";
 import { monthlyReport } from "./test/fixture";
-import { server, setupMockApi } from "./test/mockApi";
+import { server, setupMockApi, sse, sseResponse } from "./test/mockApi";
 
 // The panels need ECharts; this file tests the composer around them.
 vi.mock("./components/report/ReportView", () => ({
@@ -147,6 +147,39 @@ describe("the portfolio mode", () => {
     fireEvent.click(fold.getByRole("button", { name: "Edit" }));
     expect(screen.getByTestId("composer")).toBeTruthy();
     expect(screen.queryByTestId("report-ticker")).toBeNull();
+  });
+
+  it("shows the run page of the portfolio while it runs on a stream, then folds over the report", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockPortfolioApi();
+    server.use(
+      http.post("*/api/report/portfolio/stream", async ({ request }) => {
+        const tree = (await request.json()) as { name: string };
+        await gate;
+        return sseResponse([
+          sse("step", { step: "prices", label: "Downloading prices", index: 1, total: 4 }),
+          sse("step", { step: "factors", label: "Loading factor data", index: 2, total: 4 }),
+          sse("report", { ...monthlyReport, ticker: tree.name }),
+        ]);
+      }),
+    );
+    renderAt("/?m=portfolio");
+    await createFrom("60/40", "Streamed");
+    const live = within(screen.getByRole("complementary", { name: "Live portfolio check" }));
+    fireEvent.click(live.getByRole("button", { name: "Run backtest" }));
+    const frame = await screen.findByTestId("loading-frame");
+    expect(await screen.findByRole("heading", { name: "Building the report for Streamed" })).toBeTruthy();
+    // Portfolio placeholders: Holdings follows Price.
+    const titles = [...frame.querySelectorAll("section.ph-panel h2")].map((h) => h.textContent);
+    expect(titles.slice(0, 3)).toEqual(["Price", "Holdings", "Drawdown"]);
+    expect(screen.queryByTestId("composer")).toBeNull();
+    release();
+    expect(await screen.findByTestId("report-ticker")).toHaveProperty("textContent", "Streamed");
+    expect(screen.getByRole("group", { name: "Portfolio summary" })).toBeTruthy();
+    expect(screen.queryByTestId("loading-frame")).toBeNull();
   });
 
   it("shows the message of the API when it refuses", async () => {

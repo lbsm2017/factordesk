@@ -56,13 +56,26 @@ export const mockTickers: TickerSuggestion[] = [
 export const requests: string[] = [];
 
 let status = mockStatus;
-/** Replace what `GET /api/factors/status` returns, and what a refresh returns next. */
-export function setStatus(next: FactorDataStatus): void {
-  status = next;
-}
 let refreshed: FactorDataStatus | null = null;
 export function setRefreshResult(next: FactorDataStatus | null): void {
   refreshed = next;
+}
+
+function noStream(): Response {
+  return HttpResponse.json({ code: "not_found", message: "Not found.", action: "Check the address." }, { status: 404 });
+}
+
+/** One server-sent event block. */
+export function sse(event: string, data: unknown): string {
+  return `event: ${event}
+data: ${JSON.stringify(data)}
+
+`;
+}
+
+/** A `text/event-stream` answer made of ready blocks (see `sse`). */
+export function sseResponse(blocks: string[]): Response {
+  return new Response(blocks.join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
 export const handlers = [
@@ -76,6 +89,10 @@ export const handlers = [
     return HttpResponse.json({ items: mockTickers.filter((t) => t.ticker.startsWith(q)) });
   }),
   http.get("*/api/report/:ticker/ranges", ({ params }) => HttpResponse.json(mockRanges(String(params["ticker"])))),
+  // The default backend has no stream routes: a 404 sends the app to the plain endpoint (no step list).
+  http.get("*/api/report/:ticker/stream", noStream),
+  http.post("*/api/report/portfolio/stream", noStream),
+  http.post("*/api/report/upload/stream", noStream),
   http.get("*/api/report/:ticker", ({ params }) => {
     const ticker = String(params["ticker"]);
     if (ticker === "XYZ") {

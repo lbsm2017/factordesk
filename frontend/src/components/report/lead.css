@@ -31,6 +31,11 @@ tbody tr:focus-visible > th { box-shadow: inset 2px 0 0 var(--ink); }
 }
 
 /* euro view: the "Figures in EUR" pill beside the type badge, and the credits line of the colophon */
-.page-head .ccy-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px solid var(--accent); border-radius: var(--r-control); background: var(--accent-50); color: var(--accent); font-size: var(--fs-cap); font-weight: 600; white-space: nowrap; }
+.page-head .ccy-pill, .page-head .set-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px solid var(--accent); border-radius: var(--r-control); background: var(--accent-50); color: var(--accent); font-size: var(--fs-cap); font-weight: 600; white-space: nowrap; }
+.page-head .set-pill.plain { border-color: var(--control-line); background: transparent; color: var(--ink-2); }
+.page-head .hd-link { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0; border: 0; background: none; color: var(--accent); font-size: var(--fs-cap); font-weight: 600; cursor: pointer; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.page-head .hd-link:hover { color: var(--accent-hover); text-decoration-thickness: 2px; }
+.page-head .hd-link .icon { width: 16px; height: 16px; }
+@media (max-width: 899px) { .page-head .hd-link { min-height: 44px; } }
 .report-region .colophon .credits { margin-top: var(--s-1); }
 .report-region .colophon .credits .credit { display: block; }

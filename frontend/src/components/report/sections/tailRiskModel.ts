@@ -12,6 +12,13 @@ export const METHODS: readonly { key: TailMethod; label: string }[] = [
   { key: "cornish_fisher", label: "Cornish-Fisher" },
 ];
 
+/** The two bars of each level: the observed figure, and the model figure (Cornish-Fisher, or Gaussian where that is n/a). */
+export type BarKey = "historical" | "forecast";
+export const BARS: readonly { key: BarKey; label: string }[] = [
+  { key: "historical", label: "Historical" },
+  { key: "forecast", label: "Forecast" },
+];
+
 interface HorizonInfo {
   key: Horizon;
   label: string;
@@ -35,6 +42,8 @@ export const HORIZONS: readonly HorizonInfo[] = [
 
 export const APPROXIMATE = "approximate (tends to be narrow)";
 export const INDICATIVE = "Indicative";
+export const GAUSSIAN = "Gaussian";
+export const GAUSSIAN_NOTE = "Cornish-Fisher not available here; normal approximation used";
 export const CAPTION =
   "Losses are shown as positive numbers. Each horizon uses its own returns over whole days, months or quarters. Nothing is scaled up from daily, so quarterly figures rest on fewer observations.";
 
@@ -137,12 +146,6 @@ export function scaleOf(figures: readonly TailFigure[]): Scale {
   return { lo: bottom / 100, hi: top / 100 };
 }
 
-/** "Scale 0 to 18%". */
-export function scaleText(s: Scale): string {
-  const num = (x: number) => `${Number((x * 100).toFixed(1))}`;
-  return `Scale ${s.lo === 0 ? "0" : `${num(s.lo)}%`} to ${num(s.hi)}%`;
-}
-
 /** Position of `x` on the scale, as a percentage of the track width (clamped to 0..100). */
 export function place(x: number, s: Scale): number {
   const span = s.hi - s.lo;
@@ -153,4 +156,86 @@ export function place(x: number, s: Scale): number {
 /** Decimals for the losses of a measure: two while its scale ends below 4%, one above. */
 export function digitsFor(s: Scale): number {
   return s.hi < 0.04 ? 2 : 1;
+}
+
+/** One bar of a level: the figure it shows, and which method it comes from. */
+export interface TailBar {
+  key: BarKey;
+  label: string;
+  /** The figure on show; its `value` is null when the bar is n/a, and it is undefined when the report holds none. */
+  figure: TailFigure | undefined;
+  source: TailMethod;
+  /** True for a Forecast bar that shows the Gaussian figure because Cornish-Fisher is n/a. */
+  fallback: boolean;
+}
+
+/** One level of one measure ("VaR 95%"): its two bars, and the figure of every method for the table. */
+export interface TailLevel extends TailRow {
+  bars: [TailBar, TailBar];
+}
+
+/** One measure with its levels, from the lowest level to the highest. */
+export interface TailGroup {
+  measure: TailFigure["measure"];
+  label: string;
+  levels: TailLevel[];
+}
+
+/** The Forecast figure of a level: Cornish-Fisher when it has a value, else Gaussian, else the n/a Cornish-Fisher figure. */
+export function forecastOf(cells: TailRow["cells"]): Omit<TailBar, "key" | "label"> {
+  const cf = cells.cornish_fisher;
+  const gauss = cells.gaussian;
+  if (cf?.value != null) return { figure: cf, source: "cornish_fisher", fallback: false };
+  if (gauss?.value != null) return { figure: gauss, source: "gaussian", fallback: true };
+  return { figure: cf ?? gauss, source: "cornish_fisher", fallback: false };
+}
+
+/** The figures as a VaR group and a CVaR group, levels in ascending order, each with its Historical and Forecast bar. */
+export function groupsOf(figures: readonly TailFigure[]): TailGroup[] {
+  const rows = rowsOf(figures);
+  const out: TailGroup[] = [];
+  for (const measure of ["var", "cvar"] as const) {
+    const levels = rows
+      .filter((r) => r.measure === measure)
+      .sort((a, b) => a.level - b.level)
+      .map<TailLevel>((r) => ({
+        ...r,
+        bars: [
+          { key: "historical", label: BARS[0]?.label ?? "", figure: r.cells.historical, source: "historical", fallback: false },
+          { key: "forecast", label: BARS[1]?.label ?? "", ...forecastOf(r.cells) },
+        ],
+      }));
+    if (levels.length > 0) out.push({ measure, label: measure === "var" ? "VaR" : "CVaR", levels });
+  }
+  return out;
+}
+
+/** The figures that the bars show (Gaussian only where it stands in for Cornish-Fisher): they set the shared scale. */
+export function shownFigures(groups: readonly TailGroup[]): TailFigure[] {
+  return groups.flatMap((g) => g.levels.flatMap((l) => l.bars.flatMap((b) => (b.figure ? [b.figure] : []))));
+}
+
+/** "95%", "97.5%". */
+export function levelName(level: number): string {
+  return `${Number((level * 100).toFixed(1))}%`;
+}
+
+/** "1 month in 20". */
+export function oneIn(level: number, horizon: Horizon): string {
+  return `1 ${horizonInfo(horizon).one} in ${Math.round(1 / (1 - level))}`;
+}
+
+/** Tick values of the shared axis: a round step that gives at most four intervals, from the scale's low end to its high end. */
+export function ticksOf(s: Scale): number[] {
+  const span = (s.hi - s.lo) * 100;
+  const steps = [0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100];
+  const step = steps.find((x) => span / x <= 4) ?? 100;
+  const out: number[] = [];
+  for (let k = Math.ceil((s.lo * 100) / step - 1e-9); k * step <= s.hi * 100 + 1e-9; k++) out.push((k * step) / 100 || 0);
+  return out;
+}
+
+/** "0", "5%", "0.5%". */
+export function tickText(x: number): string {
+  return x === 0 ? "0" : `${Number((x * 100).toFixed(2))}%`;
 }

@@ -2,11 +2,13 @@ import { isIsoDate } from "../format/dates";
 import type { RangePreset } from "../api/types";
 import { parseCurrency } from "./currency";
 import type { Currency } from "./currency";
+import { DEFAULT_FACTOR_SET, parseFactorSet } from "./factorSet";
+import type { FactorSet } from "./factorSet";
 
 /**
  * URL state contract (dashboard spec DB6.1). Shapes: `/?t=SPY&range=3Y`,
  * `/?t=SPY&start=2023-01-01&end=2026-09-30`, plus an optional `win=126`, `stats=1`, `m=track` (the
- * track-record mode) or `m=portfolio` (the portfolio composer); no `m` means ticker mode and `model=ff5|ff6`; `ccy=EUR|USD` names the reference currency and overrides the stored choice. Owner decision of 2026-11-19: no
+ * track-record mode) or `m=portfolio` (the portfolio composer); no `m` means ticker mode and `model=ff5|ff6`; `ccy=EUR|USD` names the reference currency and overrides the stored choice; `fs=europe` picks the Developed Europe factors (no `fs` means the US set, and the US set is never written). Owner decision of 2026-11-19: no
  * `range` means 10Y and no `model` means FF6, and a default is never written. Full history is written
  * `range=FULL`, FF5 is written `model=ff5`. Every explicit parameter of an older URL keeps its meaning.
  * Panels read `win` through props and `stats` through `useShowStats()`, never from `location`.
@@ -45,6 +47,8 @@ export interface UrlState {
   model: FactorModel;
   /** The reference currency named by the URL (`ccy=EUR` or `ccy=USD`); null when the URL says nothing, so the stored choice or USD applies. */
   ccy: Currency | null;
+  /** The factor set: `europe` for `fs=europe`; the US set when the URL has no `fs`. */
+  fs: FactorSet;
 }
 
 export type Mode = "ticker" | "track" | "portfolio";
@@ -59,6 +63,7 @@ export const EMPTY_URL_STATE: UrlState = {
   mode: "ticker",
   model: DEFAULT_MODEL,
   ccy: null,
+  fs: DEFAULT_FACTOR_SET,
 };
 
 /** The server's ticker pattern (`validate_ticker`): 1 to 12 of letters, digits and . ^ = -, not starting with a dot. */
@@ -128,6 +133,7 @@ export function parseUrl(search: string): UrlState {
     mode: parseMode(params.get("m")),
     model: parseModel(params.get("model")),
     ccy: parseCurrency(params.get("ccy")),
+    fs: parseFactorSet(params.get("fs")),
   };
 }
 
@@ -146,6 +152,7 @@ export function toSearch(state: UrlState): string {
   if (state.mode !== "ticker") params.set("m", state.mode);
   if (state.model !== DEFAULT_MODEL) params.set("model", state.model);
   if (state.ccy !== null) params.set("ccy", state.ccy);
+  if (state.fs !== DEFAULT_FACTOR_SET) params.set("fs", state.fs);
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
 }

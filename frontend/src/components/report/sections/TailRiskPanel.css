@@ -1,53 +1,76 @@
-/* Tail risk panel: one line per method and level, the band as a whisker and the estimate as a dot.
-   Layout of the approved mockup (docs/design/sprint-3/3-tail-risk-panel.html); tokens only. */
+/* Tail risk panel: one grouped chart on one shared axis. A VaR group and a CVaR group; each level is a
+   row with two thin bars (Historical, Forecast), the 90% band as a soft overlay on the bar end and the
+   value at the bar end. The same chart is a table for assistive technology (.vh cells). Tokens only. */
 #tail-risk .panel-head > .pm { margin-left: 0; }
 #tail-risk .panel-head > .seg { margin-left: auto; }
 
-.tr-group { margin-top: var(--s-5); }
-.tr-group:first-child { margin-top: var(--s-4); }
-.tr-lines .tr-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s-3); padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
-.tr-lines .tr-head h3 { margin: 0; font-size: var(--fs-sub); }
-.tr-what { color: var(--ink-2); font-size: var(--fs-cap); }
-.tr-scale { margin-left: auto; color: var(--ink-2); font-size: var(--fs-cap); }
-.tr-line { padding: 10px 0 11px; border-bottom: 1px solid var(--grid); }
-.tr-main { display: grid; grid-template-columns: 148px 72px minmax(0, 1fr) 132px; column-gap: var(--s-4); align-items: center; min-height: 32px; font-variant-numeric: tabular-nums; }
-.tr-badge { display: inline-flex; align-items: center; justify-self: start; height: 26px; padding: 0 10px; border: 1px solid var(--control-line); border-radius: var(--r-control); background: var(--surface); font-size: var(--fs-cap); font-weight: 600; color: var(--ink); white-space: nowrap; }
-.tr-v { font-size: var(--fs-sub); font-weight: 600; text-align: right; }
-.tr-v.na { color: var(--ink-2); }
-.tr-r { font-size: var(--fs-cap); color: var(--ink-2); text-align: right; white-space: nowrap; }
-.tr-note { margin: 4px 0 0 calc(148px + var(--s-4)); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: var(--fs-cap); color: var(--ink-2); }
-.tr-flag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--r-control); background: var(--caution-50); color: var(--caution); font-size: var(--fs-cap); font-weight: 600; }
-.tr-flag .icon { width: 14px; height: 14px; }
-.tr-why { max-width: 70ch; }
+#tail-risk [data-bar="historical"] { --m: var(--m-hist); }
+#tail-risk [data-bar="forecast"] { --m: var(--m-fc); }
+
+/* legend, once */
+.tr-legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-5); margin-top: var(--s-3); font-size: var(--fs-cap); color: var(--ink-2); }
+.tr-legend li { display: inline-flex; align-items: center; gap: 8px; }
+.tr-sw { width: 18px; height: 8px; border-radius: var(--r-mark); background: var(--m); }
+.tr-sw-band { width: 26px; height: 14px; border-inline: 2px solid var(--ink-2); background: color-mix(in srgb, var(--ink-2) 22%, transparent); }
+.tr-ind-ic { width: 14px; height: 14px; flex: none; fill: none; stroke: var(--caution); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* the chart: a label column, then the plot; the end margin holds the value written after each bar */
+.tr-chart { --tr-label: 128px; --tr-end: 72px; position: relative; margin-top: var(--s-3); font-variant-numeric: tabular-nums; }
+.tr-grid { position: absolute; z-index: 0; top: 0; bottom: 35px; left: var(--tr-label); right: var(--tr-end); pointer-events: none; }
+.tr-grid i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--grid); }
+.tr-grid i.zero { background: var(--axis); }
+
+.tr-group { position: relative; z-index: 1; }
+.tr-group:hover, .tr-group:focus-within { z-index: 3; }
+.tr-group + .tr-group { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.tr-gh { position: relative; background: var(--surface); display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s-3); margin-bottom: 2px; }
+.tr-gh b { font-size: var(--fs-sub); font-weight: 600; }
+.tr-gh span { font-size: var(--fs-cap); color: var(--ink-2); }
+.tr-level { display: grid; grid-template-columns: var(--tr-label) minmax(0, 1fr); align-items: center; padding: 3px 0; }
+.tr-lv { display: flex; flex-direction: column; justify-content: center; line-height: 1.25; }
+.tr-lv b { font-size: var(--fs-sub); font-weight: 600; }
+.tr-lv span { font-size: var(--fs-cap); color: var(--ink-2); }
+.tr-bars { display: grid; row-gap: 2px; min-width: 0; }
+
+/* one bar row: focusable, shows its tooltip on hover and on focus */
+.tr-row { position: relative; height: 22px; border-radius: var(--r-inner); }
+.tr-row:hover, .tr-row:focus { z-index: 3; background: var(--soft); }
+.tr-track { position: absolute; top: 0; bottom: 0; left: 0; right: var(--tr-end); }
+.tr-bar { position: absolute; top: 7px; height: 8px; min-width: 2px; border-radius: var(--r-mark); background: var(--m); transition: left var(--dur) var(--ease), width var(--dur) var(--ease); }
+.tr-bar.ind { background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--surface) 3px 5px); }
+.tr-band { position: absolute; top: 4px; height: 14px; border-inline: 2px solid var(--m); background: color-mix(in srgb, var(--m) 26%, transparent); transition: left var(--dur) var(--ease), width var(--dur) var(--ease); }
+.tr-val { position: absolute; top: 0; height: 22px; display: flex; align-items: center; gap: 6px; padding-left: 8px; white-space: nowrap; font-size: var(--fs-cap); font-weight: 600; color: var(--ink); transition: left var(--dur) var(--ease); }
+.tr-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--control-line); border-radius: var(--r-inner); background: var(--surface); font-size: var(--fs-cap); font-weight: 600; color: var(--ink-2); }
+.tr-info { width: 14px; height: 14px; flex: none; fill: none; stroke: var(--ink-2); stroke-width: 1.6; stroke-linecap: round; }
+.tr-na { position: absolute; left: 0; top: 0; height: 22px; display: flex; align-items: center; gap: 8px; font-size: var(--fs-cap); color: var(--ink-2); }
+.tr-na i { width: 28px; border-top: 1px dashed var(--control-line); }
+
+/* tooltip: border, no shadow; hidden with Escape (data-esc) until the pointer or focus leaves */
+.tr-tip { display: none; position: absolute; z-index: 4; top: calc(100% + 2px); left: 0; width: max-content; max-width: min(380px, 100%); padding: var(--s-2) var(--s-3); border: 1px solid var(--control-line); border-radius: var(--r-inner); background: var(--surface); color: var(--ink); font-size: var(--fs-cap); font-weight: 400; line-height: 1.35; text-align: left; white-space: normal; pointer-events: none; }
+.tr-tip b { display: block; font-weight: 600; }
+.tr-tip span { display: block; color: var(--ink-2); }
+.tr-row:not([data-esc]):hover .tr-tip, .tr-row:not([data-esc]):focus .tr-tip { display: block; }
+
+/* the one axis, at the bottom */
+.tr-axis { position: relative; z-index: 1; height: 30px; margin: var(--s-1) var(--tr-end) 0 var(--tr-label); border-top: 1px solid var(--axis); font-size: var(--fs-cap); color: var(--ink-2); }
+.tr-axis span { position: absolute; top: 5px; transform: translateX(-50%); white-space: nowrap; }
+.tr-axis .tr-axis-t { left: calc(-1 * var(--tr-label)); width: calc(var(--tr-label) - var(--s-3)); transform: none; text-align: right; }
+
 .tr-gap { margin-top: var(--s-4); color: var(--ink-2); max-width: 70ch; }
 
-/* whisker: the estimate is the dot, the 90% bootstrap band is the bar with end caps */
-.tr-wh { position: relative; height: 24px; }
-.tr-wh::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 1px; background: var(--grid); }
-.tr-band { position: absolute; top: 11px; height: 2px; background: var(--ink); border-radius: var(--r-mark); }
-.tr-band::before, .tr-band::after { content: ""; position: absolute; top: -5px; width: 2px; height: 12px; background: var(--ink); border-radius: var(--r-mark); }
-.tr-band::before { left: 0; }
-.tr-band::after { right: 0; }
-.tr-dot { position: absolute; top: 6px; width: 12px; height: 12px; margin-left: -6px; border-radius: var(--r-round); background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); }
-.tr-wh.ind .tr-dot { background: var(--surface); border: 2px solid var(--caution); box-shadow: none; }
-.tr-wh.na::before { background: none; border-top: 1px dashed var(--control-line); height: 0; }
-
-.tr-legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); margin-top: var(--s-4); font-size: var(--fs-cap); color: var(--ink-2); }
-.tr-legend li { display: inline-flex; align-items: center; gap: 8px; }
-.tr-lg-dot { width: 12px; height: 12px; border-radius: var(--r-round); background: var(--accent); }
-.tr-lg-dot.ind { background: var(--surface); border: 2px solid var(--caution); }
-.tr-lg-band { position: relative; width: 28px; height: 2px; background: var(--ink); }
-.tr-lg-band::before, .tr-lg-band::after { content: ""; position: absolute; top: -5px; width: 2px; height: 12px; background: var(--ink); }
-.tr-lg-band::before { left: 0; }
-.tr-lg-band::after { right: 0; }
+/* "All three methods" list inside How this is computed */
+.tr-all { display: block; margin-top: var(--s-2); }
+.tr-all-t { display: block; font-weight: 600; color: var(--ink); }
+.tr-all-row { display: block; padding: 2px 0; }
+.tr-all-row b { color: var(--ink); font-weight: 600; }
 
 @media screen and (max-width: 719px) {
-  .tr-main { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "badge val" "wh wh" "rng rng"; row-gap: 6px; }
-  .tr-main .tr-badge { grid-area: badge; }
-  .tr-main .tr-v { grid-area: val; }
-  .tr-main .tr-wh { grid-area: wh; }
-  .tr-main .tr-r { grid-area: rng; text-align: left; }
-  .tr-note { margin-left: 0; }
-  .tr-scale { margin-left: 0; flex-basis: 100%; }
   #tail-risk .panel-head > .seg { margin-left: 0; flex-basis: 100%; }
+  .tr-chart { --tr-label: 52px; }
+  .tr-lv span, .tr-axis .tr-axis-t { display: none; }
+  .tr-tip { left: calc(-1 * var(--tr-label)); max-width: calc(100% + var(--tr-label)); }
+}
+
+@media print {
+  .tr-tip { display: none !important; }
 }

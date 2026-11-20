@@ -87,6 +87,16 @@ describe("EnergyPanel", () => {
     expect(sentence({ code: "mkt_rf", beta: 1, tag: "reliable" }, "SPY")).toBeNull();
   });
 
+  it("shows two decimals when the move is below 0.05% and one decimal otherwise", () => {
+    // Oil beta 0.004 gives a move of 0.004 * ln(1.10), about 0.038%, so it reads "+0.04%" not "+0.0%".
+    expect(sentence({ code: "oil", beta: 0.004, tag: "reliable" }, "SPY")).toContain("went with a +0.04% move");
+    expect(sentence({ code: "oil", beta: 0.004, tag: "reliable" }, "SPY")).not.toContain("0.0%");
+    // Carbon is a plain return: beta 0.004 gives a move of 0.0004, which is 0.04%.
+    expect(sentence({ code: "co2", beta: 0.004, tag: "reliable" }, "SPY")).toContain("went with a +0.04% move");
+    // Oil beta 0.02 gives about +0.19%, which is above the bar and keeps one decimal.
+    expect(sentence({ code: "oil", beta: 0.02, tag: "reliable" }, "SPY")).toContain("went with a +0.2% move");
+  });
+
   it("uses no formula on screen and calls the numbers sensitivities", () => {
     const { container } = render(<EnergyPanel report={report()} />);
     const visible = (container.textContent ?? "").replace(/Benjamini-Hochberg/g, "");

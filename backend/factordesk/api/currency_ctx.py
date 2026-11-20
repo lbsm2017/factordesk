@@ -1,6 +1,6 @@
 """The reference currency of one request: exchange rates, euro cash and the notes they leave.
 
-``CurrencySources`` holds the three loaders (injected, like ``AppDeps``: tests pass fakes, the
+``CurrencySources`` holds the loaders (injected, like ``AppDeps``: tests pass fakes, the
 real ones are ``default_sources``). ``CurrencyContext`` wraps them for one reference currency:
 it turns a source that is down into a 503 for the EUR view only (the USD view never builds a
 context unless a listing needs conversion) and collects the notices for the report's
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -30,11 +30,13 @@ brings them along)."""
 
 @dataclass(frozen=True)
 class CurrencySources:
-    """``fx_prices(ccy, ref, dates)``, ``fx_returns(ccy, ref, dates)`` and ``eur_rate()``."""
+    """``fx_prices(ccy, ref, dates)``, ``fx_returns(ccy, ref, dates)``, ``eur_rate()`` and
+    ``chf_rate()`` (SARON; ``None``: the CHF Cash line keeps its ETF proxy)."""
 
     fx_prices: FxLoader
     fx_returns: FxLoader
     eur_rate: Callable[[], rates.RateResult]
+    chf_rate: Callable[[], rates.RateResult] | None = None
 
 
 def default_sources(data_dir: Path) -> CurrencySources:
@@ -47,6 +49,7 @@ def default_sources(data_dir: Path) -> CurrencySources:
         fx_prices=lambda c, r, d: fx.fx_prices(c, r, d, data_dir=data_dir, now=now()),
         fx_returns=lambda c, r, d: fx.fx_returns(c, r, d, data_dir=data_dir, now=now()),
         eur_rate=lambda: rates.load_eur_overnight(data_dir=data_dir, now=now()),
+        chf_rate=lambda: rates.load_chf_overnight(data_dir=data_dir, now=now()),
     )
 
 
@@ -69,6 +72,14 @@ class CurrencyContext:
         self.fx_source: str | None = None
         self.rate_credit: str | None = None
         self._rate: rates.RateResult | None = None
+        self.chf_credit: str | None = None
+        self.chf_noted = False
+        """True when the CHF Cash line left a notice (SARON used, or the fallback to FXF)."""
+        self._chf: pd.Series | None = None
+        self._chf_probed = False
+        self._dropped = pd.DatetimeIndex([])
+        """Factor dates left out by every conversion of this request (one set, or two when the
+        macro, energy and world beta sections read the US frame); see ``info``."""
 
     def _need(self) -> CurrencySources:
         if self.sources is None:
@@ -105,6 +116,41 @@ class CurrencyContext:
         self.rate_credit = self._rate.credit or self.rate_credit
         return rates.cash_returns(self._rate.rate, dates)
 
+    def chf_ready(self) -> bool:
+        """True when the CHF Cash line can earn SARON in this view: the rate loaded and the
+        franc's exchange rate answers. Otherwise a notice is left and the line keeps its ETF
+        proxy (FXF); this never raises. A server without a CHF source answers False silently."""
+        if not self._chf_probed:
+            self._chf_probed = True
+            self._chf = self._load_chf()
+        return self._chf is not None
+
+    def _load_chf(self) -> pd.Series | None:
+        if self.sources is None or self.sources.chf_rate is None:
+            return None
+        result = self.sources.chf_rate()
+        if result.rate is None:
+            self.note(f"{result.notice or 'SARON is unavailable.'} The CHF Cash line uses FXF.")
+            self.chf_noted = True
+            return None
+        try:  # the franc's rate must answer too, else the line cannot be converted
+            self.returns("CHF", pd.date_range(end=pd.Timestamp.now().normalize(), periods=2))
+        except ApiException as exc:
+            self.note(f"{exc.message} The CHF Cash line uses FXF.")
+            self.chf_noted = True
+            return None
+        self.note(result.notice)
+        self.chf_credit = result.credit
+        self.chf_noted = True
+        self.note(f"The CHF Cash line earns SARON, converted to {self.ref}; not hedged.")
+        return result.rate
+
+    def chf_cash(self, dates: pd.DatetimeIndex) -> pd.Series:
+        """CHF cash return over each interval of ``dates``, in francs, indexed by ``dates[1:]``.
+        Call after ``chf_ready`` answered True."""
+        assert self._chf is not None
+        return rates.cash_returns(self._chf, dates)
+
     def factors(self, frame: pd.DataFrame) -> pd.DataFrame:
         """``frame`` in the reference currency (one conversion step; see ``convert_factors``)."""
         if ATTR in frame.attrs:  # already converted (a cached frame)
@@ -115,14 +161,12 @@ class CurrencyContext:
         fx_ret = self.returns("USD", dates)
         cash = self.cash(dates)
         out = convert_factors(frame, fx_ret, cash)
-        n = len(frame) - len(out)
-        if n:
-            self.note(
-                f"{n} factor dates before the {self.ref} series start or after its last "
-                "rate were left out; nothing was filled."
-            )
+        # the first date has no return interval in any conversion: not a loss worth a notice
+        dropped = pd.DatetimeIndex(frame.index[1:].difference(out.index))
+        self._dropped = self._dropped.union(dropped)
         out.attrs[ATTR] = {
             "notes": self.notes[mark:],
+            "dropped": tuple(dropped),  # not an Index: pandas compares attrs with ==
             "fx_source": self.fx_source,
             "rate_credit": self.rate_credit,
         }
@@ -134,15 +178,38 @@ class CurrencyContext:
         if trace:
             for text in cast(list[str], trace.get("notes", [])):
                 self.note(text)
+            dropped = cast(tuple[pd.Timestamp, ...], trace.get("dropped", ()))
+            if dropped:
+                self._dropped = self._dropped.union(pd.DatetimeIndex(dropped))
             self.fx_source = cast(str | None, trace.get("fx_source")) or self.fx_source
             self.rate_credit = cast(str | None, trace.get("rate_credit")) or self.rate_credit
 
-    def info(self) -> CurrencyInfo:
-        """The report's ``currency`` block."""
-        assert self.ref == "EUR"
+    def info(self, window: tuple[date, date] | None = None) -> CurrencyInfo:
+        """The report's ``currency`` block.
+
+        ``window`` is the span the analysis covers (first and last day, both included). The
+        factor dates the conversion left out (before the euro series start, after its last
+        rate) are reported once, and only the ones inside that span: the rest do not touch the
+        analysis. Without a window the notice is not given.
+        """
+        if window is not None and len(self._dropped):
+            lo, hi = pd.Timestamp(window[0]), pd.Timestamp(window[1])
+            n = int(((self._dropped >= lo) & (self._dropped <= hi)).sum())
+            if n:
+                noun, verb = ("date", "was") if n == 1 else ("dates", "were")
+                self.note(
+                    f"{n} factor {noun} before the {self.ref} series start or after its last "
+                    f"rate {verb} left out; nothing was filled."
+                )
+        credits = [c for c in (self.rate_credit, self.chf_credit) if c]
         return CurrencyInfo(
-            reference="EUR",
+            reference=cast(ReferenceCurrency, self.ref),
             fx_source=fx.credit(self.fx_source),
-            rate_source=self.rate_credit,
+            rate_source=" ".join(credits) or None,
             notes=list(self.notes),
         )
+
+
+def clip_window(first: date | None, last: date | None, lo: date, hi: date) -> tuple[date, date]:
+    """The requested range (``None``: open edge) cut to the dates ``lo..hi`` the subject has."""
+    return (lo if first is None else max(first, lo), hi if last is None else min(last, hi))

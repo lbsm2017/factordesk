@@ -18,6 +18,7 @@ from factordesk.api.routes_factors import router as factors_router
 from factordesk.api.routes_portfolio import report_router as portfolio_report_router
 from factordesk.api.routes_portfolio import router as portfolio_router
 from factordesk.api.routes_report import router as report_router
+from factordesk.api.routes_stream import router as stream_router
 from factordesk.api.routes_upload import UploadSizeLimit
 from factordesk.api.routes_upload import router as upload_router
 from factordesk.api.runtime import Runtime
@@ -40,6 +41,7 @@ def create_app(deps: AppDeps) -> FastAPI:
     app.add_middleware(UploadSizeLimit)
     app.include_router(factors_router)
     app.include_router(portfolio_router)
+    app.include_router(stream_router)  # before /api/report/{ticker}
     app.include_router(upload_router)  # before /api/report/{ticker}
     app.include_router(portfolio_report_router)  # before /api/report/{ticker}
     app.include_router(report_router)

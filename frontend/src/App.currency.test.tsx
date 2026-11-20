@@ -65,6 +65,7 @@ describe("currency state", () => {
     await screen.findByTestId("report-ticker");
     expect(radio("EUR").checked).toBe(true);
     expect(requests).toContain("/api/report/SPY?range=3Y&model=ff6&ccy=EUR");
+    expect(requests).toContain("/api/report/SPY/ranges?ccy=EUR");
     expect(window.location.search).toBe("?t=SPY&range=3Y&ccy=EUR");
     expect(document.querySelector(".topbar .ccy-chip")?.textContent).toBe("EUR");
     expect(screen.getByTestId("report-download").textContent).toBe("/api/report/SPY/html?range=3Y&model=ff6&ccy=EUR");
@@ -76,6 +77,7 @@ describe("currency state", () => {
     await screen.findByTestId("report-ticker");
     expect(radio("USD").checked).toBe(true);
     expect(requests).toContain("/api/report/SPY?range=3Y&model=ff6");
+    expect(requests).toContain("/api/report/SPY/ranges");
   });
 
   it("falls back to the stored choice when the URL says nothing", async () => {

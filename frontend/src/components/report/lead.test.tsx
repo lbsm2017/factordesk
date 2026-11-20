@@ -32,6 +32,7 @@ describe("Header", () => {
       ["Analysis period", "8 Aug 2024 to 30 Sep 2026"],
       ["Observations", "559 trading days"],
       ["Factor data", "To 30 Sep 2026"],
+      ["Factor set", "US"],
       ["Benchmark", "ACWI"],
     ]);
     expect(container.querySelector(".abar dd[title]")?.getAttribute("title")).toBe("49 days old");

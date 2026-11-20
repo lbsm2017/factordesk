@@ -105,6 +105,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/report/{ticker}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Report
+         * @description Progress and result of ``GET /api/report/{ticker}``, as server-sent events.
+         */
+        get: operations["stream_report_api_report__ticker__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/report/portfolio/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stream Portfolio Report
+         * @description Progress and result of ``POST /api/report/portfolio``, as server-sent events.
+         *
+         *     The factor set is the tree's ``factor_set`` field, as for the plain endpoint.
+         */
+        post: operations["stream_portfolio_report_api_report_portfolio_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/report/upload/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stream Upload Report
+         * @description Progress and result of ``POST /api/report/upload``, as server-sent events.
+         *
+         *     An upload has no price download, so its steps start at the factor data; ``fx`` is a step
+         *     when the record or the report is in euros.
+         */
+        post: operations["stream_upload_report_api_report_upload_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/report/upload": {
         parameters: {
             query?: never;
@@ -161,6 +226,10 @@ export interface paths {
         /**
          * Get Ranges
          * @description Availability of every range preset for this ticker, with the reason when one is short.
+         *
+         *     ``ccy=EUR`` counts the days of the EUR report: a rate series that starts after the prices
+         *     leaves fewer days. 503 when the exchange rates cannot be reached (USD does not need them).
+         *     The presets follow the dates of the chosen factor set (the Europe files start in 1990).
          */
         get: operations["get_ranges_api_report__ticker__ranges_get"];
         put?: never;
@@ -185,6 +254,8 @@ export interface paths {
          *     ``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro
          *     rate, factors converted. The report then carries a ``currency`` block. 503 when the
          *     exchange rates or the euro rate cannot be reached (the USD view does not need them).
+         *     ``factor_set=europe`` uses the Developed Europe factors in place of the US ones; the report
+         *     then carries a ``factor_set`` field.
          */
         get: operations["get_report_api_report__ticker__get"];
         put?: never;
@@ -379,6 +450,24 @@ export interface components {
             action: string;
         };
         /**
+         * ApiErrorEvent
+         * @description Data of an ``event: error`` of a ``.../stream`` endpoint: the ``ApiError`` plus the HTTP
+         *     status the plain endpoint would answer.
+         */
+        ApiErrorEvent: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "invalid_ticker" | "unknown_ticker" | "bad_range" | "insufficient_history" | "degenerate_input" | "unsupported_currency" | "factor_data_invalid" | "network" | "upstream_refused" | "not_found" | "internal" | "bad_request" | "invalid_upload" | "upload_too_large" | "invalid_portfolio";
+            /** Message */
+            message: string;
+            /** Action */
+            action: string;
+            /** Status */
+            status: number;
+        };
+        /**
          * AssetClassGroup
          * @description Level 1: an asset class (Cash, Fixed Income, ...) with its sub-asset class groups.
          */
@@ -540,6 +629,52 @@ export interface components {
              */
             alpha_t: number | null;
         };
+        /** Body_stream_upload_report_api_report_upload_stream_post */
+        Body_stream_upload_report_api_report_upload_stream_post: {
+            /**
+             * File
+             * @description CSV with a date and a return column.
+             */
+            file: string;
+            /**
+             * Name
+             * @description Display name of the record.
+             */
+            name?: string | null;
+            /**
+             * Gross Net
+             * @description gross or net of fees; empty when unknown.
+             */
+            gross_net?: string | null;
+            /**
+             * Model
+             * @description Factor model: ff5 (default) or ff6 (FF5 plus momentum).
+             * @default ff5
+             * @enum {string}
+             */
+            model: "ff5" | "ff6";
+            /**
+             * Record Currency
+             * @description Currency of the record itself: USD (default) or EUR.
+             * @default USD
+             * @enum {string}
+             */
+            record_currency: "USD" | "EUR";
+            /**
+             * Ccy
+             * @description Reference currency of the report: USD or EUR.
+             * @default USD
+             * @enum {string}
+             */
+            ccy: "USD" | "EUR";
+            /**
+             * Factor Set
+             * @description Regional Fama-French factor set: us (default) or europe.
+             * @default us
+             * @enum {string}
+             */
+            factor_set: "us" | "europe";
+        };
         /** Body_upload_report_api_report_upload_post */
         Body_upload_report_api_report_upload_post: {
             /**
@@ -578,6 +713,13 @@ export interface components {
              * @enum {string}
              */
             ccy: "USD" | "EUR";
+            /**
+             * Factor Set
+             * @description Regional Fama-French factor set: us (default) or europe.
+             * @default us
+             * @enum {string}
+             */
+            factor_set: "us" | "europe";
         };
         /**
          * CorrPair
@@ -593,15 +735,16 @@ export interface components {
         };
         /**
          * CurrencyInfo
-         * @description The reference currency of a report that is not in US dollars (written only for those).
+         * @description The reference currency, its exchange-rate and rate sources, and notices. Written for a
+         *     report that is not in US dollars, and for a USD portfolio whose CHF Cash line earns SARON.
          */
         CurrencyInfo: {
             /**
              * Reference
              * @description Currency of every figure in the report.
-             * @constant
+             * @enum {string}
              */
-            reference: "EUR";
+            reference: "USD" | "EUR";
             /**
              * Fx Source
              * @description Source credit of the exchange rates used; None when none were needed.
@@ -609,7 +752,7 @@ export interface components {
             fx_source: string | null;
             /**
              * Rate Source
-             * @description Source credit of the euro cash rate (overnight rate); None when not used.
+             * @description Source credit of the overnight rates used (euro cash rate, SARON); None when not used.
              */
             rate_source: string | null;
             /**
@@ -1086,7 +1229,12 @@ export interface components {
              * @description Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report.
              */
             model?: "ff6" | null;
-            /** @description Reference currency of the report when it is not US dollars; absent (not null) for a USD report. */
+            /**
+             * Factor Set
+             * @description Regional factor set of the regression when it is not the US one: europe = the Ken French Developed Europe factors (in US dollars). Absent (not null) for a report on the US factors.
+             */
+            factor_set?: "europe" | null;
+            /** @description Reference currency of the report when it is not US dollars, or a USD portfolio's CHF cash rate source (SARON); absent (not null) for any other USD report. */
             currency?: components["schemas"]["CurrencyInfo"] | null;
             /**
              * Generated At
@@ -2241,6 +2389,13 @@ export interface components {
              * @enum {string}
              */
             reference_currency: "USD" | "EUR";
+            /**
+             * Factor Set
+             * @description Regional Fama-French factor set of the report: us (default) or europe (Developed Europe, in US dollars); left out of the JSON when us.
+             * @default us
+             * @enum {string}
+             */
+            factor_set: "us" | "europe";
             root: components["schemas"]["RootGroup"];
         };
         /**
@@ -2294,6 +2449,29 @@ export interface components {
              * @description Last date with factor data; later points are drawn muted.
              */
             factor_coverage_end: string;
+        };
+        /**
+         * ProgressStep
+         * @description Data of an ``event: step`` of a ``.../stream`` endpoint: a step the run has reached.
+         */
+        ProgressStep: {
+            /**
+             * Step
+             * @enum {string}
+             */
+            step: "prices" | "fx" | "factors" | "models" | "sections";
+            /** Label */
+            label: string;
+            /**
+             * Index
+             * @description Position of the step in this run, from 1.
+             */
+            index: number;
+            /**
+             * Total
+             * @description Number of steps in this run.
+             */
+            total: number;
         };
         /**
          * ProxyBeta
@@ -4118,6 +4296,125 @@ export interface operations {
             };
         };
     };
+    stream_report_api_report__ticker__stream_get: {
+        parameters: {
+            query?: {
+                /** @description Range preset; not together with start or end. */
+                range?: ("3Y" | "5Y" | "10Y" | "FULL") | null;
+                /** @description First requested date, YYYY-MM-DD. */
+                start?: string | null;
+                /** @description Last requested date, YYYY-MM-DD. */
+                end?: string | null;
+                /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
+                model?: "ff5" | "ff6";
+                /** @description Reference currency of every figure: USD (default) or EUR. */
+                ccy?: "USD" | "EUR";
+                /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
+                factor_set?: "us" | "europe";
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A stream of server-sent events. `step` (data: ProgressStep) for each step reached, then one `report` (data: FactorReport, as the plain endpoint) or one `error` (data: ApiErrorEvent). A cached report sends `report` alone. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string | components["schemas"]["ProgressStep"] | components["schemas"]["FactorReport"] | components["schemas"]["ApiErrorEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_portfolio_report_api_report_portfolio_stream_post: {
+        parameters: {
+            query?: {
+                /** @description Range preset; not together with start or end. */
+                range?: ("3Y" | "5Y" | "10Y" | "FULL") | null;
+                /** @description First requested date, YYYY-MM-DD. */
+                start?: string | null;
+                /** @description Last requested date, YYYY-MM-DD. */
+                end?: string | null;
+                /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
+                model?: "ff5" | "ff6";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTree"];
+            };
+        };
+        responses: {
+            /** @description A stream of server-sent events. `step` (data: ProgressStep) for each step reached, then one `report` (data: FactorReport, as the plain endpoint) or one `error` (data: ApiErrorEvent). A cached report sends `report` alone. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string | components["schemas"]["ProgressStep"] | components["schemas"]["FactorReport"] | components["schemas"]["ApiErrorEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_upload_report_api_report_upload_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_stream_upload_report_api_report_upload_stream_post"];
+            };
+        };
+        responses: {
+            /** @description A stream of server-sent events. `step` (data: ProgressStep) for each step reached, then one `report` (data: FactorReport, as the plain endpoint) or one `error` (data: ApiErrorEvent). A cached report sends `report` alone. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string | components["schemas"]["ProgressStep"] | components["schemas"]["FactorReport"] | components["schemas"]["ApiErrorEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_report_api_report_upload_post: {
         parameters: {
             query?: never;
@@ -4276,7 +4573,12 @@ export interface operations {
     };
     get_ranges_api_report__ticker__ranges_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Reference currency of every figure: USD (default) or EUR. */
+                ccy?: "USD" | "EUR";
+                /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
+                factor_set?: "us" | "europe";
+            };
             header?: never;
             path: {
                 ticker: string;
@@ -4363,6 +4665,8 @@ export interface operations {
                 model?: "ff5" | "ff6";
                 /** @description Reference currency of every figure: USD (default) or EUR. */
                 ccy?: "USD" | "EUR";
+                /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
+                factor_set?: "us" | "europe";
             };
             header?: never;
             path: {
@@ -4448,6 +4752,8 @@ export interface operations {
                 end?: string | null;
                 /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
                 model?: "ff5" | "ff6";
+                /** @description Regional Fama-French factor set: us (default) or europe (Developed Europe, published in US dollars). */
+                factor_set?: "us" | "europe";
             };
             header?: never;
             path: {
