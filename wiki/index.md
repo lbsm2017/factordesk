@@ -19,6 +19,7 @@ Status in brackets: Decided, Proposed, Decided-pending-implementation, or Implem
 - [Prices from Yahoo, with adjusted-close care](decision-prices-from-yahoo-with-adjusted-close-care.md) [Decided]: raw bars, total return from adjusted close, independent recomputation, same-day cache.
 - [Parallel, throttled price downloads](decision-parallel-throttled-price-downloads.md) [Decided-pending-implementation]: a few tickers at a time, spaced requests, slow retries and a stop switch, because Yahoo publishes no rate limit.
 - [European mode, regional factors and currency](decision-european-mode-and-currency.md) [Proposed]: regional factor files, US dollar conversion and an optional currency regressor.
+- [USD or EUR reference currency](decision-reference-currency.md) [Decided-pending-implementation]: every report in USD or EUR; each asset converted daily at ECB rates; USD-only bond lines hedged in the euro view (2026-11-20).
 
 ### Statistics
 

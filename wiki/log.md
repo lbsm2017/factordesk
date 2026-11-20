@@ -185,3 +185,7 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 
 - The world beta section gets an optional `europe` block (IEUR, stand-in for MSCI Europe), computed by the same hook, cache and refresh as ACWI, with its own status. Schema version stays 4. `wiki/decision-world-beta.md` has the plain-English entry; the hand-off has the field names and live numbers (section 10).
 - The static world beta panel moved from position 350 to 505, and the static header company line is now a sentence.
+
+## 2026-11-20 (Sprint 3: reference currency)
+
+- New page [USD or EUR reference currency](decision-reference-currency.md): the owner chose the euro view as the Sprint 3 headline, per-asset daily conversion, and ECB rates with FRED H.10 as fallback. The coordinator set the hedge table and approved the mockups in docs/design/sprint-3.
