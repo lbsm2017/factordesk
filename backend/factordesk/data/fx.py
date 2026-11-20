@@ -9,6 +9,8 @@ exception and never a wait longer than the 8 s download timeout, twice at most):
   a fixing (TARGET holidays for the ECB, US holidays for FRED) carry the previous fixing forward,
   for at most 7 days. NaN where no fixing exists yet or the last one is older than that.
   Equal currencies give zero. Returns an ``FxResult``.
+- ``fx_prices(ccy, ref, dates)``: the price behind those returns (same fixings, same notices),
+  indexed by ``dates``; used to convert price histories.
 - ``FxResult``: ``series`` (or None), ``notice`` (or None) and ``source`` (``SOURCE_ECB`` or
   ``SOURCE_FRED``, None when no source worked) for the report footer; ``credit(source)`` gives
   the footer line.
@@ -114,7 +116,7 @@ def _price_on(leg: pd.Series, dates: pd.DatetimeIndex) -> pd.Series:
     return leg.dropna().reindex(dates, method="ffill", tolerance=MAX_CARRY)
 
 
-def fx_returns(
+def fx_prices(
     ccy: str,
     ref: str,
     dates: pd.DatetimeIndex,
@@ -124,14 +126,15 @@ def fx_returns(
     fetch_ecb: Callable[[str, str], str] | None = None,
     fetch_fred: Callable[[str], str] | None = None,
 ) -> FxResult:
-    """Return of one unit of ``ccy`` in ``ref`` over each interval of ``dates``. See the module
-    docstring. ``fetch_*`` replace the downloads (tests)."""
+    """Price of one unit of ``ccy`` in ``ref`` on each of ``dates`` (the last fixing on or before
+    the date; NaN before the first fixing). The same sources and notices as ``fx_returns``,
+    which is built on it. Equal currencies give 1.0."""
     ccy, ref = ccy.upper(), ref.upper()
     for code in (ccy, ref):
         if code not in CURRENCIES:
             return FxResult(None, f"No exchange-rate source for {code}.")
     if ccy == ref:
-        return FxResult(pd.Series(0.0, index=dates[1:], name="fx"))
+        return FxResult(pd.Series(1.0, index=dates, name="fx"))
     notes: list[str] = []
     try:
         num, n1 = _ecb_leg(ccy, data_dir, now, fetch_ecb)
@@ -151,6 +154,27 @@ def fx_returns(
             "(noon New York fixing)."
         )
         notes += [n for n in (n1, n2) if n]
-    price = _price_on(num, dates) / _price_on(den, dates)
+    price = (_price_on(num, dates) / _price_on(den, dates)).rename("fx")
+    return FxResult(price, " ".join(notes) or None, source)
+
+
+def fx_returns(
+    ccy: str,
+    ref: str,
+    dates: pd.DatetimeIndex,
+    *,
+    data_dir: Path | None = None,
+    now: datetime | None = None,
+    fetch_ecb: Callable[[str, str], str] | None = None,
+    fetch_fred: Callable[[str], str] | None = None,
+) -> FxResult:
+    """Return of one unit of ``ccy`` in ``ref`` over each interval of ``dates``. See the module
+    docstring. ``fetch_*`` replace the downloads (tests)."""
+    result = fx_prices(
+        ccy, ref, dates, data_dir=data_dir, now=now, fetch_ecb=fetch_ecb, fetch_fred=fetch_fred
+    )
+    if result.series is None:
+        return result
+    price = result.series
     returns = (price / price.shift(1) - 1.0).iloc[1:].rename("fx")
-    return FxResult(returns, " ".join(notes) or None, source)
+    return FxResult(returns, result.notice, result.source)
