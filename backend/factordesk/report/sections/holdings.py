@@ -5,9 +5,10 @@ it is written only for a portfolio subject (``POST /api/report/portfolio``) and 
 JSON when ``None``, so a ticker or upload report is byte-identical to one written before it
 existed.
 
-The window is the analysed window of the report: the first and last day of the analysis sample,
-the days the factor regression uses. It can be shorter than the backtest (a range preset, the end
-of the factor file). Over that window:
+The window is the analysed window of the report: the days of the analysis sample, the days the
+factor regression uses, and no others. It can be shorter than the backtest (a range preset, the end
+of the factor file) and can leave out days inside it (a day the sample dropped). ``n_days`` and
+``total_return`` count exactly those days, as the Performance section does. Over that window:
 
 * ``target_weight`` is the weight the portfolio rebalances to;
 * ``end_weight`` is the weight on the last day, after drift and before any rebalance that day;

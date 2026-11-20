@@ -2,7 +2,8 @@
 
 Reads ``ctx.inputs.portfolio_backtest.holdings``, which ``api.portfolio_report`` fills from the
 backtest result and the tree. It attributes the backtest over the analysed window of the report
-(the first to the last day of the analysis sample, as the factor regression sees it) and rolls the
+(the exact days of the analysis sample, as the factor regression sees it: a day the sample left
+out does not count) and rolls the
 leaves up through the tree. Returns ``None`` (the section is hidden) when there is no such input,
 so a subject that is not a backtested portfolio never gets one.
 """
@@ -56,7 +57,7 @@ def build_holdings(ctx: SectionContext) -> HoldingsSection | None:
         return None
     bt, nodes = info.holdings.backtest, info.holdings.nodes
     start, end = ctx.sample.start, ctx.sample.end
-    att = attribute(bt, start=start, end=end)
+    att = attribute(bt, days=pd.DatetimeIndex(ctx.sample.ret.index))
 
     # Every backtest leaf has a path: a holding sits under its groups, cash under the whole
     # portfolio only (the backtest has one cash leaf).

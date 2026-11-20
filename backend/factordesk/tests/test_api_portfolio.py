@@ -811,6 +811,20 @@ def test_a_single_holding_at_100_percent_gets_the_whole_return_and_risk(
         assert by_id[other].risk_share == pytest.approx(0.0, abs=1e-9)
 
 
+def test_holdings_count_exactly_the_analysed_days_when_the_sample_drops_a_day(
+    client: ApiClient,
+) -> None:
+    report = report_of(post(client, tree([holding(0, "GAP", 0.5), holding(1, "AAA", 0.4)])))
+    section = holdings_of(report)
+    assert section.n_days == report.data.n_obs
+    assert report.performance is not None and report.performance.returns is not None
+    assert section.total_return == pytest.approx(
+        report.performance.returns.cumulative_return, abs=1e-12
+    )
+    top = [r for r in section.rows if r.parent_id is None]
+    assert sum(r.contribution for r in top) == pytest.approx(section.total_return, abs=1e-12)
+
+
 def test_a_ticker_report_has_no_holdings_field() -> None:
     mock = Path(__file__).parent / "fixtures" / "mock_report.json"
     report = FactorReport.model_validate_json(mock.read_text(encoding="utf-8"))

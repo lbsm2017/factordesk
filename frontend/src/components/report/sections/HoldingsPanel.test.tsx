@@ -58,7 +58,7 @@ function rowNamed(name: string | RegExp): HTMLElement {
 }
 
 function rowOf(el: HTMLElement) {
-  const cells = within(el).getAllByRole("gridcell");
+  const cells = within(el).getAllByRole("cell");
   return {
     target: cells[0]?.textContent,
     end: cells[1]?.textContent,
@@ -183,7 +183,7 @@ describe("HoldingsPanel", () => {
       risk: share(sum((r) => r.risk_share)),
     });
     expect(screen.getByText(/Total return after cost:/).textContent).toBe(
-      `Total return after cost: ${pp(section.total_return)}% over ${dateLong(section.window_start)} to ${dateLong(section.window_end)}`,
+      `Total return after cost: ${pp(section.total_return)} pp over ${dateLong(section.window_start)} to ${dateLong(section.window_end)}`,
     );
   });
 
@@ -236,12 +236,31 @@ describe("HoldingsPanel", () => {
     expect(foot.textContent).not.toMatch(/[=Σ∑]|Cov\(|Var\(/);
   });
 
-  it("is a tree grid with levels and expanded state on its rows", () => {
-    render(<HoldingsPanel report={report(multi())} />);
-    expect(screen.getByRole("treegrid", { name: "Holdings by asset class" })).toBeTruthy();
-    expect(rowNamed("Equities").getAttribute("aria-level")).toBe("1");
-    expect(rowNamed("Equities").getAttribute("aria-expanded")).toBe("true");
-    expect(rowNamed("Equity N. America").getAttribute("aria-level")).toBe("2");
-    expect(rowNamed("IVV").getAttribute("aria-level")).toBe("3");
+  it("is a plain table; the caret carries the expanded state and names the rows it folds", () => {
+    const { container } = render(<HoldingsPanel report={report(multi())} />);
+    expect(screen.getByRole("table", { name: "Holdings by asset class" })).toBeTruthy();
+    expect(container.querySelector("[aria-level], [aria-expanded]:not(button)")).toBeNull();
+    const caret = screen.getByRole("button", { name: "Equities" });
+    expect(caret.getAttribute("aria-expanded")).toBe("true");
+    const ids = (caret.getAttribute("aria-controls") ?? "").split(" ");
+    // The rows below Equities, in order: its two sub-asset classes and the two holdings of the first.
+    expect(ids.map((id) => container.querySelector(`[id="${id}"]`)?.getAttribute("data-row"))).toEqual([
+      "g:na",
+      "i:ivv",
+      "i:qqq",
+      "g:eu",
+    ]);
+  });
+
+  it("uses the 'did best with' wording when the leader gave more than the total", () => {
+    const section = multi();
+    section.total_return = 0.1;
+    const text = outcomeSentence(section, tops(buildTree(section.rows)).classes);
+    expect(text).toBe("The portfolio returned +10.0 points. Equities did best with +24.0 points and 80% of the risk.");
+  });
+
+  it("explains that a cash line counts in the Cash row", () => {
+    const { container } = render(<HoldingsPanel report={report(multi())} />);
+    expect(container.querySelector(".foot")?.textContent).toContain("a cash line counts in the Cash row");
   });
 });

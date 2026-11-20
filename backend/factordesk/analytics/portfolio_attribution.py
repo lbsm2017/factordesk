@@ -37,8 +37,8 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
 from types import MappingProxyType
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -82,25 +82,23 @@ class RollUp:
     """Row ids counted in each group, in input order."""
 
 
-def attribute(
-    result: BacktestResult, *, start: date | None = None, end: date | None = None
-) -> PortfolioAttribution:
+def attribute(result: BacktestResult, *, days: pd.Index[Any] | None = None) -> PortfolioAttribution:
     """Linked return contribution and ex-post risk share of every leaf, cash and cost.
 
-    ``start`` and ``end`` (inclusive) cut the days that count, for a report whose analysed window
-    is shorter than the backtest. Linking restarts at ``start`` (``R_0 = 0``) and the weights that
-    earn each day stay the backtest's own, so the first day uses the weights as drifted until then.
-    Raises ``ValueError`` when no day is left.
+    ``days`` are the exact days that count, for a report whose analysed window is shorter than the
+    backtest or leaves out days of it (the analysis sample). Linking restarts at the first of them
+    (``R_0 = 0``) and the weights that earn each day stay the backtest's own, so the first day uses
+    the weights as drifted until then. Without ``days`` every day of the backtest counts. Raises
+    ``ValueError`` when no day is left.
     """
-    first = None if start is None else pd.Timestamp(start)
-    last = None if end is None else pd.Timestamp(end)
-    ret = result.ret.loc[first:last]
+    kept = result.ret.index if days is None else days
+    ret = result.ret.loc[kept]
     if len(ret) == 0:
         raise ValueError("no day of the backtest falls inside the window")
     index = ret.index
-    applied = result.applied_weights.loc[first:last]
-    leaf_ret = result.leaf_ret.loc[first:last]
-    gross = result.gross_ret.loc[first:last]
+    applied = result.applied_weights.loc[kept]
+    leaf_ret = result.leaf_ret.loc[kept]
+    gross = result.gross_ret.loc[kept]
     leaf_part = applied.to_numpy() * leaf_ret.to_numpy()
     cost_part = ret.to_numpy() - gross.to_numpy()
     daily = np.column_stack([leaf_part, cost_part])
@@ -116,11 +114,11 @@ def attribute(
     reason: str | None = None
     n = len(net)
     if n < MIN_RISK_OBS:
-        reason = f"{n} daily return, at least {MIN_RISK_OBS} needed for a variance"
+        reason = f"Risk shares are not shown: {n} daily return, at least {MIN_RISK_OBS} are needed."
     else:
         var = float(np.var(net, ddof=1))
         if var < VAR_FLOOR:
-            reason = "the portfolio return does not vary"
+            reason = "Risk shares are not shown: the portfolio return does not vary."
         else:
             centred = net - net.mean()
             cov = ((daily - daily.mean(axis=0)) * centred[:, None]).sum(axis=0) / (n - 1)

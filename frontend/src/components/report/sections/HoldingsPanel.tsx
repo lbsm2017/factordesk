@@ -15,6 +15,7 @@ import {
   holdingsText,
   outcomeSentence,
   points,
+  rowId,
   tops,
   totals,
   treeLines,
@@ -43,16 +44,16 @@ function Cells({ figures, noRisk, color }: CellsProps) {
   const r = noRisk ? null : figures.risk_share;
   return (
     <>
-      <div role="gridcell" className="tgt" data-l="Target">
+      <div role="cell" className="tgt" data-l="Target">
         <span className={t === null ? "hn dash" : "hn"}>{weight(t)}</span>
       </div>
-      <div role="gridcell" className="end" data-l="End">
+      <div role="cell" className="end" data-l="End">
         <span className={e === null ? "hn dash" : "hn"}>{weight(e)}</span>
       </div>
-      <div role="gridcell" className="con" data-l="Return (pp)">
+      <div role="cell" className="con" data-l="Return (pp)">
         <span className={`hn ${signClass(c)}`.trim()}>{points(c)}</span>
       </div>
-      <div role="gridcell" className="risk" data-l="Risk share">
+      <div role="cell" className="risk" data-l="Risk share">
         <div className="rs">
           <span className={r === null ? "hn dash" : "hn"}>{r === null ? "–" : weight(r)}</span>
           {r === null ? null : (
@@ -101,16 +102,22 @@ function TreeRow({ line, open, onToggle, color, noRisk }: TreeRowProps) {
   return (
     <div
       role="row"
+      id={rowId(row.id)}
       className={`t-row ${line.style}${line.multi ? " multi" : ""}`}
-      aria-level={line.level}
-      aria-expanded={line.foldable ? open : undefined}
       data-row={row.id}
     >
       <div role="rowheader" className="label">
         {line.style === "group" ? (
           <>
             {line.foldable ? (
-              <button type="button" className="caret" aria-expanded={open} aria-label={row.label} onClick={onToggle}>
+              <button
+                type="button"
+                className="caret"
+                aria-expanded={open}
+                aria-controls={line.controls.join(" ")}
+                aria-label={row.label}
+                onClick={onToggle}
+              >
                 <Icon name="caret" />
               </button>
             ) : null}
@@ -135,7 +142,7 @@ function PlainRow({ row, noRisk }: { row: HoldingRow; noRisk: boolean }) {
   const cash = row.kind === "cash";
   const color = assetClassColor("Cash");
   return (
-    <div role="row" className={`t-row plain-row${cash ? " sep" : ""}`} aria-level={1}>
+    <div role="row" id={rowId(row.id)} className={`t-row plain-row${cash ? " sep" : ""}`}>
       <div role="rowheader" className="label">
         {cash ? (
           <span className="key-sq" aria-hidden="true" style={cssVars({ "--c": color })} />
@@ -189,7 +196,7 @@ function Loaded({ section }: { section: HoldingsSection }) {
       footnote={HOLDINGS_HELP}
       how={HOLDINGS_HOW}
     >
-      <div role="treegrid" className="tree" aria-label="Holdings by asset class">
+      <div role="table" className="tree" aria-label="Holdings by asset class">
         <div role="row" className="t-head">
           <span role="columnheader" className="hl">
             Holding
@@ -220,7 +227,7 @@ function Loaded({ section }: { section: HoldingsSection }) {
         {plain.map((node) => (
           <PlainRow key={node.row.id} row={node.row} noRisk={noRisk} />
         ))}
-        <div role="row" className="t-row total" aria-level={1}>
+        <div role="row" className="t-row total">
           <div role="rowheader" className="label">
             <div className="txt">
               <span className="nm">Total</span>
@@ -239,7 +246,7 @@ function Loaded({ section }: { section: HoldingsSection }) {
         </div>
       </div>
       <p className="total-note">
-        Total return after cost: <b className={signClass(sums.total_return)}>{`${points(sums.total_return)}%`}</b> over{" "}
+        Total return after cost: <b className={signClass(sums.total_return)}>{`${points(sums.total_return)} pp`}</b> over{" "}
         {dateLong(section.window_start)} to {dateLong(section.window_end)}
       </p>
       {section.risk_share_reason ? <p className="foot-note">{section.risk_share_reason}</p> : null}

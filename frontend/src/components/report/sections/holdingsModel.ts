@@ -10,7 +10,7 @@ export interface HoldingNode {
 /** One line of the table, with the way it is drawn. */
 export interface Line {
   node: HoldingNode;
-  /** 1 asset class, cash or cost; 2 sub-asset class; 3 holding under a sub-asset class (ARIA level). */
+  /** 1 asset class, cash or cost; 2 sub-asset class; 3 holding under a sub-asset class. */
   level: number;
   /** group: asset class; line: sub-asset class or a holding directly under an asset class; inst: holding under a sub-asset class. */
   style: "group" | "line" | "inst" | "cash" | "cost";
@@ -24,6 +24,8 @@ export interface Line {
   single: HoldingRow | null;
   /** Id of the asset class the row sits in, for the colour. */
   rootId: string;
+  /** Element ids of the rows below this one that its caret folds (empty for a row without a caret). */
+  controls: string[];
 }
 
 /** The rows as a forest, in the order of `section.rows` (a group comes before its members). */
@@ -55,6 +57,12 @@ export function tops(roots: readonly HoldingNode[]): { classes: HoldingNode[]; p
 /** The visible lines of the tree (asset classes in `folded` hide their members), in table order. */
 export function treeLines(classes: readonly HoldingNode[], folded: ReadonlySet<string>): Line[] {
   const out: Line[] = [];
+  /** Ids of the rows drawn below a node, folded or not. */
+  const below = (node: HoldingNode, level: number): string[] => {
+    const only = node.children.length === 1 ? node.children[0] : undefined;
+    if (level === 2 && only?.row.kind === "holding") return [];
+    return node.children.flatMap((c) => [rowId(c.row.id), ...below(c, level + 1)]);
+  };
   const walk = (node: HoldingNode, level: number, rootId: string) => {
     const holdings = holdingCount(node);
     const only = node.children.length === 1 ? node.children[0] : undefined;
@@ -69,6 +77,7 @@ export function treeLines(classes: readonly HoldingNode[], folded: ReadonlySet<s
       holdings,
       single,
       rootId,
+      controls: level === 1 ? below(node, level) : [],
     });
     if (single !== null) return;
     if (level === 1 && folded.has(node.row.id)) return;
@@ -76,6 +85,11 @@ export function treeLines(classes: readonly HoldingNode[], folded: ReadonlySet<s
   };
   for (const root of classes) walk(root, 1, root.row.id);
   return out;
+}
+
+/** Element id of a row of the table. */
+export function rowId(id: string): string {
+  return `holdings-row-${id}`;
 }
 
 export function holdingsText(n: number): string {
@@ -132,7 +146,7 @@ export function outcomeSentence(section: HoldingsSection, classes: readonly Hold
     section.risk_share_reason === null && top.row.risk_share !== null
       ? ` and ${pct(top.row.risk_share, 0, false)} of the risk`
       : "";
-  if (total > 0 && top.row.contribution > 0) {
+  if (total > 0 && top.row.contribution > 0 && top.row.contribution <= total) {
     return `${top.row.label} gave ${pointsText(top.row.contribution, digits)} of the ${pointsText(total, digits)} points of return${risk}.`;
   }
   return `The portfolio returned ${points(total)} points. ${top.row.label} did best with ${points(top.row.contribution)} points${risk}.`;
@@ -142,4 +156,4 @@ export const HOLDINGS_HELP =
   "Return is in percentage points (pp) of the starting value, and the lines add up to the portfolio's total return. Risk share is each line's part of the portfolio's total risk; the shares add up to 100%. Target is the weight you set, end is the weight at the end of the period.";
 
 export const HOLDINGS_HOW =
-  "Each holding's return is linked through the rebalances, so the contributions add up exactly to the total return. Group rows are the sums of their holdings. Cash and cost are shown on their own rows and are not part of any asset class. Risk share splits the portfolio's volatility by holding, using each holding's weight and how it moves with the rest of the portfolio.";
+  "Each holding's return is linked through the rebalances, so the contributions add up exactly to the total return. Group rows are the sums of their holdings. Cash and cost are shown on their own rows and are not part of any asset class: a cash line counts in the Cash row, not in its asset class. Risk share splits the portfolio's volatility by holding, using each holding's weight and how it moves with the rest of the portfolio.";
