@@ -47,6 +47,9 @@ export type PortfolioBacktestSection = Schemas["PortfolioBacktestSection"];
 export type TargetWeightRow = Schemas["TargetWeightRow"];
 export type MacroSection = Schemas["MacroSection"];
 export type MacroRow = Schemas["MacroRow"];
+export type EnergySection = Schemas["EnergySection"];
+export type EnergyModel = Schemas["EnergyModel"];
+export type EnergyRow = Schemas["EnergyRow"];
 
 /** Canonical factor names and order: the five of FF5 (backend FACTOR_NAMES), then Mom, the sixth factor of FF6. */
 export const FACTOR_NAMES = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "Mom"] as const;

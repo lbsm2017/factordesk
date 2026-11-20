@@ -1960,6 +1960,384 @@
         "title": "DrawdownSeries",
         "description": "The fall from the running peak at every date of the compounded return path, for a chart."
       },
+      "EnergyLeg": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker",
+            "description": "FRED series id or Yahoo ticker."
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "mkt_rf",
+              "oil",
+              "gas",
+              "co2"
+            ],
+            "title": "Code"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "What it feeds, for example \"OIL = log change of Brent\"."
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date",
+            "description": "First price date; None when not fetched."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "code",
+          "role",
+          "first_date"
+        ],
+        "title": "EnergyLeg",
+        "description": "One price series behind a leg, with its first date."
+      },
+      "EnergyModel": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "long",
+              "carbon"
+            ],
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "\"Market, oil and gas\" or \"Market, oil, gas and carbon\"."
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Short-sample label of the carbon model; None otherwise."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Rows of the regression."
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start",
+            "description": "First date of the regression."
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End",
+            "description": "Last date of the regression."
+          },
+          "hac_lags": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hac Lags",
+            "description": "Newey-West lag of the fit."
+          },
+          "t_reference": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "student_t"
+            ],
+            "title": "T Reference"
+          },
+          "r2": {
+            "type": "number",
+            "title": "R2"
+          },
+          "adj_r2": {
+            "type": "number",
+            "title": "Adj R2"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EnergyRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Market, oil, gas (and carbon)."
+          },
+          "gas_robust": {
+            "$ref": "#/components/schemas/GasRobustness"
+          },
+          "window_limited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Limited By",
+            "description": "The leg whose first date starts the window, when it is later than the subject's own start; None otherwise."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "label",
+          "n_obs",
+          "start",
+          "end",
+          "hac_lags",
+          "t_reference",
+          "r2",
+          "adj_r2",
+          "rows",
+          "gas_robust",
+          "window_limited_by"
+        ],
+        "title": "EnergyModel",
+        "description": "One regression of the section."
+      },
+      "EnergyRow": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "mkt_rf",
+              "oil",
+              "gas",
+              "co2"
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name: \"Mkt-RF\", \"OIL\", \"GAS\", \"CO2\"."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Plain label: Market, Oil, Natural gas, Carbon."
+          },
+          "definition": {
+            "type": "string",
+            "title": "Definition",
+            "description": "How the leg is built."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Caveat on the leg."
+          },
+          "beta": {
+            "type": "number",
+            "title": "Beta",
+            "description": "Raw sensitivity: excess return per 1.00 of the leg return."
+          },
+          "se": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Se",
+            "description": "Newey-West HAC standard error of beta."
+          },
+          "t": {
+            "type": "number",
+            "title": "T",
+            "description": "HAC t-statistic of beta."
+          },
+          "p": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P",
+            "description": "Two-sided p-value of t."
+          },
+          "ci_low": {
+            "type": "number",
+            "title": "Ci Low",
+            "description": "Lower end of the 95% interval, beta - q * se."
+          },
+          "ci_high": {
+            "type": "number",
+            "title": "Ci High",
+            "description": "Upper end of the 95% interval, beta + q * se."
+          },
+          "tag": {
+            "type": "string",
+            "enum": [
+              "reliable",
+              "noise"
+            ],
+            "title": "Tag",
+            "description": "Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the legs of this model."
+          },
+          "vif": {
+            "type": "number",
+            "minimum": 1.0,
+            "title": "Vif",
+            "description": "Variance inflation factor among the legs."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "label",
+          "definition",
+          "note",
+          "beta",
+          "se",
+          "t",
+          "p",
+          "ci_low",
+          "ci_high",
+          "tag",
+          "vif"
+        ],
+        "title": "EnergyRow",
+        "description": "One leg of an energy regression."
+      },
+      "EnergySection": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_applicable",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Human-readable reason when status is not 'ok'."
+          },
+          "sample": {
+            "$ref": "#/components/schemas/SampleInfo"
+          },
+          "model_note": {
+            "type": "string",
+            "title": "Model Note",
+            "description": "Fixed note: separate regression, raw sensitivities."
+          },
+          "gas_note": {
+            "type": "string",
+            "title": "Gas Note",
+            "description": "Caveat on the fat-tailed gas leg."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "monthly"
+            ],
+            "title": "Frequency"
+          },
+          "n_sample": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Sample",
+            "description": "Rows of the analysis sample before the legs."
+          },
+          "long_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnergyModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Market, oil, gas; None unless ok."
+          },
+          "carbon_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnergyModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Market, oil, gas, carbon; None when hidden (see carbon_note)."
+          },
+          "carbon_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carbon Note",
+            "description": "Why the carbon model is not shown; None if shown."
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/EnergyLeg"
+            },
+            "type": "array",
+            "title": "Legs",
+            "description": "The series behind the legs, with first dates."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "sample",
+          "model_note",
+          "gas_note",
+          "frequency",
+          "n_sample",
+          "long_model",
+          "carbon_model",
+          "carbon_note",
+          "legs"
+        ],
+        "title": "EnergySection",
+        "description": "Sensitivity to oil, gas and carbon prices, after the market."
+      },
       "ExcludedRow": {
         "properties": {
           "date": {
@@ -2295,6 +2673,17 @@
               }
             ],
             "description": "Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed."
+          },
+          "energy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnergySection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Energy and carbon sensitivities: a separate regression on the market and oil, gas and (on a short sample) carbon price legs; absent (not null) when not computed."
           }
         },
         "additionalProperties": false,
@@ -2531,6 +2920,64 @@
         ],
         "title": "FragilitySection",
         "description": "Flip counts, leave-one-year-out table and influential days (FR0.1). In-sample, ``T_end``."
+      },
+      "GasRobustness": {
+        "properties": {
+          "beta": {
+            "type": "number",
+            "title": "Beta",
+            "description": "Gas beta without the excluded rows."
+          },
+          "se": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Se"
+          },
+          "t": {
+            "type": "number",
+            "title": "T"
+          },
+          "p": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P"
+          },
+          "n_excluded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Excluded",
+            "description": "Rows left out: the largest absolute gas returns."
+          },
+          "excluded_dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Excluded Dates",
+            "description": "Dates of the rows left out, largest first."
+          },
+          "n_obs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Obs",
+            "description": "Rows of this second fit."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "beta",
+          "se",
+          "t",
+          "p",
+          "n_excluded",
+          "excluded_dates",
+          "n_obs"
+        ],
+        "title": "GasRobustness",
+        "description": "The gas sensitivity of the same model fitted without the largest gas moves."
       },
       "HTTPValidationError": {
         "properties": {

@@ -767,6 +767,218 @@ export interface components {
             values: number[];
         };
         /**
+         * EnergyLeg
+         * @description One price series behind a leg, with its first date.
+         */
+        EnergyLeg: {
+            /**
+             * Ticker
+             * @description FRED series id or Yahoo ticker.
+             */
+            ticker: string;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "mkt_rf" | "oil" | "gas" | "co2";
+            /**
+             * Role
+             * @description What it feeds, for example "OIL = log change of Brent".
+             */
+            role: string;
+            /**
+             * First Date
+             * @description First price date; None when not fetched.
+             */
+            first_date: string | null;
+        };
+        /**
+         * EnergyModel
+         * @description One regression of the section.
+         */
+        EnergyModel: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "long" | "carbon";
+            /**
+             * Title
+             * @description "Market, oil and gas" or "Market, oil, gas and carbon".
+             */
+            title: string;
+            /**
+             * Label
+             * @description Short-sample label of the carbon model; None otherwise.
+             */
+            label: string | null;
+            /**
+             * N Obs
+             * @description Rows of the regression.
+             */
+            n_obs: number;
+            /**
+             * Start
+             * Format: date
+             * @description First date of the regression.
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             * @description Last date of the regression.
+             */
+            end: string;
+            /**
+             * Hac Lags
+             * @description Newey-West lag of the fit.
+             */
+            hac_lags: number;
+            /**
+             * T Reference
+             * @enum {string}
+             */
+            t_reference: "normal" | "student_t";
+            /** R2 */
+            r2: number;
+            /** Adj R2 */
+            adj_r2: number;
+            /**
+             * Rows
+             * @description Market, oil, gas (and carbon).
+             */
+            rows: components["schemas"]["EnergyRow"][];
+            gas_robust: components["schemas"]["GasRobustness"];
+            /**
+             * Window Limited By
+             * @description The leg whose first date starts the window, when it is later than the subject's own start; None otherwise.
+             */
+            window_limited_by: string | null;
+        };
+        /**
+         * EnergyRow
+         * @description One leg of an energy regression.
+         */
+        EnergyRow: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "mkt_rf" | "oil" | "gas" | "co2";
+            /**
+             * Name
+             * @description Display name: "Mkt-RF", "OIL", "GAS", "CO2".
+             */
+            name: string;
+            /**
+             * Label
+             * @description Plain label: Market, Oil, Natural gas, Carbon.
+             */
+            label: string;
+            /**
+             * Definition
+             * @description How the leg is built.
+             */
+            definition: string;
+            /**
+             * Note
+             * @description Caveat on the leg.
+             */
+            note: string | null;
+            /**
+             * Beta
+             * @description Raw sensitivity: excess return per 1.00 of the leg return.
+             */
+            beta: number;
+            /**
+             * Se
+             * @description Newey-West HAC standard error of beta.
+             */
+            se: number;
+            /**
+             * T
+             * @description HAC t-statistic of beta.
+             */
+            t: number;
+            /**
+             * P
+             * @description Two-sided p-value of t.
+             */
+            p: number;
+            /**
+             * Ci Low
+             * @description Lower end of the 95% interval, beta - q * se.
+             */
+            ci_low: number;
+            /**
+             * Ci High
+             * @description Upper end of the 95% interval, beta + q * se.
+             */
+            ci_high: number;
+            /**
+             * Tag
+             * @description Reliable when the Benjamini-Hochberg rule of the headline betas rejects zero across the legs of this model.
+             * @enum {string}
+             */
+            tag: "reliable" | "noise";
+            /**
+             * Vif
+             * @description Variance inflation factor among the legs.
+             */
+            vif: number;
+        };
+        /**
+         * EnergySection
+         * @description Sensitivity to oil, gas and carbon prices, after the market.
+         */
+        EnergySection: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "not_applicable" | "failed";
+            /**
+             * Reason
+             * @description Human-readable reason when status is not 'ok'.
+             */
+            reason: string | null;
+            sample: components["schemas"]["SampleInfo"];
+            /**
+             * Model Note
+             * @description Fixed note: separate regression, raw sensitivities.
+             */
+            model_note: string;
+            /**
+             * Gas Note
+             * @description Caveat on the fat-tailed gas leg.
+             */
+            gas_note: string;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "monthly";
+            /**
+             * N Sample
+             * @description Rows of the analysis sample before the legs.
+             */
+            n_sample: number;
+            /** @description Market, oil, gas; None unless ok. */
+            long_model: components["schemas"]["EnergyModel"] | null;
+            /** @description Market, oil, gas, carbon; None when hidden (see carbon_note). */
+            carbon_model: components["schemas"]["EnergyModel"] | null;
+            /**
+             * Carbon Note
+             * @description Why the carbon model is not shown; None if shown.
+             */
+            carbon_note: string | null;
+            /**
+             * Legs
+             * @description The series behind the legs, with first dates.
+             */
+            legs: components["schemas"]["EnergyLeg"][];
+        };
+        /**
          * ExcludedRow
          * @description One return row left out of the analysis sample, with the reason (M2).
          */
@@ -883,6 +1095,8 @@ export interface components {
             portfolio_backtest?: components["schemas"]["PortfolioBacktestSection"] | null;
             /** @description Macro sensitivities: a separate regression on market, rates, credit, commodity, inflation and dollar factors; absent (not null) when not computed. */
             macro?: components["schemas"]["MacroSection"] | null;
+            /** @description Energy and carbon sensitivities: a separate regression on the market and oil, gas and (on a short sample) carbon price legs; absent (not null) when not computed. */
+            energy?: components["schemas"]["EnergySection"] | null;
         };
         /**
          * FactorStat
@@ -967,6 +1181,38 @@ export interface components {
              */
             reason: string | null;
             sample: components["schemas"]["SampleInfo"];
+        };
+        /**
+         * GasRobustness
+         * @description The gas sensitivity of the same model fitted without the largest gas moves.
+         */
+        GasRobustness: {
+            /**
+             * Beta
+             * @description Gas beta without the excluded rows.
+             */
+            beta: number;
+            /** Se */
+            se: number;
+            /** T */
+            t: number;
+            /** P */
+            p: number;
+            /**
+             * N Excluded
+             * @description Rows left out: the largest absolute gas returns.
+             */
+            n_excluded: number;
+            /**
+             * Excluded Dates
+             * @description Dates of the rows left out, largest first.
+             */
+            excluded_dates: string[];
+            /**
+             * N Obs
+             * @description Rows of this second fit.
+             */
+            n_obs: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {

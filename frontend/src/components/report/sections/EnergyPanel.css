@@ -1,0 +1,33 @@
+/* Energy & carbon: one compact table per model in the style of the macro panel, with one dot and approximate 95% range per row on a shared scale. Betas stay ink; the VIF turns to the caution colour above 5. Tokens only. */
+.en-model + .en-model { margin-top: var(--s-5); }
+.en-model-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-3); margin-top: var(--s-3); }
+.en-model-head h3 { margin: 0; font-size: var(--fs-3); font-weight: 600; color: var(--ink); }
+.en-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid var(--caution); border-radius: var(--r-inner); background: var(--caution-50); color: var(--caution); font-size: var(--fs-cap); font-weight: 600; }
+.en-span { font-size: var(--fs-1); color: var(--ink-2); margin-left: auto; font-variant-numeric: tabular-nums; }
+.en-wrap { overflow-x: auto; overflow-y: hidden; } /* sideways scroll only: a vertical scrollbar never shows */
+.en-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; margin-top: var(--s-2); }
+.en-table th { font-size: var(--fs-1); font-weight: 500; color: var(--ink-2); text-align: left; padding: 0 var(--s-2) 6px 0; border-bottom: 1px solid var(--border); vertical-align: bottom; }
+.en-table th.num, .en-table td.num { text-align: right; }
+.en-table thead th:nth-child(1) { width: 190px; }
+.en-table thead th:nth-child(2) { width: 84px; }
+.en-table thead th:nth-child(4) { width: 44px; }
+.en-table thead th:nth-child(5) { width: 56px; }
+.en-table tbody th { font-size: var(--fs-2); font-weight: 560; color: var(--ink); padding: var(--s-2) var(--s-2) var(--s-2) 0; border-bottom: 1px solid var(--grid); }
+.en-table tr.en-robust th { font-weight: 400; color: var(--ink-2); }
+.en-table .en-label { display: block; }
+.en-table .en-note { display: block; font-size: var(--fs-1); font-weight: 400; color: var(--ink-2); line-height: 1.3; }
+.en-table td { font-size: var(--fs-2); color: var(--ink); padding: var(--s-2) 0 var(--s-2) var(--s-2); border-bottom: 1px solid var(--grid); }
+.en-table td.num { padding-right: 0; }
+.en-table td.en-plot { padding: 0 var(--s-2); }
+.en-table .en-control { font-size: var(--fs-1); color: var(--ink-2); }
+.en-table .bar-svg { height: 28px; }
+.en-table .en-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 1; }
+.en-vif { color: var(--ink-2); }
+.en-vif.warn { display: inline-flex; align-items: center; height: 24px; padding: 0 6px; border: 1px solid var(--caution); border-radius: var(--r-inner); background: var(--caution-50); color: var(--caution); font-size: var(--fs-cap); font-weight: 600; white-space: nowrap; }
+.en-table tfoot td { padding: 0; border: 0; }
+.en-table .axis { height: 26px; } /* tall enough for the tick labels, which sit 4px down */
+.en-table .axis span { top: 4px; }
+.en-says { margin: var(--s-3) 0 0; padding-left: var(--s-4); font-size: var(--fs-2); color: var(--ink); max-width: 76ch; }
+.en-says li + li { margin-top: var(--s-1); }
+.en-limit, .en-carbon-note { margin: var(--s-2) 0 0; font-size: var(--fs-1); color: var(--ink-2); max-width: 76ch; }
+.en-carbon-note { margin-top: var(--s-4); }
