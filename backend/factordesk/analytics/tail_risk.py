@@ -40,12 +40,21 @@ Methods
   * **Local** (decides n/a): ``g'(z) > 0`` on the range the figure uses, ``[z_p, 0]`` for VaR
     (the map from the centre out to the quantile) and ``[-4, z_p]`` for CVaR (the tail it
     averages). If it fails the figure is n/a with the reason :data:`CF_INVALID`.
+  * **Consistency** (decides n/a for CVaR): a Cornish-Fisher CVaR is n/a whenever the
+    Cornish-Fisher VaR is n/a. The CVaR at level ``L`` needs the VaR guard to hold at ``L`` itself
+    and at every reported VaR level at or beyond ``L`` (the tail it averages includes them); the
+    reason is :data:`CF_VAR_NA`.
   * **Indicative** (flag only): ``g'(z) > 0`` on ``[-3.5, 3.5]``, the practical domain of
     the map. A figure that passes its local check but where the map is not monotone somewhere
     on ``[-3.5, 3.5]`` keeps its value with ``indicative=True`` and the reason
     :data:`CF_INDICATIVE`. The condition over all real ``z`` (Maillard's global domain,
     ``a > 0`` and ``b^2 - 4 a c < 0``) is not used: any excess kurtosis below ``4 S^2 / 3``
     breaks it, which flags about half of all normal samples and so carries no information.
+
+  * **Far from historical** (flag only): a Cornish-Fisher VaR or CVaR that differs from the
+    historical figure of the same measure and level by more than :data:`CF_FAR_FROM_HISTORICAL`
+    (50%) of the historical figure is flagged ``indicative=True`` too, with the reason
+    ``far from historical (10.2% vs 5.0%)``. It is not applied where the historical figure is n/a.
 
     Share of simulated normal samples flagged (4,000 samples each, seed 7, 2026-11-19):
 
@@ -136,8 +145,12 @@ CF_Z_LOW = -4.0
 """Lower end of the interval on which the Cornish-Fisher map must be increasing."""
 CF_INVALID = "outside the valid range of the expansion (Maillard 2012)"
 CF_INDICATIVE = "not monotone on z in [-3.5, 3.5] (Maillard 2012); indicative only"
+CF_VAR_NA = "VaR is outside the valid range of the expansion (Maillard 2012); CVaR is n/a too"
 CF_Z_INDICATIVE = 3.5
 """The map must be increasing on ``[-CF_Z_INDICATIVE, CF_Z_INDICATIVE]`` not to be indicative."""
+CF_FAR_FROM_HISTORICAL = 0.5
+"""A Cornish-Fisher figure is indicative when it differs from the historical figure of the same
+measure and level by more than this share of the historical figure (ratio outside [0.5, 1.5])."""
 MIN_CF_VALID_SHARE = 0.80
 """A Cornish-Fisher band needs at least this share of resamples inside the valid range."""
 MIN_OBS = 12
@@ -339,13 +352,35 @@ def _gaussian(m: _Moments, measure: Measure, p: float) -> FloatArray:
     return -m.mean + m.std * (math.exp(-0.5 * z * z) / _SQRT_2PI) / p
 
 
+def _cf_var_levels(freq: Frequency, level: float) -> tuple[float, ...]:
+    """Levels whose Cornish-Fisher VaR must be valid for the CVaR at ``level`` to be shown.
+
+    ``level`` itself and every reported VaR level at or beyond it.
+    """
+    reported = [lv for measure, lv in LEVELS[freq] if measure == "var" and lv >= level - 1e-12]
+    return tuple(sorted({level, *reported}))
+
+
+def _cf_var_valid(m: _Moments, freq: Frequency, level: float) -> NDArray[np.bool_]:
+    """Rows where the Cornish-Fisher VaR guard holds at every level the CVaR at ``level`` needs."""
+    valid = np.ones(m.mean.shape, dtype=bool)
+    for lv in _cf_var_levels(freq, level):
+        valid &= _cornish_fisher(m, "var", tail_probability(lv))[1]
+    return valid
+
+
 def _cornish_fisher(
-    m: _Moments, measure: Measure, p: float
+    m: _Moments, measure: Measure, p: float, also_valid: NDArray[np.bool_] | None = None
 ) -> tuple[FloatArray, NDArray[np.bool_]]:
-    """(value, valid) per row; value is NaN where the local guard trips."""
+    """(value, valid) per row; value is NaN where the local guard trips.
+
+    ``also_valid`` is a further per-row condition (the VaR guards a CVaR depends on).
+    """
     z = NormalDist().inv_cdf(p)
     z_low, z_high = cornish_fisher_range(measure, 1.0 - p)
     valid = cornish_fisher_monotone(m.skew, m.exkurt, z_high=z_high, z_low=z_low)
+    if also_valid is not None:
+        valid = valid & also_valid
     g = cornish_fisher_quantile(z, m.skew, m.exkurt)
     if measure == "var":
         value = -(m.mean + g * m.std)
@@ -384,7 +419,8 @@ def _evaluate(x: FloatArray, freq: Frequency) -> dict[tuple[Method, Measure, flo
         p = tail_probability(level)
         out[("historical", measure, level)] = _historical(x_sorted, measure, level)
         out[("gaussian", measure, level)] = _gaussian(m, measure, p)
-        out[("cornish_fisher", measure, level)] = _cornish_fisher(m, measure, p)[0]
+        consistent = _cf_var_valid(m, freq, level) if measure == "cvar" else None
+        out[("cornish_fisher", measure, level)] = _cornish_fisher(m, measure, p, consistent)[0]
     return out
 
 
@@ -542,6 +578,7 @@ def tail_risk(
     for measure, level in LEVELS[frequency]:
         p = tail_probability(level)
         expected = n * p
+        historical_value: float | None = None
         for method in METHODS:
             value = float(point[(method, measure, level)][0])
             reason: str | None = None
@@ -550,19 +587,30 @@ def tail_risk(
             if method == "historical" and expected < minimum - 1e-9:
                 reason = f"{_tail_text(expected, minimum)} expected tail observations"
             elif method == "cornish_fisher" and math.isnan(value):
-                reason = CF_INVALID
+                var_ok = measure == "var" or bool(_cf_var_valid(m, frequency, level)[0])
+                reason = CF_INVALID if var_ok else CF_VAR_NA
             if reason is not None:
                 figures.append(
                     TailFigure(method, measure, level, None, reason, None, None, expected)
                 )
                 continue
-            if method == "cornish_fisher" and not bool(
-                cornish_fisher_monotone(
-                    m.skew[0], m.exkurt[0], z_high=CF_Z_INDICATIVE, z_low=-CF_Z_INDICATIVE
-                )
-            ):
-                indicative = True
-                reason = CF_INDICATIVE
+            if method == "historical":
+                historical_value = value
+            if method == "cornish_fisher":
+                reasons: list[str] = []
+                if not bool(
+                    cornish_fisher_monotone(
+                        m.skew[0], m.exkurt[0], z_high=CF_Z_INDICATIVE, z_low=-CF_Z_INDICATIVE
+                    )
+                ):
+                    reasons.append(CF_INDICATIVE)
+                if historical_value is not None and (
+                    abs(value - historical_value) > CF_FAR_FROM_HISTORICAL * abs(historical_value)
+                ):
+                    reasons.append(f"far from historical ({value:.1%} vs {historical_value:.1%})")
+                if reasons:
+                    indicative = True
+                    reason = "; ".join(reasons)
             draws = boot[(method, measure, level)]
             draws = draws[np.isfinite(draws)]
             band = None

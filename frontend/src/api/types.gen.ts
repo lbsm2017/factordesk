@@ -3246,7 +3246,7 @@ export interface components {
             reason: string | null;
             /**
              * Indicative
-             * @description True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5]: the value is shown, as an indication only.
+             * @description True for a Cornish-Fisher figure whose expansion is not monotone on [-3.5, 3.5], or that differs from the historical figure by more than 50% of it: the value is shown, as an indication only (reason says which).
              */
             indicative: boolean;
             /** @description Bootstrap band; None when none is shown. */

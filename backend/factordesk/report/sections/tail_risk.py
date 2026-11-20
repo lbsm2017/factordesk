@@ -12,8 +12,8 @@ loss); a negative figure means even the tail was a gain. A figure that is not av
 in ``series.band_level``.
 
 The section has no footnote keys of its own. Its ``sample`` is the factor-regression sample of the
-report; the series behind the figures is described by ``series.n_obs`` (the subject's returns with
-missing values dropped), which can be longer.
+report; the series behind the figures is described by ``series.n_obs``: the subject's returns on
+exactly the dates of that sample, so ``series.n_obs`` equals ``sample.n``.
 """
 
 from __future__ import annotations
@@ -56,7 +56,8 @@ class TailFigureInfo(FrozenModel):
     )
     indicative: bool = Field(
         description="True for a Cornish-Fisher figure whose expansion is not monotone on "
-        "[-3.5, 3.5]: the value is shown, as an indication only."
+        "[-3.5, 3.5], or that differs from the historical figure by more than 50% of it: the "
+        "value is shown, as an indication only (reason says which)."
     )
     band: TailBand | None = Field(description="Bootstrap band; None when none is shown.")
     band_quality: TailBandQuality | None = Field(

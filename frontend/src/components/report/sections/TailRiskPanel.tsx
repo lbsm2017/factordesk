@@ -10,7 +10,7 @@ export const TITLE = "Tail risk";
 
 const HOW = [
   "Value at risk (VaR) is the loss that is exceeded on only 1 day in 100 (99% level), or 1 month in 20 (95% level). CVaR, also called expected shortfall, is the average loss on the days beyond the 97.5% (or 95%) level. Losses are computed from simple returns and shown as positive percentages.",
-  "Historical uses the observed returns directly and shows n/a when the sample holds too few tail observations. Gaussian uses the average and the standard deviation of the returns. Cornish-Fisher adjusts the Gaussian figure for skew and fat tails, and shows n/a where its formula is not valid; a figure marked indicative passes the check only on the range it uses.",
+  "Historical uses the observed returns directly and shows n/a when the sample holds too few tail observations. Gaussian uses the average and the standard deviation of the returns. Cornish-Fisher adjusts the Gaussian figure for skew and fat tails, and shows n/a where its formula is not valid; a figure marked indicative passes the check only on the range it uses, or differs from the historical figure by more than half of it (hover the label for the reason). Where Cornish-Fisher VaR is n/a, its CVaR is n/a too.",
   "Each band is a 90% bootstrap band: the returns are resampled 1,000 times (in blocks for daily returns), and the band holds the middle 90% of the resulting figures. Bands for Gaussian and for historical VaR matched their coverage on simulated data; the others tend to be narrow.",
 ].join(" ");
 
@@ -46,7 +46,7 @@ function Cell({ figure, n, monthly, bandLevel }: CellProps) {
         <span className="tr-note">{figure.band_reason}</span>
       )}
       {figure.band && figure.band_quality === "approximate" ? <span className="tr-flag">{APPROXIMATE}</span> : null}
-      {figure.indicative ? <span className="tr-flag">{INDICATIVE}</span> : null}
+      {figure.indicative ? <span className="tr-flag" title={figure.reason ?? undefined}>{INDICATIVE}</span> : null}
       <span className="tr-note">based on {basedOn(n, monthly)}</span>
     </td>
   );

@@ -14,6 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
+import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
@@ -198,9 +199,12 @@ def test_cornish_fisher_na_and_indicative_figures_carry_a_reason() -> None:
 
 # ----------------------------------------------------------------------------- failure paths
 def _with_returns(ctx: SectionContext, returns: pd.Series) -> SectionContext:
-    """The hook reads only the subject's frequency and returns and ``sample_info``."""
+    """The hook reads only the subject's frequency and returns, the sample and ``sample_info``."""
     subject = SimpleNamespace(frequency=ctx.subject.frequency, returns=returns)
-    return cast(SectionContext, SimpleNamespace(subject=subject, sample_info=ctx.sample_info))
+    return cast(
+        SectionContext,
+        SimpleNamespace(subject=subject, sample=ctx.sample, sample_info=ctx.sample_info),
+    )
 
 
 def test_short_series_is_insufficient_and_constant_series_fails() -> None:
@@ -232,6 +236,35 @@ def test_the_tail_risk_window_is_the_analysed_window_for_a_3y_range() -> None:
     assert cut.tail_risk.sample.start == cut.regression.sample.start
     assert cut.tail_risk.series.n_obs < full.tail_risk.series.n_obs
     assert full.tail_risk.series.n_obs == full.regression.sample.n
+
+
+def test_based_on_counts_exactly_the_returns_of_the_analysed_sample(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Days inside the window that the sample excludes are not in the tail series or its count."""
+    case = make_case(3001, n=720)
+    factors = case.factors.drop(case.factors.index[[10, 200, 400]])  # no factor row on 3 days
+    used: list[np.ndarray] = []
+    real = hook.tail_risk
+
+    def spy(returns: np.ndarray, frequency: str, **kwargs: object) -> object:
+        used.append(np.asarray(returns))
+        return real(returns, frequency, **kwargs)  # pyright: ignore[reportArgumentType]
+
+    monkeypatch.setattr(hook, "tail_risk", spy)
+    report = assemble_report("STK", case.stock, factors, now=NOW, factors_downloaded_at=None)
+    section = report.tail_risk
+    assert section is not None and section.series is not None
+    sample = report.regression.sample
+    assert sample.n_excluded == 3
+    # Every return the window holds, before the sample drops any.
+    in_window = case.stock.total_returns.loc[str(sample.start) : str(sample.end)].dropna()
+    assert len(in_window) == sample.n + sample.n_excluded
+    (series,) = used
+    assert section.series.n_obs == len(series) == sample.n == len(in_window) - 3
+    excluded = {pd.Timestamp(e.date) for e in sample.excluded}
+    kept = in_window[~in_window.index.isin(excluded)]
+    assert np.allclose(series, kept.to_numpy(), rtol=0.0, atol=1e-15)
 
 
 def test_missing_returns_are_dropped_not_fatal() -> None:

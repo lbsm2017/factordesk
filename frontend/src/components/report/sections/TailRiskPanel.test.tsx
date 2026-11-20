@@ -83,6 +83,17 @@ describe("TailRiskPanel", () => {
     expect(cellOf("VaR 99%", "Gaussian").textContent).not.toContain("indicative");
   });
 
+  it("gives the reason of an indicative figure as the tooltip of its label", () => {
+    const reason = "far from historical (10.2% vs 5.0%)";
+    const report = daily((s) => {
+      const f = s.figures?.find((x) => x.method === "cornish_fisher" && x.measure === "var");
+      if (f) Object.assign(f, { indicative: true, reason });
+    });
+    render(<TailRiskPanel report={report} />);
+    const flag = within(cellOf("VaR 99%", "Cornish-Fisher")).getByText("indicative");
+    expect(flag.getAttribute("title")).toBe(reason);
+  });
+
   it("shows the reason of a hidden band in place of the band", () => {
     render(<TailRiskPanel report={monthly()} />);
     const cell = cellOf("CVaR 97.5%", "Cornish-Fisher");

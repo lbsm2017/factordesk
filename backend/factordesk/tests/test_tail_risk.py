@@ -15,8 +15,10 @@ import pytest
 from scipy import integrate  # pyright: ignore[reportMissingTypeStubs]
 
 from factordesk.analytics.tail_risk import (
+    CF_FAR_FROM_HISTORICAL,
     CF_INDICATIVE,
     CF_INVALID,
+    CF_VAR_NA,
     CF_Z_INDICATIVE,
     LEVELS,
     Frequency,
@@ -139,7 +141,7 @@ def test_guard_trips_on_heavy_skew_and_passes_on_mild_data() -> None:
     for measure, level in LEVELS["monthly"]:
         f = r.figure("cornish_fisher", measure, level)
         assert f.value is None and f.band is None and f.tail_count is None
-        assert f.reason == CF_INVALID
+        assert f.reason == CF_INVALID or (measure == "cvar" and f.reason == CF_VAR_NA)
     mild = _normal(3, 240)
     r = tail_risk(mild, "monthly", n_resamples=50)
     assert abs(r.skewness) < 0.5 and 0.0 < r.excess_kurtosis < 1.0
@@ -189,13 +191,14 @@ def test_high_kurtosis_daily_cvar_is_indicative() -> None:
     x = np.random.default_rng(1).standard_t(4, size=2500) * 0.01
     r = tail_risk(x, "daily", n_resamples=200)
     assert r.excess_kurtosis == pytest.approx(22.2, abs=0.1)
-    cvar = r.figure("cornish_fisher", "cvar", 0.975)
-    assert cvar.value is not None
-    assert cvar.indicative and cvar.reason == CF_INDICATIVE
-    assert cvar.tail_count is not None and cvar.tail_count > 0
     # g'(0) = 1 - K/8 + 5 S^2/36 < 0: the map from the centre to z_0.01 is not increasing.
     var = r.figure("cornish_fisher", "var", 0.99)
     assert var.value is None and var.reason == CF_INVALID and not var.indicative
+    # The CVaR guard on [-4, z_0.025] passes on its own, but a CVaR next to an n/a VaR is n/a too.
+    z_low, z_high = cornish_fisher_range("cvar", 0.975)
+    assert bool(cornish_fisher_monotone(r.skewness, r.excess_kurtosis, z_high=z_high, z_low=z_low))
+    cvar = r.figure("cornish_fisher", "cvar", 0.975)
+    assert cvar.value is None and cvar.reason == CF_VAR_NA and not cvar.indicative
 
 
 @pytest.mark.parametrize("seed", range(8))
@@ -421,3 +424,60 @@ def test_band_quality_labels() -> None:
     assert r.figure("cornish_fisher", "var", 0.99).band_quality == "approximate"
     na = tail_risk(_normal(1, 36), "monthly", n_resamples=50).figure("historical", "var", 0.99)
     assert na.band is None and na.band_quality is None
+
+
+# ----------------------------------------------------------------------------- S3-7 fixes
+def _heavy_tailed_cases() -> list[tuple[Frequency, list[float]]]:
+    """Series of both frequencies with heavy tails, so that the guards and the flag both trip."""
+    cases: list[tuple[Frequency, list[float]]] = []
+    for seed in range(12):
+        rng = np.random.default_rng(100 + seed)
+        cases.append(("daily", [float(v) for v in rng.standard_t(3, 1500) * 0.01]))
+        cases.append(("monthly", [float(v) for v in rng.standard_t(3, 60) * 0.03]))
+        cases.append(("monthly", [float(v) for v in rng.standard_t(5, 120) * 0.03 + 0.004]))
+    return cases
+
+
+def test_cornish_fisher_cvar_is_na_whenever_its_var_is_na() -> None:
+    tripped = 0
+    for freq, x in _heavy_tailed_cases():
+        r = tail_risk(x, freq, n_resamples=20)
+        var_levels = [lv for measure, lv in LEVELS[freq] if measure == "var"]
+        for measure, level in LEVELS[freq]:
+            if measure != "cvar":
+                continue
+            needed = [lv for lv in var_levels if lv >= level - 1e-9]
+            if not any(r.figure("cornish_fisher", "var", lv).value is None for lv in needed):
+                continue
+            tripped += 1
+            f = r.figure("cornish_fisher", "cvar", level)
+            assert f.value is None and f.band is None and f.tail_count is None
+            assert f.reason in (CF_VAR_NA, CF_INVALID) and not f.indicative
+    assert tripped > 0
+
+
+def _cf_far_from_historical(cf: float, hist: float) -> bool:
+    ratio = cf / hist
+    return not (1.0 - CF_FAR_FROM_HISTORICAL <= ratio <= 1.0 + CF_FAR_FROM_HISTORICAL)
+
+
+def test_cornish_fisher_is_indicative_when_far_from_the_historical_figure() -> None:
+    far = near = 0
+    for freq, x in _heavy_tailed_cases():
+        r = tail_risk(x, freq, n_resamples=20)
+        for measure, level in LEVELS[freq]:
+            hist = r.figure("historical", measure, level).value
+            cf = r.figure("cornish_fisher", measure, level)
+            if hist is None or cf.value is None:
+                continue
+            bends = cf.reason is not None and CF_INDICATIVE in cf.reason
+            is_far = _cf_far_from_historical(cf.value, hist)
+            text = f"far from historical ({cf.value:.1%} vs {hist:.1%})"
+            assert cf.indicative == (bends or is_far)
+            assert (cf.reason is not None and text in cf.reason) == is_far
+            if is_far:
+                far += 1
+                assert abs(cf.value - hist) > CF_FAR_FROM_HISTORICAL * hist - 1e-15
+            else:
+                near += 1
+    assert far > 0 and near > 0
