@@ -139,13 +139,13 @@ function TreeRow({ line, open, onToggle, color, noRisk }: TreeRowProps) {
 }
 
 /** What a cash row holds: in the euro view the unallocated weight is euro cash and USD cash is apart. */
-function cashNote(row: HoldingRow): string {
+function cashNote(row: HoldingRow, eurCash: boolean): string {
   if (row.id === "usd_cash") return "USD cash instruments, converted to euros";
-  if (row.label === "EUR cash") return "Any unallocated weight, held as euro cash";
+  if (row.id === "cash" && eurCash) return "Any unallocated weight, held as euro cash";
   return "USD cash instruments and any unallocated weight";
 }
 
-function PlainRow({ row, noRisk }: { row: HoldingRow; noRisk: boolean }) {
+function PlainRow({ row, noRisk, eurCash }: { row: HoldingRow; noRisk: boolean; eurCash: boolean }) {
   const cash = row.kind === "cash";
   const color = assetClassColor("Cash");
   return (
@@ -159,7 +159,7 @@ function PlainRow({ row, noRisk }: { row: HoldingRow; noRisk: boolean }) {
         <div className="txt">
           <span className="nm">{row.label}</span>
           <span className="sb">
-            {cash ? cashNote(row) : "Trading cost of the rebalances"}
+            {cash ? cashNote(row, eurCash) : "Trading cost of the rebalances"}
           </span>
         </div>
       </div>
@@ -168,7 +168,7 @@ function PlainRow({ row, noRisk }: { row: HoldingRow; noRisk: boolean }) {
   );
 }
 
-function Loaded({ section }: { section: HoldingsSection }) {
+function Loaded({ section, eurCash }: { section: HoldingsSection; eurCash: boolean }) {
   const roots = buildTree(section.rows);
   const { classes, plain } = tops(roots);
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
@@ -232,7 +232,7 @@ function Loaded({ section }: { section: HoldingsSection }) {
           />
         ))}
         {plain.map((node) => (
-          <PlainRow key={node.row.id} row={node.row} noRisk={noRisk} />
+          <PlainRow key={node.row.id} row={node.row} noRisk={noRisk} eurCash={eurCash} />
         ))}
         <div role="row" className="t-row total">
           <div role="rowheader" className="label">
@@ -269,5 +269,5 @@ function Loaded({ section }: { section: HoldingsSection }) {
 export function HoldingsPanel({ report }: ReportPanelProps) {
   const s = report.holdings;
   if (s == null) return null;
-  return <Loaded section={s} />;
+  return <Loaded section={s} eurCash={report.portfolio_backtest?.unallocated_currency === "EUR"} />;
 }

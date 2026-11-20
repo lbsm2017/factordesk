@@ -376,3 +376,45 @@ def test_eur_portfolio_has_holdings_that_match_performance_and_tail_horizons(
     if report["tail_risk"]["by_horizon"] is not None:
         assert report["tail_risk"]["status"] == "ok"
     assert report["portfolio_backtest"]["unallocated_weight"] == pytest.approx(0.1)
+
+
+def test_api_hedged_leaf_is_the_local_return_minus_rf_plus_euro_cash(
+    world: World, client: ApiClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The service converts every history, but a hedged line is hedged on its local return."""
+    with_sources(world, FAKE)
+    seen: dict[str, Any] = {}
+    real = pr._common_returns  # pyright: ignore[reportPrivateUsage]
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        out = real(*args, **kwargs)
+        seen["common"] = out
+        return out
+
+    monkeypatch.setattr(pr, "_common_returns", spy)
+    # AAA sits under a hedged line and, as BBB's twin, under an unhedged one.
+    body = eur_tree([holding(0, "AAA", 0.3), holding(1, "AAA", 0.3)])
+    body["root"]["children"][0]["children"][0]["library_id"] = "fi_na_gov"
+    response = post_tree(client, body)
+    assert response.status_code == 200, response.text
+    common = seen["common"]
+    hedged_key, plain_key = list(common.leaf_ret.columns)[:2]
+    local = world.provider.histories["AAA"].total_returns
+    calendar = common.calendar
+    ctx = CurrencyContext("EUR", FAKE)
+    rf = pr._compounded_rf(world.factors["RF"], calendar)  # pyright: ignore[reportPrivateUsage]
+    cash = ctx.cash(calendar)
+    local_on_calendar = (
+        world.provider.histories["AAA"].frame["adj_close"].loc[calendar].pct_change().iloc[1:]
+    )
+    expected = local_on_calendar - rf + cash
+    got = common.leaf_ret[hedged_key]
+    ok = got.notna()
+    assert ok.sum() > 100
+    np.testing.assert_allclose(got[ok].to_numpy(), expected[ok].to_numpy(), atol=1e-12)
+    assert local.notna().all()
+    # The unhedged twin is the converted return, which differs from the local one.
+    assert not np.allclose(common.leaf_ret[plain_key].to_numpy(), local_on_calendar.to_numpy())
+    assert (
+        "US risk-free rate (factor file)" in response.json()["portfolio_backtest"]["end_limited_by"]
+    )

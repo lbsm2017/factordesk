@@ -57,6 +57,7 @@ EUR_CASH_LABEL = "EUR cash (overnight rate)"
 USD_CASH_KEY = USD_CASH_LEAF
 """Backtest leaf of the USD cash instruments in the EUR view (their return is converted)."""
 USD_CASH_LABEL = "USD cash (converted to EUR)"
+RF_LIMIT_LABEL = "US risk-free rate (factor file)"
 RF_COLUMN = "RF"
 LEAF_PREFIX = "i:"
 """Backtest leaf ids are ``i:<instrument id>``, so no instrument id can clash with ``CASH_ID``."""
@@ -275,6 +276,9 @@ class CommonReturns:
     """Leaves whose first price is the latest: they set the start of the common calendar."""
     end_keys: tuple[str, ...]
     """Leaves whose last price is the earliest: they set the end of the common calendar."""
+    rf_keys: frozenset[str] = frozenset()
+    """Leaves that carry the US risk-free rate (hedged lines, USD cash): it ends with the factor
+    file, so it can set the end of the window."""
 
 
 def _adjusted_close(history: PriceHistory) -> pd.Series:
@@ -307,6 +311,7 @@ def _common_returns(
     rf: pd.Series,
     ctx: CurrencyContext | None = None,
     listings: Mapping[str, str] | None = None,
+    local_histories: dict[str, PriceHistory] | None = None,
 ) -> CommonReturns:
     """Returns of every weighted leaf between consecutive dates all of them have a price on.
 
@@ -348,16 +353,26 @@ def _common_returns(
     first = {k: s.index[0] for k, s in prices.items()}
     last = {k: s.index[-1] for k, s in prices.items()}
     rf_leaf = _compounded_rf(rf, common)
+    rf_keys: set[str] = set()
     if ctx is not None and ccy == "EUR":
         cash = ctx.cash(common)
-        for key in hedged_keys(plan, ccy, listings or {}):
-            frame[key] = hedge(frame[key], rf_leaf, cash)
+        hedged = hedged_keys(plan, ccy, listings or {})
+        for row in plan.holdings:
+            if row.key in hedged:
+                # hedged on the local return, not on the one converted to euros
+                assert row.key is not None and row.ticker is not None
+                source = (local_histories or histories)[row.ticker]
+                local = _adjusted_close(source).loc[common].pct_change().iloc[1:]
+                local.index = pd.DatetimeIndex(local.index, name="date")
+                frame[row.key] = hedge(local, rf_leaf, cash)
         for key in cash_keys:
             frame[key] = cash
         keys = [row.key for row in plan.holdings if row.key]
+        rf_keys = set(hedged)
         if usd_cash_weight(plan) > 0.0:  # USD cash is a currency position: its own leaf
             frame[USD_CASH_KEY] = convert(rf_leaf, ctx.returns("USD", common))
             keys.append(USD_CASH_KEY)
+            rf_keys.add(USD_CASH_KEY)
         frame = frame[keys]
         rf_leaf = cash  # the unallocated weight is held as euro cash
     return CommonReturns(
@@ -365,6 +380,7 @@ def _common_returns(
         end_keys=tuple(k for k in prices if last[k] == min(last.values())),
         leaf_ret=frame,
         rf=rf_leaf,
+        rf_keys=frozenset(rf_keys),
         calendar=common,
         n_dropped=in_span - len(common),
     )
@@ -442,13 +458,19 @@ def _limiting(
     bt_edge: date,
     own_edge: date,
     labels: dict[str, str],
+    rf_keys: frozenset[str] = frozenset(),
 ) -> tuple[str, ...]:
     """Display names of what limits one edge of the window.
 
     ``keys`` are the instruments that limit the common price calendar, ``bt_keys`` the backtest's
     own answer, which adds USD cash (its risk-free rate ends with the factor file). Cash alone
-    limits an edge when the window is cut inside the common calendar.
+    limits an edge when the window is cut inside the common calendar. In the EUR view the hedged
+    lines and USD cash (``rf_keys``) carry the same rate, and are named as such.
     """
+    if rf_keys & set(bt_keys):
+        if bt_edge != own_edge:
+            return (RF_LIMIT_LABEL,)
+        return (*(labels[k] for k in keys), RF_LIMIT_LABEL)
     if CASH_ID not in bt_keys:
         return tuple(labels[k] for k in keys)
     if bt_edge != own_edge:
@@ -499,9 +521,15 @@ def _summary(
             bt.start,
             _day(common.leaf_ret.index[0]),
             labels,
+            common.rf_keys,
         ),
         end_limited_by=_limiting(
-            common.end_keys, bt.end_leaves, bt.end, _day(common.leaf_ret.index[-1]), labels
+            common.end_keys,
+            bt.end_leaves,
+            bt.end,
+            _day(common.leaf_ret.index[-1]),
+            labels,
+            common.rf_keys,
         ),
         n_dates_dropped=common.n_dropped,
         n_instruments=len(plan.rows),
@@ -551,6 +579,7 @@ def backtest_portfolio(
     rf: pd.Series,
     ctx: CurrencyContext | None = None,
     listings: Mapping[str, str] | None = None,
+    local_histories: dict[str, PriceHistory] | None = None,
 ) -> tuple[ReturnSubject, PortfolioBacktestInput]:
     """Run the backtest of the plan and build its subject and summary (pure; blocking).
 
@@ -558,7 +587,7 @@ def backtest_portfolio(
     on the whole common window of the instruments with a weight above 0; USD cash, at ``rf``,
     joins it only when some weight is held there. A refusal is an ``ApiException`` (422).
     """
-    common = _common_returns(plan, histories, rf, ctx, listings)
+    common = _common_returns(plan, histories, rf, ctx, listings, local_histories)
     frame = common.leaf_ret
     weights = {row.key: row.weight for row in plan.holdings if row.key is not None}
     eur = ctx is not None and ctx.ref == "EUR"
@@ -594,6 +623,7 @@ def build_portfolio_report(
     ctx: CurrencyContext | None = None,
     usd_rf: pd.Series | None = None,
     listings: Mapping[str, str] | None = None,
+    local_histories: dict[str, PriceHistory] | None = None,
 ) -> FactorReport:
     """Backtest the plan and analyse the net daily returns (blocking; run in a worker).
 
@@ -601,7 +631,8 @@ def build_portfolio_report(
     whole common window. ``histories`` and ``factor_frame`` are already in the reference currency
     of ``ctx`` (None: USD). In the EUR view ``usd_rf`` is the original US risk-free rate: USD
     cash earns it, converted to euros, and a hedged line swaps it for the euro cash return.
-    ``listings`` gives each ticker's quote currency (default USD).
+    ``listings`` gives each ticker's quote currency (default USD). ``local_histories`` are the
+    histories before conversion: a hedged line is hedged on its local return.
     """
     from factordesk.pipeline import assemble_subject_report
 
@@ -611,7 +642,7 @@ def build_portfolio_report(
     if eur and usd_rf is None:
         raise ValueError("the EUR view needs the US risk-free rate (usd_rf) for USD cash")
     rf = usd_rf if eur and usd_rf is not None else factor_frame[RF_COLUMN]
-    subject, summary = backtest_portfolio(plan, histories, rf, ctx, listings)
+    subject, summary = backtest_portfolio(plan, histories, rf, ctx, listings, local_histories)
     if ctx is not None and eur:
         _note_hedges(plan, ctx, listings or {})
     cov = ranges.Coverage(

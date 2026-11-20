@@ -410,7 +410,7 @@ class ReportService:
             def build() -> FactorReport:
                 converted = {
                     t: self._to_reference(t, h, *listings[t], ctx) for t, h in histories.items()
-                }
+                }  # the local histories go too: a hedged line is hedged on its local return
                 return pr.build_portfolio_report(
                     plan,
                     converted,
@@ -425,6 +425,7 @@ class ReportService:
                     ctx=ctx,
                     usd_rf=loaded.frame["RF"],
                     listings={t: code for t, (code, _) in listings.items()},
+                    local_histories=histories,
                 )
 
             report = await self.runtime.run(build)
@@ -593,9 +594,8 @@ class ReportService:
         import dataclasses
 
         loader = self.deps.load_world_benchmark
-        if ctx.ref != "USD":
-            if inputs is not None:
-                inputs = dataclasses.replace(inputs, shrinkage_portfolios=None)
+        if ctx.ref != "USD" and inputs is not None and inputs.shrinkage_portfolios is not None:
+            inputs = dataclasses.replace(inputs, shrinkage_portfolios=None)
             ctx.note("The shrunk-betas section is not available in EUR yet.")
         if loader is None:
             return inputs

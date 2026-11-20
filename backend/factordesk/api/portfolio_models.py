@@ -36,9 +36,9 @@ TREE_VERSION: Final = 1
 MAX_INSTRUMENTS: Final = 50
 MAX_COST_BPS: Final = 1000.0
 USD_CASH_LIBRARY_ID: Final = "cash_usd"
+"""Library id of the USD cash line: the unallocated remainder goes there."""
 EUR_CASH_LIBRARY_ID: Final = "cash_eur"
 """Library id of the EUR cash line: the EUR view replaces its proxy (FXE) by the euro cash index."""
-"""Library id of the USD cash line: the unallocated remainder goes there."""
 
 _TICKER_RE = re.compile(r"^[A-Za-z0-9.^=-]{1,12}$")  # same rule as data.prices.validate_ticker
 

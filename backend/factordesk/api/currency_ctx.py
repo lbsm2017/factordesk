@@ -53,9 +53,9 @@ def default_sources(data_dir: Path) -> CurrencySources:
 def unavailable(why: str) -> ApiException:
     return ApiException(
         "network",
-        f"The EUR view needs exchange rates and the euro cash rate, and they are unavailable: "
+        f"The exchange rates or the euro cash rate this report needs are unavailable: "
         f"{why.rstrip('.')}.",
-        "Switch to USD, which does not need them, or try again later.",
+        "Try again later, or switch to USD if the instrument is quoted in US dollars.",
     )
 
 
