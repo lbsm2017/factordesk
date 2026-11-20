@@ -7,15 +7,21 @@ const FIRST_REPORT_MS = 120_000;
  * The fake backend serves USD only. The euro view is tested by answering the report and library
  * requests with the fake backend's own answer plus the fields the real backend adds in the euro view
  * (`currency` on the report, `hedge_eur` on a library line). Requests that carry `ccy=EUR` are
- * recorded so the test can check what the page asked for.
+ * recorded so the test can check what the page asked for. The credit texts are those of the real
+ * backend (`data/fx.py`, `data/rates.py`).
  */
 async function euroBackend(page: Page): Promise<string[]> {
   const asked: string[] = [];
   await page.route(/\/api\/report\/SYN\?/, async (route) => {
     const url = route.request().url();
-    const response = await route.fetch();
+    const euro = new URL(url).searchParams.get("ccy") === "EUR";
+    // The fake backend has no exchange-rate source and refuses `ccy=EUR` with an error, so the
+    // euro request is answered from the same request without `ccy` (the USD answer).
+    const usdUrl = new URL(url);
+    usdUrl.searchParams.delete("ccy");
+    const response = await route.fetch({ url: usdUrl.toString() });
     const body = (await response.json()) as Record<string, unknown>;
-    if (new URL(url).searchParams.get("ccy") === "EUR") {
+    if (euro) {
       asked.push(url);
       body["currency"] = {
         reference: "EUR",
