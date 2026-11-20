@@ -6,7 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { RECENT_KEY, resetRecentCache } from "./state/recent";
 import { monthlyReport } from "./test/fixture";
-import { requests, server, setupMockApi } from "./test/mockApi";
+import { requests, server, setupMockApi, sse, sseResponse } from "./test/mockApi";
 
 // The panels need ECharts; this file tests the track-record mode around them.
 vi.mock("./components/report/ReportView", () => ({
@@ -193,5 +193,50 @@ describe("track-record upload", () => {
     fireEvent.click(screen.getByRole("button", { name: "Factor it" }));
     await screen.findByTestId("report-ticker");
     expect(seen).toHaveLength(1);
+  });
+});
+
+describe("track-record run on a stream", () => {
+  it("lists the steps of an upload (no prices step), then shows the report", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.post("*/api/report/upload/stream", async () => {
+        const first = sse("step", { step: "factors", label: "Loading factor data", index: 1, total: 3 });
+        await gate;
+        return sseResponse([
+          first,
+          sse("step", { step: "models", label: "Fitting the models", index: 2, total: 3 }),
+          sse("report", { ...monthlyReport, ticker: "Streamed record" }),
+        ]);
+      }),
+    );
+    renderAt("/?m=track");
+    chooseFile(csv());
+    fireEvent.click(screen.getByRole("button", { name: "Factor it" }));
+    // The stream answers only when released, so the card shows after the late timer, with the three expected steps.
+    expect(await screen.findByRole("heading", { name: "Building the report for Track record" })).toBeTruthy();
+    expect(screen.queryByText("Downloading prices")).toBeNull();
+    expect(screen.getByText("Loading factor data")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Factoring…" }).getAttribute("aria-disabled")).toBe("true");
+    release();
+    expect(await screen.findByTestId("report-ticker")).toHaveProperty("textContent", "Streamed record");
+    expect(screen.getByRole("button", { name: "Factor it" })).toBeTruthy();
+  });
+
+  it("shows a refused upload (file over 1 MB) as an error with its own message", async () => {
+    server.use(
+      http.post("*/api/report/upload/stream", () =>
+        HttpResponse.json({ code: "upload_too_large", message: "The file is over 1 MB.", action: "Send a smaller file." }, { status: 413 }),
+      ),
+    );
+    renderAt("/?m=track");
+    chooseFile(csv());
+    fireEvent.click(screen.getByRole("button", { name: "Factor it" }));
+    const page = await screen.findByTestId("report-error");
+    expect(page.textContent).toContain("The file is over 1 MB.");
+    expect(page.textContent).toContain("Send a smaller file.");
   });
 });

@@ -783,5 +783,5 @@ def test_openapi_lists_the_report_endpoints() -> None:
         "/api/report/{ticker}/html",
     } <= set(paths)
     params = {p["name"] for p in paths["/api/report/{ticker}"]["get"]["parameters"]}
-    assert params == {"ticker", "range", "start", "end", "model", "ccy"}
+    assert params == {"ticker", "range", "start", "end", "model", "ccy", "factor_set"}
     assert "text/html" in paths["/api/report/{ticker}/html"]["get"]["responses"]["200"]["content"]

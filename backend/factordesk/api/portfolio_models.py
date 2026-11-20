@@ -29,6 +29,7 @@ from typing import Annotated, Final, Literal
 from pydantic import Field, model_validator
 
 from factordesk.analytics.backtest import WEIGHT_TOLERANCE
+from factordesk.data.french import FactorSet
 from factordesk.report.base import FrozenModel
 from factordesk.report.schema import ReferenceCurrency
 
@@ -39,6 +40,10 @@ USD_CASH_LIBRARY_ID: Final = "cash_usd"
 """Library id of the USD cash line: the unallocated remainder goes there."""
 EUR_CASH_LIBRARY_ID: Final = "cash_eur"
 """Library id of the EUR cash line: the EUR view replaces its proxy (FXE) by the euro cash index."""
+
+CHF_CASH_LIBRARY_ID: Final = "cash_chf"
+"""Library id of the CHF Cash line: both views replace its proxy (FXF) by the SARON cash index,
+converted to the reference currency, unless SARON or the franc's rate is unavailable."""
 
 _TICKER_RE = re.compile(r"^[A-Za-z0-9.^=-]{1,12}$")  # same rule as data.prices.validate_ticker
 
@@ -103,6 +108,12 @@ class PortfolioTree(FrozenModel):
         exclude_if=lambda value: value == "USD",
         description="Currency of the backtest and of every figure of the report; left out of the "
         "JSON when USD.",
+    )
+    factor_set: FactorSet = Field(
+        default="us",
+        exclude_if=lambda value: value == "us",
+        description="Regional Fama-French factor set of the report: us (default) or europe "
+        "(Developed Europe, in US dollars); left out of the JSON when us.",
     )
     root: RootGroup
 

@@ -183,6 +183,21 @@ class ReferenceInput:
 
 
 @dataclass(frozen=True)
+class UsFactorsInput:
+    """The US factor frame behind the sections that keep US inputs (macro, energy, world beta)
+    when the report runs on another factor set.
+
+    ``frame`` is the frame the US set would give for the same request: FF6 daily or monthly,
+    in the reference currency (converted exactly as the US report converts it). The pipeline
+    builds a second analysis sample on it for those three sections, so their output does not
+    depend on the factor set. ``downloaded_at`` is the US file's download time.
+    """
+
+    frame: pd.DataFrame
+    downloaded_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class SectionInputs:
     """Data a section needs that ``assemble_report`` does not already have.
 
@@ -208,6 +223,9 @@ class SectionInputs:
     not run. Owned by the energy feature."""
     reference: ReferenceInput | None = None
     """The EUR view of the macro and energy sections; ``None``: the US-dollar view."""
+    us_factors: UsFactorsInput | None = None
+    """Set only when the report's factor set is not the US one: the US frame for the macro,
+    energy and world beta sections (design decision: they keep their US inputs)."""
 
 
 @dataclass(frozen=True)
@@ -262,6 +280,11 @@ class SectionContext:
     subject: ReturnSubject
     """What the report is about: kind, frequency, returns, calendar, levels."""
     model: FactorModel = "ff5"
+    us_context: SectionContext | None = None
+    """A copy of this context on the US factor sample (``SectionInputs.us_factors``), read by
+    the hooks of ``US_FACTOR_FIELDS``; ``None`` when the report is on the US set."""
+    us_unavailable: bool = False
+    """True when the US sample could not be built; the ``US_FACTOR_FIELDS`` hooks are skipped."""
 
     def sample_info(self, window: int | None = None) -> SampleInfo:
         """``SampleInfo`` of the analysis sample, with ``window`` as its trailing-window length."""

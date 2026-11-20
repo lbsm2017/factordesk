@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent } from "react";
 import type { TickerSuggestion } from "../../api/types";
 import { dateLong } from "../../format";
+import { RunButton } from "./RunButton";
 
 export interface TickerSearchProps {
   /** Ticker in the URL, shown in the field after a submit. */
@@ -23,6 +24,10 @@ export interface TickerSearchProps {
   submitLabel?: string;
   /** "/" focuses the field from anywhere outside a text field; only the page's main search turns it on. */
   slashFocus?: boolean;
+  /** A run is on its way: the button is busy and a submit does nothing. The field stays editable. */
+  busy?: boolean;
+  /** Fill of the busy button's line, 0 to 1. */
+  progress?: number;
 }
 
 interface Row {
@@ -61,6 +66,8 @@ export function TickerSearch({
   label = "Ticker",
   submitLabel = "Factor it",
   slashFocus = true,
+  busy = false,
+  progress = 0,
 }: TickerSearchProps) {
   const errorId = `${inputId}-error`;
   const [text, setText] = useState(value);
@@ -118,6 +125,7 @@ export function TickerSearch({
 
   const submit = (submitted: string) => {
     closeMenu();
+    if (busy) return;
     onSubmit(submitted);
   };
   const choose = (row: Row) => {
@@ -194,9 +202,7 @@ export function TickerSearch({
               : null}
           </ul>
         </div>
-        <button type="submit" className="btn">
-          {submitLabel}
-        </button>
+        <RunButton busy={busy} progress={progress} label={submitLabel} />
       </form>
       {error !== null ? (
         <p className="ctl-err" id={errorId} role="alert">

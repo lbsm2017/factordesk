@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What EUR changes mockup</title>
+<link rel="stylesheet" href="../../../frontend/src/styles/fonts.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/tokens.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/report.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/shell.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/controls.css">
+<link rel="stylesheet" href="sprint4.css">
+</head>
+<body>
+<div class="shell" id="shell" data-ccy="EUR" data-set="US">
+<header class="topbar"><button type="button" class="menu-btn" id="menu" aria-controls="sidebar"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 5.5h14M3 10h14M3 14.5h14"/></svg><span class="vh">Menu</span></button>
+  <span class="mark"><svg class="mark-svg" viewBox="0 0 28 28" aria-hidden="true" focusable="false"><rect class="m-bg" width="28" height="28" rx="6"/><rect class="m-bar" x="7" y="13" width="3" height="8"/><rect class="m-bar" x="12.5" y="7" width="3" height="14"/><rect class="m-bar" x="18" y="10.5" width="3" height="10.5"/></svg><span>factordesk</span></span><p class="where">SPY<span class="ccy-chip eur">EUR</span></p></header>
+<div class="scrim" id="scrim" hidden aria-hidden="true"></div>
+<aside class="sidebar" id="sidebar" aria-label="Controls and sections">
+  <div class="side-scroll">
+    <div class="side-top"><span class="mark"><svg class="mark-svg" viewBox="0 0 28 28" aria-hidden="true" focusable="false"><rect class="m-bg" width="28" height="28" rx="6"/><rect class="m-bar" x="7" y="13" width="3" height="8"/><rect class="m-bar" x="12.5" y="7" width="3" height="14"/><rect class="m-bar" x="18" y="10.5" width="3" height="10.5"/></svg><span>factordesk</span></span><button type="button" class="drawer-close" id="close"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5 5 10 10M15 5 5 15"/></svg><span class="vh">Close menu</span></button></div>
+    <div class="side-group">
+      <fieldset class="ctl-range"><legend class="side-label">Analyse</legend>
+        <span class="seg-range"><label class="seg-opt"><input type="radio" name="mode-m" value="ticker" checked><span>Ticker</span></label><label class="seg-opt"><input type="radio" name="mode-m" value="track"><span>Track record</span></label><label class="seg-opt"><input type="radio" name="mode-m" value="portfolio"><span>Portfolio</span></label></span>
+      </fieldset>
+      <div class="ccy-row"><span class="side-label" id="ccyl-m">Currency</span>
+        <span class="seg-range ccy-seg" role="radiogroup" aria-labelledby="ccyl-m"><label class="seg-opt"><input type="radio" name="ccy-m" value="USD"><span>USD</span></label><label class="seg-opt"><input type="radio" name="ccy-m" value="EUR" checked><span>EUR</span></label></span></div>
+      <p class="side-note ccy-note">Returns, factors and cash in <b>EUR</b>. US bond lines are hedged to EUR.</p>
+      <div class="fs-row"><span class="side-label" id="fsl-m">Factor set</span>
+        <span class="seg-range fs-seg" role="radiogroup" aria-labelledby="fsl-m"><label class="seg-opt"><input type="radio" name="fs-m" value="US" checked><span>US</span></label><label class="seg-opt"><input type="radio" name="fs-m" value="EUROPE"><span>Europe</span></label></span></div>
+      
+    </div>
+    <section class="controls" aria-label="Report controls">
+      <div class="side-group"><div class="ctl-ticker"><form class="ctl-search" role="search" onsubmit="return false">
+        <label class="side-label" for="tk-m">Ticker</label>
+        <div class="ctl-combo"><input id="tk-m" type="text" value="SPY"></div>
+        <button type="submit" class="btn">Factor it</button>
+      </form></div></div>
+      <div class="side-group">
+        <fieldset class="ctl-range"><legend class="side-label">Date range</legend>
+          <span class="seg-range"><label class="seg-opt"><input type="radio" name="rg-m" value="3Y"><span>3Y</span></label><label class="seg-opt"><input type="radio" name="rg-m" value="5Y"><span>5Y</span></label><label class="seg-opt"><input type="radio" name="rg-m" value="10Y" checked><span>10Y</span></label><label class="seg-opt"><input type="radio" name="rg-m" value="FULL"><span>Full history</span></label></span>
+        </fieldset>
+        <div class="ctl-custom"><label>From<input type="date" value="2016-10-03"></label><label>To<input type="date" value="2026-09-30"></label></div>
+        <div class="cov"><div class="cov-bar" role="img" aria-label="Price history: analysed"><span class="cov-seg before" style="flex-grow:30"></span><span class="cov-seg analysed" style="flex-grow:100"></span></div>
+          <p class="cov-line"><span class="cov-span">3 Oct 2016 → 30 Sep 2026</span><span class="cov-size">2,512 days</span></p></div>
+      </div>
+      <div class="side-group"><p class="ctl-factors side-note"><span>Factor data ends 31 Oct 2026, so later dates cannot be chosen.</span> <button type="button" class="linkbtn"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2"/></svg>Check for newer factor data</button></p></div>
+    </section>
+    <div class="side-group"><button type="button" role="switch" aria-checked="false" class="switch"><span class="switch-text">Show statistics<span class="sw-hint" aria-hidden="true">t, p-values, intervals</span></span><span class="track" aria-hidden="true"><span class="thumb"></span></span></button></div>
+    
+  </div>
+</aside>
+<div class="canvas" id="report"><div class="mk-note"><span class="chip">Mockup S4-0 · What EUR changes</span><span>Static page. The panel is drawn open in frames 2 and 3.</span></div><section class="mk-frame" aria-labelledby="f-1"><div class="mk-fh"><span class="mk-id" aria-hidden="true">1</span><h2 id="f-1">The trigger: next to the EUR pill, EUR view only</h2><p>A text link with an info icon, in the page header, only while the currency is EUR. It opens the side panel. It is a button, so Enter and Space open it.</p></div><div class="mk-stage solo"><div class="canvas"><main class="report-region" style="padding:0"><header class="masthead">
+    <div class="page-head"><h1><span class="ticker" translate="no">SPY</span><span class="nm" translate="no">SPDR S&P 500 ETF Trust</span></h1><span class="badge">ETF</span><span class="ccy-pill">Figures in EUR</span><span class="set-pill plain">US factors</span><button type="button" class="hd-link"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M10 9v5M10 6.2v.3"/></svg>What EUR changes</button>
+      <div class="head-actions"><a class="btn-outline" href="#"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><ellipse cx="10" cy="5" rx="6" ry="2.5"/><path d="M4 5v10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5M4 10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5"/></svg>Download report</a></div>
+      <p class="listing">NYSE Arca. Returns converted to euros at ECB rates.</p></div>
+    <dl class="abar" aria-label="Analysis settings"><div><dt>Analysis period</dt><dd>3 Oct 2016 to 30 Sep 2026</dd></div><div><dt>Observations</dt><dd>2,512 trading days</dd></div><div><dt>Factor data</dt><dd>To 31 Oct 2026</dd></div><div><dt>Factor set</dt><dd>US</dd></div><div><dt>Currency</dt><dd>EUR</dd></div><div><dt>Benchmark</dt><dd>ACWI</dd></div></dl>
+  </header><section class="panel " aria-labelledby="sum-18" style=""><div class="panel-head"><h2 id="sum-18">Summary</h2><div class="pm">Figures in EUR</div></div>
+    <p class="q">How did the fund do, and what would 100 have become?</p><div class="kpis"><div class="kpi"><span class="k">Growth of 100</span><span class="v">241.9<span class="ccy">EUR</span></span><span class="n">from 3 Oct 2016</span></div><div class="kpi"><span class="k">Return a year</span><span class="v num-pos">+9.2%<span class="ccy">EUR</span></span><span class="n">after cost</span></div><div class="kpi"><span class="k">Worst fall</span><span class="v num-neg">−31.0%<span class="ccy">EUR</span></span><span class="n">peak to low, 2020</span></div><div class="kpi"><span class="k">Sharpe ratio</span><span class="v">0.78</span><span class="n">against EUR cash</span></div></div><ul class="cur-notes"><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M10 9v5M10 6.2v.3"/></svg><span>Returns, factors and cash are in <b>EUR</b>.</span></li></ul></section></main></div></div></section><section class="mk-frame" aria-labelledby="f-2"><div class="mk-fh"><span class="mk-id" aria-hidden="true">2</span><h2 id="f-2">The side panel, ticker and track record view</h2><p>A panel 360 px wide slides in from the right (200 ms) over a dimmed page. Four short lines, about 60 words. Close with the X button, Escape or a click on the dimmed page. Focus returns to the trigger.</p></div><div class="sheet-stage"><div class="sheet-bg"><main class="report-region" style="padding:0"><header class="masthead">
+    <div class="page-head"><h1><span class="ticker" translate="no">SPY</span><span class="nm" translate="no">SPDR S&P 500 ETF Trust</span></h1><span class="badge">ETF</span><span class="ccy-pill">Figures in EUR</span><span class="set-pill plain">US factors</span><button type="button" class="hd-link"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M10 9v5M10 6.2v.3"/></svg>What EUR changes</button>
+      <div class="head-actions"><a class="btn-outline" href="#"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><ellipse cx="10" cy="5" rx="6" ry="2.5"/><path d="M4 5v10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5M4 10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5"/></svg>Download report</a></div>
+      <p class="listing">NYSE Arca. Returns converted to euros at ECB rates.</p></div>
+    <dl class="abar" aria-label="Analysis settings"><div><dt>Analysis period</dt><dd>3 Oct 2016 to 30 Sep 2026</dd></div><div><dt>Observations</dt><dd>2,512 trading days</dd></div><div><dt>Factor data</dt><dd>To 31 Oct 2026</dd></div><div><dt>Factor set</dt><dd>US</dd></div><div><dt>Currency</dt><dd>EUR</dd></div><div><dt>Benchmark</dt><dd>ACWI</dd></div></dl>
+  </header><section class="panel " aria-labelledby="sum-19" style=""><div class="panel-head"><h2 id="sum-19">Summary</h2><div class="pm">Figures in EUR</div></div>
+    <p class="q">How did the fund do, and what would 100 have become?</p><div class="kpis"><div class="kpi"><span class="k">Growth of 100</span><span class="v">241.9<span class="ccy">EUR</span></span><span class="n">from 3 Oct 2016</span></div><div class="kpi"><span class="k">Return a year</span><span class="v num-pos">+9.2%<span class="ccy">EUR</span></span><span class="n">after cost</span></div><div class="kpi"><span class="k">Worst fall</span><span class="v num-neg">−31.0%<span class="ccy">EUR</span></span><span class="n">peak to low, 2020</span></div><div class="kpi"><span class="k">Sharpe ratio</span><span class="v">0.78</span><span class="n">against EUR cash</span></div></div><ul class="cur-notes"><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M10 9v5M10 6.2v.3"/></svg><span>Returns, factors and cash are in <b>EUR</b>.</span></li></ul></section></main></div><div class="sheet-scrim"></div><aside class="eur-sheet" role="dialog" aria-modal="true" aria-labelledby="sh-20"><div class="sh-head"><h2 id="sh-20">What EUR changes</h2><button type="button" class="sh-close"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5 5 10 10M15 5 5 15"/></svg><span class="vh">Close</span></button></div>
+  <div class="sh-body"><ul class="sh-list"><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg><span>Prices are converted to euros <b>every day</b>, at the ECB reference rate.</span></li><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg><span>Cash earns the <b>euro overnight rate</b> (€STR), not the US rate.</span></li><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg><span>Nothing is <b>hedged</b>: a US ticker still moves with the dollar.</span></li></ul><p class="sh-foot">A portfolio view hedges its US dollar bond lines.</p></div></aside></div></section><section class="mk-frame" aria-labelledby="f-3"><div class="mk-fh"><span class="mk-id" aria-hidden="true">3</span><h2 id="f-3">The side panel, portfolio view</h2><p>Same panel. The hedge line names the USD bond lines of the library. Nothing else changes.</p></div><div class="sheet-stage"><div class="sheet-bg"><main class="report-region" style="padding:0"><header class="masthead">
+    <div class="page-head"><h1><span class="ticker" translate="no">SPY</span><span class="nm" translate="no">SPDR S&P 500 ETF Trust</span></h1><span class="badge">ETF</span><span class="ccy-pill">Figures in EUR</span><span class="set-pill plain">US factors</span><button type="button" class="hd-link"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M10 9v5M10 6.2v.3"/></svg>What EUR changes</button>
+      <div class="head-actions"><a class="btn-outline" href="#"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><ellipse cx="10" cy="5" rx="6" ry="2.5"/><path d="M4 5v10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5M4 10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5"/></svg>Download report</a></div>
+      <p class="listing">NYSE Arca. Returns converted to euros at ECB rates.</p></div>
+    <dl class="abar" aria-label="Analysis settings"><div><dt>Analysis period</dt><dd>3 Oct 2016 to 30 Sep 2026</dd></div><div><dt>Observations</dt><dd>2,512 trading days</dd></div><div><dt>Factor data</dt><dd>To 31 Oct 2026</dd></div><div><dt>Factor set</dt><dd>US</dd></div><div><dt>Currency</dt><dd>EUR</dd></div><div><dt>Benchmark</dt><dd>ACWI</dd></div></dl>
+  </header><section class="panel " aria-labelledby="sum-21" style=""><div class="panel-head"><h2 id="sum-21">Summary</h2><div class="pm">Figures in EUR</div></div>
+    <p class="q">How did the fund do, and what would 100 have become?</p><div class="kpis"><div class="kpi"><span class="k">Growth of 100</span><span class="v">241.9<span class="ccy">EUR</span></span><span class="n">from 3 Oct 2016</span></div><div class="kpi"><span class="k">Return a year</span><span class="v num-pos">+9.2%<span class="ccy">EUR</span></span><span class="n">after cost</span></div><div class="kpi"><span class="k">Worst fall</span><span class="v num-neg">−31.0%<span class="ccy">EUR</span></span><span class="n">peak to low, 2020</span></div><div class="kpi"><span class="k">Sharpe ratio</span><span class="v">0.78</span><span class="n">against EUR cash</span></div></div><ul class="cur-notes"><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="M10 9v5M10 6.2v.3"/></svg><span>Returns, factors and cash are in <b>EUR</b>.</span></li></ul></section></main></div><div class="sheet-scrim"></div><aside class="eur-sheet" role="dialog" aria-modal="true" aria-labelledby="sh-22"><div class="sh-head"><h2 id="sh-22">What EUR changes</h2><button type="button" class="sh-close"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5 5 10 10M15 5 5 15"/></svg><span class="vh">Close</span></button></div>
+  <div class="sh-body"><ul class="sh-list"><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg><span>Prices are converted to euros <b>every day</b>, at the ECB reference rate.</span></li><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg><span>Cash earns the <b>euro overnight rate</b> (€STR), not the US rate.</span></li><li><svg class="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg><span>US dollar bond funds (IEF, LQD, HYG, EMB, TIP) are <b>hedged</b> to the euro. Shares, gold and European or global bond funds are not.</span></li></ul><p class="sh-foot">The hedge is an estimate from the rate gap, not a fund's own hedge.</p></div></aside></div></section><div class="mk-end"></div></div>
+</div>
+<script>
+(function () {
+  var shell = document.getElementById('shell'); var scrim = document.getElementById('scrim');
+  if (!shell || !scrim) return;
+  function set(open) { shell.classList.toggle('drawer-open', open); scrim.hidden = !open; }
+  var m = document.getElementById('menu'); if (m) m.addEventListener('click', function () { set(true); });
+  var c = document.getElementById('close'); if (c) c.addEventListener('click', function () { set(false); });
+  scrim.addEventListener('click', function () { set(false); });
+})();
+</script>
+</body>
+</html>

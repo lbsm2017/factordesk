@@ -83,6 +83,11 @@ class AppDeps:
     FF6 model and the alpha strip of every report. May raise ``FactorError``: an FF6 report then
     fails, an FF5 report falls back to ``load_factors`` without the strip. ``None``: not wired, so
     FF6 is refused and FF5 reports have no alpha strip."""
+    load_europe_ff6: Callable[[datetime], pd.DataFrame] | None = None
+    """The daily FF6 frame of the Developed Europe factor set (``data.french.load_ff6("daily",
+    factor_set="europe")``, in US dollars), used when a request asks for ``factor_set=europe``.
+    May raise ``FactorError``: the request then fails. ``None``: not wired, so the Europe set is
+    refused."""
     currency: CurrencySources | None = None
     """Exchange rates and the euro cash rate of the EUR view. ``None``: not wired, so the EUR view
     is refused with a 503 (and a listing in another currency cannot be converted)."""
@@ -106,6 +111,11 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         from factordesk.data.french import load_ff6
 
         return load_ff6("daily", data_dir=data_dir, now=now)
+
+    def load_europe_ff6_daily(now: datetime) -> pd.DataFrame:
+        from factordesk.data.french import load_ff6
+
+        return load_ff6("daily", data_dir=data_dir, now=now, factor_set="europe")
 
     def status(now: datetime) -> FactorStatus | None:
         return factor_status(data_dir=data_dir, now=now)
@@ -170,5 +180,6 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         load_macro=macro,
         load_energy=energy,
         load_ff6=load_ff6_daily,
+        load_europe_ff6=load_europe_ff6_daily,
         currency=default_sources(data_dir),
     )

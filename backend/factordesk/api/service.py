@@ -5,8 +5,9 @@ Four layers, each a ``SingleFlight`` (a dict of running tasks plus an LRU of res
 1. factor frame: loaded on every request through ``load_factors(False, now)`` (which may run
    the 40-day auto-refresh), then identified by its vintage ``(last_date, last_download_at)``;
 2. price history: key ``(ticker, today)``, matching the same-day cache of ``YFinanceProvider``;
-3. report: key ``(ticker, start, end, vintage, today, model)`` after preset resolution, so
-   ``range=3Y`` and the same explicit dates share one entry, and FF5 and FF6 never do;
+3. report: key ``(ticker, start, end, vintage, today, model, factor set, currency)`` after
+   preset resolution, so ``range=3Y`` and the same explicit dates share one entry, and FF5 and
+   FF6 (or the US and Europe factor sets) never do;
 4. ranges: the report key without start and end.
 
 A request whose key is running awaits the same task through ``asyncio.shield``, so a closed
@@ -16,6 +17,9 @@ gets the same exception. When the vintage changes, entries of other vintages are
 Every report is built on the FF6 frame (``AppDeps.load_ff6``, cached per vintage and day) so it
 carries the alpha strip. An FF5 report whose FF6 frame cannot be loaded falls back to the FF5
 frame without the strip; an FF6 report fails with the loader's error.
+A request for the Europe factor set (``factor_set="europe"``) uses ``AppDeps.load_europe_ff6`` for
+its factors and its ranges, always with momentum; the US vintage still names the cache entries
+(the Europe frame is re-read once a day, like the FF6 one).
 Shared state is touched only on the event-loop thread; worker functions take inputs and return
 values, so no locks are needed.
 """
@@ -34,12 +38,14 @@ from typing import TYPE_CHECKING, cast
 import pandas as pd
 from fastapi import Request
 
+from factordesk import progress
 from factordesk.analytics.currency import convert_history, listing_currency
 from factordesk.api import ranges
 from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime
 from factordesk.data.factors import FactorError, FactorStatus
+from factordesk.data.french import DEFAULT_FACTOR_SET, FactorSet
 from factordesk.data.prices import PriceHistory, Security, security_of
 from factordesk.report.render_html import render_report_html
 from factordesk.report.schema import (
@@ -73,6 +79,7 @@ def assemble_report(
     reference_currency: ReferenceCurrency = "USD",
     currency: CurrencyInfo | None = None,
     audit_history: PriceHistory | None = None,
+    factor_set: FactorSet = DEFAULT_FACTOR_SET,
 ) -> FactorReport:
     """``factordesk.pipeline.assemble_report``, imported on first use.
 
@@ -96,8 +103,12 @@ def assemble_report(
         currency=currency,
         converted=True,  # ``ReportService`` has converted the history and the factors
         audit_history=audit_history,
+        factor_set=factor_set,
     )
 
+
+SLOW_FACTORS_SECONDS = 0.25
+"""A factor load that takes longer than this (a download) is shown as the factor step."""
 
 PRICE_CACHE_SIZE = 16
 """Price histories kept in memory (DB3 layer 2)."""
@@ -192,10 +203,20 @@ class LoadedFactors:
 
 type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
-type RangesKey = tuple[str, Vintage, date]
-type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel, ReferenceCurrency]
+type RangesKey = tuple[str, Vintage, date, FactorSet, ReferenceCurrency]
+type ReportKey = tuple[
+    str, date | None, date | None, Vintage, date, FactorModel, FactorSet, ReferenceCurrency
+]
 type PortfolioKey = tuple[
-    str, FactorModel, RangePreset | None, date | None, date | None, Vintage, date, ReferenceCurrency
+    str,
+    FactorModel,
+    RangePreset | None,
+    date | None,
+    date | None,
+    Vintage,
+    date,
+    ReferenceCurrency,
+    FactorSet,
 ]
 
 
@@ -250,10 +271,10 @@ class ReportService:
         )
         self.securities: SingleFlight[SecurityKey, Security] = SingleFlight(PRICE_CACHE_SIZE * 4)
         self.inputs: SingleFlight[tuple[Vintage, date], SectionInputs | None] = SingleFlight(1)
-        self.ff6: SingleFlight[tuple[Vintage, date], pd.DataFrame] = SingleFlight(1)
+        self.ff6: SingleFlight[tuple[Vintage, date, FactorSet], pd.DataFrame] = SingleFlight(2)
         self.converted: SingleFlight[
-            tuple[Vintage, date, ReferenceCurrency, bool], pd.DataFrame
-        ] = SingleFlight(2)
+            tuple[Vintage, date, ReferenceCurrency, bool, FactorSet], pd.DataFrame
+        ] = SingleFlight(4)
         self.vintage: Vintage | None = None
 
     # ------------------------------------------------------------------ public
@@ -266,22 +287,25 @@ class ReportService:
         end: date | None = None,
         model: FactorModel = "ff5",
         ccy: ReferenceCurrency = "USD",
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> FactorReport:
         """The report for an already validated ticker; no range and no dates means FULL.
 
         ``model`` is the factor model, FF5 (default) or FF6 (FF5 plus momentum). ``ccy`` is the
-        reference currency of every figure, USD (default) or EUR.
+        reference currency of every figure, USD (default) or EUR. ``factor_set`` is the regional
+        Fama-French set, US (default) or Europe.
         """
         started = time.perf_counter()
         logger.info(
-            "Report start: %s, model %s, %s, range %s",
+            "Report start: %s, model %s, %s, factors %s, range %s",
             ticker,
             model,
             ccy,
+            factor_set,
             _range_text(preset, start, end),
         )
         try:
-            return await self._report(ticker, preset, start, end, model, ccy, started)
+            return await self._report(ticker, preset, start, end, model, ccy, started, factor_set)
         except Exception as exc:
             category = to_api_exception(exc, ticker).code
             logger.info("Report refused: %s, reason %s", ticker, category)
@@ -296,19 +320,26 @@ class ReportService:
         model: FactorModel,
         ccy: ReferenceCurrency,
         started: float,
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> FactorReport:
         ranges.check_request(preset, start, end)
         now = self._now()
-        loaded = await self._factors()
+        loaded = await self._factors_shown()
+        cold = (ticker, now.date()) not in self.prices
+        if cold:  # a warm run may still end in a cache hit, which reports no steps
+            progress.step("prices")
+        base = await self._set_frame(loaded, now, factor_set)
         security = await self._security(ticker, now.date())
         listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
         ctx = CurrencyContext(ccy, self.deps.currency)
         local = history  # the audit reads the prices as the exchange lists them
+        if cold and ccy == "EUR":
+            progress.step("fx")
         history = await self.runtime.run(self._to_reference, ticker, history, listing, scale, ctx)
-        cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
+        cov = await self.runtime.run(ranges.coverage, history, base)
         first, last = ranges.resolve(preset, start, end, cov)
-        key: ReportKey = (ticker, first, last, loaded.vintage, now.date(), model, ccy)
+        key: ReportKey = (ticker, first, last, loaded.vintage, now.date(), model, factor_set, ccy)
         if key in self.reports:
             logger.info(
                 "Report cache hit: %s, model %s (%.0f ms)",
@@ -318,10 +349,12 @@ class ReportService:
             )
 
         async def make() -> FactorReport:
-            frame = await self._model_frame(loaded, now, model, ctx)
+            progress.step("factors")
+            frame = await self._model_frame(loaded, now, model, ctx, factor_set)
             inputs = await self._section_inputs(loaded.vintage, now)
-            inputs = await self._with_world_benchmark(inputs, ctx)
+            inputs = await self._with_world_benchmark(inputs, ctx, factor_set)
             inputs = await self._with_reference(inputs, ctx, loaded, now, model)
+            inputs = await self._with_us_factors(inputs, ctx, loaded, now, model, factor_set)
             inputs = await self._with_macro(inputs, ctx)
             inputs = await self._with_energy(inputs, ctx)
 
@@ -331,7 +364,7 @@ class ReportService:
                     history,
                     frame,
                     now=now,
-                    factors_downloaded_at=loaded.vintage.downloaded_at,
+                    factors_downloaded_at=_downloaded_at(loaded, base, factor_set),
                     start=first,
                     end=last,
                     section_inputs=inputs,
@@ -340,6 +373,7 @@ class ReportService:
                     reference_currency=ccy,
                     currency=None if ccy == "USD" else ctx.info(),
                     audit_history=local,
+                    factor_set=factor_set,
                 )
 
             built_at = time.perf_counter()
@@ -366,7 +400,8 @@ class ReportService:
         """The report of a portfolio tree (``api.portfolio_report``): in-memory cache only.
 
         The key is the SHA-256 of the canonical tree JSON, the model, the range as asked, the
-        factor vintage and the day, so a new price day or factor file never serves an old result.
+        factor vintage, the day, the reference currency and the factor set (``tree.factor_set``),
+        so a new price day or factor file never serves an old result.
         Nothing about the portfolio is written to disk or logged beyond counts.
         """
         from factordesk.api import portfolio_report as pr
@@ -375,16 +410,17 @@ class ReportService:
         ranges.check_request(preset, start, end)
         plan = pr.plan_of(tree)
         ccy = tree.reference_currency
-        tickers = pr.tickers_for(plan, ccy)
+        factor_set = tree.factor_set
         logger.info(
-            "Portfolio report start: %d instruments, model %s, %s, range %s",
+            "Portfolio report start: %d instruments, model %s, %s, factors %s, range %s",
             len(plan.rows),
             model,
             ccy,
+            factor_set,
             _range_text(preset, start, end),
         )
         now = self._now()
-        loaded = await self._factors()
+        loaded = await self._factors_shown()
         key: PortfolioKey = (
             plan.digest,
             model,
@@ -394,12 +430,17 @@ class ReportService:
             loaded.vintage,
             now.date(),
             ccy,
+            factor_set,
         )
         if key in self.portfolios:
             logger.info("Portfolio report cache hit")
 
         async def make() -> FactorReport:
+            progress.step("prices")
             ctx = CurrencyContext(ccy, self.deps.currency)
+            # FXF, the proxy of the CHF Cash line, is fetched only when SARON is not used
+            saron = bool(pr.chf_cash_keys(plan)) and await self.runtime.run(ctx.chf_ready)
+            tickers = pr.tickers_for(plan, ccy, saron)
             listings: dict[str, tuple[str, float]] = {}
             for ticker in tickers:  # refuses a currency that cannot be converted
                 security = await self._security(ticker, now.date())
@@ -407,9 +448,13 @@ class ReportService:
             histories = await self.runtime.run(
                 pr.fetch_histories, self.deps.price_provider, tickers
             )
-            frame = await self._model_frame(loaded, now, model, ctx)
-            inputs = await self._with_world_benchmark(None, ctx)
+            if ccy == "EUR":
+                progress.step("fx")
+            progress.step("factors")
+            frame = await self._model_frame(loaded, now, model, ctx, factor_set)
+            inputs = await self._with_world_benchmark(None, ctx, factor_set)
             inputs = await self._with_reference(inputs, ctx, loaded, now, model)
+            inputs = await self._with_us_factors(inputs, ctx, loaded, now, model, factor_set)
             inputs = await self._with_macro(inputs, ctx)
             inputs = await self._with_energy(inputs, ctx)
 
@@ -423,7 +468,7 @@ class ReportService:
                     frame,
                     model,
                     now=now,
-                    factors_downloaded_at=loaded.vintage.downloaded_at,
+                    factors_downloaded_at=_downloaded_at(loaded, frame, factor_set),
                     preset=preset,
                     start=start,
                     end=end,
@@ -432,6 +477,7 @@ class ReportService:
                     usd_rf=loaded.frame["RF"],
                     listings={t: code for t, (code, _) in listings.items()},
                     local_histories=histories,
+                    factor_set=factor_set,
                 )
 
             report = await self.runtime.run(build)
@@ -444,16 +490,35 @@ class ReportService:
             logger.info("Portfolio report refused: reason %s", to_api_exception(exc).code)
             raise
 
-    async def range_options(self, ticker: str) -> RangeOptions:
-        """Availability of every preset for an already validated ticker."""
+    async def range_options(
+        self,
+        ticker: str,
+        ccy: ReferenceCurrency = "USD",
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
+    ) -> RangeOptions:
+        """Availability of every preset for an already validated ticker, in ``ccy``, on the
+        dates of the factor set.
+
+        The EUR view counts the rows the EUR report would use: prices and factors are converted
+        first, so a rate series that starts after the prices shortens the history here too.
+        """
         now = self._now()
         loaded = await self._factors()
-        await self._security(ticker, now.date())
+        base = await self._set_frame(loaded, now, factor_set)
+        security = await self._security(ticker, now.date())
+        listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
-        key: RangesKey = (ticker, loaded.vintage, now.date())
+        key: RangesKey = (ticker, loaded.vintage, now.date(), factor_set, ccy)
 
         async def make() -> RangeOptions:
-            return await self.runtime.run(ranges.range_options, ticker, history, loaded.frame)
+            ctx = CurrencyContext(ccy, self.deps.currency)
+
+            def build() -> RangeOptions:
+                converted = self._to_reference(ticker, history, listing, scale, ctx)
+                frame = base if ccy == "USD" else ctx.factors(base)
+                return ranges.range_options(ticker, converted, frame)
+
+            return await self.runtime.run(build)
 
         return await self.ranges.get(key, make)
 
@@ -464,9 +529,10 @@ class ReportService:
         start: date | None = None,
         end: date | None = None,
         model: FactorModel = "ff5",
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> str:
         """The offline HTML report of the same (cached) report, from the unchanged renderer."""
-        report = await self.report(ticker, preset, start, end, model)
+        report = await self.report(ticker, preset, start, end, model, "USD", factor_set)
         return await self.runtime.run(render_report_html, report)
 
     # ------------------------------------------------------------------ layers
@@ -476,6 +542,18 @@ class ReportService:
         if now.utcoffset() is None:
             raise ValueError("the injected clock must return a timezone-aware time")
         return now.astimezone(UTC)
+
+    async def _factors_shown(self) -> LoadedFactors:
+        """``_factors()``; when it is slow, a progress stream shows the factor step meanwhile.
+
+        A fast load shows nothing, so a cached report still sends no step.
+        """
+        task = asyncio.ensure_future(self._factors())
+        task.add_done_callback(_retrieve)
+        done, _ = await asyncio.wait({task}, timeout=SLOW_FACTORS_SECONDS)
+        if not done:
+            progress.step("factors")
+        return await task
 
     async def _factors(self) -> LoadedFactors:
         loaded = await self.factors.get("factors", self._load_factors)
@@ -505,20 +583,22 @@ class ReportService:
         now: datetime,
         model: FactorModel,
         ctx: CurrencyContext | None = None,
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> pd.DataFrame:
         """The factor frame of a report, in the reference currency of ``ctx`` (default USD).
 
         The USD frame is the FF6 frame, or the FF5 one when FF5 cannot have it; the EUR frame is
         that frame converted once per vintage and day (``CurrencyContext.factors``).
         """
-        frame = await self._usd_model_frame(loaded, now, model)
+        frame = await self._usd_model_frame(loaded, now, model, factor_set)
         if ctx is None or ctx.ref == "USD":
             return frame
-        key: tuple[Vintage, date, ReferenceCurrency, bool] = (
+        key: tuple[Vintage, date, ReferenceCurrency, bool, FactorSet] = (
             loaded.vintage,
             now.date(),
             cast(ReferenceCurrency, ctx.ref),
             "Mom" in frame.columns,
+            factor_set,
         )
 
         async def make() -> pd.DataFrame:
@@ -529,13 +609,20 @@ class ReportService:
         return out
 
     async def _usd_model_frame(
-        self, loaded: LoadedFactors, now: datetime, model: FactorModel
+        self,
+        loaded: LoadedFactors,
+        now: datetime,
+        model: FactorModel,
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> pd.DataFrame:
         """The USD frame: the FF6 frame, or the FF5 one when FF5 cannot have it.
 
         FF6 needs ``AppDeps.load_ff6``; without it the request is refused, and a loader error is
         raised as is. FF5 uses the FF6 frame for the alpha strip when it loads, else the FF5 frame.
+        The Europe set has no FF5-only fallback: its frame is the Europe FF6 frame or an error.
         """
+        if factor_set != "us":
+            return await self._europe_frame(loaded, now)
         loader = self.deps.load_ff6
         if loader is None:
             if model == "ff6":
@@ -550,12 +637,39 @@ class ReportService:
             return await self.runtime.run(loader, now)
 
         try:
-            return await self.ff6.get((loaded.vintage, now.date()), make)
+            return await self.ff6.get((loaded.vintage, now.date(), "us"), make)
         except (FactorError, OSError):
             if model == "ff6":
                 raise
             logger.warning("Momentum factor unavailable; FF5 report without the alpha strip")
             return loaded.frame
+
+    async def _europe_frame(self, loaded: LoadedFactors, now: datetime) -> pd.DataFrame:
+        """The daily Developed Europe FF6 frame (USD), once per vintage and day.
+
+        Refused when ``AppDeps.load_europe_ff6`` is not wired; a loader error is raised as is.
+        """
+        loader = self.deps.load_europe_ff6
+        if loader is None:
+            raise ApiException(
+                "network",
+                "The Europe factor set is not available on this server.",
+                "Use the US factor set.",
+            )
+
+        async def make() -> pd.DataFrame:
+            return await self.runtime.run(loader, now)
+
+        return await self.ff6.get((loaded.vintage, now.date(), "europe"), make)
+
+    async def _set_frame(
+        self, loaded: LoadedFactors, now: datetime, factor_set: FactorSet
+    ) -> pd.DataFrame:
+        """The daily USD frame whose dates set the ranges and the coverage of a request: the
+        cached US five-factor frame, or the Europe FF6 frame."""
+        if factor_set == "us":
+            return loaded.frame
+        return await self._europe_frame(loaded, now)
 
     async def _section_inputs(self, vintage: Vintage, now: datetime) -> SectionInputs | None:
         """The extra data of the optional sections, once per vintage and day (None: not wired)."""
@@ -591,18 +705,27 @@ class ReportService:
         return security
 
     async def _with_world_benchmark(
-        self, inputs: SectionInputs | None, ctx: CurrencyContext
+        self,
+        inputs: SectionInputs | None,
+        ctx: CurrencyContext,
+        factor_set: FactorSet = DEFAULT_FACTOR_SET,
     ) -> SectionInputs | None:
         """``inputs`` plus the ACWI and IEUR histories, refreshed now (None: not wired).
 
         In the EUR view the two US-dollar histories are converted and the shrunk betas (they
-        need US factor portfolios) are left out."""
+        need US factor portfolios) are left out; they are also left out with the Europe factor
+        set, whose report says so in its notes."""
         import dataclasses
 
         loader = self.deps.load_world_benchmark
-        if ctx.ref != "USD" and inputs is not None and inputs.shrinkage_portfolios is not None:
+        if (
+            (ctx.ref != "USD" or factor_set != "us")
+            and inputs is not None
+            and inputs.shrinkage_portfolios is not None
+        ):
             inputs = dataclasses.replace(inputs, shrinkage_portfolios=None)
-            ctx.note("The shrunk-betas section is not available in EUR yet.")
+            if ctx.ref != "USD":
+                ctx.note("The shrunk-betas section is not available in EUR yet.")
         if loader is None:
             return inputs
 
@@ -661,9 +784,34 @@ class ReportService:
 
         from factordesk.section_hooks.context import ReferenceInput, SectionInputs
 
-        usd = await self._usd_model_frame(loaded, now, model)
+        usd = await self._usd_model_frame(loaded, now, model)  # always the US dollar rate
         reference = ReferenceInput(lambda dates: ctx.returns("USD", dates), usd["RF"])
         return dataclasses.replace(inputs or SectionInputs(), reference=reference)
+
+    async def _with_us_factors(
+        self,
+        inputs: SectionInputs | None,
+        ctx: CurrencyContext,
+        loaded: LoadedFactors,
+        now: datetime,
+        model: FactorModel,
+        factor_set: FactorSet,
+    ) -> SectionInputs | None:
+        """``inputs`` plus the US frame, when the factor set is not the US one.
+
+        The macro, energy and world beta sections keep their US inputs: they run on a second
+        analysis sample built on the frame the US set would give for this request (converted to
+        the reference currency exactly as the US report converts it). The US set is returned as
+        it is."""
+        if factor_set == "us":
+            return inputs
+        import dataclasses
+
+        from factordesk.section_hooks.context import SectionInputs, UsFactorsInput
+
+        frame = await self._model_frame(loaded, now, model, ctx, "us")
+        us = UsFactorsInput(frame, loaded.vintage.downloaded_at)
+        return dataclasses.replace(inputs or SectionInputs(), us_factors=us)
 
     async def _with_macro(
         self, inputs: SectionInputs | None, ctx: CurrencyContext
@@ -710,6 +858,23 @@ class ReportService:
             return history
 
         return await self.prices.get((ticker, today), make)
+
+
+def _downloaded_at(
+    loaded: LoadedFactors, frame: pd.DataFrame, factor_set: FactorSet
+) -> datetime | None:
+    """When the factor files of the set were downloaded: the US vintage's time, or for Europe
+    the time its five-factor file carries (``frame.attrs["ff5"]``, set by ``join_momentum``)."""
+    if factor_set == "us":
+        return loaded.vintage.downloaded_at
+    ff5 = cast("dict[str, object]", frame.attrs.get("ff5") or {})
+    raw = ff5.get("downloaded_at")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return _utc(datetime.fromisoformat(raw))
+    except ValueError:
+        return None
 
 
 def _day(moment: pd.Timestamp) -> str:

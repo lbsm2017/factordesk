@@ -19,14 +19,15 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from factordesk import progress
 from factordesk.analytics.currency import convert_series
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.analytics.subject import subject_from_monthly_returns
 from factordesk.api.currency_ctx import CurrencyContext
-from factordesk.api.errors import UPLOAD_REPORT_PATH, ApiException, to_api_exception
+from factordesk.api.errors import UPLOAD_PATHS, UPLOAD_REPORT_PATH, ApiException, to_api_exception
 from factordesk.api.runtime import Runtime, get_runtime
 from factordesk.data.factors import FactorError
-from factordesk.data.french import load_ff5_monthly, load_ff6
+from factordesk.data.french import DEFAULT_FACTOR_SET, FactorSet, load_ff5_monthly, load_ff6
 from factordesk.data.upload import (
     MAX_UPLOAD_BYTES,
     UploadError,
@@ -78,7 +79,8 @@ class UploadSizeLimit:
         self.limit = limit
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["method"] != "POST" or scope["path"] != UPLOAD_PATH:
+        is_upload = scope["type"] == "http" and scope["method"] == "POST"
+        if not is_upload or scope["path"] not in UPLOAD_PATHS:
             await self.app(scope, receive, send)
             return
         declared = dict(scope["headers"]).get(b"content-length")
@@ -127,20 +129,25 @@ def _downloaded_at(frame: pd.DataFrame) -> datetime | None:
     return stamp.replace(tzinfo=UTC) if stamp.utcoffset() is None else stamp.astimezone(UTC)
 
 
-def monthly_frame(model: FactorModel, runtime: Runtime, now: datetime) -> pd.DataFrame:
+def monthly_frame(
+    model: FactorModel,
+    runtime: Runtime,
+    now: datetime,
+    factor_set: FactorSet = DEFAULT_FACTOR_SET,
+) -> pd.DataFrame:
     """The monthly factor frame of an upload: FF6 (``load_ff6``) for both models.
 
     FF5 falls back to the FF5 file without the alpha strip when momentum cannot be loaded; FF6
-    raises the loader's error.
+    raises the loader's error. ``factor_set`` picks the US (default) or Developed Europe files.
     """
     data_dir = runtime.deps.data_dir
     try:
-        return load_ff6("monthly", data_dir=data_dir, now=now)
+        return load_ff6("monthly", data_dir=data_dir, now=now, factor_set=factor_set)
     except (FactorError, OSError):
         if model == "ff6":
             raise
         logger.warning("Monthly momentum factor unavailable; FF5 report without the alpha strip")
-        return load_ff5_monthly(data_dir=data_dir, now=now)
+        return load_ff5_monthly(data_dir=data_dir, now=now, factor_set=factor_set)
 
 
 def build_upload_report(
@@ -151,10 +158,12 @@ def build_upload_report(
     model: FactorModel = "ff5",
     record_currency: ReferenceCurrency = "USD",
     ccy: ReferenceCurrency = "USD",
+    factor_set: FactorSet = DEFAULT_FACTOR_SET,
 ) -> FactorReport:
     """Parse, validate and analyse an uploaded monthly record (blocking; run in a worker).
 
     The record is in ``record_currency`` and the report in ``ccy`` (month-end exchange rates).
+    ``factor_set`` is the regional factor set: US (default) or Europe.
 
     Logs the row count, the frequency, the seconds and, on a refusal, its reason category. It
     never logs the file's contents, its name or the display name.
@@ -163,7 +172,7 @@ def build_upload_report(
     rows = 0
     try:
         report, rows = _build_upload_report(
-            raw, name, gross_net, runtime, model, record_currency, ccy
+            raw, name, gross_net, runtime, model, record_currency, ccy, factor_set
         )
     except Exception as exc:
         category = to_api_exception(exc).code
@@ -204,15 +213,18 @@ def _build_upload_report(
     model: FactorModel,
     record_currency: ReferenceCurrency,
     ccy: ReferenceCurrency,
+    factor_set: FactorSet = DEFAULT_FACTOR_SET,
 ) -> tuple[FactorReport, int]:
     from factordesk.pipeline import assemble_subject_report
-    from factordesk.section_hooks.context import ReferenceInput, SectionInputs
+    from factordesk.section_hooks.context import ReferenceInput, SectionInputs, UsFactorsInput
 
     label = clean_name(name)
     try:
         flag = parse_gross_net(gross_net)
         returns = parse_monthly_csv(raw)
         ctx = CurrencyContext(ccy, runtime.deps.currency)
+        if "EUR" in (record_currency, ccy):
+            progress.step("fx")
         meta = {} if flag is None else {"gross_net": flag}
         subject = subject_from_monthly_returns(returns, label=label, currency=ccy, meta=meta)
         if record_currency != ccy:  # the checks above ran on the record as sent
@@ -230,13 +242,18 @@ def _build_upload_report(
             "month, no gaps (for example 2021-01-31,0.012).",
         ) from exc
     now = runtime.deps.now().astimezone(UTC)
-    frame = monthly_frame(model, runtime, now)
+    progress.step("factors")
+    frame = monthly_frame(model, runtime, now, factor_set)
     load_macro = runtime.deps.load_macro
     load_energy = runtime.deps.load_energy
     reference = None
+    # Macro, energy and world beta keep US inputs: with another factor set they read the US frame.
+    us_frame = frame if factor_set == "us" else monthly_frame(model, runtime, now, "us")
     if ccy == "EUR":
-        usd_rf = frame["RF"]  # the dollar risk-free rate, before the frame is converted
+        usd_rf = us_frame["RF"]  # the dollar risk-free rate, before the frame is converted
         frame = ctx.factors(frame)
+        if factor_set != "us":
+            us_frame = ctx.factors(us_frame)
         reference = ReferenceInput(lambda dates: ctx.returns("USD", dates), usd_rf)
     inputs = (
         None
@@ -245,6 +262,7 @@ def _build_upload_report(
             macro=None if load_macro is None else load_macro(),
             energy=None if load_energy is None else load_energy(),
             reference=reference,
+            us_factors=None if factor_set == "us" else UsFactorsInput(us_frame),
         )
     )
     try:
@@ -257,6 +275,7 @@ def _build_upload_report(
             section_inputs=inputs,
             reference_currency=ccy,
             currency=ctx.info() if ccy == "EUR" else None,
+            factor_set=factor_set,
         )
         return report, len(returns)
     except InsufficientHistoryError as exc:
@@ -286,6 +305,10 @@ async def upload_report(
     ccy: Annotated[
         ReferenceCurrency, Form(description="Reference currency of the report: USD or EUR.")
     ] = "USD",
+    factor_set: Annotated[
+        FactorSet,
+        Form(description="Regional Fama-French factor set: us (default) or europe."),
+    ] = "us",
 ) -> FactorReport:
     """The factor report of an uploaded monthly track record (kept in memory, never stored)."""
     runtime = get_runtime(request)
@@ -294,5 +317,5 @@ async def upload_report(
     if len(raw) > MAX_UPLOAD_BYTES:
         raise _too_large()
     return await runtime.run(
-        build_upload_report, raw, name, gross_net, runtime, model, record_currency, ccy
+        build_upload_report, raw, name, gross_net, runtime, model, record_currency, ccy, factor_set
     )

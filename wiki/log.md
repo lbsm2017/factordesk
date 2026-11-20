@@ -6,6 +6,16 @@ Newest first. This log records changes to the knowledge base (the `wiki/` folder
 
 - May sample reports built from Yahoo data be committed to the public repository? Not yet decided (2026-11-18).
 - The README has a stale status line and no not-affiliated note. The owner plans to rewrite the README later (2026-11-18).
+- Should the euro view's dollar term use a lead? A lead is a negative shift that the no look-ahead rule forbids; options are keep the rule, allow a labelled lead, or use a fixing nearer the US close. Owner decision pending (2026-11-20, [spike](../docs/research/dollar-lag-lead-spike.md)).
+- Does the owner accept the re-run error banner that keeps the old report on screen? The coordinator accepted it on 2026-11-20 and flagged it for the demo; it reverses the earlier rule ([Factor it progress](decision-factor-it-progress.md)).
+
+## 2026-11-20 (Sprint 4 wiki, S4-9)
+
+- New page [A Europe factor set next to the US one](decision-europe-factor-set.md): the Developed Europe files, the user picks the set, design decision 4 (macro, energy and world beta keep the US factors, fixed in commit 9474d2e), and the validation numbers including the VGK daily result.
+- New page [Factor it shows real progress](decision-factor-it-progress.md): server-sent progress steps (PR #40), the placeholder page and re-run states (PR #46), and the re-run error banner that reverses the old rule.
+- Dated update on [USD or EUR reference currency](decision-reference-currency.md): ranges honour the currency (PR #36), CHF cash on SARON (PR #44), and the dollar lead finding (PR #41). The line "CHF cash on SARON is not in scope" is marked superseded.
+- Dated update on [Factor models and macro](decision-factor-models-and-macro.md): the lag or lead spike, design decision 4, and the TTF data check (PR #42).
+- Index: two new pages under Data and Product and design.
 
 ## 2026-11-20 (Energy & carbon section)
 
