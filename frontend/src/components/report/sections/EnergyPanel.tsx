@@ -12,7 +12,7 @@ export const TITLE = "Energy & carbon";
 export const QUESTION = "How has the return moved with oil, gas and carbon prices, after the market?";
 /** One line above the tables; the method detail is in "How this is computed". */
 export const INTRO =
-  "Sensitivities to oil, gas and carbon prices, with the market taken out. They describe how the return moved together with each price, not what comes next.";
+  "Each number describes how the return moved together with that price, not what comes next.";
 /** Two-sided 95% normal quantile, for the line beta ± 1.96 · SE. */
 const Z95 = 1.96;
 /** A variance inflation factor above this gets the caution style (the bar of the main regression). */
@@ -58,17 +58,6 @@ export function sentence(row: Pick<EnergyRow, "code" | "beta" | "tag">, subject:
   return row.tag === "reliable" ? `${base}.` : `${base}. The link is too weak to rely on.`;
 }
 
-function domainOf(model: EnergyModel): NiceDomain {
-  const values = [0];
-  const parts = [...model.rows.filter((r) => r.code !== "mkt_rf"), model.gas_robust];
-  for (const row of parts) {
-    if (finite(row.beta)) values.push(row.beta);
-    const w = whisker(row);
-    if (w) values.push(w.low, w.high);
-  }
-  return niceDomain(Math.min(...values), Math.max(...values), 3);
-}
-
 function tickText(t: number, ticks: readonly number[]): string {
   return tickLabel(t, ticks, 2);
 }
@@ -80,10 +69,6 @@ function betaText(x: number): string {
 
 function wordFor(s: EnergySection): string {
   return s.frequency === "monthly" ? "months" : "days";
-}
-
-function robustLabel(s: EnergySection, model: EnergyModel): string {
-  return `Natural gas without the ${model.gas_robust.n_excluded} largest ${wordFor(s)}`;
 }
 
 function textOf(label: string, row: { beta: number; se: number }): string {
@@ -133,7 +118,7 @@ function how(s: EnergySection, rows: string): string {
   return [
     s.model_note,
     `Each model is fitted by least squares on the same ${rows} for every leg, with Newey-West standard errors (${first?.hac_lags ?? 0} lags); ${reference}. No lagged terms are used: tests on oil, gas and carbon found none that matter.`,
-    "The dot is the sensitivity and the line is its approximate 95% range. All rows of a model share one scale, with a line at zero. The market row is a control and has no chart.",
+    "The dot is the sensitivity and the line is its approximate 95% range, all on one scale with a line at zero. Oil and gas come from the first model; carbon comes from the second, shorter model, which also controls for oil and gas. The market is a control in both and has no row.",
     `Legs: ${Array.from(defs.values()).join("; ")}.`,
     s.gas_note,
     ...models.map(modelHow),
@@ -174,76 +159,101 @@ function Plot({ label, row, domain }: { label: string; row: { beta: number; se: 
   );
 }
 
-function Vif({ row }: { row: Pick<EnergyRow, "vif"> }) {
-  return (
-    <span
-      className={overlaps(row) ? "en-vif warn" : "en-vif"}
-      title={`Variance inflation factor ${num(row.vif, 2)}: how much this leg overlaps with the other legs. Above ${VIF_WARN} means its sensitivity is imprecise.`}
-    >
-      {num(row.vif, 2)}
-    </span>
-  );
-}
-
-interface LineProps {
+/** One row of the table: a leg of the long model, or the carbon leg of the carbon model. */
+interface Leg {
+  code: EnergyRow["code"];
   label: string;
-  note?: string | null;
+  note: string | null;
   title: string;
   beta: number;
   se: number;
   t: number;
-  domain: NiceDomain;
-  chart: boolean;
-  vif?: number;
-  variant?: string;
+  tag: EnergyRow["tag"];
+  vif: number;
 }
 
-function Line({ label, note, title, beta, se, t, domain, chart, vif, variant }: LineProps) {
+/**
+ * The legs shown in the table: oil and gas from the long model, and carbon from the carbon model.
+ * The market is a control in both models and gets no row; the full numbers of each model are in
+ * "How this is computed".
+ */
+export function legsOf(s: EnergySection): Leg[] {
+  const leg = (r: EnergyRow, note: string | null): Leg => ({
+    code: r.code,
+    label: r.label,
+    note,
+    title: `${r.definition}${r.note ? `; ${r.note}` : ""}`,
+    beta: r.beta,
+    se: r.se,
+    t: r.t,
+    tag: r.tag,
+    vif: r.vif,
+  });
+  const legs = (s.long_model?.rows ?? []).filter((r) => r.code !== "mkt_rf").map((r) => leg(r, null));
+  const co2 = s.carbon_model?.rows.find((r) => r.code === "co2");
+  if (s.carbon_model && co2) legs.push(leg(co2, s.carbon_model.label ?? co2.note));
+  return legs;
+}
+
+function domainOfLegs(legs: readonly Leg[]): NiceDomain {
+  const values = [0];
+  for (const row of legs) {
+    if (finite(row.beta)) values.push(row.beta);
+    const w = whisker(row);
+    if (w) values.push(w.low, w.high);
+  }
+  return niceDomain(Math.min(...values), Math.max(...values), 3);
+}
+
+/** "Natural gas and carbon credits (KRBN): no link strong enough to rely on." Null when every leg is reliable. */
+export function weakLine(legs: readonly Pick<Leg, "code" | "tag">[]): string | null {
+  const names = legs.filter((l) => l.tag !== "reliable").map((l) => NOUNS[l.code] ?? l.code);
+  if (names.length === 0) return null;
+  const list = names.length === 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)}: no link strong enough to rely on, after the market.`;
+}
+
+function Line({ leg, domain }: { leg: Leg; domain: NiceDomain }) {
+  const { label, note, title, beta, se, t } = leg;
   return (
-    <tr className={variant}>
+    <tr data-leg={leg.code}>
       <th scope="row" title={title}>
         <span className="en-label">{label}</span>
         {note ? <span className="en-note">{note}</span> : null}
       </th>
       <td className="num">{finite(beta) ? betaText(beta) : "n/a"}</td>
       <td className="en-plot">
-        {chart ? (
-          <>
-            <Plot label={label} row={{ beta, se }} domain={domain} />
-            <span className="vh">{textOf(label, { beta, se })}</span>
-          </>
-        ) : (
-          <span className="en-control">controlled for</span>
-        )}
+        <Plot label={label} row={{ beta, se }} domain={domain} />
+        <span className="vh">{textOf(label, { beta, se })}</span>
       </td>
       <td className="num">{finite(t) ? tstat(t) : "n/a"}</td>
-      <td className="num en-vif-cell">{vif !== undefined ? <Vif row={{ vif }} /> : null}</td>
     </tr>
   );
 }
 
-function Model({ s, model, subject, rows }: { s: EnergySection; model: EnergyModel; subject: string; rows: string }) {
-  const domain = domainOf(model);
-  const says = model.rows.map((r) => sentence(r, subject)).filter((x): x is string => x !== null);
-  const gas = model.gas_robust;
-  const gasRow = model.rows.find((r) => r.code === "gas");
+function Legs({ s, subject, rows }: { s: EnergySection; subject: string; rows: string }) {
+  const legs = legsOf(s);
+  const domain = domainOfLegs(legs);
+  const says = legs.filter((l) => l.tag === "reliable").map((l) => sentence(l, subject)).filter((x): x is string => x !== null);
+  const gas = s.long_model?.gas_robust;
+  const gasLeg = legs.find((l) => l.code === "gas");
+  if (gas && gasLeg?.tag === "reliable") {
+    says.push(`Without the ${gas.n_excluded} largest gas ${wordFor(s)}, the same rise in gas goes with a ${pct(moveFor("gas", gas.beta), 1)} move.`);
+  }
+  const weak = weakLine(legs);
+  if (weak) says.push(weak);
+  const crowded = legs.filter(overlaps);
+  const limited = s.long_model?.window_limited_by;
   return (
-    <div className="en-model" data-model={model.key}>
-      <div className="en-model-head">
-        <h3>{model.title}</h3>
-        {model.label ? <span className="en-tag">{model.label}</span> : null}
-        <span className="en-span">
-          {dateShort(model.start)} to {dateShort(model.end)}
-        </span>
-      </div>
+    <div className="en-model">
       <div className="en-wrap">
         <table className="en-table">
           <caption className="vh">
-            Sensitivity of the return to each leg with an approximate 95% range, its t-statistic and its overlap with the other legs, {model.title}, on {rows}
+            Sensitivity of the return to oil, gas and carbon after the market, with an approximate 95% range and its t-statistic, on {rows}
           </caption>
           <thead>
             <tr>
-              <th scope="col">Leg</th>
+              <th scope="col">Price</th>
               <th scope="col" className="num">
                 Sensitivity
               </th>
@@ -253,44 +263,12 @@ function Model({ s, model, subject, rows }: { s: EnergySection; model: EnergyMod
               <th scope="col" className="num">
                 t
               </th>
-              <th scope="col" className="num">
-                <abbr title="Variance inflation factor: how much a leg overlaps with the other legs. 1 means none.">VIF</abbr>
-              </th>
             </tr>
           </thead>
           <tbody>
-            {model.rows.flatMap((r) => {
-              const title = `${r.definition}${r.note ? `; ${r.note}` : ""}`;
-              const main = (
-                <Line
-                  key={r.code}
-                  label={r.label}
-                  note={r.code === "gas" && s.frequency === "daily" ? `${r.note ?? "fat-tailed"}; daily figures are descriptive` : r.note}
-                  title={title}
-                  beta={r.beta}
-                  se={r.se}
-                  t={r.t}
-                  domain={domain}
-                  chart={r.code !== "mkt_rf"}
-                  vif={r.vif}
-                />
-              );
-              if (r.code !== "gas") return [main];
-              return [
-                main,
-                <Line
-                  key="gas-robust"
-                  label={robustLabel(s, model)}
-                  title={`The same model fitted again without the ${gas.n_excluded} rows with the largest absolute gas change`}
-                  beta={gas.beta}
-                  se={gas.se}
-                  t={gas.t}
-                  domain={domain}
-                  chart
-                  variant="en-robust"
-                />,
-              ];
-            })}
+            {legs.map((l) => (
+              <Line key={l.code} leg={l} domain={domain} />
+            ))}
           </tbody>
           <tfoot aria-hidden="true">
             <tr>
@@ -306,7 +284,6 @@ function Model({ s, model, subject, rows }: { s: EnergySection; model: EnergyMod
                 </div>
               </td>
               <td />
-              <td />
             </tr>
           </tfoot>
         </table>
@@ -315,15 +292,16 @@ function Model({ s, model, subject, rows }: { s: EnergySection; model: EnergyMod
         {says.map((line) => (
           <li key={line}>{line}</li>
         ))}
-        {gasRow ? (
-          <li>
-            {`Without the ${gas.n_excluded} largest gas ${wordFor(s)}, the same rise in gas goes with a ${pct(moveFor("gas", gas.beta), 1)} move.`}
-          </li>
-        ) : null}
       </ul>
-      {model.window_limited_by ? (
+      {crowded.length > 0 ? (
+        <p className="en-limit en-overlap">
+          {crowded.map((l) => l.label).join(" and ")} overlap{crowded.length === 1 ? "s" : ""} with the other prices
+          (variance inflation factor above {VIF_WARN}), so the sensitivity is imprecise.
+        </p>
+      ) : null}
+      {limited && s.long_model ? (
         <p className="en-limit">
-          The window starts when {model.window_limited_by} begins ({dateLong(model.start)}).
+          The window starts when {limited} begins ({dateLong(s.long_model.start)}).
         </p>
       ) : null}
     </div>
@@ -332,12 +310,13 @@ function Model({ s, model, subject, rows }: { s: EnergySection; model: EnergyMod
 
 /**
  * Panel of the `energy` section (S3-8): how the return moved with oil, gas and carbon prices after
- * the market. One table per model (market, oil and gas; and, on a short sample, market, oil, gas and
- * carbon), with the sensitivity, a dot and an approximate 95% range on one scale, the t-statistic,
- * the VIF of every leg, the gas sensitivity again without the five largest gas moves, and
- * plain-words sentences. Registered in `panelRegistry.ts` at position 509, right after Macro
- * sensitivities. Renders nothing when the section is absent; a section that could not be computed
- * shows its reason (for example FRED being down) and nothing else.
+ * the market. One table with one row per price: oil and gas from the long model, carbon from the
+ * short carbon model. Each row has the sensitivity, a dot and an approximate 95% range on one scale,
+ * and the t-statistic. Plain-words sentences for the reliable legs and one line for the weak ones.
+ * The market rows, the VIFs and the gas fit without the largest moves are in "How this is computed";
+ * an overlap above the VIF bar gets a caution line. Registered in `panelRegistry.ts` at position 509,
+ * right after Macro sensitivities. Renders nothing when the section is absent; a section that could
+ * not be computed shows its reason (for example FRED being down) and nothing else.
  */
 export function EnergyPanel({ report }: ReportPanelProps) {
   const s: FactorReport["energy"] = report.energy;
@@ -369,8 +348,7 @@ export function EnergyPanel({ report }: ReportPanelProps) {
       footnote={s.gas_note}
       how={how(s, rows)}
     >
-      <Model s={s} model={s.long_model} subject={subject} rows={rows} />
-      {s.carbon_model ? <Model s={s} model={s.carbon_model} subject={subject} rows={observations(report, s.carbon_model.n_obs)} /> : null}
+      <Legs s={s} subject={subject} rows={rows} />
       {s.fred_note ? <p className="en-carbon-note en-fred-note">{s.fred_note}</p> : null}
       {s.carbon_model == null && s.carbon_note ? <p className="en-carbon-note">{s.carbon_note}</p> : null}
     </Panel>
