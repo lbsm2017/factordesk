@@ -48,13 +48,16 @@ describe("control boundaries on the rail and on light surfaces (WCAG 1.4.11)", (
   const root = ruleBody(tokens, ":root {");
   const t = (name: string) => hex(name, root);
 
-  it("draws rail fields as white boxes and the range track in --rail-track, both 3:1 on the navy", () => {
-    expect(ruleBody(controls, '.controls input[type="text"], .controls input[type="date"]')).toMatch(
-      /border:\s*1px solid var\(--surface\)/,
-    );
-    expect(contrast(t("--surface"), t("--rail"))).toBeGreaterThanOrEqual(3);
+  it("draws rail fields and the range track with edges at least 3:1 on the navy, in light and dark", () => {
+    const field = ruleBody(controls, '.controls input[type="text"], .controls input[type="date"]');
+    expect(field).toMatch(/border:\s*1px solid var\(--rail-field-line\)/);
     expect(ruleBody(controls, ".seg-range {")).toMatch(/border:\s*1px solid var\(--rail-track\)/);
-    expect(contrast(t("--rail-track"), t("--rail"))).toBeGreaterThanOrEqual(3);
+    const dark = ruleBody(tokens, ':root[data-theme="dark"]');
+    for (const [theme, block] of [["light", root], ["dark", dark]] as const) {
+      const v = (name: string) => hex(name, block);
+      expect(contrast(v("--rail-field-line"), v("--rail")), `${theme} field edge`).toBeGreaterThanOrEqual(3);
+      expect(contrast(v("--rail-track"), v("--rail")), `${theme} range track`).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it("marks the chosen preset in cyan with navy text, and cyan only appears on the rail", () => {

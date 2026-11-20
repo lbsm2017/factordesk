@@ -518,6 +518,7 @@ _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
     "subject",
     "currency",
     "model",
+    "factor_set",
     "alpha_strip",
     "portfolio_backtest",
     "holdings",
@@ -528,8 +529,8 @@ _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
 
 
 def _subject_not_required(schema: JsonDict) -> None:
-    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest``, ``holdings``, ``macro`` and
-    ``energy`` are left out of the JSON when ``None``, so they are never required."""
+    """The fields of ``_OMITTED_WHEN_DEFAULT`` are left out of the JSON when ``None``, so they are
+    never required."""
     required = schema.get("required")
     if isinstance(required, list):
         schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
@@ -575,6 +576,13 @@ class FactorReport(FrozenModel):
         exclude_if=lambda value: value is None,
         description="Factor model of the regression when it is not FF5: ff6 = FF5 + momentum "
         "(Mom). Absent (not null) for an FF5 report.",
+    )
+    factor_set: Literal["europe"] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Regional factor set of the regression when it is not the US one: europe = "
+        "the Ken French Developed Europe factors (in US dollars). Absent (not null) for a "
+        "report on the US factors.",
     )
     currency: CurrencyInfo | None = Field(
         default=None,
