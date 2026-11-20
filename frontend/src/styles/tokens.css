@@ -1,6 +1,11 @@
 /* Design tokens of dashboard v2 (prototype v4a, owner approval 2026-11-19; README-v4 and
-   docs/design/report-design.md rev 3). Light only: there is no dark set and the OS setting is
-   ignored. The only file that may contain colour literals.
+   docs/design/report-design.md rev 3). Light is the base set; a dark set of every colour token follows
+   it. The only file that may contain colour literals.
+
+   Theme: `<html data-theme="light|dark">` is the user's choice. Without the attribute the dark set
+   follows `prefers-color-scheme`. Print is always light. The two dark blocks hold the same
+   declarations (a test checks it). Dark keeps the meaning of every colour (positive, negative,
+   caution, accent) with lighter shades: text 4.5:1 and chart lines and controls 3:1 (a test checks it).
 
    Shape rule: panels and the analysis bar 8 px | inputs, buttons, nav items, segmented control
    and type badge 6 px | segmented inner items 4 px | chart marks 2 px | switch track and thumb
@@ -50,6 +55,10 @@
   --rail-cyan: #3CC8E8;
   --rail-cyan-hover: #6FD8F0;
   --scrim: rgb(8 12 26 / 0.5);
+  /* text fields on the rail */
+  --rail-field: #FFFFFF;
+  --rail-field-text: #141A33;
+  --rail-field-line: #FFFFFF;
   /* factor identity, in the factor charts only */
   --f1: #0E1430; /* Mkt-RF */
   --f2: #066E33; /* SMB */
@@ -108,6 +117,137 @@
   --label-w: 176px;
   --num-w: 92px;
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 150ms;
+  --dur: 200ms;
+  --stagger: 60ms;
+}
+
+/* dark, chosen with the switch. Screen only: print stays light. */
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    /* surfaces */
+    --page: #0D1221;
+    --surface: #151B2E;
+    --soft: #1A2138;
+    --sunk: #0F1527;
+    --line: #2B3554;
+    --grid: #232C47;
+    --rule: #E8ECF7;
+    --control-line: #8089A8;
+    --axis: #8A94B2;
+    --mark-ns: #3E4868;
+    /* text */
+    --ink: #E8ECF7;
+    --ink-2: #B4BDD6;
+    --ink-3: #9BA5C2;
+    /* accent: the cyan of the rail, lit for dark surfaces */
+    --accent: #3CC8E8;
+    --accent-hover: #6FD8F0;
+    --accent-50: #12303B;
+    --on-accent: #0A1020;
+    --selection: #1D4D5B;
+    /* sign and evidence */
+    --pos: #3FCBA6;
+    --neg: #FF7D8F;
+    --neg-50: #3A1B27;
+    --pos-t: #1F6254;
+    --neg-t: #75313F;
+    --caution: #E8B24B;
+    --caution-50: #3A2E12;
+    /* navy rail, one step deeper than the page */
+    --rail: #080C1A;
+    --rail-text: #FFFFFF;
+    --rail-2: #A9B3D1;
+    --rail-hover: #161D3A;
+    --rail-line: #252E52;
+    --rail-track: #6B759A;
+    --rail-cyan: #3CC8E8;
+    --rail-cyan-hover: #6FD8F0;
+    --scrim: rgb(0 0 0 / 0.6);
+    --rail-field: #1B2342;
+    --rail-field-text: #F2F5FC;
+    --rail-field-line: #6B759A;
+    /* factor identity */
+    --f1: #DCE2F4; /* Mkt-RF */
+    --f2: #4CC47C; /* SMB */
+    --f3: #F08AB2; /* HML */
+    --f4: #4DB9E3; /* RMW */
+    --f5: #D8C14B; /* CMA */
+    --f6: #AB8DF2; /* Mom (FF6) */
+    /* asset-class identity */
+    --ac-equities: #7096EA;
+    --ac-fixed: #3FC0AA;
+    --ac-alts: #B88BDE;
+    --ac-real: #EA8650;
+    --ac-comm: #D6A33C;
+    --ac-cash: #909DBA;
+    --ac-other: #B38F7B;
+  }
+}
+
+/* dark, no choice made: follows the system. Screen only too. */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    /* surfaces */
+    --page: #0D1221;
+    --surface: #151B2E;
+    --soft: #1A2138;
+    --sunk: #0F1527;
+    --line: #2B3554;
+    --grid: #232C47;
+    --rule: #E8ECF7;
+    --control-line: #8089A8;
+    --axis: #8A94B2;
+    --mark-ns: #3E4868;
+    /* text */
+    --ink: #E8ECF7;
+    --ink-2: #B4BDD6;
+    --ink-3: #9BA5C2;
+    /* accent: the cyan of the rail, lit for dark surfaces */
+    --accent: #3CC8E8;
+    --accent-hover: #6FD8F0;
+    --accent-50: #12303B;
+    --on-accent: #0A1020;
+    --selection: #1D4D5B;
+    /* sign and evidence */
+    --pos: #3FCBA6;
+    --neg: #FF7D8F;
+    --neg-50: #3A1B27;
+    --pos-t: #1F6254;
+    --neg-t: #75313F;
+    --caution: #E8B24B;
+    --caution-50: #3A2E12;
+    /* navy rail, one step deeper than the page */
+    --rail: #080C1A;
+    --rail-text: #FFFFFF;
+    --rail-2: #A9B3D1;
+    --rail-hover: #161D3A;
+    --rail-line: #252E52;
+    --rail-track: #6B759A;
+    --rail-cyan: #3CC8E8;
+    --rail-cyan-hover: #6FD8F0;
+    --scrim: rgb(0 0 0 / 0.6);
+    --rail-field: #1B2342;
+    --rail-field-text: #F2F5FC;
+    --rail-field-line: #6B759A;
+    /* factor identity */
+    --f1: #DCE2F4; /* Mkt-RF */
+    --f2: #4CC47C; /* SMB */
+    --f3: #F08AB2; /* HML */
+    --f4: #4DB9E3; /* RMW */
+    --f5: #D8C14B; /* CMA */
+    --f6: #AB8DF2; /* Mom (FF6) */
+    /* asset-class identity */
+    --ac-equities: #7096EA;
+    --ac-fixed: #3FC0AA;
+    --ac-alts: #B88BDE;
+    --ac-real: #EA8650;
+    --ac-comm: #D6A33C;
+    --ac-cash: #909DBA;
+    --ac-other: #B38F7B;
+  }
 }
 
 @media (max-width: 899px) {

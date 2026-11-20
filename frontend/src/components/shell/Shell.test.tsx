@@ -148,8 +148,10 @@ describe("drawer (under 900 px)", () => {
     page();
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     const close = screen.getByRole("button", { name: "Close menu" });
-    const links = screen.getAllByRole("link").filter((a) => a.closest("#sidebar"));
-    const last = links[links.length - 1] as HTMLElement;
+    // The theme switch in the sidebar footer comes after the section links, so it is the last stop.
+    const stops = [...(document.querySelector("#sidebar") as HTMLElement).querySelectorAll<HTMLElement>("a[href], button, input")];
+    const last = stops[stops.length - 1] as HTMLElement;
+    expect(last.closest(".side-foot")).not.toBeNull();
     last.focus();
     fireEvent.keyDown(document, { key: "Tab" });
     expect(document.activeElement).toBe(close);

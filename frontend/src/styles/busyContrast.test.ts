@@ -27,10 +27,12 @@ function token(marker: string, name: string): string {
   return m?.[1] as string;
 }
 
-describe("busy placeholder on the page background (review S4)", () => {
+describe("placeholder bars on the page background (review S4)", () => {
   it("fills with --border, not --grid", () => {
-    const rule = /\[aria-busy="true"\] \.ticker[^{]*\{([^}]*)\}/.exec(frame);
+    const rule = /\.ph-ghost\s*\{([^}]*)\}/.exec(frame);
     expect(rule?.[1]).toMatch(/background:\s*var\(--border\)/);
+    const facts = /\.ph-head \.abar dd\s*\{([^}]*)\}/.exec(frame);
+    expect(facts?.[1]).toMatch(/background:\s*var\(--border\)/);
   });
 
   it.each([["--page"], ["--surface"]])("is more visible than --grid against %s", (ground) => {
