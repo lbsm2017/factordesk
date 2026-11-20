@@ -35,6 +35,7 @@ from factordesk.api.portfolio_models import (
     PortfolioTree,
     load_library,
 )
+from factordesk.data.french import DEFAULT_FACTOR_SET, FactorSet
 from factordesk.data.prices import (
     BatchPriceProvider,
     PriceDataError,
@@ -624,6 +625,7 @@ def build_portfolio_report(
     usd_rf: pd.Series | None = None,
     listings: Mapping[str, str] | None = None,
     local_histories: dict[str, PriceHistory] | None = None,
+    factor_set: FactorSet = DEFAULT_FACTOR_SET,
 ) -> FactorReport:
     """Backtest the plan and analyse the net daily returns (blocking; run in a worker).
 
@@ -632,7 +634,10 @@ def build_portfolio_report(
     of ``ctx`` (None: USD). In the EUR view ``usd_rf`` is the original US risk-free rate: USD
     cash earns it, converted to euros, and a hedged line swaps it for the euro cash return.
     ``listings`` gives each ticker's quote currency (default USD). ``local_histories`` are the
-    histories before conversion: a hedged line is hedged on its local return.
+    histories before conversion: a hedged line is hedged on its local return. ``factor_set`` is
+    the regional factor set of ``factor_frame``; with a set other than the US one, USD cash
+    earns ``usd_rf`` (the US daily rate on the US calendar) in both currencies, because the set's
+    own calendar may skip US trading days.
     """
     from factordesk.pipeline import assemble_subject_report
 
@@ -641,7 +646,10 @@ def build_portfolio_report(
     eur = ctx is not None and ctx.ref == "EUR"
     if eur and usd_rf is None:
         raise ValueError("the EUR view needs the US risk-free rate (usd_rf) for USD cash")
-    rf = usd_rf if eur and usd_rf is not None else factor_frame[RF_COLUMN]
+    if factor_set != "us" and usd_rf is None:
+        raise ValueError("a factor set other than US needs the US risk-free rate (usd_rf)")
+    own = eur or factor_set != "us"
+    rf = usd_rf if own and usd_rf is not None else factor_frame[RF_COLUMN]
     subject, summary = backtest_portfolio(plan, histories, rf, ctx, listings, local_histories)
     if ctx is not None and eur:
         _note_hedges(plan, ctx, listings or {})
@@ -664,6 +672,7 @@ def build_portfolio_report(
             section_inputs=section_inputs,
             reference_currency="EUR" if eur else "USD",
             currency=ctx.info() if ctx is not None and eur else None,
+            factor_set=factor_set,
         )
     except InsufficientHistoryError as exc:
         raise to_api_exception(exc, subject.label) from exc

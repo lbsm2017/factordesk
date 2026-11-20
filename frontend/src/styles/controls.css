@@ -27,6 +27,14 @@
 .controls .btn { background: var(--rail-cyan); border-color: var(--rail-cyan); color: var(--rail); }
 .controls .btn:hover { background: var(--rail-cyan-hover); border-color: var(--rail-cyan-hover); }
 .controls .btn:focus-visible { outline: 2px solid var(--rail-cyan); outline-offset: 2px; }
+/* Busy "Factor it": it keeps focus (aria-disabled, not disabled); a line along its bottom edge fills as steps finish. */
+.controls .btn[aria-disabled="true"],
+.controls .btn[aria-disabled="true"]:hover {
+  position: relative; overflow: hidden; background: var(--rail-hover); border-color: var(--rail-track); color: var(--rail-text); cursor: progress;
+}
+.btn-prog { position: absolute; inset: auto 0 0 0; height: 3px; background: var(--rail-line); }
+.btn-prog i { display: block; height: 100%; width: var(--p, 0%); background: var(--rail-cyan); transition: width var(--dur) var(--ease); }
+@media (prefers-reduced-motion: reduce) { .btn-prog i { transition: none; } }
 
 .ctl-list {
   position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: 220px;

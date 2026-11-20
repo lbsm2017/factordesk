@@ -518,6 +518,7 @@ _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
     "subject",
     "currency",
     "model",
+    "factor_set",
     "alpha_strip",
     "portfolio_backtest",
     "holdings",
@@ -528,8 +529,8 @@ _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
 
 
 def _subject_not_required(schema: JsonDict) -> None:
-    """``subject``, ``model``, ``alpha_strip``, ``portfolio_backtest``, ``holdings``, ``macro`` and
-    ``energy`` are left out of the JSON when ``None``, so they are never required."""
+    """The fields of ``_OMITTED_WHEN_DEFAULT`` are left out of the JSON when ``None``, so they are
+    never required."""
     required = schema.get("required")
     if isinstance(required, list):
         schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
@@ -573,6 +574,13 @@ class FactorReport(FrozenModel):
         exclude_if=lambda value: value is None,
         description="Factor model of the regression when it is not FF5: ff6 = FF5 + momentum "
         "(Mom). Absent (not null) for an FF5 report.",
+    )
+    factor_set: Literal["europe"] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Regional factor set of the regression when it is not the US one: europe = "
+        "the Ken French Developed Europe factors (in US dollars). Absent (not null) for a "
+        "report on the US factors.",
     )
     currency: CurrencyInfo | None = Field(
         default=None,
@@ -799,6 +807,26 @@ class ApiError(FrozenModel):
     code: ErrorCode
     message: str
     action: str
+
+
+ProgressStepId = Literal["prices", "fx", "factors", "models", "sections"]
+"""The steps of a report run, in order (``fx`` only for a EUR run)."""
+
+
+class ProgressStep(FrozenModel):
+    """Data of an ``event: step`` of a ``.../stream`` endpoint: a step the run has reached."""
+
+    step: ProgressStepId
+    label: str
+    index: int = Field(ge=1, description="Position of the step in this run, from 1.")
+    total: int = Field(ge=1, description="Number of steps in this run.")
+
+
+class ApiErrorEvent(ApiError):
+    """Data of an ``event: error`` of a ``.../stream`` endpoint: the ``ApiError`` plus the HTTP
+    status the plain endpoint would answer."""
+
+    status: int
 
 
 STATISTIC_MODELS: tuple[type[StatisticModel], ...] = (

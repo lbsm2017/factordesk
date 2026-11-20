@@ -2,10 +2,16 @@
 
 Each file is described by a ``FrenchDataset`` entry in ``DATASETS`` (zip name, frequency, the
 exact column header, row floor and plausibility bounds), so a new factor file is one entry, not
-new code. Today: the Fama-French five factors, monthly, and the momentum factor (``Mom``), daily
-and monthly. The daily five-factor file keeps its own loader (``data.factors.load_ff5_daily``),
+new code. Today: the US Fama-French five factors, monthly, and the US momentum factor (``Mom``),
+daily and monthly; and the Developed Europe five factors and momentum (``Europe_*`` files), daily
+and monthly. The daily US five-factor file keeps its own loader (``data.factors.load_ff5_daily``),
 which this module does not change. ``load_ff6`` joins ``Mom`` to the five factors of either
-frequency (``join_momentum``).
+frequency (``join_momentum``), for the factor set ``"us"`` (default) or ``"europe"``.
+
+The Europe files are published in USD, and their ``RF`` is the US one-month T-bill rate. They are
+read as published: ``analytics.currency`` converts them to EUR like any other factor frame. Their
+preamble names the "Bloomberg database" (the US files name "CRSP"), and their momentum column is
+called ``WML`` (winners minus losers), which is read as ``Mom``.
 
 File layout (all factor files of the library share it): a free-text preamble; a header line that
 starts with a comma (``,Mkt-RF,SMB,HML,RMW,CMA,RF``); one block of data rows whose first field is
@@ -63,6 +69,10 @@ from factordesk.data.factors import (
 logger = logging.getLogger(__name__)
 
 Frequency = Literal["daily", "monthly"]
+FactorSet = Literal["us", "europe"]
+"""Which regional Fama-French factor set a report is built on."""
+FACTOR_SETS: tuple[FactorSet, ...] = ("us", "europe")
+DEFAULT_FACTOR_SET: FactorSet = "us"
 
 BASE_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
 SENTINELS: tuple[float, ...] = (-99.99, -999.0)
@@ -79,7 +89,7 @@ _ROW_PATTERN: dict[Frequency, re.Pattern[str]] = {
     "monthly": re.compile(r"^\s*\d{6}\s*,"),
 }
 _DATE_FORMAT: dict[Frequency, str] = {"daily": "%Y%m%d", "monthly": "%Y%m"}
-_STAMP = re.compile(r"\b(\d{6})\s+CRSP\s+database", re.IGNORECASE)
+_STAMP = re.compile(r"\b(\d{6})\s+(CRSP|Bloomberg)\s+database", re.IGNORECASE)
 _USER_AGENT = "factordesk-factor-loader/0.1"
 
 
@@ -111,10 +121,10 @@ class FrenchDataset:
 
 MOM = "Mom"
 """Column name of the momentum factor in the library's files and in the frames returned here."""
-_MOM_ALIASES: Mapping[str, str] = {"MOM": MOM, "UMD": MOM, "Momentum": MOM}
+_MOM_ALIASES: Mapping[str, str] = {"MOM": MOM, "UMD": MOM, "Momentum": MOM, "WML": MOM}
 """Header spellings accepted for ``Mom`` (the preamble of the daily file says "MOM"; other
-sources say "UMD"). Every token is stripped of blanks first, so ``",Mom   "`` also
-matches."""
+sources say "UMD"; the Europe files say "WML"). Every token is stripped of blanks first, so
+``",Mom   "`` also matches."""
 
 DATASETS: dict[str, FrenchDataset] = {
     "ff5_monthly": FrenchDataset(
@@ -146,8 +156,60 @@ DATASETS: dict[str, FrenchDataset] = {
         max_abs_factor=1.0,
         aliases=_MOM_ALIASES,
     ),
+    # Developed Europe (Sprint 4, S4-2). Same layout as the US files; USD, RF = US T-bill. The
+    # files start in 1990-07 (five factors) and 1990-11 (WML), about 470 months and 9,400 days.
+    "europe5_daily": FrenchDataset(
+        key="europe5_daily",
+        filename="Europe_5_Factors_Daily_CSV.zip",
+        frequency="daily",
+        columns=("Mkt-RF", "SMB", "HML", "RMW", "CMA", "RF"),
+        min_rows=8_000,
+        max_abs_factor=0.5,
+        rf_bounds=(-0.001, 0.005),
+    ),
+    "europe5_monthly": FrenchDataset(
+        key="europe5_monthly",
+        filename="Europe_5_Factors_CSV.zip",
+        frequency="monthly",
+        columns=("Mkt-RF", "SMB", "HML", "RMW", "CMA", "RF"),
+        min_rows=400,
+        max_abs_factor=1.0,
+    ),
+    "europe_mom_daily": FrenchDataset(
+        key="europe_mom_daily",
+        filename="Europe_Mom_Factor_Daily_CSV.zip",
+        frequency="daily",
+        columns=(MOM,),
+        min_rows=8_000,
+        max_abs_factor=0.5,
+        aliases=_MOM_ALIASES,
+    ),
+    "europe_mom_monthly": FrenchDataset(
+        key="europe_mom_monthly",
+        filename="Europe_Mom_Factor_CSV.zip",
+        frequency="monthly",
+        columns=(MOM,),
+        min_rows=400,
+        max_abs_factor=1.0,
+        aliases=_MOM_ALIASES,
+    ),
 }
 """Every factor file this module can load, by key."""
+
+_FIVE_KEY: dict[tuple[FactorSet, Frequency], str] = {
+    ("us", "monthly"): "ff5_monthly",
+    ("europe", "daily"): "europe5_daily",
+    ("europe", "monthly"): "europe5_monthly",
+}
+"""Five-factor file of each set and frequency. The US daily file is not here: it has its own
+loader (``data.factors.load_ff5_daily``)."""
+_MOM_KEY: dict[tuple[FactorSet, Frequency], str] = {
+    ("us", "daily"): "mom_daily",
+    ("us", "monthly"): "mom_monthly",
+    ("europe", "daily"): "europe_mom_daily",
+    ("europe", "monthly"): "europe_mom_monthly",
+}
+"""Momentum file of each set and frequency."""
 
 Fetcher = Callable[[str], tuple[bytes, str | None]]
 """``fetch(url) -> (content, Last-Modified header)``; raises ``FactorDownloadError``."""
@@ -275,7 +337,11 @@ def parse_french_block(
     values[sentinel] = np.nan
     frame = pd.DataFrame(values / 100.0, index=index, columns=list(dataset.columns))
     _validate(frame, dataset, today)
-    frame.attrs = {"key": dataset.key, "crsp_stamp": stamp_match.group(1) if stamp_match else None}
+    frame.attrs = {
+        "key": dataset.key,
+        "crsp_stamp": stamp_match.group(1) if stamp_match else None,
+        "stamp_source": stamp_match.group(2).upper() if stamp_match else None,
+    }
     return frame
 
 
@@ -382,7 +448,15 @@ def _stamped(frame: pd.DataFrame, meta: Mapping[str, Any]) -> pd.DataFrame:
     """The frame with its vintage in ``attrs`` (key, source, download time, hash, CRSP stamp)."""
     frame.attrs = {
         k: meta.get(k)
-        for k in ("key", "source_url", "downloaded_at", "last_modified", "sha256", "crsp_stamp")
+        for k in (
+            "key",
+            "source_url",
+            "downloaded_at",
+            "last_modified",
+            "sha256",
+            "crsp_stamp",
+            "stamp_source",
+        )
     }
     return frame
 
@@ -394,6 +468,7 @@ def _refresh(fdir: Path, dataset: FrenchDataset, now: datetime, fetch: Fetcher) 
     frame = parse_french_block(raw_zip, dataset, today=now.astimezone(UTC).date())
     fdir.mkdir(parents=True, exist_ok=True)
     crsp_stamp = frame.attrs.get("crsp_stamp")
+    stamp_source = frame.attrs.get("stamp_source")
     buf = io.BytesIO()
     frame.attrs = {}
     frame.to_parquet(buf)
@@ -404,6 +479,7 @@ def _refresh(fdir: Path, dataset: FrenchDataset, now: datetime, fetch: Fetcher) 
         "last_modified": last_modified,
         "sha256": hashlib.sha256(raw_zip).hexdigest(),
         "crsp_stamp": crsp_stamp,
+        "stamp_source": stamp_source,
         "rows": len(frame),
         "first_date": cast(pd.Timestamp, frame.index[0]).date().isoformat(),
         "last_date": cast(pd.Timestamp, frame.index[-1]).date().isoformat(),
@@ -468,14 +544,23 @@ def load_french(
     return _stamped(frame, meta)
 
 
+def check_factor_set(factor_set: str) -> FactorSet:
+    """``factor_set`` as a ``FactorSet``; ``ValueError`` for anything else."""
+    if factor_set not in FACTOR_SETS:
+        raise ValueError(f"unknown factor set {factor_set!r}; use one of {list(FACTOR_SETS)}")
+    return factor_set
+
+
 def load_ff5_monthly(
     refresh: bool = False,
     data_dir: Path | None = None,
     now: datetime | None = None,
     fetch: Fetcher | None = None,
+    factor_set: FactorSet = DEFAULT_FACTOR_SET,
 ) -> pd.DataFrame:
-    """Fama-French five factors and RF, monthly (decimals, stamped at calendar month-ends)."""
-    return load_french("ff5_monthly", refresh=refresh, data_dir=data_dir, now=now, fetch=fetch)
+    """Five factors and RF of ``factor_set``, monthly (decimals, stamped at calendar month-ends)."""
+    key = _FIVE_KEY[(check_factor_set(factor_set), "monthly")]
+    return load_french(key, refresh=refresh, data_dir=data_dir, now=now, fetch=fetch)
 
 
 # --------------------------------------------------------------------------- FF6 (FF5 + Mom)
@@ -493,7 +578,9 @@ def _check_index(frame: pd.DataFrame, what: str) -> pd.DatetimeIndex:
     return index
 
 
-def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
+def join_momentum(
+    ff5: pd.DataFrame, mom: pd.DataFrame, factor_set: FactorSet = DEFAULT_FACTOR_SET
+) -> pd.DataFrame:
     """The FF6 factor frame: the five factors and RF of ``ff5`` with ``Mom`` joined on date.
 
     Pure. Both frames have one frequency (daily, or monthly stamped at calendar month-ends) and
@@ -511,8 +598,9 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
     overlap), which file ends that window (``"ends_with"``: ``"ff5"``, ``"mom"`` or ``"both"``),
     ``"mom_missing_rows"`` (five-factor dates with no ``Mom`` value, in total) and
     ``"mom_rows_without_ff5"`` (``Mom`` dates inside the five-factor range that the five-factor
-    file does not have; they are dropped).
+    file does not have; they are dropped). ``"factor_set"`` is ``factor_set`` ("us" or "europe").
     """
+    check_factor_set(factor_set)
     ff5_index = _check_index(ff5, "five-factor frame")
     mom_index = _check_index(mom, "momentum frame")
     missing = [c for c in ALL_COLUMNS if c not in ff5.columns]
@@ -557,6 +645,7 @@ def join_momentum(ff5: pd.DataFrame, mom: pd.DataFrame) -> pd.DataFrame:
     ends_with = "both" if ff5_last == mom_last else ("ff5" if ff5_last < mom_last else "mom")
     out.attrs = {
         "key": "ff6_monthly" if monthly else "ff6_daily",
+        "factor_set": factor_set,
         "ff5": dict(ff5.attrs),
         "mom": dict(mom.attrs),
         "first_date": pd.Timestamp(ff5_index[0]).date().isoformat(),
@@ -575,8 +664,9 @@ def stamp_notices(attrs: Mapping[Any, Any]) -> list[str]:
     """Report notes for a joined FF6 frame whose two files do not carry the same stamp.
 
     ``attrs`` is ``join_momentum``'s ``attrs``. A note is returned when the five-factor and
-    momentum files end on different dates, and another when both name a CRSP vintage and the two
-    differ. Nothing is returned for a frame that is not a joined one, or when the stamps agree.
+    momentum files end on different dates, and another when both name a database vintage (CRSP or
+    Bloomberg) and the two differ. Nothing is returned for a frame that is not a joined one, or
+    when the stamps agree.
     """
     ff5 = cast("Mapping[str, Any] | None", attrs.get("ff5"))
     mom = cast("Mapping[str, Any] | None", attrs.get("mom"))
@@ -590,11 +680,12 @@ def stamp_notices(attrs: Mapping[Any, Any]) -> list[str]:
             f"Momentum results use the dates both files cover, up to {min(ff5_last, mom_last)}."
         )
     ff5_stamp, mom_stamp = ff5.get("crsp_stamp"), mom.get("crsp_stamp")
+    source = "Bloomberg" if ff5.get("stamp_source") == "BLOOMBERG" else "CRSP"
     if ff5_stamp and mom_stamp and ff5_stamp != mom_stamp:
         notices.append(
-            f"The five-factor file is from the {ff5_stamp} CRSP release and the momentum file "
-            f"from {mom_stamp}. The two files were not published together, so recent values may "
-            "differ from what the library shows today."
+            f"The five-factor file is from the {ff5_stamp} {source} release and the momentum "
+            f"file from {mom_stamp}. The two files were not published together, so recent values "
+            "may differ from what the library shows today."
         )
     return notices
 
@@ -621,24 +712,34 @@ def load_ff6(
     data_dir: Path | None = None,
     now: datetime | None = None,
     fetch: Fetcher | None = None,
+    factor_set: FactorSet = DEFAULT_FACTOR_SET,
 ) -> pd.DataFrame:
-    """FF5 + RF + ``Mom`` at ``frequency`` (decimals), from the caches (``join_momentum``).
+    """FF5 + RF + ``Mom`` of ``factor_set`` at ``frequency`` (decimals), from the caches
+    (``join_momentum``).
 
-    Daily: the five factors come from ``data.factors.load_ff5_daily`` (its own download path;
-    ``fetch`` is not used for it) and ``Mom`` from ``"mom_daily"``. Monthly: ``"ff5_monthly"`` and
-    ``"mom_monthly"``. Each file follows its own cache policy. The frame keeps every five-factor
-    date, with ``Mom`` NaN where the momentum file has no value (so the FF6 window ends at the
-    earlier last date of the two files); both vintages are in ``attrs`` (see ``join_momentum``).
+    US daily: the five factors come from ``data.factors.load_ff5_daily`` (its own download path;
+    ``fetch`` is not used for it) and ``Mom`` from ``"mom_daily"``. US monthly: ``"ff5_monthly"``
+    and ``"mom_monthly"``. Europe: the four ``Europe_*`` files, all through ``load_french``. Each
+    file follows its own cache policy. The frame keeps every five-factor date, with ``Mom`` NaN
+    where the momentum file has no value (so the FF6 window ends at the earlier last date of the
+    two files); both vintages are in ``attrs`` (see ``join_momentum``).
     """
-    if frequency == "daily":
+    check_factor_set(factor_set)
+    if frequency not in ("daily", "monthly"):
+        raise ValueError(f"unknown frequency {frequency!r}; use 'daily' or 'monthly'")
+    if factor_set == "us" and frequency == "daily":
         ff5 = load_ff5_daily(refresh=refresh, data_dir=data_dir, now=now).copy(deep=False)
         ff5.attrs.clear()
         ff5.attrs.update(_ff5_daily_vintage(data_dir, now))
-        mom_key = "mom_daily"
-    elif frequency == "monthly":
-        ff5 = load_ff5_monthly(refresh=refresh, data_dir=data_dir, now=now, fetch=fetch)
-        mom_key = "mom_monthly"
     else:
-        raise ValueError(f"unknown frequency {frequency!r}; use 'daily' or 'monthly'")
-    mom = load_french(mom_key, refresh=refresh, data_dir=data_dir, now=now, fetch=fetch)
-    return join_momentum(ff5, mom)
+        ff5 = load_french(
+            _FIVE_KEY[(factor_set, frequency)],
+            refresh=refresh,
+            data_dir=data_dir,
+            now=now,
+            fetch=fetch,
+        )
+    mom = load_french(
+        _MOM_KEY[(factor_set, frequency)], refresh=refresh, data_dir=data_dir, now=now, fetch=fetch
+    )
+    return join_momentum(ff5, mom, factor_set)

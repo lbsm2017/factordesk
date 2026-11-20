@@ -3,10 +3,13 @@ import type { DragEvent } from "react";
 import type { GrossNet, UploadInput } from "../../api/queries";
 import { CURRENCIES } from "../../state/currency";
 import type { Currency } from "../../state/currency";
+import { RunButton } from "./RunButton";
 
 export interface TrackRecordInputProps {
   /** An upload is running. */
   busy: boolean;
+  /** Fill of the busy button's line, 0 to 1. */
+  progress?: number;
   onRun: (input: UploadInput) => void;
 }
 
@@ -24,7 +27,7 @@ const NEED_FILE = "Choose a CSV file first.";
  * of the record as segmented controls like the date range, and the run button. The file is sent to the server and held there in
  * memory for the one request only; this component never reads it.
  */
-export function TrackRecordInput({ busy, onRun }: TrackRecordInputProps) {
+export function TrackRecordInput({ busy, progress = 0, onRun }: TrackRecordInputProps) {
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [grossNet, setGrossNet] = useState<GrossNet>("");
@@ -50,6 +53,7 @@ export function TrackRecordInput({ busy, onRun }: TrackRecordInputProps) {
       aria-label="Track record controls"
       onSubmit={(event) => {
         event.preventDefault();
+        if (busy) return;
         if (file === null) {
           setMessage(NEED_FILE);
           return;
@@ -130,18 +134,13 @@ export function TrackRecordInput({ busy, onRun }: TrackRecordInputProps) {
             ))}
           </span>
         </fieldset>
-        <button type="submit" className="btn" disabled={busy}>
-          Factor it
-        </button>
+        <RunButton busy={busy} progress={progress} />
         {message !== null ? (
           <p className="ctl-err" role="alert">
             {message}
           </p>
         ) : null}
       </div>
-      <span className="vh" role="status">
-        {busy ? "Analysing the track record." : ""}
-      </span>
     </form>
   );
 }
