@@ -69,6 +69,8 @@ describe("landing", () => {
 describe("first load", () => {
   it("shows the page frame with the ticker from the URL, then the report", async () => {
     renderAt("/?t=SPY&range=3Y");
+    // The page shows from the first step event, or at once when the stream is not there (here: a 404).
+    await screen.findByText("Building the report for SPY");
     const frame = screen.getByTestId("loading-frame");
     expect(frame.getAttribute("aria-busy")).toBe("true");
     expect(frame.querySelector(".ticker")?.textContent).toBe("SPY");
@@ -171,14 +173,47 @@ describe("errors", () => {
     expect(notice.querySelector(".notice-do")?.textContent).toBe(body.action);
   });
 
-  it("never shows the previous report under an error", async () => {
+  it("keeps the previous report under a banner that names it, with Try again and Dismiss", async () => {
     renderAt("/?t=SPY");
     await screen.findByTestId("report-ticker");
     const input = screen.getByRole("combobox", { name: "Ticker" });
     fireEvent.change(input, { target: { value: "xyz" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    await screen.findByTestId("report-error");
-    expect(screen.queryByTestId("report-ticker")).toBeNull();
+    const banner = await screen.findByTestId("rerun-error");
+    expect(banner.getAttribute("role")).toBe("alert");
+    expect(banner.textContent).toContain("No prices were returned for XYZ.");
+    expect(banner.textContent).toContain("Check the ticker symbol.");
+    expect(banner.textContent).toContain("The report below is the previous one, for SPY.");
+    expect(screen.queryByTestId("report-error")).toBeNull();
+    expect(screen.getByTestId("report-ticker").textContent).toBe("SPY");
+    fireEvent.click(within(banner).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByTestId("rerun-error")).toBeNull();
+    expect(screen.getByTestId("report-ticker").textContent).toBe("SPY");
+  });
+
+  it("Try again on the banner runs the same request again", async () => {
+    renderAt("/?t=SPY");
+    await screen.findByTestId("report-ticker");
+    const input = screen.getByRole("combobox", { name: "Ticker" });
+    fireEvent.change(input, { target: { value: "xyz" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    const banner = await screen.findByTestId("rerun-error");
+    const calls = () => reportCalls().filter((r) => r.startsWith("/api/report/XYZ")).length;
+    const before = calls();
+    fireEvent.click(within(banner).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(calls()).toBe(before + 1));
+  });
+
+  it("the first-run error has Try again and Change ticker, and moves focus to the notice", async () => {
+    renderAt("/?t=XYZ");
+    const notice = await screen.findByTestId("report-error");
+    await waitFor(() => expect(document.activeElement).toBe(within(notice).getByRole("alert")));
+    fireEvent.click(within(notice).getByRole("button", { name: "Change ticker" }));
+    expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Ticker" }));
+    const calls = () => reportCalls().filter((r) => r.startsWith("/api/report/XYZ")).length;
+    const before = calls();
+    fireEvent.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(calls()).toBe(before + 1));
   });
 
   it("explains a missing server in the words of the spec", async () => {
@@ -277,10 +312,17 @@ describe("committing changes", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(screen.getByTestId("report-region").getAttribute("aria-busy")).toBe("true"));
     expect(screen.getByTestId("report-ticker").textContent).toBe("SPY");
-    expect(screen.getAllByRole("status").map((s) => s.textContent)).toContain("Loading the report.");
+    // The old report stays; the chip says which request runs, and the button is busy but keeps focus.
+    expect((await screen.findByTestId("rerun-chip")).textContent).toContain("Updating QQQ");
+    expect(screen.getByTestId("rerun-bar")).toBeTruthy();
+    const button = screen.getByRole("button", { name: "Factoring…" });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.hasAttribute("disabled")).toBe(false);
     release();
     await waitFor(() => expect(screen.getByTestId("report-ticker").textContent).toBe("QQQ"));
     expect(screen.getByTestId("report-region").getAttribute("aria-busy")).toBe("false");
+    expect(screen.queryByTestId("rerun-chip")).toBeNull();
+    expect(screen.getByRole("button", { name: "Factor it" })).toBeTruthy();
   });
 });
 

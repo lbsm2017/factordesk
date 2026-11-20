@@ -37,7 +37,7 @@ const KNOWN_CODES: readonly ErrorCode[] = [
   "invalid_portfolio",
 ];
 
-function isApiError(value: unknown): value is ApiError {
+export function isApiError(value: unknown): value is ApiError {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
@@ -48,7 +48,7 @@ function isApiError(value: unknown): value is ApiError {
   );
 }
 
-function internalError(status: number): ApiError {
+export function internalError(status: number): ApiError {
   return {
     code: "internal",
     message: `The server answered with an unexpected response (status ${status}).`,

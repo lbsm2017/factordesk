@@ -1,30 +1,95 @@
-/* Loading frame and busy placeholders (dashboard spec DB6.4). Colours come from tokens.css.
-   One set of panel heights for every width: the frame is a placeholder, not a measurement, so a
-   panel that arrives taller or shorter only moves what is below it. */
+/* The Factor it flow (Sprint 4 mockup 1): the run card with its steps, the placeholder page of a first
+   run, the reveal, the re-run bar and chip, and the error states. Colours come from tokens.css.
+   Motion: 150 to 250 ms, one easing; only opacity, transform and the width of a bar change; no
+   spinner. Under prefers-reduced-motion nothing is animated and nothing is transitioned. */
 
-.sk-panel { display: flex; flex-direction: column; }
-.sk-body { flex: 1; margin-top: var(--s-4); background: var(--sunk); }
-.sk-summary { min-height: 380px; }
-.sk-price { min-height: 420px; }
-.sk-exposures { min-height: 520px; }
-.sk-returns { min-height: 560px; }
-.sk-risk { min-height: 520px; }
-.sk-rolling { min-height: 600px; }
-.sk-data { min-height: 560px; }
-.sk-regression { min-height: 900px; }
+/* ---------- the run card: the step list, in the slot of the Summary panel */
+.run-card { display: flex; flex-direction: column; min-height: 380px; }
+.run-card .panel-head h2 { font-size: var(--fs-panel); }
+.run-card.failed { min-height: 0; }
+.run-bar { height: 4px; margin-top: var(--s-3); background: var(--grid); border-radius: var(--r-mark); overflow: hidden; }
+.run-bar i { display: block; height: 100%; width: var(--p, 0%); background: var(--accent); border-radius: var(--r-mark); transition: width var(--dur) var(--ease); }
+.steps { margin-top: var(--s-3); display: grid; list-style: none; padding: 0; }
+.steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: var(--s-3); min-height: 48px; border-bottom: 1px solid var(--grid); }
+.steps li:last-child { border-bottom: 0; }
+.st-mark { position: relative; width: 20px; height: 20px; border-radius: var(--r-round); border: 2px solid var(--mark-ns); display: inline-flex; align-items: center; justify-content: center; color: var(--on-accent); }
+.st-mark .icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.st-name { color: var(--ink-3); }
+.st-state { font-size: var(--fs-cap); color: var(--ink-3); }
+.steps li.done .st-mark { background: var(--accent); border-color: var(--accent); }
+.steps li.done .st-name, .steps li.done .st-state { color: var(--ink-2); }
+.steps li.run .st-mark { border-color: var(--accent); }
+.steps li.run .st-mark::after { content: ""; width: 8px; height: 8px; border-radius: var(--r-round); background: var(--accent); animation: st-pulse 1200ms var(--ease) infinite alternate; }
+.steps li.run .st-name { color: var(--ink); font-weight: 600; }
+.steps li.run .st-state { color: var(--accent); font-weight: 600; }
+.steps li.fail .st-mark { background: var(--neg); border-color: var(--neg); }
+.steps li.fail .st-name { color: var(--ink); font-weight: 600; }
+.steps li.fail .st-state { color: var(--neg); font-weight: 600; }
+.steps li .st-name, .steps li .st-state, .steps li .st-mark { transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+@keyframes st-pulse { from { opacity: 0.35; } to { opacity: 1; } }
 
-/* Busy placeholders (spec DB6.4, review S3): while a request runs, the figures that belong to the
-   report on screen are blanked so old numbers never sit beside a new request. The fill is --border,
-   not --grid (review S4: --grid is barely visible on --page). */
-[aria-busy="true"] .ticker,
-[aria-busy="true"] .abar dd,
-[aria-busy="true"] #summary .verdict,
-[aria-busy="true"] #summary .tbl td.v,
-[aria-busy="true"] #summary .tbl td.rd {
-  color: transparent;
-  background: var(--border);
-  border-radius: var(--r-mark);
-}
+/* ---------- placeholder page: real titles, grey bodies, final order, no ids */
+.ph-head .ticker { font-weight: 700; }
+.ph-ghost { display: inline-block; height: 1em; margin-left: 12px; border-radius: var(--r-mark); background: var(--border); vertical-align: middle; }
+.ph-head .abar dd { color: transparent; background: var(--border); border-radius: var(--r-mark); }
+.ph-panel { display: flex; flex-direction: column; min-height: var(--h, 360px); }
+.ph-panel .ph-body { flex: 1; margin-top: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); background: var(--sunk); border-radius: var(--r-inner); }
+.ph-panel .ph-body i { display: block; height: 12px; border-radius: var(--r-mark); background: var(--line); }
+.ph-panel .ph-body i.blk { flex: 1; min-height: 80px; background: var(--grid); }
+.ph-panel .ph-body i.w1 { width: 92%; }
+.ph-panel .ph-body i.w2 { width: 76%; }
+.ph-panel .ph-body i.w3 { width: 58%; }
+.ph-panel .ph-body i.w4 { width: 38%; }
+
+/* ---------- reveal: the header and the Summary at once, then the next panels 60 ms apart; everything
+   below the eighth panel appears at 480 ms with no motion. The page is already at its final size
+   when the reveal starts, so a panel never moves once it shows. */
+@keyframes rv { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes rv-late { from { opacity: 0; } to { opacity: 1; } }
+.report-region.reveal > .masthead,
+.report-region.reveal > section:nth-of-type(1) { animation: rv var(--dur) var(--ease) both; }
+.report-region.reveal > section:nth-of-type(2) { animation: rv var(--dur) var(--ease) calc(1 * var(--stagger)) both; }
+.report-region.reveal > section:nth-of-type(3) { animation: rv var(--dur) var(--ease) calc(2 * var(--stagger)) both; }
+.report-region.reveal > section:nth-of-type(4) { animation: rv var(--dur) var(--ease) calc(3 * var(--stagger)) both; }
+.report-region.reveal > section:nth-of-type(5) { animation: rv var(--dur) var(--ease) calc(4 * var(--stagger)) both; }
+.report-region.reveal > section:nth-of-type(6) { animation: rv var(--dur) var(--ease) calc(5 * var(--stagger)) both; }
+.report-region.reveal > section:nth-of-type(7) { animation: rv var(--dur) var(--ease) calc(6 * var(--stagger)) both; }
+.report-region.reveal > section:nth-of-type(8) { animation: rv var(--dur) var(--ease) calc(7 * var(--stagger)) both; }
+.report-region.reveal > section:nth-of-type(n + 9) { animation: rv-late 1ms linear 480ms both; }
+
+/* ---------- re-run: the old report stays, dimmed, a thin bar on top */
+.rr-bar { position: sticky; top: 0; z-index: 6; height: 3px; background: var(--grid); }
+.rr-bar i { display: block; height: 100%; width: var(--p, 0%); background: var(--accent); transition: width var(--dur) var(--ease); }
+.rr-chip-wrap { position: sticky; top: 3px; z-index: 6; height: 0; }
+.rr-chip { position: absolute; top: 12px; right: var(--page-x); display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); max-width: calc(100% - 2 * var(--page-x)); min-height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--fs-cap); font-weight: 600; }
+.rr-chip .dot { width: 8px; height: 8px; border-radius: var(--r-round); background: var(--accent); animation: st-pulse 1200ms var(--ease) infinite alternate; flex: none; }
+.rr-chip .sub { color: var(--ink-2); font-weight: 400; }
+.report-region.dim { opacity: 0.6; transition: opacity var(--dur) var(--ease); }
+
+/* ---------- error */
+.err-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-3); }
+.btn.on-light { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 14px; border: 1px solid var(--accent); border-radius: var(--r-control); background: var(--accent); color: var(--on-accent); font-size: var(--fs-body); font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn.on-light:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.err-actions .btn-outline { cursor: pointer; }
+.err-banner { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 10px; align-items: start; max-width: calc(var(--canvas-max) - 2 * var(--page-x)); margin: 20px var(--page-x) 0; padding: 12px var(--pad-x); background: var(--neg-50); border: 1px solid var(--neg-t); border-radius: var(--r-panel); color: var(--ink); font-size: var(--fs-cap); }
+.err-banner .glyph { stroke: var(--neg); transform: translateY(2px); }
+.err-banner .err-actions { align-items: center; }
+.err-banner .dismiss { min-height: 28px; padding: 0 4px; border: 0; background: none; color: var(--accent); font-size: var(--fs-cap); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
 /* A lazy panel while its chunk loads (Kalman and shrunk betas). */
 .sk-lazy { min-height: 480px; }
+
+@media (max-width: 899px) {
+  .rr-chip { left: var(--page-x); right: var(--page-x); }
+  /* the sticky top bar is 56 px high: the thin bar and the chip sit just under it */
+  .rr-bar { top: 56px; }
+  .rr-chip-wrap { top: 59px; }
+  .err-banner .dismiss, .err-actions .btn, .err-actions .btn-outline { min-height: 44px; }
+}
+
+/* reduced motion: no animation and no transition; every state still shows */
+@media (prefers-reduced-motion: reduce) {
+  .report-region.reveal > * { animation: none; }
+  .steps li.run .st-mark::after, .rr-chip .dot { animation: none; opacity: 1; }
+  .run-bar i, .rr-bar i, .report-region.dim, .steps li .st-name, .steps li .st-state, .steps li .st-mark { transition: none; }
+}
