@@ -39,11 +39,11 @@ function lines(n: number): string {
 }
 
 /** "97% + 3% USD cash" or "100% allocated", for the folded summary. */
-function allocationText(tree: PortfolioTree): string {
+function allocationText(tree: PortfolioTree, currency: Currency): string {
   const rest = remainder(tree);
   const invested = totalWeight(tree);
   const fmt = (x: number) => `${Number((x * 100).toFixed(1))}%`;
-  return rest > 0 ? `${fmt(invested)} + ${fmt(rest)} USD cash` : `${fmt(invested)} allocated`;
+  return rest > 0 ? `${fmt(invested)} + ${fmt(rest)} ${currency} cash` : `${fmt(invested)} allocated`;
 }
 
 export function PortfolioMode({ state, currency, onCurrency, onCommit }: PortfolioModeProps) {
@@ -160,7 +160,7 @@ export function PortfolioMode({ state, currency, onCurrency, onCommit }: Portfol
               <span>{lines(lineCount(ran.tree))}</span>
             </div>
             <div>
-              <span>{allocationText(ran.tree)}</span>
+              <span>{allocationText(ran.tree, reportCurrency(report))}</span>
             </div>
             <div>
               <span className="dim">Monthly, {ran.tree.cost_bps} bps</span>

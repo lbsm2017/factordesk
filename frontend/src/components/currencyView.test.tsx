@@ -1,6 +1,6 @@
 /** The euro view of the pieces (Sprint 3, S3-5): switch, top-bar chip, header pill, key figures, composer badges, backtest subtitle, credits. */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { FactorReport, LibraryLine } from "../api/types";
 import section from "@fixtures/sections/portfolio_backtest.json";
@@ -133,11 +133,30 @@ describe("BacktestCard subtitle", () => {
     rerender(<BacktestCard section={base} currency="EUR" />);
     expect(screen.getByText("Monthly rebalancing, in euros")).toBeTruthy();
   });
+
+  it("says where the unallocated weight is held", () => {
+    const { rerender } = render(<BacktestCard section={base} />);
+    expect(screen.getByText("10.0% held as USD cash")).toBeTruthy();
+    rerender(<BacktestCard section={base} currency="EUR" />);
+    expect(screen.getByText("10.0% held as EUR cash")).toBeTruthy();
+  });
 });
 
 describe("hidden panels", () => {
   it("leaves Macro out of the euro view until its legs are converted", () => {
     expect(hiddenPanels(eurReport()).has("macro")).toBe(true);
+    expect(hiddenPanels(mockReport).has("macro")).toBe(false);
+  });
+
+  it("leaves the energy panel out of the euro view, whether or not its key is registered yet", () => {
+    expect(hiddenPanels(eurReport()).has("energy")).toBe(true);
+    expect(hiddenPanels(mockReport).has("energy")).toBe(false);
+  });
+
+  it("follows the response, not the page: no currency block means USD labels", () => {
+    // The page may be in EUR (the switch), but an older backend answers without a currency block.
+    const { container } = render(<Header report={mockReport} downloadHref="#" />);
+    expect(container.querySelector(".ccy-pill")).toBeNull();
     expect(hiddenPanels(mockReport).has("macro")).toBe(false);
   });
 });
@@ -179,6 +198,36 @@ function rowOf(name: string): HTMLElement {
   if (row === null) throw new Error(`no row ${name}`);
   return row as HTMLElement;
 }
+
+describe("unallocated weight in the composer", () => {
+  function renderUnallocated(currency: Currency) {
+    const line = FLAGGED.find((l) => l.id === "fi_na_gov");
+    if (line === undefined) throw new Error("no line");
+    const tree = addLineWithWeight(buildPreset("blank", "Half", FLAGGED), line, 0.5);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <TreePanel
+          tree={tree}
+          library={libraryById(FLAGGED)}
+          currency={currency}
+          libraryCount={{ classes: 8, lines: FLAGGED.length }}
+          onChange={vi.fn()}
+          onOpenPicker={vi.fn()}
+          pickerButtonId="pick"
+          headingRef={{ current: null }}
+        />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("goes to EUR cash in the euro view and to USD cash otherwise", () => {
+    renderUnallocated("EUR");
+    expect(screen.getByText("Goes to EUR cash when you run the backtest")).toBeTruthy();
+    cleanup();
+    renderUnallocated("USD");
+    expect(screen.getByText("Goes to USD cash when you run the backtest")).toBeTruthy();
+  });
+});
 
 describe("composer rows in the euro view", () => {
   it("badges hedged lines, multi-currency lines and the cash lines", () => {

@@ -9,7 +9,11 @@ import { isSubjectReport } from "./subject";
 export function hiddenPanels(report: FactorReport): ReadonlySet<string> {
   const hidden = new Set<string>();
   if (isSubjectReport(report) && report.rolling.every((w) => w.status === "not_applicable")) hidden.add("rolling");
-  // Macro runs on US-dollar legs until Sprint 3 S3-9 converts them: it is left out of the euro view.
-  if (reportCurrency(report) === "EUR") hidden.add("macro");
+  // Macro and Energy run on US-dollar legs until Sprint 3 S3-9 converts them: both are left out of the
+  // euro view. The key "energy" is the name the energy panel registers; hiding an absent key is harmless.
+  if (reportCurrency(report) === "EUR") {
+    hidden.add("macro");
+    hidden.add("energy");
+  }
   return hidden;
 }

@@ -18,6 +18,8 @@ export interface LivePanelProps {
   onCost: (bps: number) => void;
   onNormalise: () => void;
   onRemainderToCash: () => void;
+  /** The reference currency: unallocated weight is held as cash of that currency. */
+  currency: "USD" | "EUR";
   onRun: () => void;
 }
 
@@ -49,7 +51,7 @@ export function totalBadge(tree: PortfolioTree): { text: string; tone: "ok" | "w
  * leaf that sets it), the trading cost, and the three actions. Every figure is also text, so the
  * colour of a bar or a badge is never the only carrier of meaning.
  */
-export function LivePanel({ tree, library, now, running, onCost, onNormalise, onRemainderToCash, onRun }: LivePanelProps) {
+export function LivePanel({ tree, library, currency, now, running, onCost, onNormalise, onRemainderToCash, onRun }: LivePanelProps) {
   const costId = useId();
   const noteId = useId();
   const [costDraft, setCostDraft] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function LivePanel({ tree, library, now, running, onCost, onNormalise, on
   const classes = classTotals(tree);
   const badge = totalBadge(tree);
   const start = earliestCommonStart(tree, library);
-  const list = checks(tree, library);
+  const list = checks(tree, library, currency);
   const run = runnable(tree);
   const years =
     start.date === null ? null : (now.getTime() - Date.parse(`${start.date}T00:00:00Z`)) / (365.25 * 86_400_000);
@@ -109,7 +111,7 @@ export function LivePanel({ tree, library, now, running, onCost, onNormalise, on
           {rest > 0 ? (
             <li className="gap">
               <span className="sq" aria-hidden="true" />
-              <span className="n">Unallocated (to USD cash)</span>
+              <span className="n">Unallocated (to {currency} cash)</span>
               <span className="v">{pct1(rest)}</span>
             </li>
           ) : null}

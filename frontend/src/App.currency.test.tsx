@@ -102,6 +102,15 @@ describe("currency state", () => {
   });
 });
 
+describe("labels follow the response", () => {
+  it("keeps EUR in the switch but shows no euro labels when the answer has no currency block", async () => {
+    renderAt("/?t=SPY&range=3Y&ccy=EUR");
+    await screen.findByTestId("report-ticker");
+    expect(radio("EUR").checked).toBe(true);
+    expect(screen.getByTestId("report-ccy").textContent).toBe("none");
+  });
+});
+
 describe("switching the currency", () => {
   it("reruns the ticker report with ccy=EUR, remembers the choice, and puts it in the URL", async () => {
     server.use(

@@ -74,6 +74,7 @@ export function Composer({ tree, library, currency, running, error, onChange, on
         <LivePanel
           tree={tree}
           library={byId}
+          currency={currency}
           now={now}
           running={running}
           onCost={(bps) => onChange(withCost(tree, bps))}

@@ -509,7 +509,7 @@ export function TreePanel({ tree, library, currency, libraryCount, onChange, onO
             <span className="key-hatch" aria-hidden="true" />
             <div className="txt">
               <span className="nm">Unallocated</span>
-              <span className="sb">Goes to USD cash when you run the backtest</span>
+              <span className="sb">Goes to {currency} cash when you run the backtest</span>
             </div>
           </div>
           <div className="wcell">
