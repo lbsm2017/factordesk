@@ -4140,6 +4140,15 @@ export interface operations {
                     "application/json": components["schemas"]["FactorReport"];
                 };
             };
+            /** @description The request has no file. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description The file is larger than 1 MB. */
             413: {
                 headers: {

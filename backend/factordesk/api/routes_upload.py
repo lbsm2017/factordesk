@@ -3,7 +3,7 @@
 The file lives in memory for the length of the request: it is not written to the data folder or
 to a temporary file by this code, and the report is not stored in any ``ReportService`` cache.
 The size cap is enforced by ``UploadSizeLimit`` before the body is read. Every refusal of the
-file is HTTP 422 with an ``ApiError``.
+file is HTTP 422 with an ``ApiError``, except a request with no file: that is 400.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from factordesk.analytics.currency import convert_series
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.analytics.subject import subject_from_monthly_returns
 from factordesk.api.currency_ctx import CurrencyContext
-from factordesk.api.errors import ApiException, to_api_exception
+from factordesk.api.errors import UPLOAD_REPORT_PATH, ApiException, to_api_exception
 from factordesk.api.runtime import Runtime, get_runtime
 from factordesk.data.factors import FactorError
 from factordesk.data.french import load_ff5_monthly, load_ff6
@@ -38,10 +38,11 @@ from factordesk.report.schema import ApiError, FactorModel, FactorReport, Refere
 
 logger = logging.getLogger(__name__)
 
-UPLOAD_PATH = "/api/report/upload"
+UPLOAD_PATH = UPLOAD_REPORT_PATH
 router = APIRouter(prefix="/api/report")
 
 _ERRORS: dict[int | str, dict[str, object]] = {
+    400: {"model": ApiError, "description": "The request has no file."},
     413: {"model": ApiError, "description": "The file is larger than 1 MB."},
     422: {
         "model": ApiError,

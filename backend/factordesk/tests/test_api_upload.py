@@ -240,7 +240,38 @@ def test_refuses_a_bad_gross_net(client: ApiClient, returns: pd.Series) -> None:
 
 
 def test_refuses_a_request_without_a_file(client: ApiClient) -> None:
-    assert client.post("/api/report/upload", data={"name": "x"}).status_code == 400
+    error = refused(client.post("/api/report/upload", data={"name": "x"}), 400, "bad_request")
+    assert error.message == "No file was sent."
+
+
+def test_the_missing_file_status_is_in_the_api_description(world: World) -> None:
+    responses = world.app.openapi()["paths"]["/api/report/upload"]["post"]["responses"]
+    assert "400" in responses
+
+
+def test_an_echoed_cell_is_capped_at_40_characters(client: ApiClient, returns: pd.Series) -> None:
+    lines = csv_of(returns).decode().splitlines()
+    lines[5] = lines[5].split(",")[0] + "," + "x" * 500
+    error = refused(post(client, ("\n".join(lines) + "\n").encode()), 422, "invalid_upload")
+    assert "line 6" in error.message
+    assert "x" * 41 not in error.message
+    assert "x" * 39 + "…" in error.message
+
+
+def test_an_echoed_header_is_capped(client: ApiClient, returns: pd.Series) -> None:
+    body = csv_of(returns, header="y" * 300 + ",return")
+    error = refused(post(client, body), 422, "invalid_upload")
+    assert "y" * 41 not in error.message and "line 1" in error.message
+
+
+def test_a_message_uses_the_csv_line_number_with_blank_lines(
+    client: ApiClient, returns: pd.Series
+) -> None:
+    lines = csv_of(returns).decode().splitlines()
+    lines[5] = lines[5].split(",")[0] + ",abc"
+    lines.insert(2, "")  # a blank line moves the bad row down by one in the file
+    error = refused(post(client, ("\n".join(lines) + "\n").encode()), 422, "invalid_upload")
+    assert "line 7" in error.message
 
 
 # ----------------------------------------------------------------------------- size cap

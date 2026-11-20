@@ -182,6 +182,16 @@
               }
             }
           },
+          "400": {
+            "description": "The request has no file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "413": {
             "description": "The file is larger than 1 MB.",
             "content": {

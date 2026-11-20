@@ -236,6 +236,7 @@ def validation_error(errors: Sequence[object], ticker: str | None) -> ApiExcepti
 
 
 PORTFOLIO_REPORT_PATH = "/api/report/portfolio"
+UPLOAD_REPORT_PATH = "/api/report/upload"
 
 
 def _in_body(errors: Sequence[object]) -> bool:
@@ -281,6 +282,16 @@ async def _validation_handler(request: Request, exc: Exception) -> Response:
     errors = jsonable_encoder(exc.errors(), exclude={"input", "ctx", "url"})
     if request.url.path == PORTFOLIO_REPORT_PATH and _in_body(errors):
         return _respond(portfolio_validation_error(errors))
+    if request.url.path == UPLOAD_REPORT_PATH and "file" in {
+        loc[0] for loc in _locations(errors) if loc
+    }:
+        return _respond(
+            ApiException(
+                "bad_request",
+                "No file was sent.",
+                "Choose a CSV file with a date and a return column, then send it again.",
+            )
+        )
     return _respond(validation_error(errors, _ticker_of(request)))
 
 
