@@ -17,7 +17,7 @@ Every report gets an Energy & carbon section that shows how the return moved wit
   - **Market:** the French Mkt-RF, as in the headline model.
 - Two models, each a separate regression with Newey-West errors:
   - **Long model:** market, oil and gas, over the whole analysed window.
-  - **Carbon model:** market, oil, gas and carbon, from KRBN's first date. It is labelled "short sample, since Aug 2020, mainly EU carbon". It is hidden when the window holds less than 2 years of carbon data (504 trading days, or 24 months).
+  - **Carbon model:** market, oil, gas and carbon, from KRBN's first date. It is labelled "short sample, since <month year>, mainly EU carbon", where the month is the first month of its regression (Aug 2020 on real data). It is hidden when the window holds less than 2 years of carbon data (504 trading days, or 24 months).
 - No lag terms.
 - Broad commodities (COMM) are not in this section.
 - Gas is shown twice: with all rows, and "without the 5 largest" gas moves (5 days for daily data, 5 months for monthly data), each with its t-statistic. Nothing is winsorised. Daily gas sensitivities are labelled descriptive.

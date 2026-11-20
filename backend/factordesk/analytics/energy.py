@@ -362,7 +362,7 @@ def run_energy(
             try:
                 carbon_fit = fit_energy(candidate)
                 carbon_design = candidate
-            except DegenerateInputError:
+            except (DegenerateInputError, ValueError):  # never lose the long model to carbon
                 note = "The carbon model could not be computed on this window."
     return EnergyResult(
         long_design=long_design,

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -41,10 +41,10 @@ from factordesk.data.prices import PriceHistory
 from factordesk.pipeline import assemble_report, assemble_subject_report
 from factordesk.report import FactorReport
 from factordesk.report.sections.energy import (
-    CARBON_LABEL,
     FRED_UNAVAILABLE,
     GAS_NOTE_DAILY,
     GAS_NOTE_MONTHLY,
+    carbon_label,
 )
 from factordesk.section_hooks.context import (
     EnergyInput,
@@ -331,7 +331,12 @@ def test_the_carbon_model_starts_at_krbns_first_date_and_names_it_as_the_limit()
     s = report_of(case, SectionInputs(energy=energy_input(case))).energy
     assert s is not None and s.status == "ok"
     assert s.long_model is not None and s.carbon_model is not None
-    assert s.carbon_model.label == CARBON_LABEL == "short sample, since Aug 2020, mainly EU carbon"
+    assert s.carbon_model.label == carbon_label(s.carbon_model.start)
+    assert (
+        s.carbon_model.label
+        == f"short sample, since {s.carbon_model.start:%b %Y}, mainly EU carbon"
+    )
+    assert carbon_label(date(2020, 8, 31)) == "short sample, since Aug 2020, mainly EU carbon"
     assert s.long_model.label is None and s.carbon_note is None
     assert s.long_model.n_obs == 1500 and s.carbon_model.n_obs == 800
     assert s.carbon_model.start == case.dates[700].date()
@@ -614,6 +619,35 @@ def test_monthly_legs_are_compounded_to_month_ends_before_the_log() -> None:
     wanted = pd.DatetimeIndex(sample.xret.index).to_period("M")
     expected = [math.log(last_level[p] / last_level[p - 1]) for p in wanted]
     np.testing.assert_allclose(cols.oil, expected, atol=1e-12)
+
+
+def test_a_stale_fred_copy_is_noted_in_the_section() -> None:
+    case = make_energy_case(8340, n=900)
+    inputs = energy_input(
+        case, oil=SeriesInput(levels=case.oil_levels, note="used the copy of 2026-11-18")
+    )
+    s = report_of(case, SectionInputs(energy=inputs)).energy
+    assert s is not None and s.status == "ok"
+    assert s.fred_note == "Brent: used the copy of 2026-11-18"
+    plain = report_of(case, SectionInputs(energy=energy_input(case))).energy
+    assert plain is not None and plain.fred_note is None
+
+
+def test_a_failing_carbon_fit_keeps_the_long_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    import factordesk.analytics.energy as analytics
+
+    real = analytics.fit_energy
+
+    def fail_on_carbon(design: analytics.EnergyDesign, **kwargs: int) -> analytics.EnergyFit:
+        if "co2" in design.codes:
+            raise ValueError("boom")
+        return real(design, **kwargs)
+
+    monkeypatch.setattr(analytics, "fit_energy", fail_on_carbon)
+    case = make_energy_case(8341, n=900)
+    s = report_of(case, SectionInputs(energy=energy_input(case))).energy
+    assert s is not None and s.status == "ok" and s.long_model is not None
+    assert s.carbon_model is None and s.carbon_note is not None
 
 
 if __name__ == "__main__":  # regenerate the shared fixture

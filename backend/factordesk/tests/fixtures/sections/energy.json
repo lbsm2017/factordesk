@@ -97,7 +97,7 @@
   "carbon_model": {
     "key": "carbon",
     "title": "Market, oil, gas and carbon",
-    "label": "short sample, since Aug 2020, mainly EU carbon",
+    "label": "short sample, since Oct 2010, mainly EU carbon",
     "n_obs": 520,
     "start": "2010-10-11",
     "end": "2012-10-05",
@@ -185,6 +185,7 @@
     "window_limited_by": "KRBN"
   },
   "carbon_note": null,
+  "fred_note": null,
   "legs": [
     {
       "ticker": "DCOILBRENTEU",

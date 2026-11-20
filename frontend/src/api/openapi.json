@@ -2311,6 +2311,18 @@
             "title": "Carbon Note",
             "description": "Why the carbon model is not shown; None if shown."
           },
+          "fred_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fred Note",
+            "description": "Set when an older cached copy of Brent or Henry Hub was used (FRED could not be reached); None otherwise."
+          },
           "legs": {
             "items": {
               "$ref": "#/components/schemas/EnergyLeg"
@@ -2333,6 +2345,7 @@
           "long_model",
           "carbon_model",
           "carbon_note",
+          "fred_note",
           "legs"
         ],
         "title": "EnergySection",

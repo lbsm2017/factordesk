@@ -973,6 +973,11 @@ export interface components {
              */
             carbon_note: string | null;
             /**
+             * Fred Note
+             * @description Set when an older cached copy of Brent or Henry Hub was used (FRED could not be reached); None otherwise.
+             */
+            fred_note: string | null;
+            /**
              * Legs
              * @description The series behind the legs, with first dates.
              */

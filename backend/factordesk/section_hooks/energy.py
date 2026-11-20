@@ -36,7 +36,6 @@ from factordesk.data.fred import BRENT_SERIES, HENRY_HUB_SERIES, FredError, load
 from factordesk.data.prices import PriceProvider, collapse_duplicate_dates
 from factordesk.report.base import SampleInfo, Status
 from factordesk.report.sections.energy import (
-    CARBON_LABEL,
     FRED_UNAVAILABLE,
     GAS_NOTE_DAILY,
     GAS_NOTE_MONTHLY,
@@ -46,6 +45,7 @@ from factordesk.report.sections.energy import (
     EnergyRow,
     EnergySection,
     GasRobustness,
+    carbon_label,
 )
 from factordesk.section_hooks.context import (
     EnergyInput,
@@ -171,7 +171,7 @@ def _model(key: str, fit: EnergyFit, legs: list[EnergyLeg], subject_start: date)
         {
             "key": key,
             "title": TITLES[key],
-            "label": CARBON_LABEL if key == "carbon" else None,
+            "label": carbon_label(fit.start.date()) if key == "carbon" else None,
             "n_obs": fit.nobs,
             "start": fit.start.date(),
             "end": fit.end.date(),
@@ -210,6 +210,11 @@ def build_energy(ctx: SectionContext) -> EnergySection | None:
         result: EnergyResult | None = None,
         carbon_note: str | None = None,
     ) -> EnergySection:
+        notes = [
+            f"{name}: {s.note}"
+            for name, s in (("Brent", energy.oil), ("Henry Hub", energy.gas))
+            if s.note
+        ]
         long_model = None if result is None else _model("long", result.long, legs, ctx.sample.start)
         carbon_model = (
             None
@@ -234,6 +239,7 @@ def build_energy(ctx: SectionContext) -> EnergySection | None:
                 "long_model": None if long_model is None else long_model.model_dump(),
                 "carbon_model": None if carbon_model is None else carbon_model.model_dump(),
                 "carbon_note": carbon_note if carbon_model is None else None,
+                "fred_note": " ".join(notes) if notes else None,
                 "legs": [leg.model_dump() for leg in legs],
             }
         )

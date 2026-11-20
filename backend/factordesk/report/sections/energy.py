@@ -38,8 +38,14 @@ MODEL_NOTE = (
     "co-movement in this window, not a forecast."
 )
 """Fixed note under the section."""
-CARBON_LABEL = "short sample, since Aug 2020, mainly EU carbon"
-"""Label of the carbon model (KRBN starts in July 2020 and holds mainly EU allowances)."""
+
+
+def carbon_label(start: date) -> str:
+    """Label of the carbon model: "short sample, since Aug 2020, mainly EU carbon". The month is
+    the first month of the regression (KRBN starts in July 2020 and holds mainly EU allowances)."""
+    return f"short sample, since {start:%b %Y}, mainly EU carbon"
+
+
 GAS_NOTE_DAILY = (
     "Daily gas sensitivities are descriptive: gas moves are extremely fat-tailed, so a few "
     "days can drive the result."
@@ -130,6 +136,10 @@ class EnergySection(SectionModel):
         description="Market, oil, gas, carbon; None when hidden (see carbon_note)."
     )
     carbon_note: str | None = Field(description="Why the carbon model is not shown; None if shown.")
+    fred_note: str | None = Field(
+        description="Set when an older cached copy of Brent or Henry Hub was used (FRED could "
+        "not be reached); None otherwise."
+    )
     legs: list[EnergyLeg] = Field(description="The series behind the legs, with first dates.")
 
     @model_validator(mode="after")

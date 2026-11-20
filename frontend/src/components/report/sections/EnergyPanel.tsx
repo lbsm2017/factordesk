@@ -134,6 +134,7 @@ function how(s: EnergySection, rows: string): string {
     s.gas_note,
     ...models.map(modelHow),
     s.carbon_note ? `Carbon: ${s.carbon_note}` : "",
+    s.fred_note ? `Data: ${s.fred_note}` : "",
     `Series start: ${legsText(s)}.`,
     `${count(s.n_sample - (s.long_model?.n_obs ?? 0))} of ${count(s.n_sample)} rows of the analysis sample are left out of the first model because oil or gas has no value there.`,
   ]
@@ -366,6 +367,7 @@ export function EnergyPanel({ report }: ReportPanelProps) {
     >
       <Model s={s} model={s.long_model} subject={subject} rows={rows} />
       {s.carbon_model ? <Model s={s} model={s.carbon_model} subject={subject} rows={observations(report, s.carbon_model.n_obs)} /> : null}
+      {s.fred_note ? <p className="en-carbon-note en-fred-note">{s.fred_note}</p> : null}
       {s.carbon_model == null && s.carbon_note ? <p className="en-carbon-note">{s.carbon_note}</p> : null}
     </Panel>
   );

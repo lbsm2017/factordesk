@@ -38,9 +38,11 @@ describe("EnergyPanel", () => {
 
   it("labels the carbon model as a short sample, mainly EU carbon", () => {
     const { container } = render(<EnergyPanel report={report()} />);
-    expect(container.querySelector('[data-model="carbon"] .en-tag')?.textContent).toBe(
-      "short sample, since Aug 2020, mainly EU carbon",
+    const start = section(report()).carbon_model?.start ?? "";
+    expect(container.querySelector('[data-model="carbon"] .en-tag')?.textContent).toMatch(
+      /^short sample, since [A-Z][a-z]{2} \d{4}, mainly EU carbon$/,
     );
+    expect(start).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(container.querySelector('[data-model="long"] .en-tag')).toBeNull();
   });
 
@@ -161,6 +163,15 @@ describe("EnergyPanel", () => {
     expect(container.querySelector('[data-model="long"] .en-limit')).toBeNull();
     const how = container.querySelector("details.how")?.textContent ?? "";
     expect(how).toContain("the window starts when KRBN begins");
+  });
+
+  it("shows the note when an older cached copy of Brent or Henry Hub was used", () => {
+    const r = report((s) => {
+      s.fred_note = "Brent: used the copy of 2026-11-18";
+    });
+    const { container } = render(<EnergyPanel report={r} />);
+    expect(container.querySelector(".en-fred-note")?.textContent).toBe("Brent: used the copy of 2026-11-18");
+    expect(render(<EnergyPanel report={report()} />).container.querySelector(".en-fred-note")).toBeNull();
   });
 
   it("hides the carbon model and says why when it has too little data", () => {
