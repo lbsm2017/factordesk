@@ -33,18 +33,27 @@ function eurReport(): FactorReport {
 }
 
 describe("CurrencySwitch", () => {
-  it("is a USD | EUR radio group that reports the choice, with a note only in the euro view", () => {
+  it("is a USD | EUR radio group that reports the choice, with the note as a tooltip in the euro view", () => {
     const onSelect = vi.fn();
     const { rerender } = render(<CurrencySwitch currency="USD" onSelect={onSelect} />);
     const group = within(screen.getByRole("radiogroup", { name: "Currency" }));
     expect((group.getByRole("radio", { name: "USD" }) as HTMLInputElement).checked).toBe(true);
     expect((group.getByRole("radio", { name: "EUR" }) as HTMLInputElement).checked).toBe(false);
     expect(screen.queryByText(/US bond lines are hedged to EUR/)).toBeNull();
+    expect(screen.getByText("Currency").getAttribute("title")).toBeNull();
+    expect(screen.getByText("Currency").classList.contains("has-tip")).toBe(false);
     fireEvent.click(group.getByRole("radio", { name: "EUR" }));
     expect(onSelect).toHaveBeenCalledWith("EUR");
     rerender(<CurrencySwitch currency="EUR" onSelect={onSelect} />);
     expect((screen.getByRole("radio", { name: "EUR" }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText(/US bond lines are hedged to EUR/)).toBeTruthy();
+    const label = screen.getByText("Currency");
+    const note = "Returns, factors and cash in EUR. US bond lines are hedged to EUR.";
+    expect(label.getAttribute("title")).toBe(note);
+    expect(label.classList.contains("has-tip")).toBe(true);
+    expect(document.querySelector(".ccy-note")).toBeNull(); // no caption on screen
+    const hidden = screen.getByText(note);
+    expect(hidden.classList.contains("vh")).toBe(true); // screen readers still get it
+    expect(screen.getByRole("radiogroup", { name: "Currency" }).getAttribute("aria-describedby")).toBe(hidden.id);
   });
 });
 

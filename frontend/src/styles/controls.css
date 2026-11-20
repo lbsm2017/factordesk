@@ -155,8 +155,8 @@
 .side-group .ccy-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-3); }
 .ccy-seg { flex: none; }
 .ccy-seg .seg-opt span { min-width: 56px; }
-.ccy-note { margin-top: var(--s-1); }
+/* the note is in the label tooltip (title); the dotted underline is the hint */
+.side-label.has-tip { text-decoration: underline dotted var(--rail-2); text-underline-offset: 3px; cursor: help; }
 .side-group .fs-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-2); }
 .fs-seg { flex: none; }
 .fs-seg .seg-opt span { min-width: 64px; }
-.fs-note { margin-top: var(--s-1); }

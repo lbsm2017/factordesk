@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 import pandas as pd
@@ -205,6 +205,11 @@ def _to_reference(returns: pd.Series, record: str, ctx: CurrencyContext) -> pd.S
     return done.returns.iloc[int(ok.argmax()) : len(ok) - int(ok[::-1].argmax())]
 
 
+def _record_window(returns: pd.Series) -> tuple[date, date]:
+    """First and last month-end of the record."""
+    return pd.Timestamp(returns.index[0]).date(), pd.Timestamp(returns.index[-1]).date()
+
+
 def _build_upload_report(
     raw: bytes,
     name: str | None,
@@ -274,7 +279,7 @@ def _build_upload_report(
             factors_downloaded_at=_downloaded_at(frame),
             section_inputs=inputs,
             reference_currency=ccy,
-            currency=ctx.info() if ccy == "EUR" else None,
+            currency=ctx.info(_record_window(subject.returns)) if ccy == "EUR" else None,
             factor_set=factor_set,
         )
         return report, len(returns)

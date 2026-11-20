@@ -18,17 +18,25 @@ function report(patch: Record<string, unknown> = {}): FactorReport {
 afterEach(cleanup);
 
 describe("FactorSetSwitch", () => {
-  it("is a US | Europe radio group that reports the choice, with a note only for Europe", () => {
+  it("is a US | Europe radio group that reports the choice, with the note as a tooltip for Europe", () => {
     const onSelect = vi.fn();
     const { rerender } = render(<FactorSetSwitch factorSet="us" onSelect={onSelect} />);
     const group = within(screen.getByRole("radiogroup", { name: "Factor set" }));
     expect((group.getByRole("radio", { name: "US" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByText(/Developed Europe/)).toBeNull();
+    expect(screen.getByText("Factor set").getAttribute("title")).toBeNull();
     fireEvent.click(group.getByRole("radio", { name: "Europe" }));
     expect(onSelect).toHaveBeenCalledWith("europe");
     rerender(<FactorSetSwitch factorSet="europe" onSelect={onSelect} />);
     expect((screen.getByRole("radio", { name: "Europe" }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText(/Macro, energy and world beta keep their US inputs/)).toBeTruthy();
+    const label = screen.getByText("Factor set");
+    const note = "Factors: Developed Europe, five factors plus momentum. Macro, energy and world beta keep their US inputs.";
+    expect(label.getAttribute("title")).toBe(note);
+    expect(label.classList.contains("has-tip")).toBe(true);
+    expect(document.querySelector(".fs-note")).toBeNull(); // no caption on screen
+    const hidden = screen.getByText(note);
+    expect(hidden.classList.contains("vh")).toBe(true); // screen readers still get it
+    expect(screen.getByRole("radiogroup", { name: "Factor set" }).getAttribute("aria-describedby")).toBe(hidden.id);
   });
 });
 
