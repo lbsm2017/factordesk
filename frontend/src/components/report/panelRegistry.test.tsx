@@ -12,6 +12,7 @@ const ORDER = [
   "header",
   "summary",
   "price",
+  "holdings",
   "performance",
   "tail_risk",
   "exposures",

@@ -21,6 +21,7 @@ interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: "summary", label: "Summary", icon: "summary" },
   { id: "price", label: "Price", icon: "price" },
+  { id: "holdings", label: "Holdings", icon: "pie" },
   { id: "performance", label: "Drawdown", icon: "drawdown" },
   { id: "tail-risk", label: "Tail risk", icon: "risk" },
   { id: "exposures", label: "Factor exposures", icon: "exposures" },
@@ -42,6 +43,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 
 /** Report field behind each optional section; its item is hidden while the field is null or absent. */
 const SECTION_FIELD: Readonly<Record<string, keyof FactorReport>> = {
+  holdings: "holdings",
   performance: "performance",
   "tail-risk": "tail_risk",
   "alpha-strip": "alpha_strip",

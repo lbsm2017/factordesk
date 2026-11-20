@@ -24,6 +24,7 @@ import { SummaryPanel } from "./SummaryPanel";
 import { AlphaStripPanel } from "./sections/AlphaStripPanel";
 import { EnergyPanel } from "./sections/EnergyPanel";
 import { FragilityPanel } from "./sections/FragilityPanel";
+import { HoldingsPanel } from "./sections/HoldingsPanel";
 import { LazyKalmanPanel, LazyRegressionDetail, LazyShrunkBetasPanel } from "./sections/lazySections";
 import { LeadLagPanel } from "./sections/LeadLagPanel";
 import { MacroPanel } from "./sections/MacroPanel";
@@ -54,6 +55,7 @@ export const PANELS: readonly PanelEntry[] = [
   { name: "header", position: 100, Component: Header },
   { name: "summary", position: 200, Component: SummaryPanel },
   { name: "price", position: 400, Component: PricePanel },
+  { name: "holdings", position: 420, Component: HoldingsPanel },
   { name: "performance", position: 450, Component: PerformancePanel },
   { name: "tail_risk", position: 460, Component: TailRiskPanel },
   { name: "exposures", position: 500, Component: ExposuresPanel },
