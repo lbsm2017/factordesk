@@ -16,8 +16,9 @@ _ERRORS: dict[int | str, dict[str, object]] = {
     422: {
         "model": ApiError,
         "description": "The portfolio is not valid (a total over 100%, more than 50 instruments, "
-        "a weight on a line with no proxy), an instrument has no prices, is not quoted in US "
-        "dollars or shares no trading period with the others, or the history is too short.",
+        "a weight on a line with no proxy), an instrument has no prices, is quoted in an "
+        "unsupported currency or shares no trading period with the others, or the history is "
+        "too short.",
     },
     500: {"model": ApiError, "description": "The report could not be computed."},
     502: {"model": ApiError, "description": "The downloaded factor file failed validation."},
