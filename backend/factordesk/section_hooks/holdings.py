@@ -17,9 +17,11 @@ import pandas as pd
 from factordesk.analytics.backtest import CASH_ID
 from factordesk.analytics.portfolio_attribution import COST_ID, GroupPath, attribute, roll_up
 from factordesk.report.sections.holdings import HoldingKind, HoldingRow, HoldingsSection
-from factordesk.section_hooks.context import SectionContext
+from factordesk.section_hooks.context import USD_CASH_LEAF, SectionContext
 
 CASH_LABEL = "USD cash"
+EUR_CASH_LABEL = "EUR cash"
+USD_CASH_CONVERTED_LABEL = "USD cash (converted to EUR)"
 COST_LABEL = "Trading cost"
 
 
@@ -63,6 +65,10 @@ def build_holdings(ctx: SectionContext) -> HoldingsSection | None:
     # portfolio only (the backtest has one cash leaf).
     paths: dict[str, GroupPath] = {n.id: n.path for n in nodes if n.kind == "holding"}
     paths[CASH_ID] = ()
+    usd_cash = USD_CASH_LEAF in bt.target_weights.index  # the EUR view holds USD cash apart
+    if usd_cash:
+        paths[USD_CASH_LEAF] = ()
+    eur_cash = info.unallocated_currency == "EUR"
     last = bt.drifted_weights.loc[: pd.Timestamp(end)].iloc[-1]
 
     def totals(values: Mapping[str, float]) -> Mapping[GroupPath, float]:
@@ -108,11 +114,25 @@ def build_holdings(ctx: SectionContext) -> HoldingsSection | None:
                     risk_share=leaf_share(node.id),
                 )
             )
+    if usd_cash:
+        rows.append(
+            _row(
+                USD_CASH_LEAF,
+                "cash",
+                USD_CASH_CONVERTED_LABEL,
+                depth=0,
+                parent_id=None,
+                target_weight=bt.target_weights[USD_CASH_LEAF],
+                end_weight=float(last[USD_CASH_LEAF]),
+                contribution=att.contribution[USD_CASH_LEAF],
+                risk_share=leaf_share(USD_CASH_LEAF),
+            )
+        )
     rows.append(
         _row(
             CASH_ID,
             "cash",
-            CASH_LABEL,
+            EUR_CASH_LABEL if eur_cash else CASH_LABEL,
             depth=0,
             parent_id=None,
             target_weight=bt.target_weights[CASH_ID],

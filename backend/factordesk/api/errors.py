@@ -132,8 +132,7 @@ def to_api_exception(exc: BaseException, ticker: str | None = None) -> ApiExcept
         return ApiException(
             "unsupported_currency",
             str(exc),
-            "Choose a ticker quoted in US dollars. Other currencies need European factors, "
-            "which factordesk does not have yet.",
+            "Choose a ticker quoted in US dollars, euros or another major currency.",
         )
     if isinstance(exc, PriceDataError):
         return ApiException(

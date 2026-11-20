@@ -450,13 +450,13 @@ def test_a_ticker_with_no_data_from_a_provider_without_batch_is_422(tmp_path: Pa
 
 
 def test_a_non_usd_ticker_is_422(world: World, client: ApiClient) -> None:
-    world.provider.securities["BBB"] = Security(name="Euro fund", currency="EUR")
+    world.provider.securities["BBB"] = Security(name="Rand fund", currency="ZAR")
     error = refused(
         post(client, tree([holding(0, "AAA", 0.5), holding(1, "BBB", 0.5)])),
         422,
         "unsupported_currency",
     )
-    assert "BBB" in error.message and "EUR" in error.message
+    assert "BBB" in error.message and "ZAR" in error.message
     assert world.provider.many_calls == []  # refused before any price download
 
 

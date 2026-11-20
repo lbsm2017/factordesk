@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
+from factordesk.api.currency_ctx import CurrencySources, default_sources
 from factordesk.config import get_settings
 from factordesk.data.factors import (
     FactorDownloadError,
@@ -82,6 +83,9 @@ class AppDeps:
     FF6 model and the alpha strip of every report. May raise ``FactorError``: an FF6 report then
     fails, an FF5 report falls back to ``load_factors`` without the strip. ``None``: not wired, so
     FF6 is refused and FF5 reports have no alpha strip."""
+    currency: CurrencySources | None = None
+    """Exchange rates and the euro cash rate of the EUR view. ``None``: not wired, so the EUR view
+    is refused with a 503 (and a listing in another currency cannot be converted)."""
 
     def __post_init__(self) -> None:
         if self.max_workers < 1:
@@ -166,4 +170,5 @@ def default_deps(static_dir: Path | None = None) -> AppDeps:
         load_macro=macro,
         load_energy=energy,
         load_ff6=load_ff6_daily,
+        currency=default_sources(data_dir),
     )

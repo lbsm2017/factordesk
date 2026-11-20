@@ -181,6 +181,10 @@ export interface paths {
         /**
          * Get Report
          * @description The factor report for a range preset or custom dates (neither: Full history).
+         *
+         *     ``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro
+         *     rate, factors converted. The report then carries a ``currency`` block. 503 when the
+         *     exchange rates or the euro rate cannot be reached (the USD view does not need them).
          */
         get: operations["get_report_api_report__ticker__get"];
         put?: never;
@@ -560,6 +564,20 @@ export interface components {
              * @enum {string}
              */
             model: "ff5" | "ff6";
+            /**
+             * Record Currency
+             * @description Currency of the record itself: USD (default) or EUR.
+             * @default USD
+             * @enum {string}
+             */
+            record_currency: "USD" | "EUR";
+            /**
+             * Ccy
+             * @description Reference currency of the report: USD or EUR.
+             * @default USD
+             * @enum {string}
+             */
+            ccy: "USD" | "EUR";
         };
         /**
          * CorrPair
@@ -572,6 +590,33 @@ export interface components {
             b: string;
             /** Corr */
             corr: number;
+        };
+        /**
+         * CurrencyInfo
+         * @description The reference currency of a report that is not in US dollars (written only for those).
+         */
+        CurrencyInfo: {
+            /**
+             * Reference
+             * @description Currency of every figure in the report.
+             * @constant
+             */
+            reference: "EUR";
+            /**
+             * Fx Source
+             * @description Source credit of the exchange rates used; None when none were needed.
+             */
+            fx_source: string | null;
+            /**
+             * Rate Source
+             * @description Source credit of the euro cash rate (overnight rate); None when not used.
+             */
+            rate_source: string | null;
+            /**
+             * Notes
+             * @description Plain-words notices: dates dropped for lack of an exchange rate, sections left out in this currency, a source that fell back to its second choice.
+             */
+            notes: string[];
         };
         /**
          * DataInfo
@@ -1041,6 +1086,8 @@ export interface components {
              * @description Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report.
              */
             model?: "ff6" | null;
+            /** @description Reference currency of the report when it is not US dollars; absent (not null) for a USD report. */
+            currency?: components["schemas"]["CurrencyInfo"] | null;
             /**
              * Generated At
              * Format: date-time
@@ -1588,6 +1635,18 @@ export interface components {
              * @description Quote currency of the proxy.
              */
             currency: string | null;
+            /**
+             * Hedge Eur
+             * @description True for a bond line with only US-dollar underlying: the EUR view hedges it to euros (its return above US cash, plus euro cash).
+             * @default false
+             */
+            hedge_eur: boolean;
+            /**
+             * Multi Currency
+             * @description True for a bond fund that holds several currencies: the EUR view leaves it unhedged and says so.
+             * @default false
+             */
+            multi_currency: boolean;
         };
         /**
          * MacroLeg
@@ -2139,9 +2198,14 @@ export interface components {
             average_turnover: number;
             /**
              * Unallocated Weight
-             * @description Weight left over by the targets; held in USD cash.
+             * @description Weight left over by the targets; held in USD cash, or as euro cash when unallocated_currency says so.
              */
             unallocated_weight: number;
+            /**
+             * Unallocated Currency
+             * @description EUR when the unallocated weight is held as euro cash (the EUR view); absent (not null) in the USD view, where it is held in USD cash.
+             */
+            unallocated_currency?: "EUR" | null;
             /**
              * Survivorship Note
              * @description Fixed warning carried by every backtest.
@@ -2170,6 +2234,13 @@ export interface components {
              * @description Cost per unit of turnover.
              */
             cost_bps: number;
+            /**
+             * Reference Currency
+             * @description Currency of the backtest and of every figure of the report; left out of the JSON when USD.
+             * @default USD
+             * @enum {string}
+             */
+            reference_currency: "USD" | "EUR";
             root: components["schemas"]["RootGroup"];
         };
         /**
@@ -4281,6 +4352,8 @@ export interface operations {
                 end?: string | null;
                 /** @description Factor model: ff5 (default) or ff6 (FF5 plus momentum). */
                 model?: "ff5" | "ff6";
+                /** @description Reference currency of every figure: USD (default) or EUR. */
+                ccy?: "USD" | "EUR";
             };
             header?: never;
             path: {

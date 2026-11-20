@@ -29,22 +29,31 @@ from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Hashable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pandas as pd
 from fastapi import Request
 
+from factordesk.analytics.currency import convert_history, listing_currency
 from factordesk.api import ranges
+from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime
 from factordesk.data.factors import FactorError, FactorStatus
-from factordesk.data.prices import PriceHistory, Security, check_currency, security_of
+from factordesk.data.prices import PriceHistory, Security, security_of
 from factordesk.report.render_html import render_report_html
-from factordesk.report.schema import FactorModel, FactorReport, RangeOptions, RangePreset
+from factordesk.report.schema import (
+    CurrencyInfo,
+    FactorModel,
+    FactorReport,
+    RangeOptions,
+    RangePreset,
+    ReferenceCurrency,
+)
 
 if TYPE_CHECKING:
     from factordesk.api.portfolio_models import PortfolioTree
-    from factordesk.section_hooks.context import SectionInputs
+    from factordesk.section_hooks.context import SectionInputs, WorldBenchmarkInput
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +70,8 @@ def assemble_report(
     section_inputs: SectionInputs | None = None,
     security: Security | None = None,
     model: FactorModel = "ff5",
+    reference_currency: ReferenceCurrency = "USD",
+    currency: CurrencyInfo | None = None,
 ) -> FactorReport:
     """``factordesk.pipeline.assemble_report``, imported on first use.
 
@@ -80,6 +91,9 @@ def assemble_report(
         section_inputs=section_inputs,
         security=security,
         model=model,
+        reference_currency=reference_currency,
+        currency=currency,
+        converted=True,  # ``ReportService`` has converted the history and the factors
     )
 
 
@@ -177,9 +191,9 @@ class LoadedFactors:
 type PriceKey = tuple[str, date]
 type SecurityKey = tuple[str, date]
 type RangesKey = tuple[str, Vintage, date]
-type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel]
+type ReportKey = tuple[str, date | None, date | None, Vintage, date, FactorModel, ReferenceCurrency]
 type PortfolioKey = tuple[
-    str, FactorModel, RangePreset | None, date | None, date | None, Vintage, date
+    str, FactorModel, RangePreset | None, date | None, date | None, Vintage, date, ReferenceCurrency
 ]
 
 
@@ -235,6 +249,9 @@ class ReportService:
         self.securities: SingleFlight[SecurityKey, Security] = SingleFlight(PRICE_CACHE_SIZE * 4)
         self.inputs: SingleFlight[tuple[Vintage, date], SectionInputs | None] = SingleFlight(1)
         self.ff6: SingleFlight[tuple[Vintage, date], pd.DataFrame] = SingleFlight(1)
+        self.converted: SingleFlight[
+            tuple[Vintage, date, ReferenceCurrency, bool], pd.DataFrame
+        ] = SingleFlight(2)
         self.vintage: Vintage | None = None
 
     # ------------------------------------------------------------------ public
@@ -246,17 +263,23 @@ class ReportService:
         start: date | None = None,
         end: date | None = None,
         model: FactorModel = "ff5",
+        ccy: ReferenceCurrency = "USD",
     ) -> FactorReport:
         """The report for an already validated ticker; no range and no dates means FULL.
 
-        ``model`` is the factor model, FF5 (default) or FF6 (FF5 plus momentum).
+        ``model`` is the factor model, FF5 (default) or FF6 (FF5 plus momentum). ``ccy`` is the
+        reference currency of every figure, USD (default) or EUR.
         """
         started = time.perf_counter()
         logger.info(
-            "Report start: %s, model %s, range %s", ticker, model, _range_text(preset, start, end)
+            "Report start: %s, model %s, %s, range %s",
+            ticker,
+            model,
+            ccy,
+            _range_text(preset, start, end),
         )
         try:
-            return await self._report(ticker, preset, start, end, model, started)
+            return await self._report(ticker, preset, start, end, model, ccy, started)
         except Exception as exc:
             category = to_api_exception(exc, ticker).code
             logger.info("Report refused: %s, reason %s", ticker, category)
@@ -269,16 +292,20 @@ class ReportService:
         start: date | None,
         end: date | None,
         model: FactorModel,
+        ccy: ReferenceCurrency,
         started: float,
     ) -> FactorReport:
         ranges.check_request(preset, start, end)
         now = self._now()
         loaded = await self._factors()
         security = await self._security(ticker, now.date())
+        listing, scale = listing_currency(ticker, security)
         history = await self._history(ticker, now.date())
+        ctx = CurrencyContext(ccy, self.deps.currency)
+        history = await self.runtime.run(self._to_reference, ticker, history, listing, scale, ctx)
         cov = await self.runtime.run(ranges.coverage, history, loaded.frame)
         first, last = ranges.resolve(preset, start, end, cov)
-        key: ReportKey = (ticker, first, last, loaded.vintage, now.date(), model)
+        key: ReportKey = (ticker, first, last, loaded.vintage, now.date(), model, ccy)
         if key in self.reports:
             logger.info(
                 "Report cache hit: %s, model %s (%.0f ms)",
@@ -288,11 +315,11 @@ class ReportService:
             )
 
         async def make() -> FactorReport:
-            frame = await self._model_frame(loaded, now, model)
+            frame = await self._model_frame(loaded, now, model, ctx)
             inputs = await self._section_inputs(loaded.vintage, now)
-            inputs = await self._with_world_benchmark(inputs)
-            inputs = await self._with_macro(inputs)
-            inputs = await self._with_energy(inputs)
+            inputs = await self._with_world_benchmark(inputs, ctx)
+            inputs = await self._with_macro(inputs, ctx)
+            inputs = await self._with_energy(inputs, ctx)
 
             def build() -> FactorReport:
                 return assemble_report(
@@ -306,6 +333,8 @@ class ReportService:
                     section_inputs=inputs,
                     security=security,
                     model=model,
+                    reference_currency=ccy,
+                    currency=None if ccy == "USD" else ctx.info(),
                 )
 
             built_at = time.perf_counter()
@@ -340,33 +369,51 @@ class ReportService:
         started = time.perf_counter()
         ranges.check_request(preset, start, end)
         plan = pr.plan_of(tree)
+        ccy = tree.reference_currency
+        tickers = pr.tickers_for(plan, ccy)
         logger.info(
-            "Portfolio report start: %d instruments, model %s, range %s",
+            "Portfolio report start: %d instruments, model %s, %s, range %s",
             len(plan.rows),
             model,
+            ccy,
             _range_text(preset, start, end),
         )
         now = self._now()
         loaded = await self._factors()
-        key: PortfolioKey = (plan.digest, model, preset, start, end, loaded.vintage, now.date())
+        key: PortfolioKey = (
+            plan.digest,
+            model,
+            preset,
+            start,
+            end,
+            loaded.vintage,
+            now.date(),
+            ccy,
+        )
         if key in self.portfolios:
             logger.info("Portfolio report cache hit")
 
         async def make() -> FactorReport:
-            for ticker in plan.tickers:
-                await self._security(ticker, now.date())  # refuses a currency other than USD
+            ctx = CurrencyContext(ccy, self.deps.currency)
+            listings: dict[str, tuple[str, float]] = {}
+            for ticker in tickers:  # refuses a currency that cannot be converted
+                security = await self._security(ticker, now.date())
+                listings[ticker] = listing_currency(ticker, security)
             histories = await self.runtime.run(
-                pr.fetch_histories, self.deps.price_provider, plan.tickers
+                pr.fetch_histories, self.deps.price_provider, tickers
             )
-            frame = await self._model_frame(loaded, now, model)
-            inputs = await self._with_world_benchmark(None)
-            inputs = await self._with_macro(inputs)
-            inputs = await self._with_energy(inputs)
+            frame = await self._model_frame(loaded, now, model, ctx)
+            inputs = await self._with_world_benchmark(None, ctx)
+            inputs = await self._with_macro(inputs, ctx)
+            inputs = await self._with_energy(inputs, ctx)
 
             def build() -> FactorReport:
+                converted = {
+                    t: self._to_reference(t, h, *listings[t], ctx) for t, h in histories.items()
+                }
                 return pr.build_portfolio_report(
                     plan,
-                    histories,
+                    converted,
                     frame,
                     model,
                     now=now,
@@ -375,6 +422,9 @@ class ReportService:
                     start=start,
                     end=end,
                     inputs=inputs,
+                    ctx=ctx,
+                    usd_rf=loaded.frame["RF"],
+                    listings={t: code for t, (code, _) in listings.items()},
                 )
 
             report = await self.runtime.run(build)
@@ -428,6 +478,7 @@ class ReportService:
             self.reports.discard(lambda key: key[3] == current)
             self.ranges.discard(lambda key: key[1] == current)
             self.portfolios.discard(lambda key: key[5] == current)
+            self.converted.discard(lambda key: key[0] == current)
         return loaded
 
     async def _load_factors(self) -> LoadedFactors:
@@ -442,9 +493,38 @@ class ReportService:
         return LoadedFactors(Vintage(status.last_date, _utc(status.last_download_at)), frame)
 
     async def _model_frame(
+        self,
+        loaded: LoadedFactors,
+        now: datetime,
+        model: FactorModel,
+        ctx: CurrencyContext | None = None,
+    ) -> pd.DataFrame:
+        """The factor frame of a report, in the reference currency of ``ctx`` (default USD).
+
+        The USD frame is the FF6 frame, or the FF5 one when FF5 cannot have it; the EUR frame is
+        that frame converted once per vintage and day (``CurrencyContext.factors``).
+        """
+        frame = await self._usd_model_frame(loaded, now, model)
+        if ctx is None or ctx.ref == "USD":
+            return frame
+        key: tuple[Vintage, date, ReferenceCurrency, bool] = (
+            loaded.vintage,
+            now.date(),
+            cast(ReferenceCurrency, ctx.ref),
+            "Mom" in frame.columns,
+        )
+
+        async def make() -> pd.DataFrame:
+            return await self.runtime.run(ctx.factors, frame)
+
+        out = await self.converted.get(key, make)
+        ctx.absorb(out)
+        return out
+
+    async def _usd_model_frame(
         self, loaded: LoadedFactors, now: datetime, model: FactorModel
     ) -> pd.DataFrame:
-        """The factor frame of a report: the FF6 frame, or the FF5 one when FF5 cannot have it.
+        """The USD frame: the FF6 frame, or the FF5 one when FF5 cannot have it.
 
         FF6 needs ``AppDeps.load_ff6``; without it the request is refused, and a loader error is
         raised as is. FF5 uses the FF6 frame for the alpha strip when it loads, else the FF5 frame.
@@ -482,11 +562,12 @@ class ReportService:
         return await self.inputs.get((vintage, now.date()), make)
 
     async def _security(self, ticker: str, today: date) -> Security | None:
-        """The ticker's Yahoo metadata, or None when unavailable; refuses a non-USD currency.
+        """The ticker's Yahoo metadata, or None when unavailable; refuses a currency that cannot
+        be converted.
 
         Metadata never blocks a report: a missing or failed read gives None (not cached, so the
-        next request tries again). A known currency other than USD raises
-        ``UnsupportedCurrencyError`` before the price history is downloaded (roadmap N1).
+        next request tries again). A known currency outside ``data.fx.CURRENCIES`` raises
+        ``UnsupportedCurrencyError`` before the price history is downloaded.
         """
 
         async def make() -> Security:
@@ -499,28 +580,75 @@ class ReportService:
             security = await self.securities.get((ticker, today), make)
         except _NoSecurity:
             return None
-        check_currency(ticker, security)
+        listing_currency(ticker, security)
         return security
 
-    async def _with_world_benchmark(self, inputs: SectionInputs | None) -> SectionInputs | None:
-        """``inputs`` plus the ACWI and IEUR histories, refreshed now (None: not wired)."""
+    async def _with_world_benchmark(
+        self, inputs: SectionInputs | None, ctx: CurrencyContext
+    ) -> SectionInputs | None:
+        """``inputs`` plus the ACWI and IEUR histories, refreshed now (None: not wired).
+
+        In the EUR view the two US-dollar histories are converted and the shrunk betas (they
+        need US factor portfolios) are left out."""
+        import dataclasses
+
         loader = self.deps.load_world_benchmark
+        if ctx.ref != "USD":
+            if inputs is not None:
+                inputs = dataclasses.replace(inputs, shrinkage_portfolios=None)
+            ctx.note("The shrunk-betas section is not available in EUR yet.")
         if loader is None:
             return inputs
-        import dataclasses
 
         from factordesk.section_hooks.context import SectionInputs
 
         benchmark = await self.runtime.run(loader)
         europe_loader = self.deps.load_europe_benchmark
         europe = None if europe_loader is None else await self.runtime.run(europe_loader)
+        if ctx.ref != "USD":
+            benchmark = await self.runtime.run(self._benchmark_to_reference, benchmark, ctx)
+            if europe is not None:
+                europe = await self.runtime.run(self._benchmark_to_reference, europe, ctx)
         return dataclasses.replace(
             inputs or SectionInputs(), world_benchmark=benchmark, europe_benchmark=europe
         )
 
-    async def _with_macro(self, inputs: SectionInputs | None) -> SectionInputs | None:
-        """``inputs`` plus the macro section's funds and dollar index (None: not wired)."""
+    @staticmethod
+    def _benchmark_to_reference(
+        bench: WorldBenchmarkInput, ctx: CurrencyContext
+    ) -> WorldBenchmarkInput:
+        """A US-dollar benchmark history in the reference currency (blocking)."""
+        import dataclasses
+
+        if bench.history is None:
+            return bench
+        history, dropped = convert_history(bench.history, lambda d: ctx.prices("USD", d))
+        if dropped:
+            ctx.note(f"{dropped} benchmark dates had no exchange rate and are left out.")
+        return dataclasses.replace(bench, history=history)
+
+    @staticmethod
+    def _to_reference(
+        ticker: str, history: PriceHistory, listing: str, scale: float, ctx: CurrencyContext
+    ) -> PriceHistory:
+        """A listing's price history in the reference currency (blocking; the same object when
+        no conversion is needed). Dates without an exchange rate are left out and noted."""
+        if listing == ctx.ref and scale == 1.0:
+            return history
+        converted, dropped = convert_history(history, lambda d: ctx.prices(listing, d), scale)
+        if dropped:
+            ctx.note(f"{ticker}: {dropped} dates had no exchange rate and are left out.")
+        return converted
+
+    async def _with_macro(
+        self, inputs: SectionInputs | None, ctx: CurrencyContext
+    ) -> SectionInputs | None:
+        """``inputs`` plus the macro section's funds and dollar index (None: not wired). Left
+        out in the EUR view."""
         loader = self.deps.load_macro
+        if ctx.ref != "USD":
+            ctx.note("The macro section is not available in EUR yet.")
+            return inputs
         if loader is None:
             return inputs
         import dataclasses
@@ -530,9 +658,15 @@ class ReportService:
         macro = await self.runtime.run(loader)
         return dataclasses.replace(inputs or SectionInputs(), macro=macro)
 
-    async def _with_energy(self, inputs: SectionInputs | None) -> SectionInputs | None:
-        """``inputs`` plus the energy section's oil, gas and KRBN data (None: not wired)."""
+    async def _with_energy(
+        self, inputs: SectionInputs | None, ctx: CurrencyContext
+    ) -> SectionInputs | None:
+        """``inputs`` plus the energy section's oil, gas and KRBN data (None: not wired). Left
+        out in the EUR view."""
         loader = self.deps.load_energy
+        if ctx.ref != "USD":
+            ctx.note("The energy section is not available in EUR yet.")
+            return inputs
         if loader is None:
             return inputs
         import dataclasses

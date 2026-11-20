@@ -91,6 +91,7 @@ from factordesk.report.schema import (
     AverageBeta,
     AverageBetaPanel,
     CorrPair,
+    CurrencyInfo,
     DataInfo,
     DiagnosticCode,
     DiagnosticTest,
@@ -899,6 +900,9 @@ def assemble_report(
     section_inputs: SectionInputs | None = None,
     security: Security | None = None,
     model: FactorModel = "ff5",
+    reference_currency: str = SUPPORTED_CURRENCY,
+    currency: CurrencyInfo | None = None,
+    converted: bool = False,
 ) -> FactorReport:
     """Pure part of ``build_report``: everything after the data has been fetched.
 
@@ -909,11 +913,19 @@ def assemble_report(
     ``UnsupportedCurrencyError`` (roadmap N1, an unknown currency does not). A wrapper over
     ``assemble_subject_report`` with the daily ticker subject of ``history``; ``model`` is FF5
     (default) or FF6, which needs the ``Mom`` column of ``data.french.load_ff6``.
+    ``converted`` says the caller already converted ``history`` and ``factor_frame`` to
+    ``reference_currency`` (the listing currency is then not refused); ``currency`` is the
+    report's ``currency`` block for a reference other than USD.
     """
-    check_currency(ticker, security)
+    if not converted:
+        check_currency(ticker, security)
     history = unique_dates(history)
     subject = subject_from_history(
-        history, label=ticker, currency=None if security is None else security.currency
+        history,
+        label=ticker,
+        currency=reference_currency
+        if converted
+        else (None if security is None else security.currency),
     )
     return assemble_subject_report(
         subject,
@@ -927,6 +939,8 @@ def assemble_report(
         end=end,
         section_inputs=section_inputs,
         security=security,
+        reference_currency=reference_currency,
+        currency=currency,
     )
 
 
@@ -960,10 +974,10 @@ def _subject_info(subject: ReturnSubject) -> SubjectInfo | None:
     )
 
 
-def _check_subject_currency(subject: ReturnSubject) -> None:
-    """Only US-dollar returns are analysed (owner decision); an unknown currency passes."""
+def _check_subject_currency(subject: ReturnSubject, reference: str) -> None:
+    """The subject must be in the reference currency of the factors; an unknown one passes."""
     currency = subject.currency
-    if currency is not None and currency.strip().upper() != SUPPORTED_CURRENCY:
+    if currency is not None and currency.strip().upper() != reference:
         raise UnsupportedCurrencyError(subject.label, currency.strip())
 
 
@@ -1011,6 +1025,8 @@ def assemble_subject_report(
     end: date | None = None,
     section_inputs: SectionInputs | None = None,
     security: Security | None = None,
+    reference_currency: str = SUPPORTED_CURRENCY,
+    currency: CurrencyInfo | None = None,
 ) -> FactorReport:
     """The report of any return subject: the engine behind every mode.
 
@@ -1020,14 +1036,16 @@ def assemble_subject_report(
     momentum, which needs the ``Mom`` column; its sample keeps the dates where ``Mom`` exists).
     A frame with ``Mom`` also gives the alpha strip under FF5; the FF5 sections do not change.
     Annualised figures use ``subject.periods``.
+    ``reference_currency`` is the currency of the subject and of ``factor_frame`` (the caller
+    converts both); ``currency`` is the report's ``currency`` block when it is not USD.
     A ticker subject's report is exactly ``assemble_report``'s. A subject in a known currency
-    other than USD raises ``UnsupportedCurrencyError``; fewer aligned rows than the frequency's
-    floor raise ``InsufficientHistoryError`` (daily 504, monthly 36).
+    other than the reference raises ``UnsupportedCurrencyError``; fewer aligned rows than the
+    frequency's floor raise ``InsufficientHistoryError`` (daily 504, monthly 36).
     """
     if model not in FACTOR_MODELS:
         raise ValueError(f"unknown factor model {model!r}; use 'ff5' or 'ff6'")
     codes = model_codes(model)
-    _check_subject_currency(subject)
+    _check_subject_currency(subject, reference_currency)
     is_daily = subject.frequency == "daily"
     periods = subject.periods
     audit = _subject_audit(subject)
@@ -1168,6 +1186,7 @@ def assemble_subject_report(
         {
             "ticker": subject.label,
             "subject": _subject_info(subject),
+            "currency": currency,
             "model": "ff6" if model == "ff6" else None,
             "generated_at": now,
             "data": core.data,

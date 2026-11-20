@@ -41,7 +41,7 @@ def test_identity_does_not_call_fx() -> None:
 
     out = convert_series(R, "usd", "USD", boom)
     assert out.returns is R
-    assert out.dropped == 0
+    assert out.missing == 0
     assert out.notice is None
 
 
@@ -55,13 +55,13 @@ def test_hedge_swaps_cash() -> None:
     np.testing.assert_allclose((out - R).to_numpy(), 0.0003)
 
 
-def test_missing_fx_dates_are_dropped_and_counted() -> None:
+def test_missing_fx_dates_stay_nan_and_are_counted() -> None:
     fx = F.copy()
     fx.iloc[[1, 4]] = np.nan
     out = convert_series(R, "USD", "EUR", lambda: fx)
-    assert out.dropped == 2
-    assert len(out.returns) == 4
-    assert out.returns.notna().all()
+    assert out.missing == 2
+    assert out.returns.index.equals(R.index)  # the calendar is not rebuilt
+    assert out.returns.isna().sum() == 2
     assert out.notice is not None and "2 dates" in out.notice
 
 
@@ -137,7 +137,12 @@ def test_converted_history_returns_match_convert() -> None:
     assert (out.frame["volume"] == 100.0).all()
     price.iloc[0] = np.nan
     short, dropped = convert_history(history, lambda d: price.reindex(d))
-    assert dropped == 1 and len(short.frame) == 5
+    assert dropped == 1 and len(short.frame) == 5  # a leading row without a rate is cut
+    price.iloc[0], price.iloc[3] = 0.92, np.nan
+    hole, counted = convert_history(history, lambda d: price.reindex(d))
+    assert counted == 1 and len(hole.frame) == 6  # an inner row stays, with NaN prices
+    assert np.isnan(hole.frame["adj_close"].iloc[3])
+    assert hole.total_returns.isna().sum() == 2  # the sample excludes both returns
 
 
 def test_pence_are_divided_by_one_hundred() -> None:
@@ -147,6 +152,10 @@ def test_pence_are_divided_by_one_hundred() -> None:
     assert listing_currency("X", None) == ("USD", 1.0)
     with pytest.raises(UnsupportedCurrencyError):
         listing_currency("X.JO", Security(currency="ZAR"))
+    for security in (None, Security(name="No currency")):
+        with pytest.raises(UnsupportedCurrencyError, match="no quote currency"):
+            listing_currency("SAP.DE", security)
+    assert listing_currency("BRK.B", None) == ("USD", 1.0)  # a US class share
     idx = pd.bdate_range("2023-01-02", periods=3, name="date")
     frame = pd.DataFrame({"close": 250.0, "adj_close": 250.0, "dividends": 0.0}, index=idx)
     history = PriceHistory("X.L", frame, datetime(2023, 2, 1, tzinfo=UTC), "test")

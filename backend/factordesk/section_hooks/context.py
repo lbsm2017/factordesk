@@ -53,6 +53,11 @@ class WorldBenchmarkInput:
     note: str | None = None
 
 
+USD_CASH_LEAF = "usd_cash"
+"""Backtest leaf of the USD cash instruments in the EUR view (their return is converted); the
+unallocated weight stays in the backtest's own cash leaf, which is euro cash in that view."""
+
+
 @dataclass(frozen=True)
 class HoldingsNode:
     """One group or holding of the portfolio tree, as the holdings table lists it."""
@@ -109,6 +114,8 @@ class PortfolioBacktestInput:
     weights: tuple[tuple[str, str | None, float], ...]
     holdings: HoldingsInput | None = None
     """The backtest and tree layout behind the holdings section (read by the ``holdings`` hook)."""
+    unallocated_currency: str | None = None
+    """``"EUR"`` when the unallocated weight is held as euro cash (the EUR view); ``None``: USD."""
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ from factordesk.data.fx import (
     SOURCE_FRED,
     FxResult,
     credit,
+    fx_prices,
     fx_returns,
 )
 from factordesk.data.rates import (
@@ -442,3 +443,30 @@ def test_fx_downloads_once_per_day_per_series(tmp_path: Path) -> None:
     assert calls == ["D.USD.EUR.SP00.A"]
     last = results[-1].series
     assert last is not None and not np.isnan(last.to_numpy()[1:]).any()
+
+
+def test_fx_prices_usd_in_eur_is_finite_and_the_inverse_of_the_ecb_rate(tmp_path: Path) -> None:
+    usd = {"2024-04-29": 1.07, "2024-04-30": 1.08, "2024-05-02": 1.10}
+    dates = day_index("2024-04-29", "2024-04-30", "2024-05-01", "2024-05-02")
+    res = fx_prices(
+        "USD", "EUR", dates, data_dir=tmp_path, now=NOW, fetch_ecb=ecb_fetcher({"USD": usd})
+    )
+    assert res.series is not None and res.source == SOURCE_ECB
+    assert list(res.series.index) == list(dates)
+    np.testing.assert_allclose(
+        res.series.to_numpy(), [1 / 1.07, 1 / 1.08, 1 / 1.08, 1 / 1.10], rtol=0, atol=TOL
+    )
+    same = fx_prices("EUR", "EUR", dates, data_dir=tmp_path, now=NOW)
+    assert same.series is not None and (same.series == 1.0).all()
+
+
+def test_fx_prices_older_than_seven_days_is_nan(tmp_path: Path) -> None:
+    usd = {"2024-04-29": 1.07, "2024-04-30": 1.08}
+    dates = day_index("2024-04-30", "2024-05-03", "2024-05-07", "2024-05-13")
+    res = fx_prices(
+        "USD", "EUR", dates, data_dir=tmp_path, now=NOW, fetch_ecb=ecb_fetcher({"USD": usd})
+    )
+    assert res.series is not None
+    got = res.series.to_numpy()
+    assert np.isfinite(got[:3]).all()  # up to 7 days old is carried
+    assert np.isnan(got[3])

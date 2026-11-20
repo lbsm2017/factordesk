@@ -487,7 +487,7 @@
     "/api/report/{ticker}": {
       "get": {
         "summary": "Get Report",
-        "description": "The factor report for a range preset or custom dates (neither: Full history).",
+        "description": "The factor report for a range preset or custom dates (neither: Full history).\n\n``ccy=EUR`` shows it in euros: returns converted with the exchange rate, cash at the euro\nrate, factors converted. The report then carries a ``currency`` block. 503 when the\nexchange rates or the euro rate cannot be reached (the USD view does not need them).",
         "operationId": "get_report_api_report__ticker__get",
         "parameters": [
           {
@@ -576,6 +576,22 @@
               "title": "Model"
             },
             "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum)."
+          },
+          {
+            "name": "ccy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "USD",
+                "EUR"
+              ],
+              "type": "string",
+              "description": "Reference currency of every figure: USD (default) or EUR.",
+              "default": "USD",
+              "title": "Ccy"
+            },
+            "description": "Reference currency of every figure: USD (default) or EUR."
           }
         ],
         "responses": {
@@ -1566,6 +1582,26 @@
             "title": "Model",
             "description": "Factor model: ff5 (default) or ff6 (FF5 plus momentum).",
             "default": "ff5"
+          },
+          "record_currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Record Currency",
+            "description": "Currency of the record itself: USD (default) or EUR.",
+            "default": "USD"
+          },
+          "ccy": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Ccy",
+            "description": "Reference currency of the report: USD or EUR.",
+            "default": "USD"
           }
         },
         "type": "object",
@@ -1598,6 +1634,58 @@
         ],
         "title": "CorrPair",
         "description": "A factor pair whose sample correlation exceeds 0.6 in absolute value (M3.4)."
+      },
+      "CurrencyInfo": {
+        "properties": {
+          "reference": {
+            "type": "string",
+            "const": "EUR",
+            "title": "Reference",
+            "description": "Currency of every figure in the report."
+          },
+          "fx_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Source",
+            "description": "Source credit of the exchange rates used; None when none were needed."
+          },
+          "rate_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Source",
+            "description": "Source credit of the euro cash rate (overnight rate); None when not used."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "Plain-words notices: dates dropped for lack of an exchange rate, sections left out in this currency, a source that fell back to its second choice."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reference",
+          "fx_source",
+          "rate_source",
+          "notes"
+        ],
+        "title": "CurrencyInfo",
+        "description": "The reference currency of a report that is not in US dollars (written only for those)."
       },
       "DataInfo": {
         "properties": {
@@ -2497,6 +2585,17 @@
             ],
             "title": "Model",
             "description": "Factor model of the regression when it is not FF5: ff6 = FF5 + momentum (Mom). Absent (not null) for an FF5 report."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reference currency of the report when it is not US dollars; absent (not null) for a USD report."
           },
           "generated_at": {
             "type": "string",
@@ -3733,6 +3832,18 @@
             ],
             "title": "Currency",
             "description": "Quote currency of the proxy."
+          },
+          "hedge_eur": {
+            "type": "boolean",
+            "title": "Hedge Eur",
+            "description": "True for a bond line with only US-dollar underlying: the EUR view hedges it to euros (its return above US cash, plus euro cash).",
+            "default": false
+          },
+          "multi_currency": {
+            "type": "boolean",
+            "title": "Multi Currency",
+            "description": "True for a bond fund that holds several currencies: the EUR view leaves it unhedged and says so.",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -3745,7 +3856,9 @@
           "proxy_kind",
           "note",
           "first_date",
-          "currency"
+          "currency",
+          "hedge_eur",
+          "multi_currency"
         ],
         "title": "LibraryLine",
         "description": "One sub-asset class of the owner's Asset Class Library and the proxy that stands for it."
@@ -4934,7 +5047,20 @@
             "maximum": 1.0,
             "minimum": 0.0,
             "title": "Unallocated Weight",
-            "description": "Weight left over by the targets; held in USD cash."
+            "description": "Weight left over by the targets; held in USD cash, or as euro cash when unallocated_currency says so."
+          },
+          "unallocated_currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "EUR"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Currency",
+            "description": "EUR when the unallocated weight is held as euro cash (the EUR view); absent (not null) in the USD view, where it is held in USD cash."
           },
           "survivorship_note": {
             "type": "string",
@@ -4993,6 +5119,16 @@
             "minimum": 0.0,
             "title": "Cost Bps",
             "description": "Cost per unit of turnover."
+          },
+          "reference_currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "EUR"
+            ],
+            "title": "Reference Currency",
+            "description": "Currency of the backtest and of every figure of the report; left out of the JSON when USD.",
+            "default": "USD"
           },
           "root": {
             "$ref": "#/components/schemas/RootGroup"

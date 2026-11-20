@@ -45,6 +45,7 @@ def build_portfolio_backtest(ctx: SectionContext) -> PortfolioBacktestSection | 
         total_cost=info.total_cost,
         average_turnover=info.average_turnover,
         unallocated_weight=info.unallocated_weight,
+        unallocated_currency="EUR" if info.unallocated_currency == "EUR" else None,
         survivorship_note=info.survivorship_note,
         weights=[
             TargetWeightRow(label=label, ticker=ticker, weight=weight)

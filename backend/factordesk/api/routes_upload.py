@@ -19,8 +19,10 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from factordesk.analytics.currency import convert_series
 from factordesk.analytics.sample import DegenerateInputError, InsufficientHistoryError
 from factordesk.analytics.subject import subject_from_monthly_returns
+from factordesk.api.currency_ctx import CurrencyContext
 from factordesk.api.errors import ApiException, to_api_exception
 from factordesk.api.runtime import Runtime, get_runtime
 from factordesk.data.factors import FactorError
@@ -32,7 +34,7 @@ from factordesk.data.upload import (
     parse_gross_net,
     parse_monthly_csv,
 )
-from factordesk.report.schema import ApiError, FactorModel, FactorReport
+from factordesk.report.schema import ApiError, FactorModel, FactorReport, ReferenceCurrency
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +148,12 @@ def build_upload_report(
     gross_net: str | None,
     runtime: Runtime,
     model: FactorModel = "ff5",
+    record_currency: ReferenceCurrency = "USD",
+    ccy: ReferenceCurrency = "USD",
 ) -> FactorReport:
     """Parse, validate and analyse an uploaded monthly record (blocking; run in a worker).
+
+    The record is in ``record_currency`` and the report in ``ccy`` (month-end exchange rates).
 
     Logs the row count, the frequency, the seconds and, on a refusal, its reason category. It
     never logs the file's contents, its name or the display name.
@@ -155,7 +161,9 @@ def build_upload_report(
     started = time.perf_counter()
     rows = 0
     try:
-        report, rows = _build_upload_report(raw, name, gross_net, runtime, model)
+        report, rows = _build_upload_report(
+            raw, name, gross_net, runtime, model, record_currency, ccy
+        )
     except Exception as exc:
         category = to_api_exception(exc).code
         logger.info("Upload refused: reason %s (%.1f s)", category, time.perf_counter() - started)
@@ -169,12 +177,32 @@ def build_upload_report(
     return report
 
 
+def _to_reference(returns: pd.Series, record: str, ctx: CurrencyContext) -> pd.Series:
+    """The record's monthly returns in the reference currency, with month-end exchange rates.
+
+    Months with no exchange rate (before 1999, or after the last one) are cut at the ends and
+    noted; the months stay consecutive. Nothing is filled.
+    """
+    if record == ctx.ref:
+        return returns
+    stamps = pd.DatetimeIndex(returns.index)  # calendar month-ends, set by the subject
+    calendar = pd.DatetimeIndex([stamps[0] - pd.offsets.MonthEnd(1), *stamps], name="date")
+    done = convert_series(returns, record, ctx.ref, lambda: ctx.returns(record, calendar))
+    ctx.note(done.notice)
+    ok = done.returns.notna().to_numpy()
+    if not ok.any():
+        return done.returns
+    return done.returns.iloc[int(ok.argmax()) : len(ok) - int(ok[::-1].argmax())]
+
+
 def _build_upload_report(
     raw: bytes,
     name: str | None,
     gross_net: str | None,
     runtime: Runtime,
     model: FactorModel,
+    record_currency: ReferenceCurrency,
+    ccy: ReferenceCurrency,
 ) -> tuple[FactorReport, int]:
     from factordesk.pipeline import assemble_subject_report
     from factordesk.section_hooks.context import SectionInputs
@@ -183,11 +211,16 @@ def _build_upload_report(
     try:
         flag = parse_gross_net(gross_net)
         returns = parse_monthly_csv(raw)
-        subject = subject_from_monthly_returns(
-            returns,
-            label=label,
-            meta={} if flag is None else {"gross_net": flag},
-        )
+        ctx = CurrencyContext(ccy, runtime.deps.currency)
+        meta = {} if flag is None else {"gross_net": flag}
+        subject = subject_from_monthly_returns(returns, label=label, currency=ccy, meta=meta)
+        if record_currency != ccy:  # the checks above ran on the record as sent
+            subject = subject_from_monthly_returns(
+                _to_reference(subject.returns, record_currency, ctx),
+                label=label,
+                currency=ccy,
+                meta=meta,
+            )
     except (UploadError, ValueError) as exc:
         raise ApiException(
             "invalid_upload",
@@ -199,14 +232,19 @@ def _build_upload_report(
     frame = monthly_frame(model, runtime, now)
     load_macro = runtime.deps.load_macro
     load_energy = runtime.deps.load_energy
-    inputs = (
-        None
-        if load_macro is None and load_energy is None
-        else SectionInputs(
-            macro=None if load_macro is None else load_macro(),
-            energy=None if load_energy is None else load_energy(),
+    if ccy == "EUR":
+        frame = ctx.factors(frame)
+        ctx.note("The macro and energy sections are not available in EUR yet.")
+        inputs = None
+    else:
+        inputs = (
+            None
+            if load_macro is None and load_energy is None
+            else SectionInputs(
+                macro=None if load_macro is None else load_macro(),
+                energy=None if load_energy is None else load_energy(),
+            )
         )
-    )
     try:
         report = assemble_subject_report(
             subject,
@@ -215,6 +253,8 @@ def _build_upload_report(
             now=now,
             factors_downloaded_at=_downloaded_at(frame),
             section_inputs=inputs,
+            reference_currency=ccy,
+            currency=ctx.info() if ccy == "EUR" else None,
         )
         return report, len(returns)
     except InsufficientHistoryError as exc:
@@ -238,6 +278,12 @@ async def upload_report(
     model: Annotated[
         FactorModel, Form(description="Factor model: ff5 (default) or ff6 (FF5 plus momentum).")
     ] = "ff5",
+    record_currency: Annotated[
+        ReferenceCurrency, Form(description="Currency of the record itself: USD (default) or EUR.")
+    ] = "USD",
+    ccy: Annotated[
+        ReferenceCurrency, Form(description="Reference currency of the report: USD or EUR.")
+    ] = "USD",
 ) -> FactorReport:
     """The factor report of an uploaded monthly track record (kept in memory, never stored)."""
     runtime = get_runtime(request)
@@ -245,4 +291,6 @@ async def upload_report(
     await file.close()
     if len(raw) > MAX_UPLOAD_BYTES:
         raise _too_large()
-    return await runtime.run(build_upload_report, raw, name, gross_net, runtime, model)
+    return await runtime.run(
+        build_upload_report, raw, name, gross_net, runtime, model, record_currency, ccy
+    )

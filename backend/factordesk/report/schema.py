@@ -516,6 +516,7 @@ class PriceSeries(FrozenModel):
 
 _OMITTED_WHEN_DEFAULT: tuple[str, ...] = (
     "subject",
+    "currency",
     "model",
     "alpha_strip",
     "portfolio_backtest",
@@ -532,6 +533,26 @@ def _subject_not_required(schema: JsonDict) -> None:
     required = schema.get("required")
     if isinstance(required, list):
         schema["required"] = [name for name in required if name not in _OMITTED_WHEN_DEFAULT]
+
+
+ReferenceCurrency = Literal["USD", "EUR"]
+"""The currencies a report can be shown in (decision: reference currency)."""
+
+
+class CurrencyInfo(FrozenModel):
+    """The reference currency of a report that is not in US dollars (written only for those)."""
+
+    reference: Literal["EUR"] = Field(description="Currency of every figure in the report.")
+    fx_source: str | None = Field(
+        description="Source credit of the exchange rates used; None when none were needed."
+    )
+    rate_source: str | None = Field(
+        description="Source credit of the euro cash rate (overnight rate); None when not used."
+    )
+    notes: list[str] = Field(
+        description="Plain-words notices: dates dropped for lack of an exchange rate, sections "
+        "left out in this currency, a source that fell back to its second choice."
+    )
 
 
 class FactorReport(FrozenModel):
@@ -552,6 +573,12 @@ class FactorReport(FrozenModel):
         exclude_if=lambda value: value is None,
         description="Factor model of the regression when it is not FF5: ff6 = FF5 + momentum "
         "(Mom). Absent (not null) for an FF5 report.",
+    )
+    currency: CurrencyInfo | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description="Reference currency of the report when it is not US dollars; absent (not "
+        "null) for a USD report.",
     )
     generated_at: datetime = Field(description="Timezone-aware UTC timestamp.")
     data: DataInfo
@@ -657,6 +684,8 @@ class FactorReport(FrozenModel):
             present = [s.report_field for s in SECTIONS if getattr(self, s.report_field)]
             if self.subject is not None:
                 present.append("subject")
+            if self.currency is not None:
+                present.append("currency")
             if self.model is not None:
                 present.append("model")
             if present:
