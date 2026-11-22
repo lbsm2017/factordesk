@@ -32,6 +32,10 @@ A public repository can be copied, cached and indexed as soon as it opens, and i
 | Licences of dependencies | Python and JavaScript lockfiles | All runtime dependencies permissive ([audit](decision-open-source-mit-license.md)) |
 | Data terms | FRED, ECB, SNB added to [docs/references.md](../docs/references.md#data-sources-and-licences) | FRED and ECB: free with citation; SNB: non-commercial; SARON: licensed by SIX |
 
+## The public release
+
+Version 1.0.0, tagged `v1.0.0` on `prod` on 2026-11-21, is the commit that goes public. Earlier versions (0.1.0 to 0.5.0) were private development releases.
+
 ## Publish checklist
 
 1. Merge the release to `prod`, tag it and publish a GitHub release (the newest release on GitHub was still 0.1.0).
