@@ -1,13 +1,43 @@
 # factordesk wiki
 
-Last updated 2026-11-21. This is the project's knowledge base. Its main purpose is to record each decision in plain English: what we decided, why, how it works, and what we gave up. Pages date their claims, and facts that depend on `docs/` link to the source document instead of copying it.
+Last updated 2026-11-28. This is the project's knowledge base: user guides, and a record of each decision in plain English: what we decided, why, how it works, and what we gave up. Pages date their claims, and facts that depend on `docs/` link to the source document instead of copying it.
 
 ## Start here
 
 - [Glossary](glossary.md): plain-English definitions of every term used in the wiki, from alpha to the five factors.
-- [README](../README.md): what factordesk is and how to run it.
+- [README](../README.md): what factordesk is, in short, and the quick start.
 - [Methodology specification](../docs/methodology.md): the exact statistical rules the decisions below summarise.
 - [Plan](../docs/PLAN.md): the approved architecture and sprint plan (2026-11-18).
+
+## User guides
+
+The details that used to live in the README (2026-11-28).
+
+- [Install and use factordesk](guide-install-and-use.md): installation on each system, shortcuts, the dashboard and report commands, factor data, the API and exit codes.
+- [A tour of the dashboard](guide-dashboard.md): every panel, control and mode, with screenshots.
+- [How factordesk works](guide-how-it-works.md): the pipeline, the method, scientific rigour, limitations and key references.
+- [Data sources and their terms](guide-data-sources.md): each data source, what it is used for and its terms.
+- [Developing factordesk](guide-development.md): code layout, tests and quality checks, status and roadmap.
+
+## Technical documents
+
+The `docs/` folder holds the binding rules and the evidence; the wiki summarises them.
+
+| Where | What it holds |
+| --- | --- |
+| [docs/overview.md](../docs/overview.md) | Method, status, rigour and limitations in detail |
+| [docs/methodology.md](../docs/methodology.md) | The binding statistical rules (M0 to M16) |
+| [docs/research-protocol.md](../docs/research-protocol.md) | Pre-registration, correction, power, robustness |
+| [docs/test-oracle.md](../docs/test-oracle.md) | The tests and their tolerances |
+| [docs/specs/](../docs/specs) | Feature specifications, including dashboard v2 and the schema contract |
+| [docs/design/report-design.md](../docs/design/report-design.md) | Look, wording and accessibility of the report and the dashboard |
+| [docs/reviews/](../docs/reviews) and [docs/validation/](../docs/validation) | Independent reviews and validation |
+| [docs/sprints/](../docs/sprints) | What each sprint shipped, its decisions and its retro |
+| [docs/research/](../docs/research) | Research notes and spikes behind the newer features |
+| [docs/ROADMAP.md](../docs/ROADMAP.md) | What is built, in progress and planned |
+| [docs/references.md](../docs/references.md) | Verified bibliography, sources and terms; [BibTeX](../docs/references.bib) |
+| [docs/dashboard.md](../docs/dashboard.md) | Dashboard runbook |
+| [docs/release-checklist.md](../docs/release-checklist.md) | Steps for a release |
 
 ## Decisions
 
