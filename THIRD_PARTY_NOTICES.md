@@ -57,4 +57,4 @@ the book remain its author's.
 
 No market or factor data is stored in this repository or in the package. factordesk downloads data
 on your machine at run time, and that data stays under each provider's terms. See
-[Data sources and licences](README.md#data-sources-and-licences).
+[Data sources and their terms](wiki/guide-data-sources.md).

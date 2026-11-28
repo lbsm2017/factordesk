@@ -106,7 +106,7 @@ repository shows today:
   `frontend/package-lock.json`; CI installs with `uv sync --locked`. Simulated data uses fixed seeds
   (policy: test `k` uses `numpy.random.default_rng(20261118 + k)`; seed sweeps use seeds 1 to 50),
   never the global generator. Rerun the checks with the commands under
-  [Tests and checks](../README.md#tests-and-checks).
+  [Tests and quality checks](../wiki/guide-development.md#tests-and-quality-checks).
 - **No citation without verification.** Every source in the bibliography was looked up and checked
   by a script or by hand; what could not be checked is listed as unverified, and claims in the
   repository that have no source are listed in
