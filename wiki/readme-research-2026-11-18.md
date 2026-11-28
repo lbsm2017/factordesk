@@ -22,3 +22,10 @@ Source: a read-only survey on 2026-11-18 of READMEs of 7 named repos (quantstats
 7. Data sources and terms: Ken French Data Library, yfinance, not affiliated, personal and research use.
 8. Limitations, not investment advice.
 9. Install options, contributing, license.
+
+## Update 2026-11-28: the README is short again
+
+By version 1.0.0 the README had grown to about 1,000 lines: a full dashboard tour, the install and usage reference, the method, the data terms, the project layout and the roadmap. That is the "method dump" the survey above found off-putting. The owner asked for a simpler README that points to the wiki for details.
+
+The README now keeps the hero, "Why factordesk", the use-case table with the screenshot grid, the quick start, a four-step "How it works", a documentation table, contributing with starter tasks, the FAQ, "Can I use it?", the author and citation, and the advice disclaimer (about 310 lines). The details live in the user guides listed in the [index](index.md#user-guides). The licence summary and the data-terms pointer stay in the README because they decide whether a reader may use the tool at all.
+
